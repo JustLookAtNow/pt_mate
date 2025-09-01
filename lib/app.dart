@@ -464,6 +464,9 @@ class _HomePageState extends State<HomePage> {
       _items.clear();
       _hasMore = true;
       _totalPages = 1;
+      // 重置排序状态
+      _sortBy = 'none';
+      _sortAscending = false;
     }
     setState(() {
       _loading = true;
@@ -578,39 +581,25 @@ class _HomePageState extends State<HomePage> {
       // 1. 获取下载 URL
       final url = await ApiClient.instance.genDlToken(id: item.id);
 
-      // 2. 获取默认下载器和设置
-      final clients = await StorageService.instance.loadQbClients();
-      final defaultId = await StorageService.instance.loadDefaultQbId();
-      
-      if (clients.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('请先配置下载器')),
-          );
-        }
-        return;
-      }
-      
-      final clientConfig = clients.firstWhere(
-        (c) => c.id == defaultId,
-        orElse: () => clients.first,
+      // 2. 弹出对话框让用户选择下载器设置
+      if (!mounted) return;
+      final result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (_) => _TorrentDownloadDialog(
+          torrentName: item.name,
+          downloadUrl: url,
+        ),
       );
       
-      final password = await StorageService.instance.loadQbPassword(clientConfig.id);
-      if (password == null || password.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('请先为下载器"${clientConfig.name}"配置密码')),
-          );
-        }
-        return;
-      }
+      if (result == null) return; // 用户取消了
       
-      // 3. 获取默认下载设置
-      final category = await StorageService.instance.loadDefaultDownloadCategory();
-      final tags = await StorageService.instance.loadDefaultDownloadTags();
-      final savePath = await StorageService.instance.loadDefaultDownloadSavePath();
-      final autoTMM = (category != null && category.isNotEmpty) ? true : null;
+      // 3. 从对话框结果中获取设置
+      final clientConfig = result['clientConfig'] as QbClientConfig;
+      final password = result['password'] as String;
+      final category = result['category'] as String?;
+      final tags = result['tags'] as List<String>?;
+      final savePath = result['savePath'] as String?;
+      final autoTMM = result['autoTMM'] as bool?;
 
       // 4. 发送到 qBittorrent
       await QbService.instance.addTorrentByUrl(
@@ -618,7 +607,7 @@ class _HomePageState extends State<HomePage> {
         password: password,
         url: url,
         category: category,
-        tags: tags.isEmpty ? null : tags,
+        tags: tags,
         savePath: savePath,
         autoTMM: autoTMM,
       );
