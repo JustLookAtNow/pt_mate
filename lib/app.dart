@@ -38,15 +38,12 @@ class MTeamApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => AppState()..loadInitial()),
         ChangeNotifierProvider(
-          create: (_) => AppState()..loadInitial(),
+          create: (_) =>
+              ThemeManager(StorageService.instance)..initializeDynamicColor(),
         ),
-        ChangeNotifierProvider(
-          create: (_) => ThemeManager(StorageService.instance)..initializeDynamicColor(),
-        ),
-        Provider<StorageService>(
-          create: (_) => StorageService.instance,
-        ),
+        Provider<StorageService>(create: (_) => StorageService.instance),
       ],
       child: Consumer<ThemeManager>(
         builder: (context, themeManager, child) {
@@ -389,13 +386,24 @@ class _HomePageState extends State<HomePage> {
   final int _pageSize = 30;
   int _totalPages = 1;
   bool _hasMore = true;
-  
+
   // 排序相关状态
   String _sortBy = 'none'; // none, size, upload, download
   bool _sortAscending = false;
-  
+
   // 收藏筛选状态
   bool _onlyFavorites = false;
+
+  // 选中状态管理
+  bool _isSelectionMode = false;
+  final Set<String> _selectedItems = <String>{};
+
+  // 收藏请求间隔控制
+  DateTime? _lastCollectionRequest;
+  final Map<String, bool> _pendingCollectionRequests = <String, bool>{};
+  
+  // 下载请求状态管理
+  final Set<String> _pendingDownloadRequests = <String>{};
 
   @override
   void initState() {
@@ -497,7 +505,7 @@ class _HomePageState extends State<HomePage> {
           final now = DateTime.now();
           final difference = endDateTime.difference(now);
           final hoursLeft = difference.inHours;
-          
+
           if (hoursLeft > 0) {
             return 'free ${hoursLeft}h';
           } else {
@@ -537,7 +545,7 @@ class _HomePageState extends State<HomePage> {
 
     _items.sort((a, b) {
       int comparison = 0;
-      
+
       switch (_sortBy) {
         case 'size':
           comparison = a.sizeBytes.compareTo(b.sizeBytes);
@@ -549,20 +557,18 @@ class _HomePageState extends State<HomePage> {
           comparison = a.leechers.compareTo(b.leechers);
           break;
       }
-      
+
       return _sortAscending ? comparison : -comparison;
     });
-    
+
     setState(() {}); // 触发重建以显示排序结果
   }
 
   void _onTorrentTap(TorrentItem item) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => TorrentDetailPage(
-          torrentId: item.id,
-          torrentName: item.name,
-        ),
+        builder: (context) =>
+            TorrentDetailPage(torrentId: item.id, torrentName: item.name),
       ),
     );
   }
@@ -571,36 +577,52 @@ class _HomePageState extends State<HomePage> {
     try {
       // 1. 获取下载 URL
       final url = await ApiClient.instance.genDlToken(id: item.id);
+
+      // 2. 获取默认下载器和设置
+      final clients = await StorageService.instance.loadQbClients();
+      final defaultId = await StorageService.instance.loadDefaultQbId();
       
-      // 2. 弹出下载配置对话框
-      if (!mounted) return;
-      final result = await showDialog<Map<String, dynamic>>(
-        context: context,
-        builder: (_) => _TorrentDownloadDialog(
-          torrentName: item.name,
-          downloadUrl: url,
-        ),
+      if (clients.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('请先配置下载器')),
+          );
+        }
+        return;
+      }
+      
+      final clientConfig = clients.firstWhere(
+        (c) => c.id == defaultId,
+        orElse: () => clients.first,
       );
-      if (result == null) return; // 用户取消
       
-      // 3. 提取参数并发送到 qBittorrent
-      final clientConfig = result['clientConfig'] as QbClientConfig;
-      final password = result['password'] as String;
-      final category = result['category'] as String?;
-      final tags = result['tags'] as List<String>?;
-      final savePath = result['savePath'] as String?;
-      final autoTMM = result['autoTMM'] as bool?;
+      final password = await StorageService.instance.loadQbPassword(clientConfig.id);
+      if (password == null || password.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('请先为下载器"${clientConfig.name}"配置密码')),
+          );
+        }
+        return;
+      }
       
+      // 3. 获取默认下载设置
+      final category = await StorageService.instance.loadDefaultDownloadCategory();
+      final tags = await StorageService.instance.loadDefaultDownloadTags();
+      final savePath = await StorageService.instance.loadDefaultDownloadSavePath();
+      final autoTMM = (category != null && category.isNotEmpty) ? true : null;
+
+      // 4. 发送到 qBittorrent
       await QbService.instance.addTorrentByUrl(
         config: clientConfig,
         password: password,
         url: url,
         category: category,
-        tags: tags,
+        tags: tags.isEmpty ? null : tags,
         savePath: savePath,
         autoTMM: autoTMM,
       );
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('已成功发送"${item.name}"到 ${clientConfig.name}')),
@@ -608,22 +630,69 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('下载失败：$e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('下载失败：$e')));
       }
     }
   }
 
   Future<void> _onToggleCollection(TorrentItem item) async {
+    final newCollectionState = !item.collection;
+    
+    // 立即更新UI状态
+    final index = _items.indexWhere((t) => t.id == item.id);
+    if (index != -1) {
+      setState(() {
+        _items[index] = TorrentItem(
+          id: item.id,
+          name: item.name,
+          smallDescr: item.smallDescr,
+          discount: item.discount,
+          discountEndTime: item.discountEndTime,
+          seeders: item.seeders,
+          leechers: item.leechers,
+          sizeBytes: item.sizeBytes,
+          imageList: item.imageList,
+          downloadStatus: item.downloadStatus,
+          collection: newCollectionState,
+        );
+      });
+    }
+
+    // 不显示开始通知，直接进行后台处理
+
+    // 异步后台请求
+    _performCollectionRequest(item, newCollectionState);
+  }
+
+  Future<void> _performCollectionRequest(TorrentItem item, bool newCollectionState) async {
+    // 检查请求间隔
+    final now = DateTime.now();
+    if (_lastCollectionRequest != null) {
+      final timeDiff = now.difference(_lastCollectionRequest!);
+      if (timeDiff.inMilliseconds < 1000) {
+        await Future.delayed(Duration(milliseconds: 1000 - timeDiff.inMilliseconds));
+      }
+    }
+    _lastCollectionRequest = DateTime.now();
+
+    // 标记为处理中
+    _pendingCollectionRequests[item.id] = newCollectionState;
+
     try {
-      final newCollectionState = !item.collection;
       await ApiClient.instance.toggleCollection(
         id: item.id,
         make: newCollectionState,
       );
+
+      // 请求成功，移除处理标记
+      _pendingCollectionRequests.remove(item.id);
+      // 不显示成功通知
+    } catch (e) {
+      // 请求失败，恢复原状态
+      _pendingCollectionRequests.remove(item.id);
       
-      // 更新本地状态
       final index = _items.indexWhere((t) => t.id == item.id);
       if (index != -1) {
         setState(() {
@@ -638,32 +707,18 @@ class _HomePageState extends State<HomePage> {
             sizeBytes: item.sizeBytes,
             imageList: item.imageList,
             downloadStatus: item.downloadStatus,
-            collection: newCollectionState,
+            collection: !newCollectionState, // 恢复原状态
           );
         });
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              newCollectionState ? '已收藏"${item.name}"' : '已取消收藏"${item.name}"',
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white
-                    : null,
-              ),
-            ),
-            backgroundColor: Theme.of(context).brightness == Brightness.dark
-                ? Colors.grey[800]
-                : null,
+            content: Text('收藏操作失败：$e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('收藏操作失败：$e')),
         );
       }
     }
@@ -757,7 +812,10 @@ class _HomePageState extends State<HomePage> {
                         borderRadius: BorderRadius.all(Radius.circular(25)),
                       ),
                       isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                     onSubmitted: (_) => _search(reset: true),
                   ),
@@ -772,7 +830,9 @@ class _HomePageState extends State<HomePage> {
                   },
                   icon: Icon(
                     _onlyFavorites ? Icons.favorite : Icons.favorite_border,
-                    color: _onlyFavorites ? Theme.of(context).colorScheme.secondary : null,
+                    color: _onlyFavorites
+                        ? Theme.of(context).colorScheme.secondary
+                        : null,
                   ),
                   tooltip: _onlyFavorites ? '显示全部' : '仅显示收藏',
                 ),
@@ -781,7 +841,9 @@ class _HomePageState extends State<HomePage> {
                   onSelected: _onSortSelected,
                   icon: Icon(
                     _sortBy == 'none' ? Icons.sort : Icons.sort,
-                    color: _sortBy == 'none' ? null : Theme.of(context).colorScheme.secondary,
+                    color: _sortBy == 'none'
+                        ? null
+                        : Theme.of(context).colorScheme.secondary,
                   ),
                   tooltip: '排序',
                   itemBuilder: (context) => [
@@ -789,15 +851,24 @@ class _HomePageState extends State<HomePage> {
                       value: 'none',
                       child: Container(
                         decoration: BoxDecoration(
-                          color: _sortBy == 'none' ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1) : null,
+                          color: _sortBy == 'none'
+                              ? Theme.of(
+                                  context,
+                                ).colorScheme.primary.withValues(alpha: 0.1)
+                              : null,
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         child: Row(
                           children: [
                             Icon(
                               Icons.clear,
-                              color: _sortBy == 'none' ? Theme.of(context).colorScheme.secondary : null,
+                              color: _sortBy == 'none'
+                                  ? Theme.of(context).colorScheme.secondary
+                                  : null,
                             ),
                             const SizedBox(width: 8),
                             const Text('默认排序'),
@@ -809,15 +880,26 @@ class _HomePageState extends State<HomePage> {
                       value: 'size',
                       child: Container(
                         decoration: BoxDecoration(
-                          color: _sortBy == 'size' ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1) : null,
+                          color: _sortBy == 'size'
+                              ? Theme.of(
+                                  context,
+                                ).colorScheme.primary.withValues(alpha: 0.1)
+                              : null,
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         child: Row(
                           children: [
                             Icon(
-                              _sortBy == 'size' && _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
-                              color: _sortBy == 'size' ? Theme.of(context).colorScheme.secondary : null,
+                              _sortBy == 'size' && _sortAscending
+                                  ? Icons.arrow_upward
+                                  : Icons.arrow_downward,
+                              color: _sortBy == 'size'
+                                  ? Theme.of(context).colorScheme.secondary
+                                  : null,
                             ),
                             const SizedBox(width: 8),
                             const Text('按大小排序'),
@@ -829,15 +911,26 @@ class _HomePageState extends State<HomePage> {
                       value: 'upload',
                       child: Container(
                         decoration: BoxDecoration(
-                          color: _sortBy == 'upload' ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1) : null,
+                          color: _sortBy == 'upload'
+                              ? Theme.of(
+                                  context,
+                                ).colorScheme.primary.withValues(alpha: 0.1)
+                              : null,
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         child: Row(
                           children: [
                             Icon(
-                              _sortBy == 'upload' && _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
-                              color: _sortBy == 'upload' ? Theme.of(context).colorScheme.secondary : null,
+                              _sortBy == 'upload' && _sortAscending
+                                  ? Icons.arrow_upward
+                                  : Icons.arrow_downward,
+                              color: _sortBy == 'upload'
+                                  ? Theme.of(context).colorScheme.secondary
+                                  : null,
                             ),
                             const SizedBox(width: 8),
                             const Text('按上传量排序'),
@@ -849,15 +942,26 @@ class _HomePageState extends State<HomePage> {
                       value: 'download',
                       child: Container(
                         decoration: BoxDecoration(
-                          color: _sortBy == 'download' ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1) : null,
+                          color: _sortBy == 'download'
+                              ? Theme.of(
+                                  context,
+                                ).colorScheme.primary.withValues(alpha: 0.1)
+                              : null,
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         child: Row(
                           children: [
                             Icon(
-                              _sortBy == 'download' && _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
-                              color: _sortBy == 'download' ? Theme.of(context).colorScheme.secondary : null,
+                              _sortBy == 'download' && _sortAscending
+                                  ? Icons.arrow_upward
+                                  : Icons.arrow_downward,
+                              color: _sortBy == 'download'
+                                  ? Theme.of(context).colorScheme.secondary
+                                  : null,
                             ),
                             const SizedBox(width: 8),
                             const Text('按下载量排序'),
@@ -897,92 +1001,135 @@ class _HomePageState extends State<HomePage> {
                     );
                   }
                   final t = _items[i];
-                  return InkWell(
-                    onTap: () => _onTorrentTap(t),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  t.name,
-                                  style: Theme.of(context).textTheme.titleMedium,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  t.smallDescr,
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Theme.of(context).textTheme.bodySmall?.color,
+                  final isSelected = _selectedItems.contains(t.id);
+                  return GestureDetector(
+                    onTap: () => _isSelectionMode
+                        ? _onToggleSelection(t)
+                        : _onTorrentTap(t),
+                    onLongPress: () => _onLongPress(t),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.1)
+                            : null,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    t.name,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    if ((t.discount ?? '').toUpperCase() == 'FREE' ||
-                                        (t.discount ?? '').toUpperCase() ==
-                                            'PERCENT_50')
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    t.smallDescr,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall?.color,
                                         ),
-                                        decoration: BoxDecoration(
-                                          color: _discountColor(t.discount!),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          _discountText(t.discount!, t.discountEndTime),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 12,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      if ((t.discount ?? '').toUpperCase() ==
+                                              'FREE' ||
+                                          (t.discount ?? '').toUpperCase() ==
+                                              'PERCENT_50')
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: _discountColor(t.discount!),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            _discountText(
+                                              t.discount!,
+                                              t.discountEndTime,
+                                            ),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                            ),
                                           ),
                                         ),
+                                      const SizedBox(width: 6),
+                                      _buildSeedLeechInfo(
+                                        t.seeders,
+                                        t.leechers,
                                       ),
-                                    const SizedBox(width: 6),
-                                    _buildSeedLeechInfo(t.seeders, t.leechers),
-                                    const SizedBox(width: 10),
-                                    Text(Formatters.dataFromBytes(t.sizeBytes)),
-                                    const Spacer(),
-                                    _buildDownloadStatusIcon(t.downloadStatus),
-                                  ],
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        Formatters.dataFromBytes(t.sizeBytes),
+                                      ),
+                                      const Spacer(),
+                                      _buildDownloadStatusIcon(
+                                        t.downloadStatus,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  onPressed: () => _onToggleCollection(t),
+                                  icon: Icon(
+                                    t.collection
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    color: t.collection ? Colors.red : null,
+                                  ),
+                                  tooltip: t.collection ? '取消收藏' : '收藏',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 40,
+                                    minHeight: 40,
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: () => _onDownload(t),
+                                  icon: const Icon(Icons.download_outlined),
+                                  tooltip: '下载',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 40,
+                                    minHeight: 40,
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                onPressed: () => _onToggleCollection(t),
-                                icon: Icon(
-                                  t.collection ? Icons.favorite : Icons.favorite_border,
-                                  color: t.collection ? Colors.red : null,
-                                ),
-                                tooltip: t.collection ? '取消收藏' : '收藏',
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 40,
-                                  minHeight: 40,
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: () => _onDownload(t),
-                                icon: const Icon(Icons.download_outlined),
-                                tooltip: '下载',
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 40,
-                                  minHeight: 40,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   );
@@ -990,9 +1137,268 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
+          // 选中模式下的操作栏
+          if (_isSelectionMode)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                border: Border(
+                  top: BorderSide(
+                    color: Theme.of(context).dividerColor,
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _onCancelSelection,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.secondary,
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onSecondary,
+                      ),
+                      child: const Text('取消'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _selectedItems.isNotEmpty
+                          ? _onBatchFavorite
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text('收藏 (${_selectedItems.length})'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _selectedItems.isNotEmpty
+                          ? _onBatchDownload
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onPrimary,
+                      ),
+                      child: Text('下载 (${_selectedItems.length})'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  // 长按触发选中模式
+  void _onLongPress(TorrentItem item) {
+    if (!_isSelectionMode) {
+      setState(() {
+        _isSelectionMode = true;
+        _selectedItems.add(item.id);
+      });
+    }
+  }
+
+  // 切换选中状态
+  void _onToggleSelection(TorrentItem item) {
+    setState(() {
+      if (_selectedItems.contains(item.id)) {
+        _selectedItems.remove(item.id);
+        if (_selectedItems.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedItems.add(item.id);
+      }
+    });
+  }
+
+  // 取消选中模式
+  void _onCancelSelection() {
+    setState(() {
+      _isSelectionMode = false;
+      _selectedItems.clear();
+    });
+  }
+
+  // 批量收藏
+  Future<void> _onBatchFavorite() async {
+    if (_selectedItems.isEmpty) return;
+
+    final selectedItems = _items
+        .where((item) => _selectedItems.contains(item.id))
+        .toList();
+    _onCancelSelection(); // 立即取消选择模式
+    
+    // 显示开始收藏的提示
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('开始批量收藏${selectedItems.length}个项目...')),
+      );
+    }
+
+    // 异步处理收藏
+    _performBatchFavorite(selectedItems);
+  }
+  
+  Future<void> _performBatchFavorite(List<TorrentItem> items) async {
+    int successCount = 0;
+    int failureCount = 0;
+    
+    
+    for (int i = 0; i < items.length; i++) {
+      final item = items[i];
+      try {
+        await _onToggleCollection(item);
+        successCount++;
+        
+        // 间隔控制
+        if (i < items.length - 1) {
+          await Future.delayed(Duration(seconds: 2));
+        }
+      } catch (e) {
+        failureCount++;
+         if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('收藏失败: ${item.name}, 错误: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+    
+    // 显示最终结果
+    if (mounted) {
+      final total = items.length;
+      final message = '已成功收藏/取消收藏 $successCount/$total 个';
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: failureCount == 0 ? Colors.green : Colors.orange,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  // 批量下载
+  Future<void> _onBatchDownload() async {
+    if (_selectedItems.isEmpty) return;
+
+    final selectedItems = _items
+        .where((item) => _selectedItems.contains(item.id))
+        .toList();
+    
+    // 显示批量下载设置对话框
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _BatchDownloadDialog(
+        itemCount: selectedItems.length,
+      ),
+    );
+    
+    if (result == null) return; // 用户取消了
+    
+    _onCancelSelection(); // 取消选择模式
+    
+    // 显示开始下载的提示
+    if (mounted) {
+      final clientConfig = result['clientConfig'] as QbClientConfig;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('开始批量下载${selectedItems.length}个项目到${clientConfig.name}...')),
+      );
+    }
+
+    // 异步处理下载
+    _performBatchDownload(
+      selectedItems,
+      result['clientConfig'] as QbClientConfig,
+      result['password'] as String,
+      result['category'] as String?,
+      result['tags'] as List<String>? ?? [],
+      result['savePath'] as String?,
+      result['autoTMM'] as bool?,
+    );
+  }
+  
+  Future<void> _performBatchDownload(
+    List<TorrentItem> items,
+    QbClientConfig clientConfig,
+    String password,
+    String? category,
+    List<String> tags,
+    String? savePath,
+    bool? autoTMM,
+  ) async {
+    int successCount = 0;
+    int failureCount = 0;
+    
+    for (final item in items) {
+      try {
+        // 检查是否在待处理列表中
+        if (_pendingDownloadRequests.contains(item.id)) {
+          continue;
+        }
+        
+        _pendingDownloadRequests.add(item.id);
+        
+        // 获取下载 URL
+        final url = await ApiClient.instance.genDlToken(id: item.id);
+        
+        // 发送到 qBittorrent
+        await QbService.instance.addTorrentByUrl(
+          config: clientConfig,
+          password: password,
+          url: url,
+          category: category,
+          tags: tags.isEmpty ? null : tags,
+          savePath: savePath,
+          autoTMM: autoTMM,
+        );
+        
+        successCount++;
+        
+        // 添加延迟避免请求过快
+        await Future.delayed(const Duration(milliseconds: 500));
+      } catch (e) {
+        failureCount++;
+        print('下载失败: ${item.name}, 错误: $e');
+      } finally {
+        _pendingDownloadRequests.remove(item.id);
+      }
+    }
+    
+    // 显示最终结果
+    if (mounted) {
+      final message = failureCount == 0
+          ? '批量下载完成，成功${successCount}个项目'
+          : '批量下载完成，成功${successCount}个，失败${failureCount}个';
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: failureCount == 0 ? null : Colors.orange,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   Widget _buildSeedLeechInfo(int seeders, int leechers) {
@@ -1011,11 +1417,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildDownloadStatusIcon(DownloadStatus status) {
     switch (status) {
       case DownloadStatus.completed:
-        return const Icon(
-          Icons.download_done,
-          color: Colors.green,
-          size: 20,
-        );
+        return const Icon(Icons.download_done, color: Colors.green, size: 20);
       case DownloadStatus.downloading:
         return const SizedBox(
           width: 20,
@@ -1250,84 +1652,82 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       if ((password ?? '').isEmpty) return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(
-      content: Row(
-        children: [
-          SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            '正在测试连接…',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
-          ),
-        ],
-      ),
-      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-      behavior: SnackBarBehavior.floating,
-    ));
-    try {
-      await QbService.instance.testConnection(config: c, password: password!);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
         content: Row(
           children: [
-            Icon(
-              Icons.check_circle,
-              color: Colors.green[700],
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              '连接成功',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-        behavior: SnackBarBehavior.floating,
-      ));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              Icons.error,
-              color: Theme.of(context).colorScheme.onErrorContainer,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                '连接失败：$e',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onErrorContainer,
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  Theme.of(context).colorScheme.onPrimaryContainer,
                 ),
               ),
             ),
+            const SizedBox(width: 12),
+            Text(
+              '正在测试连接…',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
           ],
         ),
-        backgroundColor: Theme.of(context).colorScheme.errorContainer,
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         behavior: SnackBarBehavior.floating,
-      ));
+      ),
+    );
+    try {
+      await QbService.instance.testConnection(config: c, password: password!);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green[700], size: 20),
+              const SizedBox(width: 12),
+              Text(
+                '连接成功',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Theme.of(
+            context,
+          ).colorScheme.surfaceContainerHighest,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                Icons.error,
+                color: Theme.of(context).colorScheme.onErrorContainer,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '连接失败：$e',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -1380,7 +1780,9 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                     groupValue: _defaultId,
                     onChanged: (String? value) {
                       if (value != null) {
-                        final client = _clients.firstWhere((c) => c.id == value);
+                        final client = _clients.firstWhere(
+                          (c) => c.id == value,
+                        );
                         _setDefault(client);
                       }
                     },
@@ -1388,36 +1790,35 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                       itemCount: _clients.length,
                       itemBuilder: (_, i) {
                         final c = _clients[i];
-                        final subtitle = '${c.host}:${c.port}  ·  ${c.username}';
+                        final subtitle =
+                            '${c.host}:${c.port}  ·  ${c.username}';
                         return ListTile(
-                          leading: Radio<String>(
-                            value: c.id,
+                          leading: Radio<String>(value: c.id),
+                          title: Text(c.name),
+                          subtitle: Text(subtitle),
+                          onTap: () => _addOrEdit(existing: c),
+                          trailing: Wrap(
+                            spacing: 8,
+                            children: [
+                              IconButton(
+                                tooltip: '测试连接',
+                                onPressed: () => _test(c),
+                                icon: const Icon(Icons.wifi_tethering),
+                              ),
+                              IconButton(
+                                tooltip: '分类与标签',
+                                onPressed: () => _openCategoriesTags(c),
+                                icon: const Icon(Icons.folder_open),
+                              ),
+                              IconButton(
+                                tooltip: '删除',
+                                onPressed: () => _delete(c),
+                                icon: const Icon(Icons.delete_outline),
+                              ),
+                            ],
                           ),
-                        title: Text(c.name),
-                        subtitle: Text(subtitle),
-                        onTap: () => _addOrEdit(existing: c),
-                        trailing: Wrap(
-                          spacing: 8,
-                          children: [
-                            IconButton(
-                              tooltip: '测试连接',
-                              onPressed: () => _test(c),
-                              icon: const Icon(Icons.wifi_tethering),
-                            ),
-                            IconButton(
-                              tooltip: '分类与标签',
-                              onPressed: () => _openCategoriesTags(c),
-                              icon: const Icon(Icons.folder_open),
-                            ),
-                            IconButton(
-                              tooltip: '删除',
-                              onPressed: () => _delete(c),
-                              icon: const Icon(Icons.delete_outline),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -1474,8 +1875,6 @@ class _PasswordPromptDialogState extends State<_PasswordPromptDialog> {
     );
   }
 }
-
-
 
 class _QbEditorResult {
   final QbClientConfig config;
@@ -1616,7 +2015,9 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Colors.grey, width: 0.5)),
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey, width: 0.5),
+                ),
               ),
               child: Row(
                 children: [
@@ -1698,9 +2099,8 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
                                 const SizedBox(height: 4),
                                 Text(
                                   '启用后先下载种子文件到本地，再提交给 qBittorrent',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.grey.shade600,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: Colors.grey.shade600),
                                 ),
                               ],
                             ),
@@ -1753,8 +2153,12 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: _testOk == true
-                                      ? Theme.of(context).colorScheme.onPrimaryContainer
-                                      : Theme.of(context).colorScheme.onErrorContainer,
+                                      ? Theme.of(
+                                          context,
+                                        ).colorScheme.onPrimaryContainer
+                                      : Theme.of(
+                                          context,
+                                        ).colorScheme.onErrorContainer,
                                 ),
                               ),
                             ),
@@ -1784,7 +2188,9 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.wifi_tethering),
                         label: Text(_testing ? '测试中…' : '测试连接'),
@@ -1816,16 +2222,6 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
 
 class _QbCategoriesTagsDialog extends StatefulWidget {
   final QbClientConfig config;
@@ -2021,26 +2417,24 @@ class _QbCategoriesTagsDialogState extends State<_QbCategoriesTagsDialog> {
   }
 }
 
-class _TorrentDownloadDialog extends StatefulWidget {
-  final String torrentName;
-  final String downloadUrl;
-  
-  const _TorrentDownloadDialog({
-    required this.torrentName,
-    required this.downloadUrl,
+class _BatchDownloadDialog extends StatefulWidget {
+  final int itemCount;
+
+  const _BatchDownloadDialog({
+    required this.itemCount,
   });
 
   @override
-  State<_TorrentDownloadDialog> createState() => _TorrentDownloadDialogState();
+  State<_BatchDownloadDialog> createState() => _BatchDownloadDialogState();
 }
 
-class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
+class _BatchDownloadDialogState extends State<_BatchDownloadDialog> {
   List<QbClientConfig> _clients = [];
   QbClientConfig? _selectedClient;
   String? _selectedCategory;
   final List<String> _selectedTags = [];
   final _savePathCtrl = TextEditingController();
-  
+
   List<String> _categories = [];
   List<String> _tags = [];
   bool _loading = false;
@@ -2062,15 +2456,18 @@ class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
     try {
       final clients = await StorageService.instance.loadQbClients();
       final defaultId = await StorageService.instance.loadDefaultQbId();
-      
+
       if (mounted) {
         setState(() {
           _clients = clients;
-          _selectedClient = clients.isNotEmpty 
-              ? clients.firstWhere((c) => c.id == defaultId, orElse: () => clients.first)
+          _selectedClient = clients.isNotEmpty
+              ? clients.firstWhere(
+                  (c) => c.id == defaultId,
+                  orElse: () => clients.first,
+                )
               : null;
         });
-        
+
         if (_selectedClient != null) {
           _loadCategoriesAndTags();
         }
@@ -2082,20 +2479,24 @@ class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
 
   Future<void> _loadCategoriesAndTags() async {
     if (_selectedClient == null) return;
-    
+
     setState(() => _loading = true);
     try {
       // 优先读取缓存
-      final cachedCategories = await StorageService.instance.loadQbCategories(_selectedClient!.id);
-      final cachedTags = await StorageService.instance.loadQbTags(_selectedClient!.id);
-      
+      final cachedCategories = await StorageService.instance.loadQbCategories(
+        _selectedClient!.id,
+      );
+      final cachedTags = await StorageService.instance.loadQbTags(
+        _selectedClient!.id,
+      );
+
       if (mounted) {
         setState(() {
           _categories = cachedCategories;
           _tags = cachedTags;
         });
       }
-      
+
       // 只有缓存为空时才刷新
       if (cachedCategories.isEmpty || cachedTags.isEmpty) {
         await _refreshCategoriesAndTags();
@@ -2109,15 +2510,17 @@ class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
 
   Future<void> _refreshCategoriesAndTags() async {
     if (_selectedClient == null) return;
-    
+
     try {
-      String? password = await StorageService.instance.loadQbPassword(_selectedClient!.id);
-      
+      String? password = await StorageService.instance.loadQbPassword(
+        _selectedClient!.id,
+      );
+
       if (password == null || password.isEmpty) {
         password = await _promptPassword(_selectedClient!.name);
         if (password == null) return;
       }
-      
+
       final categories = await QbService.instance.fetchCategories(
         config: _selectedClient!,
         password: password,
@@ -2126,11 +2529,14 @@ class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
         config: _selectedClient!,
         password: password,
       );
-      
+
       // 保存到缓存
-      await StorageService.instance.saveQbCategories(_selectedClient!.id, categories);
+      await StorageService.instance.saveQbCategories(
+        _selectedClient!.id,
+        categories,
+      );
       await StorageService.instance.saveQbTags(_selectedClient!.id, tags);
-      
+
       if (mounted) {
         setState(() {
           _categories = categories;
@@ -2155,24 +2561,31 @@ class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
       setState(() => _error = '请选择下载器');
       return;
     }
-    
-    String? password = await StorageService.instance.loadQbPassword(_selectedClient!.id);
+
+    String? password = await StorageService.instance.loadQbPassword(
+      _selectedClient!.id,
+    );
     if (password == null || password.isEmpty) {
       if (!mounted) return;
       password = await _promptPassword(_selectedClient!.name);
       if (password == null) return;
     }
-    
+
     // 只有选择了分类才强制启用自动管理；未选择分类时不传该参数，遵循服务器默认
-    final bool? autoTMM = (_selectedCategory != null && _selectedCategory!.isNotEmpty) ? true : null;
-    
+    final bool? autoTMM =
+        (_selectedCategory != null && _selectedCategory!.isNotEmpty)
+        ? true
+        : null;
+
     if (!mounted) return;
     Navigator.pop(context, {
       'clientConfig': _selectedClient!,
       'password': password,
       'category': _selectedCategory,
       'tags': _selectedTags.isEmpty ? null : _selectedTags,
-      'savePath': _savePathCtrl.text.trim().isEmpty ? null : _savePathCtrl.text.trim(),
+      'savePath': _savePathCtrl.text.trim().isEmpty
+          ? null
+          : _savePathCtrl.text.trim(),
       'autoTMM': autoTMM,
     });
   }
@@ -2180,11 +2593,13 @@ class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-        title: const Text('配置下载'),
-        scrollable: true,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        content: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      title: Text('批量下载设置 (${widget.itemCount}个项目)'),
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      content: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
         child: SizedBox(
           width: 400,
           child: SingleChildScrollView(
@@ -2193,13 +2608,11 @@ class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '种子：${widget.torrentName}',
+                  '将下载 ${widget.itemCount} 个种子文件',
                   style: Theme.of(context).textTheme.bodyMedium,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 16),
-                
+
                 // 选择下载器
                 Text('下载器', style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 8),
@@ -2211,19 +2624,23 @@ class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
                   ),
                   isExpanded: true,
                   selectedItemBuilder: (context) => _clients
-                      .map((c) => Text(
-                            '${c.name} (${c.host}:${c.port})',
-                            overflow: TextOverflow.ellipsis,
-                          ))
+                      .map(
+                        (c) => Text(
+                          '${c.name} (${c.host}:${c.port})',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      )
                       .toList(),
                   items: _clients
-                      .map((client) => DropdownMenuItem<QbClientConfig>(
-                            value: client,
-                            child: Text(
-                              '${client.name} (${client.host}:${client.port})',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ))
+                      .map(
+                        (client) => DropdownMenuItem<QbClientConfig>(
+                          value: client,
+                          child: Text(
+                            '${client.name} (${client.host}:${client.port})',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
                       .toList(),
                   onChanged: (client) {
                     setState(() {
@@ -2237,12 +2654,15 @@ class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
                   },
                 ),
                 const SizedBox(height: 16),
-                
+
                 // 选择分类
                 Row(
                   children: [
                     Expanded(
-                      child: Text('分类', style: Theme.of(context).textTheme.titleSmall),
+                      child: Text(
+                        '分类',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
                     ),
                     if (_loading)
                       const SizedBox(
@@ -2268,16 +2688,21 @@ class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
                   ),
                   isExpanded: true,
                   items: [
-                    const DropdownMenuItem<String?>(value: null, child: Text('不使用分类')),
-                    ..._categories.map((cat) => DropdownMenuItem<String?>(
-                          value: cat,
-                          child: Text(cat, overflow: TextOverflow.ellipsis),
-                        )),
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('不使用分类'),
+                    ),
+                    ..._categories.map(
+                      (cat) => DropdownMenuItem<String?>(
+                        value: cat,
+                        child: Text(cat, overflow: TextOverflow.ellipsis),
+                      ),
+                    ),
                   ],
                   onChanged: (cat) => setState(() => _selectedCategory = cat),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // 选择标签
                 Text('标签', style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 8),
@@ -2305,7 +2730,7 @@ class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
                     }).toList(),
                   ),
                 const SizedBox(height: 16),
-                
+
                 // 保存路径
                 Text('保存路径', style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 8),
@@ -2320,13 +2745,18 @@ class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
                 const SizedBox(height: 8),
                 Text(
                   '提示：选择分类时将启用自动管理模式',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.grey),
                 ),
-                
+
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 16),
-                    child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   ),
               ],
             ),
@@ -2338,10 +2768,368 @@ class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('取消'),
         ),
-        FilledButton(
-          onPressed: _onSubmit,
-          child: const Text('开始下载'),
+        FilledButton(onPressed: _onSubmit, child: const Text('开始下载')),
+      ],
+    );
+  }
+}
+
+class _TorrentDownloadDialog extends StatefulWidget {
+  final String torrentName;
+  final String downloadUrl;
+
+  const _TorrentDownloadDialog({
+    required this.torrentName,
+    required this.downloadUrl,
+  });
+
+  @override
+  State<_TorrentDownloadDialog> createState() => _TorrentDownloadDialogState();
+}
+
+class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
+  List<QbClientConfig> _clients = [];
+  QbClientConfig? _selectedClient;
+  String? _selectedCategory;
+  final List<String> _selectedTags = [];
+  final _savePathCtrl = TextEditingController();
+
+  List<String> _categories = [];
+  List<String> _tags = [];
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadClients();
+  }
+
+  @override
+  void dispose() {
+    _savePathCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadClients() async {
+    try {
+      final clients = await StorageService.instance.loadQbClients();
+      final defaultId = await StorageService.instance.loadDefaultQbId();
+
+      if (mounted) {
+        setState(() {
+          _clients = clients;
+          _selectedClient = clients.isNotEmpty
+              ? clients.firstWhere(
+                  (c) => c.id == defaultId,
+                  orElse: () => clients.first,
+                )
+              : null;
+        });
+
+        if (_selectedClient != null) {
+          _loadCategoriesAndTags();
+        }
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = '加载下载器列表失败：$e');
+    }
+  }
+
+  Future<void> _loadCategoriesAndTags() async {
+    if (_selectedClient == null) return;
+
+    setState(() => _loading = true);
+    try {
+      // 优先读取缓存
+      final cachedCategories = await StorageService.instance.loadQbCategories(
+        _selectedClient!.id,
+      );
+      final cachedTags = await StorageService.instance.loadQbTags(
+        _selectedClient!.id,
+      );
+
+      if (mounted) {
+        setState(() {
+          _categories = cachedCategories;
+          _tags = cachedTags;
+        });
+      }
+
+      // 只有缓存为空时才刷新
+      if (cachedCategories.isEmpty || cachedTags.isEmpty) {
+        await _refreshCategoriesAndTags();
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = '加载分类标签失败：$e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _refreshCategoriesAndTags() async {
+    if (_selectedClient == null) return;
+
+    try {
+      String? password = await StorageService.instance.loadQbPassword(
+        _selectedClient!.id,
+      );
+
+      if (password == null || password.isEmpty) {
+        password = await _promptPassword(_selectedClient!.name);
+        if (password == null) return;
+      }
+
+      final categories = await QbService.instance.fetchCategories(
+        config: _selectedClient!,
+        password: password,
+      );
+      final tags = await QbService.instance.fetchTags(
+        config: _selectedClient!,
+        password: password,
+      );
+
+      // 保存到缓存
+      await StorageService.instance.saveQbCategories(
+        _selectedClient!.id,
+        categories,
+      );
+      await StorageService.instance.saveQbTags(_selectedClient!.id, tags);
+
+      if (mounted) {
+        setState(() {
+          _categories = categories;
+          _tags = tags;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = '刷新分类标签失败：$e');
+    }
+  }
+
+  Future<String?> _promptPassword(String clientName) async {
+    return await showDialog<String>(
+      context: context,
+      builder: (_) => _PasswordPromptDialog(name: clientName),
+    );
+  }
+
+  Future<void> _onSubmit() async {
+    if (_selectedClient == null) {
+      setState(() => _error = '请选择下载器');
+      return;
+    }
+
+    String? password = await StorageService.instance.loadQbPassword(
+      _selectedClient!.id,
+    );
+    if (password == null || password.isEmpty) {
+      if (!mounted) return;
+      password = await _promptPassword(_selectedClient!.name);
+      if (password == null) return;
+    }
+
+    // 只有选择了分类才强制启用自动管理；未选择分类时不传该参数，遵循服务器默认
+    final bool? autoTMM =
+        (_selectedCategory != null && _selectedCategory!.isNotEmpty)
+        ? true
+        : null;
+
+    if (!mounted) return;
+    Navigator.pop(context, {
+      'clientConfig': _selectedClient!,
+      'password': password,
+      'category': _selectedCategory,
+      'tags': _selectedTags.isEmpty ? null : _selectedTags,
+      'savePath': _savePathCtrl.text.trim().isEmpty
+          ? null
+          : _savePathCtrl.text.trim(),
+      'autoTMM': autoTMM,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('配置下载'),
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      content: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
+        child: SizedBox(
+          width: 400,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '种子：${widget.torrentName}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 16),
+
+                // 选择下载器
+                Text('下载器', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<QbClientConfig>(
+                  initialValue: _selectedClient,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  isExpanded: true,
+                  selectedItemBuilder: (context) => _clients
+                      .map(
+                        (c) => Text(
+                          '${c.name} (${c.host}:${c.port})',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      )
+                      .toList(),
+                  items: _clients
+                      .map(
+                        (client) => DropdownMenuItem<QbClientConfig>(
+                          value: client,
+                          child: Text(
+                            '${client.name} (${client.host}:${client.port})',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (client) {
+                    setState(() {
+                      _selectedClient = client;
+                      _selectedCategory = null;
+                      _selectedTags.clear();
+                      _categories.clear();
+                      _tags.clear();
+                    });
+                    if (client != null) _loadCategoriesAndTags();
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // 选择分类
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '分类',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    if (_loading)
+                      const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    if (!_loading)
+                      IconButton(
+                        onPressed: _refreshCategoriesAndTags,
+                        icon: const Icon(Icons.refresh, size: 20),
+                        tooltip: '刷新',
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String?>(
+                  initialValue: _selectedCategory,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    hintText: '选择分类（可选）',
+                  ),
+                  isExpanded: true,
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('不使用分类'),
+                    ),
+                    ..._categories.map(
+                      (cat) => DropdownMenuItem<String?>(
+                        value: cat,
+                        child: Text(cat, overflow: TextOverflow.ellipsis),
+                      ),
+                    ),
+                  ],
+                  onChanged: (cat) => setState(() => _selectedCategory = cat),
+                ),
+                const SizedBox(height: 16),
+
+                // 选择标签
+                Text('标签', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                if (_tags.isEmpty)
+                  const Text('暂无可用标签', style: TextStyle(color: Colors.grey))
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: _tags.map((tag) {
+                      final selected = _selectedTags.contains(tag);
+                      return FilterChip(
+                        label: Text(tag),
+                        selected: selected,
+                        onSelected: (sel) {
+                          setState(() {
+                            if (sel) {
+                              _selectedTags.add(tag);
+                            } else {
+                              _selectedTags.remove(tag);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                const SizedBox(height: 16),
+
+                // 保存路径
+                Text('保存路径', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _savePathCtrl,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    hintText: '留空使用默认路径',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '提示：选择分类时将启用自动管理模式',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                ),
+
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _onSubmit, child: const Text('开始下载')),
       ],
     );
   }

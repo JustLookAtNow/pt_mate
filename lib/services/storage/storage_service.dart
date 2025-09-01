@@ -14,6 +14,11 @@ class StorageKeys {
   // 新增：分类与标签缓存 key
   static String qbCategoriesKey(String id) => 'qb.categories.$id';
   static String qbTagsKey(String id) => 'qb.tags.$id';
+  
+  // 默认下载设置
+  static const String defaultDownloadCategory = 'download.defaultCategory';
+  static const String defaultDownloadTags = 'download.defaultTags';
+  static const String defaultDownloadSavePath = 'download.defaultSavePath';
 
   static const String siteApiKey = 'site.apiKey';
   // 非安全存储的降级 Key（例如 Linux 桌面端 keyring 被锁定时）
@@ -206,5 +211,48 @@ class StorageService {
   Future<bool> loadAutoLoadImages() async {
     final prefs = await _prefs;
     return prefs.getBool(StorageKeys.autoLoadImages) ?? true; // 默认自动加载
+  }
+
+  // 默认下载设置相关
+  Future<void> saveDefaultDownloadCategory(String? category) async {
+    final prefs = await _prefs;
+    if (category != null && category.isNotEmpty) {
+      await prefs.setString(StorageKeys.defaultDownloadCategory, category);
+    } else {
+      await prefs.remove(StorageKeys.defaultDownloadCategory);
+    }
+  }
+
+  Future<String?> loadDefaultDownloadCategory() async {
+    final prefs = await _prefs;
+    return prefs.getString(StorageKeys.defaultDownloadCategory);
+  }
+
+  Future<void> saveDefaultDownloadTags(List<String> tags) async {
+    final prefs = await _prefs;
+    if (tags.isNotEmpty) {
+      await prefs.setStringList(StorageKeys.defaultDownloadTags, tags);
+    } else {
+      await prefs.remove(StorageKeys.defaultDownloadTags);
+    }
+  }
+
+  Future<List<String>> loadDefaultDownloadTags() async {
+    final prefs = await _prefs;
+    return prefs.getStringList(StorageKeys.defaultDownloadTags) ?? <String>[];
+  }
+
+  Future<void> saveDefaultDownloadSavePath(String? savePath) async {
+    final prefs = await _prefs;
+    if (savePath != null && savePath.isNotEmpty) {
+      await prefs.setString(StorageKeys.defaultDownloadSavePath, savePath);
+    } else {
+      await prefs.remove(StorageKeys.defaultDownloadSavePath);
+    }
+  }
+
+  Future<String?> loadDefaultDownloadSavePath() async {
+    final prefs = await _prefs;
+    return prefs.getString(StorageKeys.defaultDownloadSavePath);
   }
 }
