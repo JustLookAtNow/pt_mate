@@ -717,7 +717,7 @@ class _HomePageState extends State<HomePage> {
           SnackBar(
             content: Text('收藏操作失败：$e'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -1292,7 +1292,7 @@ class _HomePageState extends State<HomePage> {
         SnackBar(
           content: Text(message),
           backgroundColor: failureCount == 0 ? Colors.green : Colors.orange,
-          duration: const Duration(seconds: 3),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -1379,7 +1379,15 @@ class _HomePageState extends State<HomePage> {
         await Future.delayed(const Duration(milliseconds: 500));
       } catch (e) {
         failureCount++;
-        print('下载失败: ${item.name}, 错误: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('下载失败: ${item.name}, 错误: $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
       } finally {
         _pendingDownloadRequests.remove(item.id);
       }
@@ -1388,14 +1396,14 @@ class _HomePageState extends State<HomePage> {
     // 显示最终结果
     if (mounted) {
       final message = failureCount == 0
-          ? '批量下载完成，成功${successCount}个项目'
-          : '批量下载完成，成功${successCount}个，失败${failureCount}个';
+          ? '批量下载完成，成功$successCount个项目'
+          : '批量下载完成，成功$successCount个，失败$failureCount个';
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
           backgroundColor: failureCount == 0 ? null : Colors.orange,
-          duration: const Duration(seconds: 3),
+          duration: const Duration(seconds: 2),
         ),
       );
     }

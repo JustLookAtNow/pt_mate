@@ -33,7 +33,7 @@ class AboutPage extends StatelessWidget {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('无法直接打开链接，已复制到剪贴板，请手动粘贴到浏览器'),
-                          duration: Duration(seconds: 3),
+                          duration: Duration(seconds: 2),
                         ),
                       );
                     }
@@ -44,7 +44,7 @@ class AboutPage extends StatelessWidget {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('操作失败: $e'),
-                        duration: const Duration(seconds: 3),
+                        duration: const Duration(seconds: 2),
                       ),
                     );
                   }
