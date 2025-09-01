@@ -1,16 +1,26 @@
 #!/bin/bash
 
 # 脚本功能：将一个 APK 文件安装到所有通过 adb 连接的设备上。
-# 用法: ./install_all.sh /path/to/your/app.apk
+# 用法: ./install_all.sh release
+# 或者: ./install_all.sh debug
 
-# 检查是否提供了 APK 文件路径作为参数
-if [ -z "$1" ]; then
-    echo "❌ 错误: 请提供 APK 文件的路径。"
-    echo "用法: $0 <path_to_apk>"
-    exit 1
+# 默认使用debug版本
+BUILD_TYPE="debug"
+
+# 如果提供了参数且为release，则使用release版本
+if [ -n "$1" ] && [ "$1" = "release" ]; then
+    BUILD_TYPE="release"
 fi
 
-APK_PATH="$1"
+# 根据构建类型设置APK路径
+if [ "$BUILD_TYPE" = "release" ]; then
+    APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+else
+    APK_PATH="build/app/outputs/flutter-apk/app-debug.apk"
+fi
+
+# 显示当前使用的构建类型
+echo "🔧 使用 ${BUILD_TYPE} 版本进行安装"
 
 # 检查提供的 APK 文件是否存在
 if [ ! -f "${APK_PATH}" ]; then
