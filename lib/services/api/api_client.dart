@@ -338,13 +338,19 @@ class TorrentItem {
     int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
     bool parseBool(dynamic v) => v == true || v.toString().toLowerCase() == 'true';
     final status = (json['status'] as Map<String, dynamic>?) ?? const {};
+    final promotionRule = (status['promotionRule'] as Map<String, dynamic>?) ?? const {};
     final imgs = (json['imageList'] as List?)?.map((e) => e.toString()).toList() ?? const <String>[];
+    
+    // 优先使用promotionRule中的字段，如果不存在则使用status中的字段
+    final discount = promotionRule['discount']?.toString() ?? status['discount']?.toString();
+    final discountEndTime = promotionRule['endTime']?.toString() ?? status['discountEndTime']?.toString();
+    
     return TorrentItem(
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       smallDescr: (json['smallDescr'] ?? '').toString(),
-      discount: status['discount']?.toString(),
-      discountEndTime: status['discountEndTime']?.toString(),
+      discount: discount,
+      discountEndTime: discountEndTime,
       seeders: parseInt(status['seeders']),
       leechers: parseInt(status['leechers']),
       sizeBytes: parseInt(json['size']),
