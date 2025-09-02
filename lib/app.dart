@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
+import 'package:flutter/services.dart';
 
 import 'models/app_models.dart';
 import 'pages/torrent_detail_page.dart';
@@ -1195,6 +1196,8 @@ class _HomePageState extends State<HomePage> {
   // 长按触发选中模式
   void _onLongPress(TorrentItem item) {
     if (!_isSelectionMode) {
+      // 使用 Flutter 内置的触觉反馈，提供原生的震动体验
+      HapticFeedback.mediumImpact();
       setState(() {
         _isSelectionMode = true;
         _selectedItems.add(item.id);
