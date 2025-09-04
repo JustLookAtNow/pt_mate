@@ -63,7 +63,21 @@ class MTeamAdapter extends SiteAdapter {
         error: data['message'] ?? 'Profile fetch failed',
       );
     }
-    return MemberProfile.fromJson(data['data'] as Map<String, dynamic>);
+    return _parseMemberProfile(data['data'] as Map<String, dynamic>);
+  }
+
+  /// 解析 M-Team 站点的用户资料数据
+  MemberProfile _parseMemberProfile(Map<String, dynamic> json) {
+    final mc = json['memberCount'] as Map<String, dynamic>?;
+    double parseDouble(dynamic v) => v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
+    int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
+    return MemberProfile(
+      username: (json['username'] ?? '').toString(),
+      bonus: parseDouble(mc?['bonus']),
+      shareRate: parseDouble(mc?['shareRate']),
+      uploadedBytes: parseInt(mc?['uploaded']),
+      downloadedBytes: parseInt(mc?['downloaded']),
+    );
   }
   
   @override
@@ -104,7 +118,7 @@ class MTeamAdapter extends SiteAdapter {
       );
     }
     
-    final searchResult = TorrentSearchResult.fromJson(data['data'] as Map<String, dynamic>);
+    final searchResult = _parseTorrentSearchResult(data['data'] as Map<String, dynamic>);
     
     // Query download history for all torrent IDs
     if (searchResult.items.isNotEmpty) {
@@ -180,7 +194,54 @@ class MTeamAdapter extends SiteAdapter {
       );
     }
     
-    return TorrentDetail.fromJson(data['data'] as Map<String, dynamic>);
+    return _parseTorrentDetail(data['data'] as Map<String, dynamic>);
+  }
+
+  /// 解析 M-Team 站点的种子详情数据
+  TorrentDetail _parseTorrentDetail(Map<String, dynamic> json) {
+    return TorrentDetail(
+      descr: (json['descr'] ?? '').toString(),
+    );
+  }
+
+  /// 解析 M-Team 站点的种子搜索结果数据
+  TorrentSearchResult _parseTorrentSearchResult(Map<String, dynamic> json) {
+    int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
+    final list = (json['data'] as List? ?? const []).cast<dynamic>();
+    return TorrentSearchResult(
+      pageNumber: parseInt(json['pageNumber']),
+      pageSize: parseInt(json['pageSize']),
+      total: parseInt(json['total']),
+      totalPages: parseInt(json['totalPages']),
+      items: list.map((e) => _parseTorrentItem(e as Map<String, dynamic>)).toList(),
+    );
+  }
+
+  /// 解析 M-Team 站点的种子项目数据
+  TorrentItem _parseTorrentItem(Map<String, dynamic> json, {DownloadStatus? downloadStatus}) {
+    int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
+    bool parseBool(dynamic v) => v == true || v.toString().toLowerCase() == 'true';
+    final status = (json['status'] as Map<String, dynamic>?) ?? const {};
+    final promotionRule = (status['promotionRule'] as Map<String, dynamic>?) ?? const {};
+    final imgs = (json['imageList'] as List?)?.map((e) => e.toString()).toList() ?? const <String>[];
+    
+    // 优先使用promotionRule中的字段，如果不存在则使用status中的字段
+    final discount = promotionRule['discount']?.toString() ?? status['discount']?.toString();
+    final discountEndTime = promotionRule['endTime']?.toString() ?? status['discountEndTime']?.toString();
+    
+    return TorrentItem(
+      id: (json['id'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      smallDescr: (json['smallDescr'] ?? '').toString(),
+      discount: discount,
+      discountEndTime: discountEndTime,
+      seeders: parseInt(status['seeders']),
+      leechers: parseInt(status['leechers']),
+      sizeBytes: parseInt(json['size']),
+      imageList: imgs,
+      downloadStatus: downloadStatus ?? DownloadStatus.none,
+      collection: parseBool(json['collection']),
+    );
   }
   
   @override
