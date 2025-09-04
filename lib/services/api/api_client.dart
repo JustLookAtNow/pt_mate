@@ -109,23 +109,30 @@ class ApiClient {
 
   // Search torrents - relative path, baseUrl from saved site, auth via interceptor
   Future<TorrentSearchResult> searchTorrents({
-    required String mode, // normal, tvshow, movie, adult
     String? keyword,
     int pageNumber = 1,
     int pageSize = 30,
     int? onlyFav,
+    Map<String, dynamic>? additionalParams,
   }) async {
+    final requestData = <String, Object>{
+      'visible': 1,
+      'pageNumber': pageNumber,
+      'pageSize': pageSize,
+      if (keyword != null && keyword.trim().isNotEmpty) 'keyword': keyword.trim(),
+      if (onlyFav != null) 'onlyFav': onlyFav,
+    };
+    
+    // 合并额外参数
+    if (additionalParams != null) {
+      additionalParams.forEach((key, value) {
+        requestData[key] = value;
+      });
+    }
+    
     final resp = await _dio.post(
       '/api/torrent/search',
-      data: {
-        'mode': mode,
-        'visible': 1,
-        'categories': [],
-        'pageNumber': pageNumber,
-        'pageSize': pageSize,
-        if (keyword != null && keyword.trim().isNotEmpty) 'keyword': keyword.trim(),
-        if (onlyFav != null) 'onlyFav': onlyFav,
-      },
+      data: requestData,
       options: Options(contentType: 'application/json'),
     );
 

@@ -31,6 +31,9 @@ class StorageKeys {
   
   // 图片设置
   static const String autoLoadImages = 'images.autoLoad'; // bool
+  
+  // 查询条件配置
+  static const String searchCategories = 'search.categories'; // List<SearchCategoryConfig>
 }
 
 class StorageService {
@@ -254,5 +257,28 @@ class StorageService {
   Future<String?> loadDefaultDownloadSavePath() async {
     final prefs = await _prefs;
     return prefs.getString(StorageKeys.defaultDownloadSavePath);
+  }
+
+  // 查询条件配置相关
+  Future<void> saveSearchCategories(List<SearchCategoryConfig> categories) async {
+    final prefs = await _prefs;
+    final jsonList = categories.map((e) => e.toJson()).toList();
+    await prefs.setString(StorageKeys.searchCategories, jsonEncode(jsonList));
+  }
+
+  Future<List<SearchCategoryConfig>> loadSearchCategories() async {
+    final prefs = await _prefs;
+    final str = prefs.getString(StorageKeys.searchCategories);
+    if (str == null) {
+      // 返回默认配置
+      return SearchCategoryConfig.getDefaultConfigs();
+    }
+    try {
+      final list = (jsonDecode(str) as List).cast<Map<String, dynamic>>();
+      return list.map(SearchCategoryConfig.fromJson).toList();
+    } catch (_) {
+      // 解析失败时返回默认配置
+      return SearchCategoryConfig.getDefaultConfigs();
+    }
   }
 }

@@ -376,7 +376,8 @@ class _HomePageState extends State<HomePage> {
   final _keywordCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
 
-  String _mode = 'normal';
+  int _selectedCategoryIndex = 0;
+  List<SearchCategoryConfig> _categories = [];
   bool _loading = false;
   String? _error;
 
@@ -423,6 +424,14 @@ class _HomePageState extends State<HomePage> {
   Future<void> _init() async {
     setState(() => _loading = true);
     try {
+      // 加载分类配置
+      final storageService = Provider.of<StorageService>(context, listen: false);
+      final categories = await storageService.loadSearchCategories();
+      setState(() {
+        _categories = categories;
+        _selectedCategoryIndex = categories.isNotEmpty ? 0 : -1;
+      });
+      
       // 拉取用户基础信息
       final prof = await ApiClient.instance.fetchMemberProfile();
       setState(() => _profile = prof);
@@ -433,6 +442,30 @@ class _HomePageState extends State<HomePage> {
       if (mounted) setState(() => _loading = false);
     }
     await _search(reset: true);
+  }
+
+  Future<void> _reloadCategories() async {
+    try {
+      // 重新加载分类配置
+      final storageService = Provider.of<StorageService>(context, listen: false);
+      final categories = await storageService.loadSearchCategories();
+      setState(() {
+        _categories = categories;
+        // 如果当前选中的分类索引超出范围，重置为第一个分类
+        if (categories.isNotEmpty && (_selectedCategoryIndex < 0 || _selectedCategoryIndex >= categories.length)) {
+          _selectedCategoryIndex = 0;
+        } else if (categories.isEmpty) {
+          _selectedCategoryIndex = -1;
+        }
+      });
+    } catch (e) {
+      // 分类加载失败时显示错误信息
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('重新加载分类失败: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _refresh() async {
@@ -474,14 +507,23 @@ class _HomePageState extends State<HomePage> {
       _error = null;
     });
     try {
+      // 获取当前分类的额外参数
+      Map<String, dynamic>? additionalParams;
+      if (_categories.isNotEmpty && _selectedCategoryIndex >= 0 && _selectedCategoryIndex < _categories.length) {
+        final currentCategory = _categories[_selectedCategoryIndex];
+        if (currentCategory.parameters.isNotEmpty) {
+          additionalParams = currentCategory.parseParameters();
+        }
+      }
+      
       final res = await ApiClient.instance.searchTorrents(
-        mode: _mode,
         keyword: _keywordCtrl.text.trim().isEmpty
             ? null
             : _keywordCtrl.text.trim(),
         pageNumber: _pageNumber,
         pageSize: _pageSize,
         onlyFav: _onlyFavorites ? 1 : null,
+        additionalParams: additionalParams,
       );
       setState(() {
         _items.addAll(res.items);
@@ -721,7 +763,7 @@ class _HomePageState extends State<HomePage> {
         title: const Text('M-Team 首页'),
         actions: const [QbSpeedIndicator()],
       ),
-      drawer: const _AppDrawer(),
+      drawer: _AppDrawer(onSettingsChanged: _reloadCategories),
       body: Column(
         children: [
           // 顶部用户基础信息
@@ -772,17 +814,19 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                DropdownButton<String>(
-                  value: _mode,
-                  items: const [
-                    DropdownMenuItem(value: 'normal', child: Text('综合')),
-                    DropdownMenuItem(value: 'tvshow', child: Text('电视')),
-                    DropdownMenuItem(value: 'movie', child: Text('电影')),
-                    DropdownMenuItem(value: 'adult', child: Text('9kg')),
-                  ],
+                DropdownButton<int>(
+                  value: _categories.isNotEmpty && _selectedCategoryIndex >= 0 && _selectedCategoryIndex < _categories.length ? _selectedCategoryIndex : null,
+                  items: _categories.asMap().entries.map((entry) => 
+                    DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value.displayName),
+                    ),
+                  ).toList(),
                   onChanged: (v) {
-                    setState(() => _mode = v ?? 'normal');
-                    _search(reset: true);
+                    if (v != null && v >= 0 && v < _categories.length) {
+                      setState(() => _selectedCategoryIndex = v);
+                      _search(reset: true);
+                    }
                   },
                 ),
                 const SizedBox(width: 8),
@@ -1456,7 +1500,9 @@ class HomePlaceholderPage extends StatelessWidget {
 
 // 应用左侧抽屉
 class _AppDrawer extends StatelessWidget {
-  const _AppDrawer();
+  final VoidCallback? onSettingsChanged;
+  
+  const _AppDrawer({this.onSettingsChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -1503,11 +1549,13 @@ class _AppDrawer extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.settings_outlined),
               title: const Text('设置'),
-              onTap: () {
+              onTap: () async {
                 Navigator.of(context).pop();
-                Navigator.of(
+                await Navigator.of(
                   context,
                 ).push(MaterialPageRoute(builder: (_) => const SettingsPage()));
+                // 从设置页面返回后，重新加载分类配置
+                onSettingsChanged?.call();
               },
             ),
             ListTile(
