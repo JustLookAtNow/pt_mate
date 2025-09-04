@@ -2,10 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
 import '../services/theme/theme_manager.dart';
 import '../widgets/qb_speed_indicator.dart';
+import 'server_settings_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -22,269 +22,7 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-class _SearchCategoriesConfigTile extends StatefulWidget {
-  @override
-  State<_SearchCategoriesConfigTile> createState() => _SearchCategoriesConfigTileState();
-}
-
-class _SearchCategoriesConfigTileState extends State<_SearchCategoriesConfigTile> {
-  List<SearchCategoryConfig> _categories = [];
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCategories();
-  }
-
-  Future<void> _loadCategories() async {
-    try {
-      final storage = Provider.of<StorageService>(context, listen: false);
-      final categories = await storage.loadSearchCategories();
-      if (mounted) {
-        setState(() {
-          _categories = categories;
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
-    }
-  }
-
-  Future<void> _saveCategories() async {
-    try {
-      final storage = Provider.of<StorageService>(context, listen: false);
-      await storage.saveSearchCategories(_categories);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存失败: $e')),
-        );
-      }
-    }
-  }
-
-  void _addCategory() {
-    setState(() {
-      _categories.add(SearchCategoryConfig(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        displayName: '新分类',
-        parameters: '{"mode": "normal"}',
-      ));
-    });
-    _saveCategories();
-  }
-
-  void _removeCategory(int index) {
-    setState(() {
-      _categories.removeAt(index);
-    });
-    _saveCategories();
-  }
-
-  void _editCategory(int index) async {
-    final category = _categories[index];
-    final result = await showDialog<SearchCategoryConfig>(
-      context: context,
-      builder: (context) => _CategoryEditDialog(category: category),
-    );
-    if (result != null) {
-      setState(() {
-        _categories[index] = result;
-      });
-      _saveCategories();
-    }
-  }
-
-  void _resetToDefault() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('重置确认'),
-        content: const Text('确定要重置为默认配置吗？这将删除所有自定义配置。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      setState(() {
-        _categories = SearchCategoryConfig.getDefaultConfigs();
-      });
-      _saveCategories();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const ListTile(
-        leading: Icon(Icons.category),
-        title: Text('查询分类'),
-        trailing: SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        ListTile(
-          leading: const Icon(Icons.category),
-          title: const Text('查询分类'),
-          subtitle: Text('共 ${_categories.length} 个分类'),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: _resetToDefault,
-                tooltip: '重置为默认',
-              ),
-              IconButton(
-                icon: const Icon(Icons.add),
-                onPressed: _addCategory,
-                tooltip: '添加分类',
-              ),
-            ],
-          ),
-        ),
-        ..._categories.asMap().entries.map((entry) {
-          final index = entry.key;
-          final category = entry.value;
-          return ListTile(
-            leading: const SizedBox(width: 24),
-            title: Text(category.displayName),
-            subtitle: Text(
-              category.parameters,
-              style: const TextStyle(fontSize: 12),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 20),
-                  onPressed: () => _editCategory(index),
-                  tooltip: '编辑',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete, size: 20),
-                  onPressed: () => _removeCategory(index),
-                  tooltip: '删除',
-                ),
-              ],
-            ),
-          );
-        }),
-      ],
-    );
-  }
-}
-
-class _CategoryEditDialog extends StatefulWidget {
-  final SearchCategoryConfig category;
-
-  const _CategoryEditDialog({required this.category});
-
-  @override
-  State<_CategoryEditDialog> createState() => _CategoryEditDialogState();
-}
-
-class _CategoryEditDialogState extends State<_CategoryEditDialog> {
-  late TextEditingController _nameController;
-  late TextEditingController _parametersController;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController(text: widget.category.displayName);
-    _parametersController = TextEditingController(text: widget.category.parameters);
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _parametersController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('编辑分类'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: '显示名称',
-                hintText: '例如：综合',
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _parametersController,
-              decoration: const InputDecoration(
-                labelText: '请求参数',
-                hintText: '推荐JSON格式：{"mode": "normal", "teams": ["44", "9", "43"]}',
-              ),
-              maxLines: 4,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              '参数格式说明：\n'
-              '• 推荐JSON格式：{"mode": "normal", "teams": ["44", "9", "43"]}\n'
-              '• 键值对格式：mode: normal; teams: ["44", "9", "43"]\n'
-              '• JSON格式支持复杂数据结构，避免解析错误\n'
-              '• 键值对格式用分号分隔，避免数组参数被错误分割',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          onPressed: () {
-            final name = _nameController.text.trim();
-            final parameters = _parametersController.text.trim();
-            if (name.isEmpty || parameters.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请填写完整信息')),
-              );
-              return;
-            }
-            final result = widget.category.copyWith(
-              displayName: name,
-              parameters: parameters,
-            );
-            Navigator.pop(context, result);
-          },
-          child: const Text('确定'),
-        ),
-      ],
-    );
-  }
-}
+// 查询分类配置已移至站点配置中，请在服务器设置页面进行配置
 
 class _SettingsBody extends StatelessWidget {
   const _SettingsBody();
@@ -294,6 +32,29 @@ class _SettingsBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // 服务器设置
+        Text(
+          '服务器设置',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.dns),
+            title: const Text('服务器配置'),
+            subtitle: const Text('管理多个站点服务器配置'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const ServerSettingsPage(),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+        
         // 主题设置
         Text(
           '主题设置',
@@ -385,15 +146,7 @@ class _SettingsBody extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         
-        // 查询条件配置
-        Text(
-          '查询条件配置',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 8),
-        Card(
-          child: _SearchCategoriesConfigTile(),
-        ),
+        // 查询条件配置已移至站点配置中，可在服务器配置页面管理
       ],
     );
   }

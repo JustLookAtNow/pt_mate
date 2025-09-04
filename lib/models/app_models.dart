@@ -1,33 +1,93 @@
 import 'dart:convert';
 
+// 网站类型枚举
+enum SiteType {
+  mteam('M-Team', 'M-Team 站点'),
+  // 未来可以添加其他站点类型
+  // nexusphp('NexusPHP', 'NexusPHP 站点'),
+  // gazelle('Gazelle', 'Gazelle 站点'),
+  ;
+
+  const SiteType(this.id, this.displayName);
+  final String id;
+  final String displayName;
+}
+
 class SiteConfig {
+  final String id; // 唯一标识符
   final String name;
   final String baseUrl; // e.g. https://kp.m-team.cc/
   final String? apiKey; // x-api-key
+  final SiteType siteType; // 网站类型
+  final bool isActive; // 是否激活
+  final List<SearchCategoryConfig> searchCategories; // 查询分类配置
 
   const SiteConfig({
+    required this.id,
     required this.name,
     required this.baseUrl,
     this.apiKey,
+    this.siteType = SiteType.mteam,
+    this.isActive = true,
+    this.searchCategories = const [],
   });
 
-  SiteConfig copyWith({String? name, String? baseUrl, String? apiKey}) => SiteConfig(
+  SiteConfig copyWith({
+    String? id,
+    String? name,
+    String? baseUrl,
+    String? apiKey,
+    SiteType? siteType,
+    bool? isActive,
+    List<SearchCategoryConfig>? searchCategories,
+  }) => SiteConfig(
+        id: id ?? this.id,
         name: name ?? this.name,
         baseUrl: baseUrl ?? this.baseUrl,
         apiKey: apiKey ?? this.apiKey,
+        siteType: siteType ?? this.siteType,
+        isActive: isActive ?? this.isActive,
+        searchCategories: searchCategories ?? this.searchCategories,
       );
 
   Map<String, dynamic> toJson() => {
+        'id': id,
         'name': name,
         'baseUrl': baseUrl,
         'apiKey': apiKey,
+        'siteType': siteType.id,
+        'isActive': isActive,
+        'searchCategories': searchCategories.map((e) => e.toJson()).toList(),
       };
 
-  factory SiteConfig.fromJson(Map<String, dynamic> json) => SiteConfig(
-        name: json['name'] as String,
-        baseUrl: json['baseUrl'] as String,
-        apiKey: json['apiKey'] as String?,
-      );
+  factory SiteConfig.fromJson(Map<String, dynamic> json) {
+    List<SearchCategoryConfig> categories = [];
+    if (json['searchCategories'] != null) {
+      try {
+        final list = (json['searchCategories'] as List).cast<Map<String, dynamic>>();
+        categories = list.map(SearchCategoryConfig.fromJson).toList();
+      } catch (_) {
+        // 解析失败时使用默认配置
+        categories = SearchCategoryConfig.getDefaultConfigs();
+      }
+    } else {
+      // 如果没有配置，使用默认配置
+      categories = SearchCategoryConfig.getDefaultConfigs();
+    }
+    
+    return SiteConfig(
+      id: json['id'] as String? ?? 'legacy-${DateTime.now().millisecondsSinceEpoch}',
+      name: json['name'] as String,
+      baseUrl: json['baseUrl'] as String,
+      apiKey: json['apiKey'] as String?,
+      siteType: SiteType.values.firstWhere(
+        (type) => type.id == (json['siteType'] as String? ?? 'mteam'),
+        orElse: () => SiteType.mteam,
+      ),
+      isActive: json['isActive'] as bool? ?? true,
+      searchCategories: categories,
+    );
+  }
 
   @override
   String toString() => jsonEncode(toJson());
@@ -219,9 +279,24 @@ class QbClientConfig {
 }
 
 class Defaults {
-  static const List<SiteConfig> presetSites = [
-    SiteConfig(name: 'M-Team api 主站', baseUrl: 'https://api.m-team.cc/'),
-    SiteConfig(name: 'M-Team api 副站', baseUrl: 'https://api2.m-team.cc/'),
-    SiteConfig(name: 'M-Team 旧风格api', baseUrl: 'https://api.m-team.io/'),
+  static final List<SiteConfig> presetSites = [
+    SiteConfig(
+      id: 'mteam-main',
+      name: 'M-Team api 主站',
+      baseUrl: 'https://api.m-team.cc/',
+      searchCategories: SearchCategoryConfig.getDefaultConfigs(),
+    ),
+    SiteConfig(
+      id: 'mteam-backup',
+      name: 'M-Team api 副站',
+      baseUrl: 'https://api2.m-team.cc/',
+      searchCategories: SearchCategoryConfig.getDefaultConfigs(),
+    ),
+    SiteConfig(
+      id: 'mteam-legacy',
+      name: 'M-Team 旧风格api',
+      baseUrl: 'https://api.m-team.io/',
+      searchCategories: SearchCategoryConfig.getDefaultConfigs(),
+    ),
   ];
 }

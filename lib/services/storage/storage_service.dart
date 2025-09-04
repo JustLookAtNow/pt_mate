@@ -6,7 +6,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/app_models.dart';
 
 class StorageKeys {
+  // 多站点配置
+  static const String siteConfigs = 'app.sites'; // 存储所有站点配置
+  static const String activeSiteId = 'app.activeSiteId'; // 当前活跃站点ID
+  
+  // 兼容性：旧的单站点配置（用于迁移）
   static const String siteConfig = 'app.site';
+  
   static const String qbClients = 'qb.clients';
   static const String qbDefaultId = 'qb.defaultId';
   static String qbPasswordKey(String id) => 'qb.password.$id';
@@ -20,9 +26,14 @@ class StorageKeys {
   static const String defaultDownloadTags = 'download.defaultTags';
   static const String defaultDownloadSavePath = 'download.defaultSavePath';
 
-  static const String siteApiKey = 'site.apiKey';
+  // 多站点API密钥存储
+  static String siteApiKey(String siteId) => 'site.apiKey.$siteId';
+  static String siteApiKeyFallback(String siteId) => 'site.apiKey.fallback.$siteId';
+  
+  // 兼容性：旧的API密钥存储
+  static const String legacySiteApiKey = 'site.apiKey';
   // 非安全存储的降级 Key（例如 Linux 桌面端 keyring 被锁定时）
-  static const String siteApiKeyFallback = 'site.apiKey.fallback';
+  static const String legacySiteApiKeyFallback = 'site.apiKey.fallback';
 
   // 主题相关
   static const String themeMode = 'theme.mode'; // system | light | dark
@@ -32,8 +43,7 @@ class StorageKeys {
   // 图片设置
   static const String autoLoadImages = 'images.autoLoad'; // bool
   
-  // 查询条件配置
-  static const String searchCategories = 'search.categories'; // List<SearchCategoryConfig>
+  // 查询条件配置已移至站点配置中，不再需要全局键
 }
 
 class StorageService {
@@ -51,19 +61,19 @@ class StorageService {
     // secure parts
     if ((config.apiKey ?? '').isNotEmpty) {
       try {
-        await _secure.write(key: StorageKeys.siteApiKey, value: config.apiKey);
+        await _secure.write(key: StorageKeys.legacySiteApiKey, value: config.apiKey);
         // 清理降级存储
-        await prefs.remove(StorageKeys.siteApiKeyFallback);
+        await prefs.remove(StorageKeys.legacySiteApiKeyFallback);
       } catch (_) {
         // 当桌面环境的 keyring 被锁定或不可用时，降级到本地存储，避免崩溃
-        await prefs.setString(StorageKeys.siteApiKeyFallback, config.apiKey!);
+        await prefs.setString(StorageKeys.legacySiteApiKeyFallback, config.apiKey!);
       }
     } else {
       try {
-        await _secure.delete(key: StorageKeys.siteApiKey);
+        await _secure.delete(key: StorageKeys.legacySiteApiKey);
       } catch (_) {
         // 同步清理降级存储
-        await prefs.remove(StorageKeys.siteApiKeyFallback);
+        await prefs.remove(StorageKeys.legacySiteApiKeyFallback);
       }
     }
   }
@@ -77,20 +87,165 @@ class StorageService {
 
     String? apiKey;
     try {
-      apiKey = await _secure.read(key: StorageKeys.siteApiKey);
+      apiKey = await _secure.read(key: StorageKeys.legacySiteApiKey);
     } catch (_) {
       // 读取失败时，从降级存储取值
-      apiKey = prefs.getString(StorageKeys.siteApiKeyFallback);
+      apiKey = prefs.getString(StorageKeys.legacySiteApiKeyFallback);
     }
     // 若安全存储读取到的值为空或为 null，则继续尝试降级存储
     if (apiKey == null || apiKey.isEmpty) {
-      final fallback = prefs.getString(StorageKeys.siteApiKeyFallback);
+      final fallback = prefs.getString(StorageKeys.legacySiteApiKeyFallback);
       if (fallback != null && fallback.isNotEmpty) {
         apiKey = fallback;
       }
     }
 
     return base.copyWith(apiKey: apiKey);
+  }
+
+  // 多站点配置管理
+  Future<void> saveSiteConfigs(List<SiteConfig> configs) async {
+    final prefs = await _prefs;
+    final jsonList = configs.map((config) => {
+      ...config.toJson(),
+      'apiKey': null, // API密钥单独存储
+    }).toList();
+    await prefs.setString(StorageKeys.siteConfigs, jsonEncode(jsonList));
+    
+    // 保存每个站点的API密钥
+    for (final config in configs) {
+      await _saveSiteApiKey(config.id, config.apiKey);
+    }
+  }
+
+  Future<List<SiteConfig>> loadSiteConfigs() async {
+    final prefs = await _prefs;
+    final str = prefs.getString(StorageKeys.siteConfigs);
+    if (str == null) {
+      // 尝试从旧的单站点配置迁移
+      final legacySite = await loadSite();
+      if (legacySite != null) {
+        // 为旧配置生成ID并迁移
+        final migratedSite = legacySite.copyWith(
+          id: 'migrated-${DateTime.now().millisecondsSinceEpoch}',
+        );
+        await saveSiteConfigs([migratedSite]);
+        await setActiveSiteId(migratedSite.id);
+        return [migratedSite];
+      }
+      return [];
+    }
+    
+    try {
+      final list = (jsonDecode(str) as List).cast<Map<String, dynamic>>();
+      final configs = <SiteConfig>[];
+      
+      for (final json in list) {
+        final baseConfig = SiteConfig.fromJson(json);
+        final apiKey = await _loadSiteApiKey(baseConfig.id);
+        configs.add(baseConfig.copyWith(apiKey: apiKey));
+      }
+      
+      return configs;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> addSiteConfig(SiteConfig config) async {
+    final configs = await loadSiteConfigs();
+    configs.add(config);
+    await saveSiteConfigs(configs);
+  }
+
+  Future<void> updateSiteConfig(SiteConfig config) async {
+    final configs = await loadSiteConfigs();
+    final index = configs.indexWhere((c) => c.id == config.id);
+    if (index >= 0) {
+      configs[index] = config;
+      await saveSiteConfigs(configs);
+    }
+  }
+
+  Future<void> deleteSiteConfig(String siteId) async {
+    final configs = await loadSiteConfigs();
+    configs.removeWhere((c) => c.id == siteId);
+    await saveSiteConfigs(configs);
+    await _deleteSiteApiKey(siteId);
+    
+    // 如果删除的是当前活跃站点，清除活跃站点设置
+    final activeSiteId = await getActiveSiteId();
+    if (activeSiteId == siteId) {
+      await setActiveSiteId(null);
+    }
+  }
+
+  Future<void> setActiveSiteId(String? siteId) async {
+    final prefs = await _prefs;
+    if (siteId != null) {
+      await prefs.setString(StorageKeys.activeSiteId, siteId);
+    } else {
+      await prefs.remove(StorageKeys.activeSiteId);
+    }
+  }
+
+  Future<String?> getActiveSiteId() async {
+    final prefs = await _prefs;
+    return prefs.getString(StorageKeys.activeSiteId);
+  }
+
+  Future<SiteConfig?> getActiveSiteConfig() async {
+    final activeSiteId = await getActiveSiteId();
+    if (activeSiteId == null) return null;
+    
+    final configs = await loadSiteConfigs();
+    try {
+      return configs.firstWhere((c) => c.id == activeSiteId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // 私有方法：处理单个站点的API密钥
+  Future<void> _saveSiteApiKey(String siteId, String? apiKey) async {
+    if (apiKey == null || apiKey.isEmpty) {
+      await _deleteSiteApiKey(siteId);
+      return;
+    }
+    
+    try {
+      await _secure.write(key: StorageKeys.siteApiKey(siteId), value: apiKey);
+      // 清理降级存储
+      final prefs = await _prefs;
+      await prefs.remove(StorageKeys.siteApiKeyFallback(siteId));
+    } catch (_) {
+      // 降级到本地存储
+      final prefs = await _prefs;
+      await prefs.setString(StorageKeys.siteApiKeyFallback(siteId), apiKey);
+    }
+  }
+
+  Future<String?> _loadSiteApiKey(String siteId) async {
+    try {
+      final apiKey = await _secure.read(key: StorageKeys.siteApiKey(siteId));
+      if (apiKey != null && apiKey.isNotEmpty) return apiKey;
+    } catch (_) {
+      // ignore and try fallback
+    }
+    
+    final prefs = await _prefs;
+    return prefs.getString(StorageKeys.siteApiKeyFallback(siteId));
+  }
+
+  Future<void> _deleteSiteApiKey(String siteId) async {
+    try {
+      await _secure.delete(key: StorageKeys.siteApiKey(siteId));
+    } catch (_) {
+      // ignore
+    }
+    
+    final prefs = await _prefs;
+    await prefs.remove(StorageKeys.siteApiKeyFallback(siteId));
   }
 
   // qBittorrent clients
@@ -259,26 +414,6 @@ class StorageService {
     return prefs.getString(StorageKeys.defaultDownloadSavePath);
   }
 
-  // 查询条件配置相关
-  Future<void> saveSearchCategories(List<SearchCategoryConfig> categories) async {
-    final prefs = await _prefs;
-    final jsonList = categories.map((e) => e.toJson()).toList();
-    await prefs.setString(StorageKeys.searchCategories, jsonEncode(jsonList));
-  }
-
-  Future<List<SearchCategoryConfig>> loadSearchCategories() async {
-    final prefs = await _prefs;
-    final str = prefs.getString(StorageKeys.searchCategories);
-    if (str == null) {
-      // 返回默认配置
-      return SearchCategoryConfig.getDefaultConfigs();
-    }
-    try {
-      final list = (jsonDecode(str) as List).cast<Map<String, dynamic>>();
-      return list.map(SearchCategoryConfig.fromJson).toList();
-    } catch (_) {
-      // 解析失败时返回默认配置
-      return SearchCategoryConfig.getDefaultConfigs();
-    }
-  }
+  // 查询条件配置现在已集成到站点配置中，不再需要全局配置方法
+  // 如需访问查询分类配置，请通过站点配置获取：siteConfig.searchCategories
 }

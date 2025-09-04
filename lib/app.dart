@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'models/app_models.dart';
 import 'pages/torrent_detail_page.dart';
+import 'services/api/api_service.dart';
 import 'services/api/api_client.dart';
 import 'services/storage/storage_service.dart';
 import 'services/theme/theme_manager.dart';
@@ -12,6 +13,7 @@ import 'utils/format.dart';
 import 'services/qbittorrent/qb_client.dart';
 import 'pages/settings_page.dart';
 import 'pages/about_page.dart';
+import 'pages/server_settings_page.dart';
 import 'widgets/qb_speed_indicator.dart';
 
 class AppState extends ChangeNotifier {
@@ -19,15 +21,24 @@ class AppState extends ChangeNotifier {
   SiteConfig? get site => _site;
 
   Future<void> loadInitial() async {
-    _site = await StorageService.instance.loadSite();
-    await ApiClient.instance.init();
+    _site = await StorageService.instance.getActiveSiteConfig();
+    await ApiService.instance.init();
     notifyListeners();
   }
 
   Future<void> setSite(SiteConfig site) async {
     await StorageService.instance.saveSite(site);
     _site = site;
-    await ApiClient.instance.init();
+    await ApiService.instance.setActiveSite(site);
+    notifyListeners();
+  }
+
+  Future<void> setActiveSite(String siteId) async {
+    await StorageService.instance.setActiveSiteId(siteId);
+    _site = await StorageService.instance.getActiveSiteConfig();
+    if (_site != null) {
+      await ApiService.instance.setActiveSite(_site!);
+    }
     notifyListeners();
   }
 }
@@ -80,19 +91,19 @@ class _LaunchDeciderState extends State<LaunchDecider> {
   }
 
   Future<void> _check() async {
-    // 自动检测会话：如果有站点信息且 profile 测试通过 -> HomePage
+    // 自动检测会话：如果有活跃站点信息且 profile 测试通过 -> HomePage
     try {
-      final site = await StorageService.instance.loadSite();
-      await ApiClient.instance.init();
+      final site = await StorageService.instance.getActiveSiteConfig();
+      await ApiService.instance.init();
       if (site != null && (site.apiKey ?? '').isNotEmpty) {
         // 验证 key 是否可用
-        await ApiClient.instance.fetchMemberProfile();
+        await ApiService.instance.fetchMemberProfile();
         _target = const HomePage();
       } else {
-        _target = const ProfilePreviewPage();
+        _target = const ServerSettingsPage();
       }
     } catch (_) {
-      _target = const ProfilePreviewPage();
+      _target = const ServerSettingsPage();
     } finally {
       if (mounted) setState(() => _checking = false);
     }
@@ -103,7 +114,7 @@ class _LaunchDeciderState extends State<LaunchDecider> {
     if (_checking) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return _target ?? const ProfilePreviewPage();
+    return _target ?? const ServerSettingsPage();
   }
 }
 
@@ -130,7 +141,7 @@ class _ProfilePreviewPageState extends State<ProfilePreviewPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final loaded = await StorageService.instance.loadSite();
+      final loaded = await StorageService.instance.getActiveSiteConfig();
       final presets = Defaults.presetSites;
       if (loaded != null) {
         _apiKeyCtrl.text = loaded.apiKey ?? '';
@@ -155,6 +166,7 @@ class _ProfilePreviewPageState extends State<ProfilePreviewPage> {
     var base = _customBaseCtrl.text.trim();
     if (base.isNotEmpty && !base.endsWith('/')) base = '$base/';
     return SiteConfig(
+      id: 'custom-${DateTime.now().millisecondsSinceEpoch}',
       name: _customNameCtrl.text.trim().isEmpty
           ? '自定义'
           : _customNameCtrl.text.trim(),
@@ -170,12 +182,10 @@ class _ProfilePreviewPageState extends State<ProfilePreviewPage> {
       _profile = null;
     });
     try {
-      final key = _apiKeyCtrl.text.trim();
       final site = _composeCurrentSite();
-      final prof = await ApiClient.instance.fetchMemberProfile(
-        apiKey: key,
-        siteOverride: site,
-      );
+      // 临时设置站点进行测试
+      await ApiService.instance.setActiveSite(site);
+      final prof = await ApiService.instance.fetchMemberProfile();
       setState(() => _profile = prof);
     } catch (e) {
       setState(() => _error = e.toString());
@@ -424,16 +434,17 @@ class _HomePageState extends State<HomePage> {
   Future<void> _init() async {
     setState(() => _loading = true);
     try {
-      // 加载分类配置
+      // 加载当前活跃站点的分类配置
       final storageService = Provider.of<StorageService>(context, listen: false);
-      final categories = await storageService.loadSearchCategories();
+      final activeSite = await storageService.getActiveSiteConfig();
+      final categories = activeSite?.searchCategories ?? SearchCategoryConfig.getDefaultConfigs();
       setState(() {
         _categories = categories;
         _selectedCategoryIndex = categories.isNotEmpty ? 0 : -1;
       });
       
       // 拉取用户基础信息
-      final prof = await ApiClient.instance.fetchMemberProfile();
+      final prof = await ApiService.instance.fetchMemberProfile();
       setState(() => _profile = prof);
     } catch (e) {
       // 用户信息失败不阻塞首页使用，仅提示
@@ -446,9 +457,10 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _reloadCategories() async {
     try {
-      // 重新加载分类配置
+      // 重新加载当前活跃站点的分类配置
       final storageService = Provider.of<StorageService>(context, listen: false);
-      final categories = await storageService.loadSearchCategories();
+      final activeSite = await storageService.getActiveSiteConfig();
+      final categories = activeSite?.searchCategories ?? SearchCategoryConfig.getDefaultConfigs();
       setState(() {
         _categories = categories;
         // 如果当前选中的分类索引超出范围，重置为第一个分类
@@ -470,7 +482,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _refresh() async {
     try {
-      final prof = await ApiClient.instance.fetchMemberProfile();
+      final prof = await ApiService.instance.fetchMemberProfile();
       if (mounted) setState(() => _profile = prof);
     } catch (_) {
       // 忽略用户信息失败
@@ -516,7 +528,7 @@ class _HomePageState extends State<HomePage> {
         }
       }
       
-      final res = await ApiClient.instance.searchTorrents(
+      final res = await ApiService.instance.searchTorrents(
         keyword: _keywordCtrl.text.trim().isEmpty
             ? null
             : _keywordCtrl.text.trim(),
@@ -622,7 +634,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _onDownload(TorrentItem item) async {
     try {
       // 1. 获取下载 URL
-      final url = await ApiClient.instance.genDlToken(id: item.id);
+      final url = await ApiService.instance.genDlToken(id: item.id);
 
       // 2. 弹出对话框让用户选择下载器设置
       if (!mounted) return;
@@ -713,7 +725,7 @@ class _HomePageState extends State<HomePage> {
     _pendingCollectionRequests[item.id] = newCollectionState;
 
     try {
-      await ApiClient.instance.toggleCollection(
+      await ApiService.instance.toggleCollection(
         id: item.id,
         make: newCollectionState,
       );
@@ -1396,7 +1408,7 @@ class _HomePageState extends State<HomePage> {
         _pendingDownloadRequests.add(item.id);
         
         // 获取下载 URL
-        final url = await ApiClient.instance.genDlToken(id: item.id);
+        final url = await ApiService.instance.genDlToken(id: item.id);
         
         // 发送到 qBittorrent
         await QbService.instance.addTorrentByUrl(
@@ -1536,16 +1548,7 @@ class _AppDrawer extends StatelessWidget {
                 );
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.dns_outlined),
-              title: const Text('服务器设置'),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ProfilePreviewPage()),
-                );
-              },
-            ),
+
             ListTile(
               leading: const Icon(Icons.settings_outlined),
               title: const Text('设置'),
