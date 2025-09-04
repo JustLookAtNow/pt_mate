@@ -13,6 +13,86 @@ enum SiteType {
   final String displayName;
 }
 
+// 站点功能配置
+class SiteFeatures {
+  final bool supportMemberProfile; // 支持用户资料
+  final bool supportTorrentSearch; // 支持种子搜索
+  final bool supportTorrentDetail; // 支持种子详情
+  final bool supportDownload; // 支持下载
+  final bool supportCollection; // 支持收藏功能
+  final bool supportHistory; // 支持下载历史
+  final bool supportCategories; // 支持分类搜索
+  final bool supportAdvancedSearch; // 支持高级搜索
+
+  const SiteFeatures({
+    this.supportMemberProfile = true,
+    this.supportTorrentSearch = true,
+    this.supportTorrentDetail = true,
+    this.supportDownload = true,
+    this.supportCollection = true,
+    this.supportHistory = true,
+    this.supportCategories = true,
+    this.supportAdvancedSearch = true,
+  });
+
+  SiteFeatures copyWith({
+    bool? supportMemberProfile,
+    bool? supportTorrentSearch,
+    bool? supportTorrentDetail,
+    bool? supportDownload,
+    bool? supportCollection,
+    bool? supportHistory,
+    bool? supportCategories,
+    bool? supportAdvancedSearch,
+  }) => SiteFeatures(
+        supportMemberProfile: supportMemberProfile ?? this.supportMemberProfile,
+        supportTorrentSearch: supportTorrentSearch ?? this.supportTorrentSearch,
+        supportTorrentDetail: supportTorrentDetail ?? this.supportTorrentDetail,
+        supportDownload: supportDownload ?? this.supportDownload,
+        supportCollection: supportCollection ?? this.supportCollection,
+        supportHistory: supportHistory ?? this.supportHistory,
+        supportCategories: supportCategories ?? this.supportCategories,
+        supportAdvancedSearch: supportAdvancedSearch ?? this.supportAdvancedSearch,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'supportMemberProfile': supportMemberProfile,
+        'supportTorrentSearch': supportTorrentSearch,
+        'supportTorrentDetail': supportTorrentDetail,
+        'supportDownload': supportDownload,
+        'supportCollection': supportCollection,
+        'supportHistory': supportHistory,
+        'supportCategories': supportCategories,
+        'supportAdvancedSearch': supportAdvancedSearch,
+      };
+
+  factory SiteFeatures.fromJson(Map<String, dynamic> json) => SiteFeatures(
+        supportMemberProfile: json['supportMemberProfile'] as bool? ?? true,
+        supportTorrentSearch: json['supportTorrentSearch'] as bool? ?? true,
+        supportTorrentDetail: json['supportTorrentDetail'] as bool? ?? true,
+        supportDownload: json['supportDownload'] as bool? ?? true,
+        supportCollection: json['supportCollection'] as bool? ?? true,
+        supportHistory: json['supportHistory'] as bool? ?? true,
+        supportCategories: json['supportCategories'] as bool? ?? true,
+        supportAdvancedSearch: json['supportAdvancedSearch'] as bool? ?? true,
+      );
+
+  // M-Team 站点的默认功能配置
+  static const SiteFeatures mteamDefault = SiteFeatures(
+    supportMemberProfile: true,
+    supportTorrentSearch: true,
+    supportTorrentDetail: true,
+    supportDownload: true,
+    supportCollection: true,
+    supportHistory: true,
+    supportCategories: true,
+    supportAdvancedSearch: true,
+  );
+
+  @override
+  String toString() => jsonEncode(toJson());
+}
+
 class SiteConfig {
   final String id; // 唯一标识符
   final String name;
@@ -21,6 +101,7 @@ class SiteConfig {
   final SiteType siteType; // 网站类型
   final bool isActive; // 是否激活
   final List<SearchCategoryConfig> searchCategories; // 查询分类配置
+  final SiteFeatures features; // 功能支持配置
 
   const SiteConfig({
     required this.id,
@@ -30,6 +111,7 @@ class SiteConfig {
     this.siteType = SiteType.mteam,
     this.isActive = true,
     this.searchCategories = const [],
+    this.features = SiteFeatures.mteamDefault,
   });
 
   SiteConfig copyWith({
@@ -40,6 +122,7 @@ class SiteConfig {
     SiteType? siteType,
     bool? isActive,
     List<SearchCategoryConfig>? searchCategories,
+    SiteFeatures? features,
   }) => SiteConfig(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -48,6 +131,7 @@ class SiteConfig {
         siteType: siteType ?? this.siteType,
         isActive: isActive ?? this.isActive,
         searchCategories: searchCategories ?? this.searchCategories,
+        features: features ?? this.features,
       );
 
   Map<String, dynamic> toJson() => {
@@ -58,6 +142,7 @@ class SiteConfig {
         'siteType': siteType.id,
         'isActive': isActive,
         'searchCategories': searchCategories.map((e) => e.toJson()).toList(),
+        'features': features.toJson(),
       };
 
   factory SiteConfig.fromJson(Map<String, dynamic> json) {
@@ -75,6 +160,17 @@ class SiteConfig {
       categories = SearchCategoryConfig.getDefaultConfigs();
     }
     
+    // 解析功能配置
+    SiteFeatures features = SiteFeatures.mteamDefault;
+    if (json['features'] != null) {
+      try {
+        features = SiteFeatures.fromJson(json['features'] as Map<String, dynamic>);
+      } catch (_) {
+        // 解析失败时使用默认配置
+        features = SiteFeatures.mteamDefault;
+      }
+    }
+    
     return SiteConfig(
       id: json['id'] as String? ?? 'legacy-${DateTime.now().millisecondsSinceEpoch}',
       name: json['name'] as String,
@@ -86,6 +182,7 @@ class SiteConfig {
       ),
       isActive: json['isActive'] as bool? ?? true,
       searchCategories: categories,
+      features: features,
     );
   }
 
@@ -279,24 +376,16 @@ class QbClientConfig {
 }
 
 class Defaults {
-  static final List<SiteConfig> presetSites = [
-    SiteConfig(
-      id: 'mteam-main',
-      name: 'M-Team api 主站',
-      baseUrl: 'https://api.m-team.cc/',
-      searchCategories: SearchCategoryConfig.getDefaultConfigs(),
-    ),
-    SiteConfig(
-      id: 'mteam-backup',
-      name: 'M-Team api 副站',
-      baseUrl: 'https://api2.m-team.cc/',
-      searchCategories: SearchCategoryConfig.getDefaultConfigs(),
-    ),
-    SiteConfig(
-      id: 'mteam-legacy',
-      name: 'M-Team 旧风格api',
-      baseUrl: 'https://api.m-team.io/',
-      searchCategories: SearchCategoryConfig.getDefaultConfigs(),
-    ),
-  ];
+  // 预设站点配置现在从JSON文件加载
+  // 使用 SiteConfigService.loadPresetSites() 来获取预设站点
+  
+  /// 获取默认的搜索分类配置
+  static List<SearchCategoryConfig> getDefaultSearchCategories() {
+    return SearchCategoryConfig.getDefaultConfigs();
+  }
+  
+  /// 获取默认的站点功能配置
+  static SiteFeatures getDefaultSiteFeatures() {
+    return SiteFeatures.mteamDefault;
+  }
 }

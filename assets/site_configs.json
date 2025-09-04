@@ -1,0 +1,72 @@
+{
+  "presetSites": [
+    {
+      "id": "mteam-adult",
+      "name": "M-Team - KP",
+      "baseUrl": "https://kp.m-team.cc",
+      "searchCategories": [
+        {"id": "normal", "displayName": "综合", "parameters": "{\"mode\": \"normal\"}"},
+        {"id": "tvshow", "displayName": "电视", "parameters": "{\"mode\": \"tvshow\"}"},
+        {"id": "movie", "displayName": "电影", "parameters": "{\"mode\": \"movie\"}"},
+        {"id": "official", "displayName": "官组", "parameters": "{\"mode\": \"normal\", \"teams\": [\"44\", \"9\", \"43\"]}"}
+      ],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    },
+    {
+      "id": "mteam-tp",
+      "name": "M-Team - TP",
+      "baseUrl": "https://tp.m-team.cc",
+      "searchCategories": [
+        {"id": "normal", "displayName": "综合", "parameters": "{\"mode\": \"normal\"}"},
+        {"id": "tvshow", "displayName": "电视", "parameters": "{\"mode\": \"tvshow\"}"},
+        {"id": "movie", "displayName": "电影", "parameters": "{\"mode\": \"movie\"}"},
+        {"id": "official", "displayName": "官组", "parameters": "{\"mode\": \"normal\", \"teams\": [\"44\", \"9\", \"43\"]}"}
+      ],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    },
+    {
+      "id": "mteam-api",
+      "name": "M-Team - API",
+      "baseUrl": "https://api.m-team.cc",
+      "searchCategories": [
+        {"id": "401", "name": "Movies"},
+        {"id": "402", "name": "TV Series"},
+        {"id": "403", "name": "TV Shows"},
+        {"id": "404", "name": "Documentaries"},
+        {"id": "405", "name": "Animation"},
+        {"id": "406", "name": "Music Video"},
+        {"id": "407", "name": "Sports"},
+        {"id": "408", "name": "Audio"},
+        {"id": "409", "name": "Other"}
+      ],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    }
+  ]
+}

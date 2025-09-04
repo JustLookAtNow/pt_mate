@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:math';
-
 import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
 import '../services/api/api_service.dart';
 import '../services/api/api_client.dart';
+import '../services/site_config_service.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/server_settings_drawer.dart';
 import '../utils/format.dart';
@@ -424,27 +424,49 @@ class _SiteEditPageState extends State<SiteEditPage> {
   String? _error;
   MemberProfile? _profile;
   List<SearchCategoryConfig> _searchCategories = [];
+  SiteFeatures _siteFeatures = SiteFeatures.mteamDefault;
+  List<SiteConfig> _presetSites = [];
 
   @override
   void initState() {
     super.initState();
+    _loadPresetSites();
     if (widget.site != null) {
       _nameController.text = widget.site!.name;
       _baseUrlController.text = widget.site!.baseUrl;
       _apiKeyController.text = widget.site!.apiKey ?? '';
       _selectedSiteType = widget.site!.siteType;
       _searchCategories = List.from(widget.site!.searchCategories);
-      
-      // 检查是否是预设站点
-      final presets = Defaults.presetSites;
-      for (int i = 0; i < presets.length; i++) {
-        if (presets[i].baseUrl == widget.site!.baseUrl) {
-          _presetIndex = i;
-          break;
-        }
-      }
+      _siteFeatures = widget.site!.features;
     } else {
       _searchCategories = SearchCategoryConfig.getDefaultConfigs();
+      _siteFeatures = SiteFeatures.mteamDefault;
+    }
+  }
+  
+  Future<void> _loadPresetSites() async {
+    try {
+      final presets = await SiteConfigService.loadPresetSites();
+      setState(() {
+        _presetSites = presets;
+      });
+      
+      // 如果是编辑现有站点，检查是否是预设站点
+      if (widget.site != null) {
+        for (int i = 0; i < presets.length; i++) {
+          if (presets[i].baseUrl == widget.site!.baseUrl) {
+            setState(() {
+              _presetIndex = i;
+            });
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      // 加载失败时使用空列表
+      setState(() {
+        _presetSites = [];
+      });
     }
   }
 
@@ -464,8 +486,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
       id = 'site-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1000)}';
     }
 
-    if (_presetIndex >= 0) {
-      final preset = Defaults.presetSites[_presetIndex];
+    if (_presetIndex >= 0 && _presetIndex < _presetSites.length) {
+      final preset = _presetSites[_presetIndex];
       return SiteConfig(
         id: id,
         name: preset.name,
@@ -473,6 +495,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
         apiKey: _apiKeyController.text.trim(),
         siteType: _selectedSiteType,
         searchCategories: _searchCategories,
+        features: _siteFeatures,
       );
     }
     
@@ -490,6 +513,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       apiKey: _apiKeyController.text.trim(),
       siteType: _selectedSiteType,
       searchCategories: _searchCategories,
+      features: _siteFeatures,
     );
   }
 
@@ -526,6 +550,24 @@ class _SiteEditPageState extends State<SiteEditPage> {
     setState(() {
       _searchCategories = SearchCategoryConfig.getDefaultConfigs();
     });
+  }
+
+  Widget _buildFeatureSwitch(
+    String title,
+    String subtitle,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
+    return SwitchListTile(
+      title: Text(title),
+      subtitle: Text(
+        subtitle,
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+      value: value,
+      onChanged: onChanged,
+      contentPadding: EdgeInsets.zero,
+    );
   }
 
   Future<void> _testConnection() async {
@@ -587,7 +629,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
   @override
   Widget build(BuildContext context) {
-    final presets = Defaults.presetSites;
+    final presets = _presetSites;
     
     return Scaffold(
       appBar: AppBar(
@@ -783,6 +825,93 @@ class _SiteEditPageState extends State<SiteEditPage> {
                             );
                           },
                         ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // 功能配置
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '功能配置',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '配置此站点支持的功能',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildFeatureSwitch(
+                        '用户资料',
+                        '获取用户个人信息和统计数据',
+                        _siteFeatures.supportMemberProfile,
+                        (value) => setState(() {
+                          _siteFeatures = _siteFeatures.copyWith(supportMemberProfile: value);
+                        }),
+                      ),
+                      _buildFeatureSwitch(
+                        '种子搜索',
+                        '搜索和浏览种子资源',
+                        _siteFeatures.supportTorrentSearch,
+                        (value) => setState(() {
+                          _siteFeatures = _siteFeatures.copyWith(supportTorrentSearch: value);
+                        }),
+                      ),
+                      _buildFeatureSwitch(
+                        '种子详情',
+                        '查看种子的详细信息',
+                        _siteFeatures.supportTorrentDetail,
+                        (value) => setState(() {
+                          _siteFeatures = _siteFeatures.copyWith(supportTorrentDetail: value);
+                        }),
+                      ),
+                      _buildFeatureSwitch(
+                        '下载功能',
+                        '生成下载链接和下载种子',
+                        _siteFeatures.supportDownload,
+                        (value) => setState(() {
+                          _siteFeatures = _siteFeatures.copyWith(supportDownload: value);
+                        }),
+                      ),
+                      _buildFeatureSwitch(
+                        '收藏功能',
+                        '收藏和取消收藏种子',
+                        _siteFeatures.supportCollection,
+                        (value) => setState(() {
+                          _siteFeatures = _siteFeatures.copyWith(supportCollection: value);
+                        }),
+                      ),
+                      _buildFeatureSwitch(
+                        '下载历史',
+                        '查看种子下载历史记录',
+                        _siteFeatures.supportHistory,
+                        (value) => setState(() {
+                          _siteFeatures = _siteFeatures.copyWith(supportHistory: value);
+                        }),
+                      ),
+                      _buildFeatureSwitch(
+                        '分类搜索',
+                        '按分类筛选搜索结果',
+                        _siteFeatures.supportCategories,
+                        (value) => setState(() {
+                          _siteFeatures = _siteFeatures.copyWith(supportCategories: value);
+                        }),
+                      ),
+                      _buildFeatureSwitch(
+                        '高级搜索',
+                        '使用高级搜索参数和过滤器',
+                        _siteFeatures.supportAdvancedSearch,
+                        (value) => setState(() {
+                          _siteFeatures = _siteFeatures.copyWith(supportAdvancedSearch: value);
+                        }),
+                      ),
                     ],
                   ),
                 ),

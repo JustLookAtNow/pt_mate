@@ -9,6 +9,7 @@ import 'services/api/api_service.dart';
 import 'services/api/api_client.dart';
 import 'services/storage/storage_service.dart';
 import 'services/theme/theme_manager.dart';
+import 'services/site_config_service.dart';
 import 'utils/format.dart';
 import 'services/qbittorrent/qb_client.dart';
 import 'pages/settings_page.dart';
@@ -133,6 +134,7 @@ class _ProfilePreviewPageState extends State<ProfilePreviewPage> {
   bool _loading = false;
   MemberProfile? _profile;
   String? _error;
+  List<SiteConfig> _presetSites = [];
 
   // 站点选择：index=0/1 为预置，-1 为自定义
   int _siteIndex = 0;
@@ -140,9 +142,18 @@ class _ProfilePreviewPageState extends State<ProfilePreviewPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    _loadPresetSites();
+  }
+  
+  Future<void> _loadPresetSites() async {
+    try {
+      final presets = await SiteConfigService.loadPresetSites();
+      setState(() {
+        _presetSites = presets;
+      });
+      
+      // 加载当前活跃站点配置
       final loaded = await StorageService.instance.getActiveSiteConfig();
-      final presets = Defaults.presetSites;
       if (loaded != null) {
         _apiKeyCtrl.text = loaded.apiKey ?? '';
         final idx = presets.indexWhere((s) => s.baseUrl == loaded.baseUrl);
@@ -155,12 +166,16 @@ class _ProfilePreviewPageState extends State<ProfilePreviewPage> {
         }
         setState(() {});
       }
-    });
+    } catch (e) {
+      setState(() {
+        _presetSites = [];
+      });
+    }
   }
 
   SiteConfig _composeCurrentSite() {
-    if (_siteIndex >= 0) {
-      final preset = Defaults.presetSites[_siteIndex];
+    if (_siteIndex >= 0 && _siteIndex < _presetSites.length) {
+      final preset = _presetSites[_siteIndex];
       return preset.copyWith(apiKey: _apiKeyCtrl.text.trim());
     }
     var base = _customBaseCtrl.text.trim();
@@ -224,7 +239,7 @@ class _ProfilePreviewPageState extends State<ProfilePreviewPage> {
 
   @override
   Widget build(BuildContext context) {
-    final presets = Defaults.presetSites;
+    final presets = _presetSites;
     return Scaffold(
       appBar: AppBar(
         title: const Text('服务器设置'),
