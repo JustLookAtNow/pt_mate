@@ -182,6 +182,14 @@ class NexusPHPAdapter implements SiteAdapter {
 
   @override
   Future<String> genDlToken({required String id}) async {
+    // 检查必要的配置参数
+    if (_siteConfig.passKey == null || _siteConfig.passKey!.isEmpty) {
+      throw Exception('站点配置缺少passKey，无法生成下载链接');
+    }
+    if (_siteConfig.userId == null || _siteConfig.userId!.isEmpty) {
+      throw Exception('站点配置缺少userId，无法生成下载链接');
+    }
+    
     // https://www.ptskit.org/download.php?downhash={userId}.{jwt}
     final jwt = getDownLoadHash(
       _siteConfig.passKey!,

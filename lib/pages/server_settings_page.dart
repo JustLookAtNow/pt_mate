@@ -622,8 +622,22 @@ class _SiteEditPageState extends State<SiteEditPage> {
       
       if (widget.site != null) {
         await StorageService.instance.updateSiteConfig(finalSite);
+        // 更新现有站点后，如果是当前活跃站点，需要重新初始化适配器
+        final activeSiteId = await StorageService.instance.getActiveSiteId();
+        if (activeSiteId == finalSite.id) {
+          await ApiService.instance.setActiveSite(finalSite);
+        }
       } else {
         await StorageService.instance.addSiteConfig(finalSite);
+        // 首次添加站点时，设置为活跃站点
+        await StorageService.instance.setActiveSiteId(finalSite.id);
+        // 重新初始化适配器，确保userId正确更新
+        await ApiService.instance.setActiveSite(finalSite);
+        // 通知AppState更新
+        if (mounted) {
+          final appState = context.read<AppState>();
+          await appState.setActiveSite(finalSite.id);
+        }
       }
       
       if (mounted) {

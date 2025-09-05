@@ -801,12 +801,23 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('M-Team 首页'),
-        actions: const [QbSpeedIndicator()],
-      ),
-      drawer: _AppDrawer(onSettingsChanged: _reloadCategories),
+    return Consumer<AppState>(
+      builder: (context, appState, child) {
+        // 当AppState变化时，检查是否需要重新初始化
+        if (appState.site != null && 
+            (_currentSite == null || _currentSite!.id != appState.site!.id)) {
+          // 站点发生变化，需要重新初始化
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _init();
+          });
+        }
+        
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('M-Team 首页'),
+            actions: const [QbSpeedIndicator()],
+          ),
+          drawer: _AppDrawer(onSettingsChanged: _reloadCategories),
       body: Column(
         children: [
           // 顶部用户基础信息 - 仅在站点支持用户资料功能时显示
@@ -1311,6 +1322,8 @@ class _HomePageState extends State<HomePage> {
             ),
         ],
       ),
+    );
+      },
     );
   }
 

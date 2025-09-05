@@ -41,6 +41,8 @@ class ApiService {
   
   /// 设置活跃站点
   Future<void> setActiveSite(SiteConfig siteConfig) async {
+    // 清除该站点的缓存适配器，确保使用最新配置
+    removeAdapter(siteConfig.id);
     _activeAdapter = await getAdapter(siteConfig);
   }
   

@@ -3,7 +3,7 @@ import 'dart:convert';
 // 网站类型枚举
 enum SiteType {
   mteam('M-Team', 'M-Team 站点', 'API Key (x-api-key)', '从 控制台-实验室-存储令牌 获取并粘贴此处'),
-  nexusphp('NexusPHP', 'NexusPHP (1.9+) 站点', 'API Key (访问令牌)', '控制面板-设定首页-访问令牌（权限都勾上）'),
+  nexusphp('NexusPHP', 'NexusPHP(1.9+)站点', 'API Key (访问令牌)', '控制面板-设定首页-访问令牌（权限都勾上）'),
   // 未来可以添加其他站点类型
   // gazelle('Gazelle', 'Gazelle 站点'),
   ;
