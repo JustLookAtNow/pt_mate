@@ -45,6 +45,8 @@ dependencies:
   flutter_colorpicker: ^1.1.0
   url_launcher: ^6.3.1
   package_info_plus: ^8.0.2
+  dart_jsonwebtoken: ^2.14.0
+  crypto: ^3.0.3
 
 
 dev_dependencies:

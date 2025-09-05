@@ -4,6 +4,7 @@
       "id": "mteam-adult",
       "name": "M-Team - KP",
       "baseUrl": "https://kp.m-team.cc",
+      "siteType": "M-Team",
       "searchCategories": [
         {
           "id": "normal",
@@ -41,6 +42,7 @@
       "id": "mteam-tp",
       "name": "M-Team - TP",
       "baseUrl": "https://tp.m-team.cc",
+      "siteType": "M-Team",
       "searchCategories": [
         {
           "id": "normal",
@@ -78,6 +80,7 @@
       "id": "mteam-api",
       "name": "M-Team - API",
       "baseUrl": "https://api.m-team.cc",
+      "siteType": "M-Team",
       "searchCategories": [
         {
           "id": "normal",
@@ -109,6 +112,29 @@
         "downloadHistory": true,
         "categorySearch": true,
         "advancedSearch": true
+      }
+    },
+    {
+      "id": "ptskit",
+      "name": "PTSKit (NexusPHP)",
+      "baseUrl": "https://www.ptskit.org/",
+      "siteType": "NexusPHP",
+      "searchCategories": [
+        {
+          "id": "all",
+          "displayName": "全部",
+          "parameters": "{}"
+        }
+      ],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": false,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": false,
+        "advancedSearch": false
       }
     }
   ]

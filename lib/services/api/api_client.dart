@@ -7,6 +7,7 @@ class MemberProfile {
   final double shareRate;
   final int uploadedBytes;
   final int downloadedBytes;
+  final String? userId; // 用户ID，NexusPHP类型从data.data.id获取
 
   MemberProfile({
     required this.username,
@@ -14,6 +15,7 @@ class MemberProfile {
     required this.shareRate,
     required this.uploadedBytes,
     required this.downloadedBytes,
+    this.userId,
   });
 
   // fromJson 方法已移至各站点适配器中实现

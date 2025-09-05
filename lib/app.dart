@@ -573,13 +573,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Color _discountColor(String d) {
-    if (d.toUpperCase() == 'FREE') return Colors.green;
+    if (d.toUpperCase().startsWith('FREE')) return Colors.green;
     if (d.toUpperCase().startsWith('PERCENT_')) return Colors.amber;
     return Colors.grey;
   }
 
   String _discountText(String d, String? endTime) {
-    if (d.toUpperCase() == 'FREE') {
+    if (d.toUpperCase().startsWith('FREE')) {
       if (endTime != null && endTime.isNotEmpty) {
         try {
           final endDateTime = DateTime.parse(endTime);
@@ -588,15 +588,15 @@ class _HomePageState extends State<HomePage> {
           final hoursLeft = difference.inHours;
 
           if (hoursLeft > 0) {
-            return 'free ${hoursLeft}h';
+            return '$d ${hoursLeft}h';
           } else {
-            return 'free';
+            return d;
           }
         } catch (e) {
-          return 'free';
+          return d;
         }
       }
-      return 'free';
+      return d;
     }
     if (d.toUpperCase().startsWith('PERCENT_')) {
       final p = d.split('_').last;
@@ -1157,32 +1157,28 @@ class _HomePageState extends State<HomePage> {
                                   const SizedBox(height: 4),
                                   Row(
                                     children: [
-                                      if ((t.discount ?? '').toUpperCase() ==
-                                              'FREE' ||
-                                          (t.discount ?? '').toUpperCase() ==
-                                              'PERCENT_50')
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: _discountColor(t.discount!),
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            _discountText(
-                                              t.discount!,
-                                              t.discountEndTime,
-                                            ),
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 12,
-                                            ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: _discountColor(t.discount!),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
                                           ),
                                         ),
+                                        child: Text(
+                                          _discountText(
+                                            t.discount!,
+                                            t.discountEndTime,
+                                          ),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
                                       const SizedBox(width: 6),
                                       _buildSeedLeechInfo(
                                         t.seeders,

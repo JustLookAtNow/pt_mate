@@ -2,15 +2,44 @@ import 'dart:convert';
 
 // 网站类型枚举
 enum SiteType {
-  mteam('M-Team', 'M-Team 站点'),
+  mteam('M-Team', 'M-Team 站点', 'API Key (x-api-key)', '从 控制台-实验室-存储令牌 获取并粘贴此处'),
+  nexusphp('NexusPHP', 'NexusPHP (1.9+) 站点', 'API Key (访问令牌)', '控制面板-设定首页-访问令牌（权限都勾上）'),
   // 未来可以添加其他站点类型
-  // nexusphp('NexusPHP', 'NexusPHP 站点'),
   // gazelle('Gazelle', 'Gazelle 站点'),
   ;
 
-  const SiteType(this.id, this.displayName);
+  const SiteType(this.id, this.displayName, this.apiKeyLabel, this.apiKeyHint);
   final String id;
   final String displayName;
+  final String apiKeyLabel;
+  final String apiKeyHint;
+
+  String get passKeyLabel {
+    switch (this) {
+      case SiteType.mteam:
+        return 'Pass Key'; // M-Team通常不需要passKey
+      case SiteType.nexusphp:
+        return 'Pass Key';
+    }
+  }
+
+  String get passKeyHint {
+    switch (this) {
+      case SiteType.mteam:
+        return '请输入Pass Key（可选）';
+      case SiteType.nexusphp:
+        return '控制面板-设定首页-密钥';
+    }
+  }
+
+  bool get requiresPassKey {
+    switch (this) {
+      case SiteType.mteam:
+        return false;
+      case SiteType.nexusphp:
+        return true;
+    }
+  }
 }
 
 // 站点功能配置
@@ -98,6 +127,8 @@ class SiteConfig {
   final String name;
   final String baseUrl; // e.g. https://kp.m-team.cc/
   final String? apiKey; // x-api-key
+  final String? passKey; // NexusPHP类型网站的passKey
+  final String? userId; // 用户ID，从fetchMemberProfile获取
   final SiteType siteType; // 网站类型
   final bool isActive; // 是否激活
   final List<SearchCategoryConfig> searchCategories; // 查询分类配置
@@ -108,6 +139,8 @@ class SiteConfig {
     required this.name,
     required this.baseUrl,
     this.apiKey,
+    this.passKey,
+    this.userId,
     this.siteType = SiteType.mteam,
     this.isActive = true,
     this.searchCategories = const [],
@@ -119,6 +152,8 @@ class SiteConfig {
     String? name,
     String? baseUrl,
     String? apiKey,
+    String? passKey,
+    String? userId,
     SiteType? siteType,
     bool? isActive,
     List<SearchCategoryConfig>? searchCategories,
@@ -128,6 +163,8 @@ class SiteConfig {
         name: name ?? this.name,
         baseUrl: baseUrl ?? this.baseUrl,
         apiKey: apiKey ?? this.apiKey,
+        passKey: passKey ?? this.passKey,
+        userId: userId ?? this.userId,
         siteType: siteType ?? this.siteType,
         isActive: isActive ?? this.isActive,
         searchCategories: searchCategories ?? this.searchCategories,
@@ -139,6 +176,8 @@ class SiteConfig {
         'name': name,
         'baseUrl': baseUrl,
         'apiKey': apiKey,
+        'passKey': passKey,
+        'userId': userId,
         'siteType': siteType.id,
         'isActive': isActive,
         'searchCategories': searchCategories.map((e) => e.toJson()).toList(),
@@ -176,8 +215,10 @@ class SiteConfig {
       name: json['name'] as String,
       baseUrl: json['baseUrl'] as String,
       apiKey: json['apiKey'] as String?,
+      passKey: json['passKey'] as String?,
+      userId: json['userId'] as String?,
       siteType: SiteType.values.firstWhere(
-        (type) => type.id == (json['siteType'] as String? ?? 'mteam'),
+        (type) => type.id == (json['siteType'] as String? ?? 'M-Team'),
         orElse: () => SiteType.mteam,
       ),
       isActive: json['isActive'] as bool? ?? true,

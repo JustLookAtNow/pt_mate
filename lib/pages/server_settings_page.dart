@@ -417,6 +417,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
   final _nameController = TextEditingController();
   final _baseUrlController = TextEditingController();
   final _apiKeyController = TextEditingController();
+  final _passKeyController = TextEditingController();
   
   SiteType _selectedSiteType = SiteType.mteam;
   int _presetIndex = -1; // -1 表示自定义
@@ -435,6 +436,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       _nameController.text = widget.site!.name;
       _baseUrlController.text = widget.site!.baseUrl;
       _apiKeyController.text = widget.site!.apiKey ?? '';
+      _passKeyController.text = widget.site!.passKey ?? '';
       _selectedSiteType = widget.site!.siteType;
       _searchCategories = List.from(widget.site!.searchCategories);
       _siteFeatures = widget.site!.features;
@@ -475,6 +477,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
     _nameController.dispose();
     _baseUrlController.dispose();
     _apiKeyController.dispose();
+    _passKeyController.dispose();
     super.dispose();
   }
 
@@ -493,6 +496,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
         name: preset.name,
         baseUrl: preset.baseUrl,
         apiKey: _apiKeyController.text.trim(),
+        passKey: _passKeyController.text.trim().isEmpty ? null : _passKeyController.text.trim(),
         siteType: _selectedSiteType,
         searchCategories: _searchCategories,
         features: _siteFeatures,
@@ -511,6 +515,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
           : _nameController.text.trim(),
       baseUrl: baseUrl.isEmpty ? 'https://api.m-team.cc/' : baseUrl,
       apiKey: _apiKeyController.text.trim(),
+      passKey: _passKeyController.text.trim().isEmpty ? null : _passKeyController.text.trim(),
       siteType: _selectedSiteType,
       searchCategories: _searchCategories,
       features: _siteFeatures,
@@ -604,13 +609,21 @@ class _SiteEditPageState extends State<SiteEditPage> {
     setState(() {
       _loading = true;
       _error = null;
+      _profile = null;
     });
     
     try {
+      // 先验证连接并获取用户信息
+      await ApiService.instance.setActiveSite(site);
+      final profile = await ApiService.instance.fetchMemberProfile();
+      
+      // 创建包含userId的最终站点配置
+      final finalSite = site.copyWith(userId: profile.userId);
+      
       if (widget.site != null) {
-        await StorageService.instance.updateSiteConfig(site);
+        await StorageService.instance.updateSiteConfig(finalSite);
       } else {
-        await StorageService.instance.addSiteConfig(site);
+        await StorageService.instance.addSiteConfig(finalSite);
       }
       
       if (mounted) {
@@ -621,7 +634,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
         Navigator.of(context).pop();
       }
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = '保存失败: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -665,8 +678,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
               ),
               const SizedBox(height: 16),
               
-              // 预设站点选择（仅M-Team类型显示）
-              if (_selectedSiteType == SiteType.mteam) ...[
+              // 预设站点选择
+              if (presets.where((site) => site.siteType == _selectedSiteType).isNotEmpty) ...[
                 DropdownButtonFormField<int>(
                   initialValue: _presetIndex,
                   decoration: const InputDecoration(
@@ -675,10 +688,11 @@ class _SiteEditPageState extends State<SiteEditPage> {
                   ),
                   items: [
                     for (int i = 0; i < presets.length; i++)
-                      DropdownMenuItem(
-                        value: i,
-                        child: Text('${presets[i].name} (${presets[i].baseUrl})'),
-                      ),
+                      if (presets[i].siteType == _selectedSiteType)
+                        DropdownMenuItem(
+                          value: i,
+                          child: Text('${presets[i].name} (${presets[i].baseUrl})'),
+                        ),
                     const DropdownMenuItem(
                       value: -1,
                       child: Text('自定义…'),
@@ -747,12 +761,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
               TextFormField(
                 controller: _apiKeyController,
                 decoration: InputDecoration(
-                  labelText: _selectedSiteType == SiteType.mteam
-                      ? 'API Key (x-api-key)'
-                      : 'API Key',
-                  hintText: _selectedSiteType == SiteType.mteam
-                      ? '从 控制台-实验室-存储令牌 获取并粘贴此处'
-                      : '请输入API密钥',
+                  labelText: _selectedSiteType.apiKeyLabel,
+                  hintText: _selectedSiteType.apiKeyHint,
                   border: const OutlineInputBorder(),
                 ),
                 obscureText: true,
@@ -763,7 +773,28 @@ class _SiteEditPageState extends State<SiteEditPage> {
                   return null;
                 },
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+              
+              // Pass Key输入（仅NexusPHP类型显示）
+              if (_selectedSiteType.requiresPassKey) ...[
+                TextFormField(
+                  controller: _passKeyController,
+                  decoration: InputDecoration(
+                    labelText: _selectedSiteType.passKeyLabel,
+                    hintText: _selectedSiteType.passKeyHint,
+                    border: const OutlineInputBorder(),
+                  ),
+                  obscureText: true,
+                  validator: (value) {
+                    if (_selectedSiteType.requiresPassKey && (value == null || value.trim().isEmpty)) {
+                      return '请输入Pass Key';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+              const SizedBox(height: 8),
               
               // 查询分类配置
               Card(
