@@ -690,6 +690,16 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         _presetIndex = value;
                         _profile = null;
                         _error = null;
+                        
+                        // 当选择预设站点时，更新搜索分类配置
+                        if (value >= 0 && value < _presetSites.length) {
+                          _searchCategories = List.from(_presetSites[value].searchCategories);
+                          _siteFeatures = _presetSites[value].features;
+                        } else {
+                          // 选择自定义时，使用默认配置
+                          _searchCategories = SearchCategoryConfig.getDefaultConfigs();
+                          _siteFeatures = SiteFeatures.mteamDefault;
+                        }
                       });
                     }
                   },

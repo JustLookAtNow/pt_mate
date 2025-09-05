@@ -431,6 +431,9 @@ class _HomePageState extends State<HomePage> {
   
   // 下载请求状态管理
   final Set<String> _pendingDownloadRequests = <String>{};
+  
+  // 当前站点配置
+  SiteConfig? _currentSite;
 
   @override
   void initState() {
@@ -454,6 +457,7 @@ class _HomePageState extends State<HomePage> {
       final activeSite = await storageService.getActiveSiteConfig();
       final categories = activeSite?.searchCategories ?? SearchCategoryConfig.getDefaultConfigs();
       setState(() {
+        _currentSite = activeSite;
         _categories = categories;
         _selectedCategoryIndex = categories.isNotEmpty ? 0 : -1;
       });
@@ -467,7 +471,10 @@ class _HomePageState extends State<HomePage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-    await _search(reset: true);
+    // 仅在站点支持种子搜索功能时执行默认搜索
+    if (_currentSite?.features.supportTorrentSearch ?? true) {
+      await _search(reset: true);
+    }
   }
 
   Future<void> _reloadCategories() async {
@@ -534,9 +541,10 @@ class _HomePageState extends State<HomePage> {
       _error = null;
     });
     try {
-      // 获取当前分类的额外参数
+      // 获取当前分类的额外参数 - 仅在站点支持高级搜索功能时使用
       Map<String, dynamic>? additionalParams;
-      if (_categories.isNotEmpty && _selectedCategoryIndex >= 0 && _selectedCategoryIndex < _categories.length) {
+      if ((_currentSite?.features.supportAdvancedSearch ?? true) && 
+          _categories.isNotEmpty && _selectedCategoryIndex >= 0 && _selectedCategoryIndex < _categories.length) {
         final currentCategory = _categories[_selectedCategoryIndex];
         if (currentCategory.parameters.isNotEmpty) {
           additionalParams = currentCategory.parseParameters();
@@ -638,6 +646,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onTorrentTap(TorrentItem item) {
+    // 检查站点是否支持种子详情功能
+    if (_currentSite?.features.supportTorrentDetail == false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前站点不支持种子详情功能')),
+      );
+      return;
+    }
+    
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) =>
@@ -793,8 +809,8 @@ class _HomePageState extends State<HomePage> {
       drawer: _AppDrawer(onSettingsChanged: _reloadCategories),
       body: Column(
         children: [
-          // 顶部用户基础信息
-          if (_profile != null)
+          // 顶部用户基础信息 - 仅在站点支持用户资料功能时显示
+          if (_profile != null && (_currentSite?.features.supportMemberProfile ?? true))
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
               child: Card(
@@ -841,62 +857,89 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                DropdownButton<int>(
-                  value: _categories.isNotEmpty && _selectedCategoryIndex >= 0 && _selectedCategoryIndex < _categories.length ? _selectedCategoryIndex : null,
-                  items: _categories.asMap().entries.map((entry) => 
-                    DropdownMenuItem(
-                      value: entry.key,
-                      child: Text(entry.value.displayName),
-                    ),
-                  ).toList(),
-                  onChanged: (v) {
-                    if (v != null && v >= 0 && v < _categories.length) {
-                      setState(() => _selectedCategoryIndex = v);
-                      _search(reset: true);
-                    }
-                  },
-                ),
-                const SizedBox(width: 8),
+                // 分类下拉菜单 - 仅在站点支持分类搜索功能时显示
+                if (_currentSite?.features.supportCategories ?? true) ...[
+                  DropdownButton<int>(
+                    value: _categories.isNotEmpty && _selectedCategoryIndex >= 0 && _selectedCategoryIndex < _categories.length ? _selectedCategoryIndex : null,
+                    items: _categories.asMap().entries.map((entry) => 
+                      DropdownMenuItem(
+                        value: entry.key,
+                        child: Text(entry.value.displayName),
+                      ),
+                    ).toList(),
+                    onChanged: (v) {
+                      if (v != null && v >= 0 && v < _categories.length) {
+                        setState(() => _selectedCategoryIndex = v);
+                        if (_currentSite?.features.supportTorrentSearch ?? true) {
+                          _search(reset: true);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('当前站点不支持搜索功能')),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 Expanded(
                   child: TextField(
                     controller: _keywordCtrl,
                     textInputAction: TextInputAction.search,
-                    decoration: const InputDecoration(
-                      hintText: '输入关键词（可选）',
-                      border: OutlineInputBorder(
+                    enabled: _currentSite?.features.supportTorrentSearch ?? true,
+                    decoration: InputDecoration(
+                      hintText: (_currentSite?.features.supportTorrentSearch ?? true) 
+                          ? '输入关键词（可选）' 
+                          : '当前站点不支持搜索功能',
+                      border: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(25)),
                       ),
-                      enabledBorder: OutlineInputBorder(
+                      enabledBorder: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(25)),
                       ),
-                      focusedBorder: OutlineInputBorder(
+                      focusedBorder: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(25)),
                       ),
                       isDense: true,
-                      contentPadding: EdgeInsets.symmetric(
+                      contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 12,
                       ),
                     ),
-                    onSubmitted: (_) => _search(reset: true),
+                    onSubmitted: (_) {
+                      if (_currentSite?.features.supportTorrentSearch ?? true) {
+                        _search(reset: true);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('当前站点不支持搜索功能')),
+                        );
+                      }
+                    },
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _onlyFavorites = !_onlyFavorites;
-                    });
-                    _search(reset: true);
-                  },
-                  icon: Icon(
-                    _onlyFavorites ? Icons.favorite : Icons.favorite_border,
-                    color: _onlyFavorites
-                        ? Theme.of(context).colorScheme.secondary
-                        : null,
+                if (_currentSite?.features.supportCollection == true)
+                  IconButton(
+                    onPressed: () {
+                      setState(() {
+                        _onlyFavorites = !_onlyFavorites;
+                      });
+                      if (_currentSite?.features.supportTorrentSearch ?? true) {
+                        _search(reset: true);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('当前站点不支持搜索功能')),
+                        );
+                      }
+                    },
+                    icon: Icon(
+                      _onlyFavorites ? Icons.favorite : Icons.favorite_border,
+                      color: _onlyFavorites
+                          ? Theme.of(context).colorScheme.secondary
+                          : null,
+                    ),
+                    tooltip: _onlyFavorites ? '显示全部' : '仅显示收藏',
                   ),
-                  tooltip: _onlyFavorites ? '显示全部' : '仅显示收藏',
-                ),
                 const SizedBox(width: 8),
                 PopupMenuButton<String>(
                   onSelected: _onSortSelected,
@@ -1150,9 +1193,11 @@ class _HomePageState extends State<HomePage> {
                                         Formatters.dataFromBytes(t.sizeBytes),
                                       ),
                                       const Spacer(),
-                                      _buildDownloadStatusIcon(
-                                        t.downloadStatus,
-                                      ),
+                                      // 下载状态图标 - 仅在站点支持下载历史功能时显示
+                                      if (_currentSite?.features.supportHistory ?? true)
+                                        _buildDownloadStatusIcon(
+                                          t.downloadStatus,
+                                        ),
                                     ],
                                   ),
                                 ],
@@ -1162,31 +1207,35 @@ class _HomePageState extends State<HomePage> {
                             Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                IconButton(
-                                  onPressed: () => _onToggleCollection(t),
-                                  icon: Icon(
-                                    t.collection
-                                        ? Icons.favorite
-                                        : Icons.favorite_border,
-                                    color: t.collection ? Colors.red : null,
+                                // 收藏按钮 - 仅在站点支持收藏功能时显示
+                                if (_currentSite?.features.supportCollection ?? true)
+                                  IconButton(
+                                    onPressed: () => _onToggleCollection(t),
+                                    icon: Icon(
+                                      t.collection
+                                          ? Icons.favorite
+                                          : Icons.favorite_border,
+                                      color: t.collection ? Colors.red : null,
+                                    ),
+                                    tooltip: t.collection ? '取消收藏' : '收藏',
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 40,
+                                      minHeight: 40,
+                                    ),
                                   ),
-                                  tooltip: t.collection ? '取消收藏' : '收藏',
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(
-                                    minWidth: 40,
-                                    minHeight: 40,
+                                // 下载按钮 - 仅在站点支持下载功能时显示
+                                if (_currentSite?.features.supportDownload ?? true)
+                                  IconButton(
+                                    onPressed: () => _onDownload(t),
+                                    icon: const Icon(Icons.download_outlined),
+                                    tooltip: '下载',
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 40,
+                                      minHeight: 40,
+                                    ),
                                   ),
-                                ),
-                                IconButton(
-                                  onPressed: () => _onDownload(t),
-                                  icon: const Icon(Icons.download_outlined),
-                                  tooltip: '下载',
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(
-                                    minWidth: 40,
-                                    minHeight: 40,
-                                  ),
-                                ),
                               ],
                             ),
                           ],
@@ -1229,25 +1278,30 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _selectedItems.isNotEmpty
-                          ? _onBatchFavorite
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
+                  // 批量收藏按钮 - 仅在站点支持收藏功能时显示
+                  if (_currentSite?.features.supportCollection ?? true) ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _selectedItems.isNotEmpty
+                            ? _onBatchFavorite
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: Text('收藏 (${_selectedItems.length})'),
                       ),
-                      child: Text('收藏 (${_selectedItems.length})'),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _selectedItems.isNotEmpty
-                          ? _onBatchDownload
-                          : null,
-                      style: ElevatedButton.styleFrom(
+                    const SizedBox(width: 12),
+                  ],
+                  // 批量下载按钮 - 仅在站点支持下载功能时显示
+                  if (_currentSite?.features.supportDownload ?? true)
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _selectedItems.isNotEmpty
+                            ? _onBatchDownload
+                            : null,
+                        style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.primary,
                         foregroundColor: Theme.of(
                           context,

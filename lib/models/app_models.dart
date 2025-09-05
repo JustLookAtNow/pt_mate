@@ -67,14 +67,14 @@ class SiteFeatures {
       };
 
   factory SiteFeatures.fromJson(Map<String, dynamic> json) => SiteFeatures(
-        supportMemberProfile: json['supportMemberProfile'] as bool? ?? true,
-        supportTorrentSearch: json['supportTorrentSearch'] as bool? ?? true,
-        supportTorrentDetail: json['supportTorrentDetail'] as bool? ?? true,
-        supportDownload: json['supportDownload'] as bool? ?? true,
-        supportCollection: json['supportCollection'] as bool? ?? true,
-        supportHistory: json['supportHistory'] as bool? ?? true,
-        supportCategories: json['supportCategories'] as bool? ?? true,
-        supportAdvancedSearch: json['supportAdvancedSearch'] as bool? ?? true,
+        supportMemberProfile: json['userProfile'] ?? json['supportMemberProfile'] as bool? ?? true,
+        supportTorrentSearch: json['torrentSearch'] ?? json['supportTorrentSearch'] as bool? ?? true,
+        supportTorrentDetail: json['torrentDetail'] ?? json['supportTorrentDetail'] as bool? ?? true,
+        supportDownload: json['download'] ?? json['supportDownload'] as bool? ?? true,
+        supportCollection: json['favorites'] ?? json['supportCollection'] as bool? ?? true,
+        supportHistory: json['downloadHistory'] ?? json['supportHistory'] as bool? ?? true,
+        supportCategories: json['categorySearch'] ?? json['supportCategories'] as bool? ?? true,
+        supportAdvancedSearch: json['advancedSearch'] ?? json['supportAdvancedSearch'] as bool? ?? true,
       );
 
   // M-Team 站点的默认功能配置
