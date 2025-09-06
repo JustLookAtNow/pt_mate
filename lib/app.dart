@@ -1628,6 +1628,18 @@ class _AppDrawer extends StatelessWidget {
                 );
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.dns),
+              title: const Text('服务器配置'),
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ServerSettingsPage(),
+                  ),
+                );
+              },
+            ),
 
             ListTile(
               leading: const Icon(Icons.settings_outlined),

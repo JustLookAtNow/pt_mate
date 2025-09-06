@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../services/storage/storage_service.dart';
 import '../services/theme/theme_manager.dart';
 import '../widgets/qb_speed_indicator.dart';
-import 'server_settings_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -32,28 +31,6 @@ class _SettingsBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // 服务器设置
-        Text(
-          '服务器设置',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 8),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.dns),
-            title: const Text('服务器配置'),
-            subtitle: const Text('管理多个站点服务器配置'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const ServerSettingsPage(),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 16),
         
         // 主题设置
         Text(
