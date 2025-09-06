@@ -116,7 +116,7 @@
     },
     {
       "id": "ptskit",
-      "name": "PTSKit (NexusPHP)",
+      "name": "PTSKit",
       "baseUrl": "https://www.ptskit.org/",
       "siteType": "NexusPHP",
       "searchCategories": [
@@ -124,6 +124,21 @@
           "id": "all",
           "displayName": "全部",
           "parameters": "{}"
+        },
+        {
+          "id": "shotVideo",
+          "displayName": "短剧",
+          "parameters": "{\"category\":\"chd#401\"}"
+        },
+        {
+          "id": "movie",
+          "displayName": "电影",
+          "parameters": "{\"category\":\"chd#404\"}"
+        },
+        {
+          "id": "tvshow",
+          "displayName": "电视",
+          "parameters": "{\"category\":\"chd#405\"}"
         }
       ],
       "features": {
@@ -133,8 +148,42 @@
         "download": true,
         "favorites": false,
         "downloadHistory": false,
-        "categorySearch": false,
-        "advancedSearch": false
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    },
+    {
+      "id": "hxpt",
+      "name": "好学",
+      "baseUrl": "https://www.hxpt.org/",
+      "siteType": "NexusPHP",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    },
+    {
+      "id": "mypt",
+      "name": "我的",
+      "baseUrl": "https://cc.mypt.cc/",
+      "siteType": "NexusPHP",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": true,
+        "advancedSearch": true
       }
     }
   ],
@@ -178,13 +227,7 @@
     "NexusPHP": {
       "name": "NexusPHP 站点",
       "baseUrl": "https://",
-      "searchCategories": [
-        {
-          "id": "all",
-          "displayName": "全部",
-          "parameters": "{}"
-        }
-      ],
+      "searchCategories": [],
       "features": {
         "userProfile": true,
         "torrentSearch": true,
@@ -193,7 +236,7 @@
         "favorites": false,
         "downloadHistory": false,
         "categorySearch": true,
-        "advancedSearch": false
+        "advancedSearch": true
       }
     }
   }

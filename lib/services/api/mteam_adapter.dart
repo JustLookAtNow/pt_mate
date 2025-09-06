@@ -329,7 +329,10 @@ class MTeamAdapter extends SiteAdapter {
   
   @override
   Future<List<SearchCategoryConfig>> getSearchCategories() async {
-    // 从JSON配置文件中加载默认的分类配置，而不是从已保存的站点配置中读取
-    return await SiteConfigService.getDefaultSearchCategories(_siteConfig.siteType.id);
+    // 从JSON配置文件中加载默认的分类配置，优先匹配baseUrl，然后类型
+    return await SiteConfigService.getDefaultSearchCategories(
+      _siteConfig.siteType.id,
+      baseUrl: _siteConfig.baseUrl,
+    );
   }
 }

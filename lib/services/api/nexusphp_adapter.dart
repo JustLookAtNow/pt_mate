@@ -5,6 +5,7 @@ import 'dart:convert';
 import '../../models/app_models.dart';
 import 'api_client.dart';
 import 'site_adapter.dart';
+import '../site_config_service.dart';
 
 /// NexusPHP 站点适配器
 /// 实现 NexusPHP (1.9+) 站点的 API 调用
@@ -103,21 +104,29 @@ class NexusPHPAdapter implements SiteAdapter {
       'per_page': pageSize.toString(),
       'include_fields[torrent]': 'download_url',
     };
-    
+
     if (keyword != null && keyword.isNotEmpty) {
       params['filter[title]'] = keyword;
     }
-    
+    var url = '/api/v1/torrents';
     // 添加额外参数
-    if (additionalParams != null) {
-      params.addAll(additionalParams);
+    if (additionalParams != null && additionalParams.isNotEmpty) {
+      //
+      for (var add in additionalParams.entries) {
+        if (add.key == 'category') {
+          var category = add.value.toString().split('#');
+          if (category.length == 2) {
+            url += '/${category[0]}';
+            params['filter[category]'] = category[1];
+          }
+        } else {
+          params[add.key] = add.value;
+        }
+      }
     }
-    
-    final response = await _dio.get(
-      '/api/v1/torrents',
-      queryParameters: params,
-    );
-    
+
+    final response = await _dio.get(url, queryParameters: params);
+
     if (response.statusCode == 200) {
       final data = response.data;
       if (data['ret'] == 0) {
@@ -129,13 +138,13 @@ class NexusPHPAdapter implements SiteAdapter {
       throw Exception('HTTP ${response.statusCode}: ${response.data}');
     }
   }
-  
+
   TorrentSearchResult _parseTorrentSearchResult(Map<String, dynamic> data) {
     final meta = data['meta'] as Map<String, dynamic>;
     final items = (data['data'] as List)
         .map((item) => _parseTorrentItem(item as Map<String, dynamic>))
         .toList();
-    
+
     return TorrentSearchResult(
       pageNumber: meta['current_page'] as int,
       pageSize: meta['per_page'] as int,
@@ -144,7 +153,7 @@ class NexusPHPAdapter implements SiteAdapter {
       items: items,
     );
   }
-  
+
   TorrentItem _parseTorrentItem(Map<String, dynamic> item) {
     // 解析促销信息
     String discount = 'Normal';
@@ -152,13 +161,14 @@ class NexusPHPAdapter implements SiteAdapter {
     if (promotionInfo != null) {
       final originalText = promotionInfo['text'] as String? ?? 'Normal';
       // 映射促销信息以兼容现有的显示逻辑
-      if (originalText.toLowerCase().contains('2x') && originalText.toLowerCase().contains('free')) {
+      if (originalText.toLowerCase().contains('2x') &&
+          originalText.toLowerCase().contains('free')) {
         discount = 'Free*2';
       } else {
         discount = originalText;
       }
     }
-    
+
     return TorrentItem(
       id: (item['id'] as int).toString(),
       name: item['name'] as String,
@@ -180,13 +190,13 @@ class NexusPHPAdapter implements SiteAdapter {
     try {
       final response = await _dio.get(
         '/api/v1/detail/$id',
-        queryParameters: {
-          'includes': 'extra',
-        },
+        queryParameters: {'includes': 'extra'},
       );
 
       final data = response.data;
-      if (data == null || data['data'] == null || data['data']['data'] == null) {
+      if (data == null ||
+          data['data'] == null ||
+          data['data']['data'] == null) {
         throw Exception('响应数据格式错误');
       }
 
@@ -210,13 +220,9 @@ class NexusPHPAdapter implements SiteAdapter {
     if (_siteConfig.userId == null || _siteConfig.userId!.isEmpty) {
       throw Exception('站点配置缺少userId，无法生成下载链接');
     }
-    
+
     // https://www.ptskit.org/download.php?downhash={userId}.{jwt}
-    final jwt = getDownLoadHash(
-      _siteConfig.passKey!,
-      id,
-      _siteConfig.userId!,
-    );
+    final jwt = getDownLoadHash(_siteConfig.passKey!, id, _siteConfig.userId!);
     return '${_siteConfig.baseUrl}download.php?downhash=${_siteConfig.userId!}.$jwt';
   }
 
@@ -281,11 +287,58 @@ class NexusPHPAdapter implements SiteAdapter {
 
     return token;
   }
-  
+
   @override
   Future<List<SearchCategoryConfig>> getSearchCategories() async {
-    // TODO: NexusPHP站点分类配置获取待定
-    // 暂时返回站点配置中的分类配置
-    return _siteConfig.searchCategories;
+    // 优先匹配baseUrl，然后类型
+    final defaultCategories = await SiteConfigService.getDefaultSearchCategories(
+      _siteConfig.siteType.id,
+      baseUrl: _siteConfig.baseUrl,
+    );
+
+    // 如果获取到默认分类配置，则直接返回
+    if (defaultCategories.isNotEmpty) {
+      return defaultCategories;
+    }
+
+    try {
+      final response = await _dio.get('/api/v1/sections');
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        if (data['ret'] == 0 && data['data'] != null) {
+          final List<SearchCategoryConfig> categories = [];
+
+          // 双循环遍历sections和categories
+          final sectionsData = data['data']['data'] as List;
+          for (final section in sectionsData) {
+            final sectionName = section['name'] as String;
+            final sectionDisplayName = section['display_name'] as String;
+            final categoriesData = section['categories'] as List;
+
+            for (final category in categoriesData) {
+              final categoryId = category['id'];
+              final categoryName = category['name'] as String;
+
+              categories.add(
+                SearchCategoryConfig(
+                  id: '${sectionName}_$categoryId',
+                  displayName: '$sectionDisplayName.$categoryName',
+                  parameters: '{"category":"$sectionName#$categoryId"}',
+                ),
+              );
+            }
+          }
+
+          return categories;
+        }
+      }
+
+      // 如果获取失败，返回空列表
+      return [];
+    } catch (e) {
+      // 发生异常时，返回空列表
+      return [];
+    }
   }
 }

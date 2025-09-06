@@ -472,6 +472,49 @@ class _SiteEditPageState extends State<SiteEditPage> {
     }
   }
   
+  Future<void> _loadDefaultFeatures(SiteType siteType) async {
+    try {
+      final defaultTemplate = await SiteConfigService.getDefaultTemplate(siteType.id);
+      if (defaultTemplate != null && defaultTemplate['features'] != null) {
+        setState(() {
+          _siteFeatures = SiteFeatures.fromJson(defaultTemplate['features'] as Map<String, dynamic>);
+        });
+      } else {
+        // 如果没有找到默认模板，使用硬编码的默认值
+        setState(() {
+          _siteFeatures = siteType == SiteType.nexusphp 
+              ? const SiteFeatures(
+                  supportMemberProfile: true,
+                  supportTorrentSearch: true,
+                  supportTorrentDetail: true,
+                  supportDownload: true,
+                  supportCollection: false,
+                  supportHistory: false,
+                  supportCategories: true,
+                  supportAdvancedSearch: true,
+                )
+              : SiteFeatures.mteamDefault;
+        });
+      }
+    } catch (e) {
+      // 加载失败时使用硬编码的默认值
+      setState(() {
+        _siteFeatures = siteType == SiteType.nexusphp 
+            ? const SiteFeatures(
+                supportMemberProfile: true,
+                supportTorrentSearch: true,
+                supportTorrentDetail: true,
+                supportDownload: true,
+                supportCollection: false,
+                supportHistory: false,
+                supportCategories: true,
+                supportAdvancedSearch: true,
+              )
+            : SiteFeatures.mteamDefault;
+      });
+    }
+  }
+  
 
 
 
@@ -730,7 +773,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                       _selectedSiteType = value;
                       _presetIndex = -1; // 重置预设选择为自定义
                       _searchCategories = []; // 分类配置保持为空
-                      _siteFeatures = SiteFeatures.mteamDefault;
+                      _loadDefaultFeatures(value);
                     });
                   }
                 },
@@ -750,7 +793,11 @@ class _SiteEditPageState extends State<SiteEditPage> {
                       if (presets[i].siteType == _selectedSiteType)
                         DropdownMenuItem(
                           value: i,
-                          child: Text('${presets[i].name} (${presets[i].baseUrl})'),
+                          child: Text(
+                            '${presets[i].name} (${presets[i].baseUrl})',
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
                         ),
                     const DropdownMenuItem(
                       value: -1,
@@ -771,7 +818,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         } else {
                           // 选择自定义时，分类配置也保持为空
                           _searchCategories = [];
-                          _siteFeatures = SiteFeatures.mteamDefault;
+                          _loadDefaultFeatures(_selectedSiteType);
                         }
                       });
                     }
