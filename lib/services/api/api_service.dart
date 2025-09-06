@@ -109,7 +109,10 @@ class ApiService {
   }
   
   /// 生成下载令牌
-  Future<String> genDlToken({required String id}) async {
+  Future<String> genDlToken({required String id,String? url}) async {
+    if (url != null && url.isNotEmpty) {
+      return url;
+    }
     if (_activeAdapter == null) {
       throw StateError('No active site adapter available');
     }

@@ -800,9 +800,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                   ),
                   obscureText: true,
                   validator: (value) {
-                    if (_selectedSiteType.requiresPassKey && (value == null || value.trim().isEmpty)) {
-                      return '请输入Pass Key';
-                    }
+                    // Pass Key 现在对所有站点类型都是可选的
                     return null;
                   },
                 ),

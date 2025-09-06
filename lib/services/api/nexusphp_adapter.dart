@@ -101,6 +101,7 @@ class NexusPHPAdapter implements SiteAdapter {
     final Map<String, dynamic> params = {
       'page': pageNumber.toString(),
       'per_page': pageSize.toString(),
+      'include_fields[torrent]': 'download_url',
     };
     
     if (keyword != null && keyword.isNotEmpty) {
@@ -164,6 +165,7 @@ class NexusPHPAdapter implements SiteAdapter {
       smallDescr: item['small_descr'] as String? ?? '',
       discount: discount,
       discountEndTime: null, // 暂时没有
+      downloadUrl: item['download_url'] as String?,
       seeders: item['seeders'] as int,
       leechers: item['leechers'] as int,
       sizeBytes: item['size'] as int,
@@ -180,6 +182,7 @@ class NexusPHPAdapter implements SiteAdapter {
     return TorrentDetail(descr: '临时数据 - NexusPHP种子详情');
   }
 
+  //实际上调用不到了
   @override
   Future<String> genDlToken({required String id}) async {
     // 检查必要的配置参数

@@ -19,7 +19,7 @@ enum SiteType {
       case SiteType.mteam:
         return 'Pass Key'; // M-Team通常不需要passKey
       case SiteType.nexusphp:
-        return 'Pass Key';
+        return 'Pass Key (可选)';
     }
   }
 
@@ -28,7 +28,7 @@ enum SiteType {
       case SiteType.mteam:
         return '请输入Pass Key（可选）';
       case SiteType.nexusphp:
-        return '控制面板-设定首页-密钥';
+        return '控制面板-设定首页-密钥（可选）';
     }
   }
 
@@ -37,7 +37,7 @@ enum SiteType {
       case SiteType.mteam:
         return false;
       case SiteType.nexusphp:
-        return true;
+        return false;
     }
   }
 }

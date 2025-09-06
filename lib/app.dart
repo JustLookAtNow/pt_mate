@@ -665,7 +665,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _onDownload(TorrentItem item) async {
     try {
       // 1. 获取下载 URL
-      final url = await ApiService.instance.genDlToken(id: item.id);
+      final url = await ApiService.instance.genDlToken(id: item.id,url: item.downloadUrl);
 
       // 2. 弹出对话框让用户选择下载器设置
       if (!mounted) return;
@@ -725,6 +725,7 @@ class _HomePageState extends State<HomePage> {
           smallDescr: item.smallDescr,
           discount: item.discount,
           discountEndTime: item.discountEndTime,
+          downloadUrl: item.downloadUrl,
           seeders: item.seeders,
           leechers: item.leechers,
           sizeBytes: item.sizeBytes,
@@ -777,6 +778,7 @@ class _HomePageState extends State<HomePage> {
             smallDescr: item.smallDescr,
             discount: item.discount,
             discountEndTime: item.discountEndTime,
+            downloadUrl: item.downloadUrl,
             seeders: item.seeders,
             leechers: item.leechers,
             sizeBytes: item.sizeBytes,
@@ -1486,7 +1488,7 @@ class _HomePageState extends State<HomePage> {
         _pendingDownloadRequests.add(item.id);
         
         // 获取下载 URL
-        final url = await ApiService.instance.genDlToken(id: item.id);
+        final url = await ApiService.instance.genDlToken(id: item.id,url: item.downloadUrl);
         
         // 发送到 qBittorrent
         await QbService.instance.addTorrentByUrl(

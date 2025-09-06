@@ -41,6 +41,7 @@ class TorrentItem {
   final String smallDescr;
   final String? discount; // e.g., FREE, PERCENT_50
   final String? discountEndTime; // e.g., 2025-08-27 21:16:48
+  final String? downloadUrl; //下载链接，有些网站可以直接通过列表接口获取到
   final int seeders;
   final int leechers;
   final int sizeBytes;
@@ -54,6 +55,7 @@ class TorrentItem {
     required this.smallDescr,
     required this.discount,
     required this.discountEndTime,
+    required this.downloadUrl,
     required this.seeders,
     required this.leechers,
     required this.sizeBytes,
