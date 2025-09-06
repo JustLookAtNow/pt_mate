@@ -51,4 +51,30 @@ class SiteConfigService {
       return null;
     }
   }
+  
+  /// 根据站点类型获取默认的搜索分类配置
+  static Future<List<SearchCategoryConfig>> getDefaultSearchCategories(String siteType) async {
+    try {
+      // 从assets读取JSON文件
+      final String jsonString = await rootBundle.loadString(_configPath);
+      final Map<String, dynamic> jsonData = json.decode(jsonString);
+      
+      // 查找第一个匹配站点类型的预设站点
+      final List<dynamic> presetSitesJson = jsonData['presetSites'] ?? [];
+      for (final siteJson in presetSitesJson) {
+        if (siteJson['siteType'] == siteType) {
+          final List<dynamic> categoriesJson = siteJson['searchCategories'] ?? [];
+          return categoriesJson
+              .map((categoryJson) => SearchCategoryConfig.fromJson(categoryJson))
+              .toList();
+        }
+      }
+      
+      // 如果没有找到匹配的站点类型，返回空列表
+      return [];
+    } catch (e) {
+      // 如果加载失败，返回空列表
+      return [];
+    }
+  }
 }

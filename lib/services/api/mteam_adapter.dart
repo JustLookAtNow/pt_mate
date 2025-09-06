@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import '../../models/app_models.dart';
 import 'site_adapter.dart';
 import 'api_client.dart';
+import '../site_config_service.dart';
 
 /// M-Team站点适配器实现
 class MTeamAdapter extends SiteAdapter {
@@ -324,5 +325,11 @@ class MTeamAdapter extends SiteAdapter {
     } catch (e) {
       return false;
     }
+  }
+  
+  @override
+  Future<List<SearchCategoryConfig>> getSearchCategories() async {
+    // 从JSON配置文件中加载默认的分类配置，而不是从已保存的站点配置中读取
+    return await SiteConfigService.getDefaultSearchCategories(_siteConfig.siteType.id);
   }
 }

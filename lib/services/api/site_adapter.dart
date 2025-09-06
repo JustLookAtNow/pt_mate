@@ -38,6 +38,9 @@ abstract class SiteAdapter {
   
   /// 测试连接是否有效
   Future<bool> testConnection();
+  
+  /// 获取站点的分类条件配置
+  Future<List<SearchCategoryConfig>> getSearchCategories();
 }
 
 /// 站点适配器工厂

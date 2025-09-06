@@ -281,4 +281,11 @@ class NexusPHPAdapter implements SiteAdapter {
 
     return token;
   }
+  
+  @override
+  Future<List<SearchCategoryConfig>> getSearchCategories() async {
+    // TODO: NexusPHP站点分类配置获取待定
+    // 暂时返回站点配置中的分类配置
+    return _siteConfig.searchCategories;
+  }
 }
