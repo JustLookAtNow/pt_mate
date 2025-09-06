@@ -129,7 +129,7 @@
       "features": {
         "userProfile": true,
         "torrentSearch": true,
-        "torrentDetail": false,
+        "torrentDetail": true,
         "download": true,
         "favorites": false,
         "downloadHistory": false,

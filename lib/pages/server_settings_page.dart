@@ -241,7 +241,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                           borderRadius: BorderRadius.circular(12),
                                         ),
                                         child: Text(
-                                          '当前使用',
+                                          '当前',
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: Theme.of(context).colorScheme.onPrimary,

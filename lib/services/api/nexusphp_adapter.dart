@@ -177,9 +177,27 @@ class NexusPHPAdapter implements SiteAdapter {
 
   @override
   Future<TorrentDetail> fetchTorrentDetail(String id) async {
-    // TODO: 实现NexusPHP种子详情获取
-    // 临时返回默认数据
-    return TorrentDetail(descr: '临时数据 - NexusPHP种子详情');
+    try {
+      final response = await _dio.get(
+        '/api/v1/detail/$id',
+        queryParameters: {
+          'includes': 'extra',
+        },
+      );
+
+      final data = response.data;
+      if (data == null || data['data'] == null || data['data']['data'] == null) {
+        throw Exception('响应数据格式错误');
+      }
+
+      final torrentData = data['data']['data'];
+      final extra = torrentData['extra'] as Map<String, dynamic>?;
+      final descr = extra?['descr']?.toString() ?? '';
+
+      return TorrentDetail(descr: descr);
+    } catch (e) {
+      throw Exception('获取种子详情失败: $e');
+    }
   }
 
   //实际上调用不到了
