@@ -137,5 +137,64 @@
         "advancedSearch": false
       }
     }
-  ]
+  ],
+  "defaultTemplates": {
+    "M-Team": {
+      "name": "M-Team 站点",
+      "baseUrl": "https://",
+      "searchCategories": [
+        {
+          "id": "normal",
+          "displayName": "综合",
+          "parameters": "{\"mode\": \"normal\"}"
+        },
+        {
+          "id": "tvshow",
+          "displayName": "电视",
+          "parameters": "{\"mode\": \"tvshow\"}"
+        },
+        {
+          "id": "movie",
+          "displayName": "电影",
+          "parameters": "{\"mode\": \"movie\"}"
+        },
+        {
+          "id": "official",
+          "displayName": "官组",
+          "parameters": "{\"mode\": \"normal\", \"teams\": [\"44\", \"9\", \"43\"]}"
+        }
+      ],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    },
+    "NexusPHP": {
+      "name": "NexusPHP 站点",
+      "baseUrl": "https://",
+      "searchCategories": [
+        {
+          "id": "all",
+          "displayName": "全部",
+          "parameters": "{}"
+        }
+      ],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": true,
+        "advancedSearch": false
+      }
+    }
+  }
 }

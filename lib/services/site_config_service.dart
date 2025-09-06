@@ -31,4 +31,24 @@ class SiteConfigService {
   static SiteFeatures getDefaultFeatures() {
     return SiteFeatures.mteamDefault;
   }
+  
+  /// 根据站点类型获取默认模板配置
+  static Future<Map<String, dynamic>?> getDefaultTemplate(String siteType) async {
+    try {
+      // 从assets读取JSON文件
+      final String jsonString = await rootBundle.loadString(_configPath);
+      final Map<String, dynamic> jsonData = json.decode(jsonString);
+      
+      // 获取默认模板配置
+      final Map<String, dynamic>? templates = jsonData['defaultTemplates'];
+      if (templates != null && templates.containsKey(siteType)) {
+        return templates[siteType] as Map<String, dynamic>;
+      }
+      
+      return null;
+    } catch (e) {
+      // 如果加载失败，返回null
+      return null;
+    }
+  }
 }

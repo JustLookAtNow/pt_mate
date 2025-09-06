@@ -441,8 +441,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
       _searchCategories = List.from(widget.site!.searchCategories);
       _siteFeatures = widget.site!.features;
     } else {
-      _searchCategories = SearchCategoryConfig.getDefaultConfigs();
-      _siteFeatures = SiteFeatures.mteamDefault;
+      // 新建站点时，加载默认模板
+      _loadDefaultTemplateForSiteType();
     }
   }
   
@@ -468,6 +468,56 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // 加载失败时使用空列表
       setState(() {
         _presetSites = [];
+      });
+    }
+  }
+  
+
+  /// 加载对应站点类型的默认模板配置
+  Future<void> _loadDefaultTemplateForSiteType() async {
+    try {
+      final template = await SiteConfigService.getDefaultTemplate(_selectedSiteType.id);
+      if (template != null) {
+        setState(() {
+          // 加载默认名称
+          if (_nameController.text.isEmpty) {
+            _nameController.text = template['name'] ?? '';
+          }
+          
+          // 加载默认URL（如果当前为空）
+          if (_baseUrlController.text.isEmpty) {
+            _baseUrlController.text = template['baseUrl'] ?? '';
+          }
+          
+          // 加载搜索分类配置
+          if (template['searchCategories'] != null) {
+            final categoriesJson = template['searchCategories'] as List;
+            _searchCategories = categoriesJson
+                .map((json) => SearchCategoryConfig.fromJson(json as Map<String, dynamic>))
+                .toList();
+          } else {
+            _searchCategories = SearchCategoryConfig.getDefaultConfigs();
+          }
+          
+          // 加载功能配置
+          if (template['features'] != null) {
+            _siteFeatures = SiteFeatures.fromJson(template['features'] as Map<String, dynamic>);
+          } else {
+            _siteFeatures = SiteFeatures.mteamDefault;
+          }
+        });
+      } else {
+        // 如果没有找到模板，使用默认配置
+        setState(() {
+          _searchCategories = SearchCategoryConfig.getDefaultConfigs();
+          _siteFeatures = SiteFeatures.mteamDefault;
+        });
+      }
+    } catch (e) {
+      // 加载失败时使用默认配置
+      setState(() {
+        _searchCategories = SearchCategoryConfig.getDefaultConfigs();
+        _siteFeatures = SiteFeatures.mteamDefault;
       });
     }
   }
@@ -685,8 +735,10 @@ class _SiteEditPageState extends State<SiteEditPage> {
                   if (value != null) {
                     setState(() {
                       _selectedSiteType = value;
-                      _presetIndex = -1; // 重置预设选择
+                      _presetIndex = -1; // 重置预设选择为自定义
                     });
+                    // 选择网站类型时直接加载默认模板
+                    _loadDefaultTemplateForSiteType();
                   }
                 },
               ),
@@ -724,9 +776,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
                           _searchCategories = List.from(_presetSites[value].searchCategories);
                           _siteFeatures = _presetSites[value].features;
                         } else {
-                          // 选择自定义时，使用默认配置
-                          _searchCategories = SearchCategoryConfig.getDefaultConfigs();
-                          _siteFeatures = SiteFeatures.mteamDefault;
+                          // 选择自定义时，加载对应站点类型的默认模板
+                          _loadDefaultTemplateForSiteType();
                         }
                       });
                     }
