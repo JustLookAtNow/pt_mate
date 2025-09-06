@@ -712,6 +712,11 @@ class _SiteEditPageState extends State<SiteEditPage> {
         final activeSiteId = await StorageService.instance.getActiveSiteId();
         if (activeSiteId == finalSite.id) {
           await ApiService.instance.setActiveSite(finalSite);
+          // 通知AppState更新
+          if (mounted) {
+            final appState = context.read<AppState>();
+            await appState.loadInitial();
+          }
         }
       } else {
         await StorageService.instance.addSiteConfig(finalSite);
