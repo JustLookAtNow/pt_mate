@@ -1,7 +1,7 @@
 {
   "presetSites": [
     {
-      "id": "mteam-adult",
+      "id": "mteam-kp",
       "name": "M-Team - KP",
       "baseUrl": "https://kp.m-team.cc",
       "siteType": "M-Team",
@@ -78,7 +78,7 @@
     },
     {
       "id": "mteam-api",
-      "name": "M-Team - API",
+      "name": "M-Team - 主站",
       "baseUrl": "https://api.m-team.cc",
       "siteType": "M-Team",
       "searchCategories": [
@@ -108,7 +108,7 @@
         "torrentSearch": true,
         "torrentDetail": true,
         "download": true,
-        "favorites": false,
+        "favorites": true,
         "downloadHistory": true,
         "categorySearch": true,
         "advancedSearch": true
