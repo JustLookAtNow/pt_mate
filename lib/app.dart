@@ -547,7 +547,17 @@ class _HomePageState extends State<HomePage> {
         
         return Scaffold(
           appBar: AppBar(
-            title: Text('${appState.site?.name ?? 'PT Mate'} - PT Mate'),
+            title: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: appState.site?.name ?? 'PT Mate'),
+                  TextSpan(
+                    text: ' - PT Mate',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
             actions: const [QbSpeedIndicator()],
           ),
           drawer: _AppDrawer(onSettingsChanged: _reloadCategories),
