@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
-import 'package:flutter_application_m_team/services/api/nexusphp_adapter.dart';
+import 'package:pt_mate/services/api/nexusphp_adapter.dart';
 
 void main() {
   group('NexusPHPAdapter Tests', () {

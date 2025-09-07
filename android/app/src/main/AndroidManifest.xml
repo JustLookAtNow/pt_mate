@@ -11,7 +11,7 @@
         </intent>
     </queries>
     <application
-        android:label="M-Team Assist"
+        android:label="PT Mate"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

@@ -1,4 +1,4 @@
-package com.just_look_at_now.m_team
+package com.github.justlookatnow.ptmate
 
 import io.flutter.embedding.android.FlutterActivity
 
