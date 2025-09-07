@@ -2,7 +2,7 @@
   "presetSites": [
     {
       "id": "mteam-kp",
-      "name": "M-Team - KP",
+      "name": "M-Team(KP)",
       "baseUrl": "https://kp.m-team.cc",
       "siteType": "M-Team",
       "searchCategories": [
@@ -40,7 +40,7 @@
     },
     {
       "id": "mteam-tp",
-      "name": "M-Team - TP",
+      "name": "M-Team(TP)",
       "baseUrl": "https://tp.m-team.cc",
       "siteType": "M-Team",
       "searchCategories": [
@@ -78,7 +78,7 @@
     },
     {
       "id": "mteam-api",
-      "name": "M-Team - 主站",
+      "name": "M-Team",
       "baseUrl": "https://api.m-team.cc",
       "siteType": "M-Team",
       "searchCategories": [

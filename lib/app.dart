@@ -62,7 +62,7 @@ class MTeamApp extends StatelessWidget {
         builder: (context, themeManager, child) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
-            title: 'M-Team',
+            title: 'PT Mate',
             theme: themeManager.lightTheme,
             darkTheme: themeManager.darkTheme,
             themeMode: themeManager.flutterThemeMode,
@@ -547,7 +547,7 @@ class _HomePageState extends State<HomePage> {
         
         return Scaffold(
           appBar: AppBar(
-            title: const Text('M-Team 首页'),
+            title: Text('${appState.site?.name ?? 'PT Mate'} - PT Mate'),
             actions: const [QbSpeedIndicator()],
           ),
           drawer: _AppDrawer(onSettingsChanged: _reloadCategories),
@@ -1300,26 +1300,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class HomePlaceholderPage extends StatelessWidget {
-  const HomePlaceholderPage({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    final site = context.watch<AppState>().site;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('M-Team 首页（占位）'),
-        actions: const [QbSpeedIndicator()],
-      ),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [Text('已保存站点：${site?.name ?? ''}')],
-        ),
-      ),
-    );
-  }
-}
 
 // 应用左侧抽屉
 class _AppDrawer extends StatelessWidget {
@@ -1337,7 +1318,7 @@ class _AppDrawer extends StatelessWidget {
               child: Align(
                 alignment: Alignment.bottomLeft,
                 child: Text(
-                  'M-Team',
+                  'PT Mate',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
                 ),
               ),

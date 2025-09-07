@@ -7,7 +7,7 @@ import '../services/api/api_service.dart';
 import '../services/api/api_client.dart';
 import '../services/site_config_service.dart';
 import '../widgets/qb_speed_indicator.dart';
-import '../widgets/server_settings_drawer.dart';
+
 import '../utils/format.dart';
 import '../app.dart';
 
@@ -140,9 +140,14 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('服务器设置'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+        ),
         actions: const [QbSpeedIndicator()],
       ),
-      drawer: const ServerSettingsDrawer(),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
