@@ -64,7 +64,7 @@ mode:"normal";teams:["44","9","43"]
 #### 参数说明(m-team)
 - `mode`：搜索模式（如 "normal"、"movie" 等）
 - `teams`：制作组ID数组
-- `category`：分类ID数组
+- `categories`：分类ID数组 （数组格式，如：["407", "420"]）
 - `discount`：促销（如 "FREE"、"PERCENT_50" 等）
 - 其他自定义参数请自行在浏览器中的网络请求里面查找。
 
