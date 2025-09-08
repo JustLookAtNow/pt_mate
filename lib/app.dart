@@ -911,28 +911,29 @@ class _HomePageState extends State<HomePage> {
                                   const SizedBox(height: 4),
                                   Row(
                                     children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: _discountColor(t.discount!),
-                                          borderRadius: BorderRadius.circular(
-                                            4,
+                                      if (t.discount != null)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: _discountColor(t.discount!),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            _discountText(
+                                              t.discount!,
+                                              t.discountEndTime,
+                                            ),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                            ),
                                           ),
                                         ),
-                                        child: Text(
-                                          _discountText(
-                                            t.discount!,
-                                            t.discountEndTime,
-                                          ),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
                                       const SizedBox(width: 6),
                                       _buildSeedLeechInfo(
                                         t.seeders,
