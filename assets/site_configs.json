@@ -185,6 +185,23 @@
         "categorySearch": true,
         "advancedSearch": true
       }
+    },
+    {
+      "id": "ptzone",
+      "name": "PTZone",
+      "baseUrl": "https://ptzone.xyz/",
+      "siteType": "NexusPHP",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
     }
   ],
   "defaultTemplates": {
