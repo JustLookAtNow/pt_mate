@@ -26,6 +26,12 @@
 - **图片查看器**：支持缩放、平移的全屏图片浏览
 - **安全存储**：敏感信息（Passkey、密码）安全加密存储
 
+### 截图
+![截图1](screenshots/Screenshot_1.jpg)
+![截图2](screenshots/Screenshot_2.jpg)
+![截图3](screenshots/Screenshot_3.jpg)
+
+
 ## 使用说明
 
 ### 动态查询条件配置
