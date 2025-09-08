@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
 import '../services/api/api_client.dart';
+import '../services/api/api_service.dart';
 import '../services/image_http_client.dart';
 import '../services/storage/storage_service.dart';
 
@@ -48,7 +49,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     });
 
     try {
-      final detail = await ApiClient.instance.fetchTorrentDetail(widget.torrentId);
+      final detail = await ApiService.instance.fetchTorrentDetail(widget.torrentId);
       setState(() {
         _detail = detail;
         _loading = false;

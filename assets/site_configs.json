@@ -1,0 +1,260 @@
+{
+  "presetSites": [
+    {
+      "id": "mteam-kp",
+      "name": "M-Team(KP)",
+      "baseUrl": "https://kp.m-team.cc",
+      "siteType": "M-Team",
+      "searchCategories": [
+        {
+          "id": "normal",
+          "displayName": "综合",
+          "parameters": "{\"mode\": \"normal\"}"
+        },
+        {
+          "id": "tvshow",
+          "displayName": "电视",
+          "parameters": "{\"mode\": \"tvshow\"}"
+        },
+        {
+          "id": "movie",
+          "displayName": "电影",
+          "parameters": "{\"mode\": \"movie\"}"
+        },
+        {
+          "id": "official",
+          "displayName": "官组",
+          "parameters": "{\"mode\": \"normal\", \"teams\": [\"44\", \"9\", \"43\"]}"
+        }
+      ],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    },
+    {
+      "id": "mteam-tp",
+      "name": "M-Team(TP)",
+      "baseUrl": "https://tp.m-team.cc",
+      "siteType": "M-Team",
+      "searchCategories": [
+        {
+          "id": "normal",
+          "displayName": "综合",
+          "parameters": "{\"mode\": \"normal\"}"
+        },
+        {
+          "id": "tvshow",
+          "displayName": "电视",
+          "parameters": "{\"mode\": \"tvshow\"}"
+        },
+        {
+          "id": "movie",
+          "displayName": "电影",
+          "parameters": "{\"mode\": \"movie\"}"
+        },
+        {
+          "id": "official",
+          "displayName": "官组",
+          "parameters": "{\"mode\": \"normal\", \"teams\": [\"44\", \"9\", \"43\"]}"
+        }
+      ],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    },
+    {
+      "id": "mteam-api",
+      "name": "M-Team",
+      "baseUrl": "https://api.m-team.cc",
+      "siteType": "M-Team",
+      "searchCategories": [
+        {
+          "id": "normal",
+          "displayName": "综合",
+          "parameters": "{\"mode\": \"normal\"}"
+        },
+        {
+          "id": "tvshow",
+          "displayName": "电视",
+          "parameters": "{\"mode\": \"tvshow\"}"
+        },
+        {
+          "id": "movie",
+          "displayName": "电影",
+          "parameters": "{\"mode\": \"movie\"}"
+        },
+        {
+          "id": "official",
+          "displayName": "官组",
+          "parameters": "{\"mode\": \"normal\", \"teams\": [\"44\", \"9\", \"43\"]}"
+        }
+      ],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    },
+    {
+      "id": "ptskit",
+      "name": "PTSKit",
+      "baseUrl": "https://www.ptskit.org/",
+      "siteType": "NexusPHP",
+      "searchCategories": [
+        {
+          "id": "all",
+          "displayName": "全部",
+          "parameters": "{}"
+        },
+        {
+          "id": "shotVideo",
+          "displayName": "短剧",
+          "parameters": "{\"category\":\"chd#401\"}"
+        },
+        {
+          "id": "movie",
+          "displayName": "电影",
+          "parameters": "{\"category\":\"chd#404\"}"
+        },
+        {
+          "id": "tvshow",
+          "displayName": "电视",
+          "parameters": "{\"category\":\"chd#405\"}"
+        }
+      ],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    },
+    {
+      "id": "hxpt",
+      "name": "好学",
+      "baseUrl": "https://www.hxpt.org/",
+      "siteType": "NexusPHP",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    },
+    {
+      "id": "mypt",
+      "name": "我的",
+      "baseUrl": "https://cc.mypt.cc/",
+      "siteType": "NexusPHP",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    },
+    {
+      "id": "ptzone",
+      "name": "PTZone",
+      "baseUrl": "https://ptzone.xyz/",
+      "siteType": "NexusPHP",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    }
+  ],
+  "defaultTemplates": {
+    "M-Team": {
+      "name": "M-Team 站点",
+      "baseUrl": "https://",
+      "searchCategories": [
+        {
+          "id": "normal",
+          "displayName": "综合",
+          "parameters": "{\"mode\": \"normal\"}"
+        },
+        {
+          "id": "tvshow",
+          "displayName": "电视",
+          "parameters": "{\"mode\": \"tvshow\"}"
+        },
+        {
+          "id": "movie",
+          "displayName": "电影",
+          "parameters": "{\"mode\": \"movie\"}"
+        },
+        {
+          "id": "official",
+          "displayName": "官组",
+          "parameters": "{\"mode\": \"normal\", \"teams\": [\"44\", \"9\", \"43\"]}"
+        }
+      ],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    },
+    "NexusPHP": {
+      "name": "NexusPHP 站点",
+      "baseUrl": "https://",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": true,
+        "advancedSearch": true
+      }
+    }
+  }
+}

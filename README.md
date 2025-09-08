@@ -1,6 +1,6 @@
-# M-Team Flutter 客户端
+# PT Mate（pt伴侣）
 
-基于 Flutter（Material Design 3）开发的 M-Team 非官方移动客户端，支持种子浏览、搜索和下载管理。
+基于 Flutter（Material Design 3）开发的私有种子站点客户端，支持多种PT站点的种子浏览、搜索和下载管理。目前支持M-Team和NexusPHP类型的站点。
 
 ## 功能特性
 
@@ -35,8 +35,9 @@
 #### 配置步骤
 1. 进入应用设置页面
 2. 找到「搜索分类配置」部分
-3. 点击「添加分类」或编辑现有分类
-4. 配置分类信息：
+3. 可以点击获取让程序自动获取现有的分类信息
+4. 也可以自定义：点击「添加分类」或编辑现有分类
+5. 配置分类信息：
    - **显示名称**：在下拉框中显示的分类名称
    - **查询参数**：搜索时使用的参数配置
 
@@ -95,7 +96,7 @@ lib/
 │   └── torrent_detail_page.dart # 种子详情页面
 ├── services/
 │   ├── api/
-│   │   └── api_client.dart     # M-Team API 客户端
+│   │   └── api_client.dart     # PT站点 API 客户端
 │   ├── qbittorrent/
 │   │   └── qb_client.dart      # qBittorrent API 封装
 │   ├── storage/
@@ -146,7 +147,8 @@ flutter build apk --release
 
 ## 配置说明
 
-### M-Team 站点配置
+### 站点配置
+- 支持多种PT站点类型（M-Team、NexusPHP）
 - 支持自定义站点域名
 - 使用 Passkey 进行身份验证
 - 自动保存登录状态
