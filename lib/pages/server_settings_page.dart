@@ -142,8 +142,22 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         title: const Text('服务器设置'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.of(context).pop();
+          onPressed: () async {
+            final navigator = Navigator.of(context);
+            // 检查是否有可用的站点配置
+            final site = await StorageService.instance.getActiveSiteConfig();
+            if (!mounted) return;
+            
+            if (site != null && (site.apiKey ?? '').isNotEmpty) {
+              // 有配置，回到LaunchDecider让它重新决定跳转
+              navigator.pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LaunchDecider()),
+                (route) => false,
+              );
+            } else {
+              // 没有配置，退出应用
+              navigator.pop();
+            }
           },
         ),
         actions: const [QbSpeedIndicator()],
