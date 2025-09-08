@@ -1,4 +1,4 @@
-# PT Mate（pt伴侣）
+# PT Mate（PT伴侣）
 
 基于 Flutter（Material Design 3）开发的私有种子站点客户端，支持多种PT站点的种子浏览、搜索和下载管理。目前支持M-Team和NexusPHP类型的站点。
 
@@ -55,7 +55,7 @@
 mode:"normal";teams:["44","9","43"]
 ```
 
-#### 参数说明
+#### 参数说明(m-team)
 - `mode`：搜索模式（如 "normal"、"movie" 等）
 - `teams`：制作组ID数组
 - `category`：分类ID数组
