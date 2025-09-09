@@ -47,6 +47,7 @@ dependencies:
   package_info_plus: ^8.0.2
   dart_jsonwebtoken: ^2.14.0
   crypto: ^3.0.3
+  flutter_bbcode: ^1.5.1
 
 
 dev_dependencies:
