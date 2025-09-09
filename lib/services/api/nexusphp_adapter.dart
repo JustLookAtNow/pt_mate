@@ -291,24 +291,25 @@ class NexusPHPAdapter implements SiteAdapter {
   @override
   Future<List<SearchCategoryConfig>> getSearchCategories() async {
     // 优先匹配baseUrl，然后类型
-    final defaultCategories = await SiteConfigService.getDefaultSearchCategories(
-      _siteConfig.siteType.id,
-      baseUrl: _siteConfig.baseUrl,
-    );
+    final defaultCategories =
+        await SiteConfigService.getDefaultSearchCategories(
+          _siteConfig.siteType.id,
+          baseUrl: _siteConfig.baseUrl,
+        );
 
     // 如果获取到默认分类配置，则直接返回
     if (defaultCategories.isNotEmpty) {
       return defaultCategories;
     }
-
+    final List<SearchCategoryConfig> categories = [];
+    // 默认塞个综合进来
+    categories.add(SearchCategoryConfig(id:'all', displayName: '综合', parameters: '{}'),);
     try {
       final response = await _dio.get('/api/v1/sections');
 
       if (response.statusCode == 200) {
         final data = response.data;
         if (data['ret'] == 0 && data['data'] != null) {
-          final List<SearchCategoryConfig> categories = [];
-
           // 双循环遍历sections和categories
           final sectionsData = data['data']['data'] as List;
           for (final section in sectionsData) {
@@ -335,10 +336,10 @@ class NexusPHPAdapter implements SiteAdapter {
       }
 
       // 如果获取失败，返回空列表
-      return [];
+      return categories;
     } catch (e) {
       // 发生异常时，返回空列表
-      return [];
+      return categories;
     }
   }
 }

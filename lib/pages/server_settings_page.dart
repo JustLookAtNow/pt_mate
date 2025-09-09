@@ -690,6 +690,11 @@ class _SiteEditPageState extends State<SiteEditPage> {
     });
     
     try {
+      // 如果搜索分类为空，先重置分类配置
+      if (_searchCategories.isEmpty) {
+        await _resetSearchCategories();
+      }
+      
       final site = _composeCurrentSite();
       // 临时设置站点进行测试
       await ApiService.instance.setActiveSite(site);
@@ -704,6 +709,23 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    // 如果搜索分类为空，先重置分类配置
+    if (_searchCategories.isEmpty) {
+      setState(() {
+        _loading = true;
+        _error = null;
+        _profile = null;
+      });
+      
+      try {
+        await _resetSearchCategories();
+      } catch (e) {
+        setState(() => _error = '重置分类配置失败: $e');
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
+    }
     
     final site = _composeCurrentSite();
     if (site.baseUrl.isEmpty) {
