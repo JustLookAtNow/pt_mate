@@ -564,7 +564,7 @@ class _HomePageState extends State<HomePage> {
       body: Column(
         children: [
           // 顶部用户基础信息 - 仅在站点支持用户资料功能时显示
-          if (_profile != null && (_currentSite?.features.supportMemberProfile ?? true))
+          if (_profile != null && (appState.site?.features.supportMemberProfile ?? true))
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
               child: Card(
