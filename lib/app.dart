@@ -613,26 +613,34 @@ class _HomePageState extends State<HomePage> {
               children: [
                 // 分类下拉菜单 - 仅在站点支持分类搜索功能时显示
                 if (_currentSite?.features.supportCategories ?? true) ...[
-                  DropdownButton<int>(
-                    value: _categories.isNotEmpty && _selectedCategoryIndex >= 0 && _selectedCategoryIndex < _categories.length ? _selectedCategoryIndex : null,
-                    items: _categories.asMap().entries.map((entry) => 
-                      DropdownMenuItem(
-                        value: entry.key,
-                        child: Text(entry.value.displayName),
-                      ),
-                    ).toList(),
-                    onChanged: (v) {
-                      if (v != null && v >= 0 && v < _categories.length) {
-                        setState(() => _selectedCategoryIndex = v);
-                        if (_currentSite?.features.supportTorrentSearch ?? true) {
-                          _search(reset: true);
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('当前站点不支持搜索功能')),
-                          );
+                  SizedBox(
+                    width: 80, // 限制最大宽度
+                    child: DropdownButton<int>(
+                      value: _categories.isNotEmpty && _selectedCategoryIndex >= 0 && _selectedCategoryIndex < _categories.length ? _selectedCategoryIndex : null,
+                      isExpanded: true, // 让下拉按钮占满容器宽度
+                      items: _categories.asMap().entries.map((entry) => 
+                        DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(
+                            entry.value.displayName,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.left,
+                          ),
+                        ),
+                      ).toList(),
+                      onChanged: (v) {
+                        if (v != null && v >= 0 && v < _categories.length) {
+                          setState(() => _selectedCategoryIndex = v);
+                          if (_currentSite?.features.supportTorrentSearch ?? true) {
+                            _search(reset: true);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('当前站点不支持搜索功能')),
+                            );
+                          }
                         }
-                      }
-                    },
+                      },
+                    ),
                   ),
                   const SizedBox(width: 8),
                 ],
