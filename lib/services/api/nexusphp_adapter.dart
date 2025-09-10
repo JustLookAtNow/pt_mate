@@ -6,6 +6,7 @@ import '../../models/app_models.dart';
 import 'api_client.dart';
 import 'site_adapter.dart';
 import '../site_config_service.dart';
+import '../../utils/format.dart';
 
 /// NexusPHP 站点适配器
 /// 实现 NexusPHP (1.9+) 站点的 API 调用
@@ -81,12 +82,17 @@ class NexusPHPAdapter implements SiteAdapter {
 
   /// 解析用户资料数据
   MemberProfile _parseMemberProfile(Map<String, dynamic> data) {
+    final uploadedBytes = (data['uploaded'] ?? 0).toInt();
+    final downloadedBytes = (data['downloaded'] ?? 0).toInt();
+    
     return MemberProfile(
       username: data['username'] ?? '',
       bonus: (data['bonus'] ?? 0).toDouble(),
       shareRate: double.tryParse(data['share_ratio']?.toString() ?? '0') ?? 0.0,
-      uploadedBytes: (data['uploaded'] ?? 0).toInt(),
-      downloadedBytes: (data['downloaded'] ?? 0).toInt(),
+      uploadedBytes: uploadedBytes,
+      downloadedBytes: downloadedBytes,
+      uploadedBytesString: Formatters.dataFromBytes(uploadedBytes),
+      downloadedBytesString: Formatters.dataFromBytes(downloadedBytes),
       userId: data['id']?.toString(), // 从data.data.id获取用户ID
     );
   }

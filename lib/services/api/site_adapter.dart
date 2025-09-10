@@ -2,6 +2,7 @@ import '../../models/app_models.dart';
 import 'api_client.dart';
 import 'mteam_adapter.dart';
 import 'nexusphp_adapter.dart';
+import 'nexusphp_web_adapter.dart';
 
 /// 统一的站点协议接口
 /// 定义所有站点适配器都应该实现的基本操作
@@ -51,6 +52,8 @@ class SiteAdapterFactory {
         return MTeamAdapter();
       case SiteType.nexusphp:
         return NexusPHPAdapter();
+      case SiteType.nexusphpweb:
+        return NexusPHPWebAdapter();
     }
   }
 }

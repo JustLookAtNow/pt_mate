@@ -7,6 +7,7 @@ import '../services/api/api_service.dart';
 import '../services/api/api_client.dart';
 import '../services/site_config_service.dart';
 import '../widgets/qb_speed_indicator.dart';
+import '../widgets/nexusphp_web_login.dart';
 
 import '../utils/format.dart';
 import '../app.dart';
@@ -446,6 +447,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
   List<SearchCategoryConfig> _searchCategories = [];
   SiteFeatures _siteFeatures = SiteFeatures.mteamDefault;
   List<SiteConfig> _presetSites = [];
+  String? _cookieStatus; // 登录状态信息
+  String? _savedCookie; // 保存的cookie
 
   @override
   void initState() {
@@ -565,6 +568,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
         siteType: _selectedSiteType,
         searchCategories: _searchCategories,
         features: _siteFeatures,
+        cookie: _selectedSiteType == SiteType.nexusphpweb ? _savedCookie : null,
       );
     }
     
@@ -574,17 +578,18 @@ class _SiteEditPageState extends State<SiteEditPage> {
     }
     
     return SiteConfig(
-      id: id,
-      name: _nameController.text.trim().isEmpty
-          ? '自定义站点'
-          : _nameController.text.trim(),
-      baseUrl: baseUrl.isEmpty ? 'https://api.m-team.cc/' : baseUrl,
-      apiKey: _apiKeyController.text.trim(),
-      passKey: _passKeyController.text.trim().isEmpty ? null : _passKeyController.text.trim(),
-      siteType: _selectedSiteType,
-      searchCategories: _searchCategories,
-      features: _siteFeatures,
-    );
+        id: id,
+        name: _nameController.text.trim().isEmpty
+            ? '自定义站点'
+            : _nameController.text.trim(),
+        baseUrl: baseUrl.isEmpty ? 'https://api.m-team.cc/' : baseUrl,
+        apiKey: _apiKeyController.text.trim(),
+        passKey: _passKeyController.text.trim().isEmpty ? null : _passKeyController.text.trim(),
+        siteType: _selectedSiteType,
+        searchCategories: _searchCategories,
+        features: _siteFeatures,
+        cookie: _selectedSiteType == SiteType.nexusphpweb ? _savedCookie : null,
+      );
   }
 
   void _addSearchCategory() {
@@ -618,13 +623,34 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
   Future<void> _resetSearchCategories() async {
     // 检查必要的配置是否完整
-    if (_apiKeyController.text.trim().isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先填写API Key')),
-        );
+    if (_selectedSiteType == SiteType.nexusphpweb) {
+      // nexusphpweb类型需要passkey和cookie
+      if (_passKeyController.text.trim().isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('请先填写Pass Key')),
+          );
+        }
+        return;
       }
-      return;
+      if (_savedCookie == null || _savedCookie!.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('请先完成登录获取Cookie')),
+          );
+        }
+        return;
+      }
+    } else {
+      // 其他类型需要API Key
+      if (_apiKeyController.text.trim().isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('请先填写API Key')),
+          );
+        }
+        return;
+      }
     }
     
     try {
@@ -786,6 +812,35 @@ class _SiteEditPageState extends State<SiteEditPage> {
     }
   }
 
+  Future<void> _openWebLogin() async {
+    final site = _composeCurrentSite();
+    if (site.baseUrl.isEmpty) {
+      setState(() {
+        _cookieStatus = '请先填写站点地址';
+      });
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => NexusPhpWebLogin(
+          baseUrl: site.baseUrl,
+          onCookieReceived: (cookie) {
+            setState(() {
+              _savedCookie = cookie;
+              _cookieStatus = '登录成功，已获取认证信息';
+            });
+          },
+          onCancel: () {
+            setState(() {
+              _cookieStatus = '用户取消登录';
+            });
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final presets = _presetSites;
@@ -909,23 +964,106 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 const SizedBox(height: 16),
               ],
               
-              // API Key输入
-              TextFormField(
-                controller: _apiKeyController,
-                decoration: InputDecoration(
-                  labelText: _selectedSiteType.apiKeyLabel,
-                  hintText: _selectedSiteType.apiKeyHint,
-                  border: const OutlineInputBorder(),
+              // API Key输入或登录按钮
+              if (_selectedSiteType != SiteType.nexusphpweb) ...[
+                TextFormField(
+                  controller: _apiKeyController,
+                  decoration: InputDecoration(
+                    labelText: _selectedSiteType.apiKeyLabel,
+                    hintText: _selectedSiteType.apiKeyHint,
+                    border: const OutlineInputBorder(),
+                  ),
+                  obscureText: true,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return '请输入API密钥';
+                    }
+                    return null;
+                  },
                 ),
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return '请输入API密钥';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
+              ] else ...[
+                // NexusPHPWeb类型显示登录按钮
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.login),
+                            const SizedBox(width: 8),
+                            const Text(
+                              '登录认证',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          '此类型站点需要通过网页登录获取认证信息',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _openWebLogin,
+                            icon: const Icon(Icons.web),
+                            label: const Text('打开登录页面'),
+                          ),
+                        ),
+                        if (_cookieStatus != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: _cookieStatus!.startsWith('成功')
+                                  ? Colors.green.withValues(alpha: 0.1)
+                                  : Colors.orange.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _cookieStatus!.startsWith('成功')
+                                    ? Colors.green
+                                    : Colors.orange,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _cookieStatus!.startsWith('成功')
+                                      ? Icons.check_circle
+                                      : Icons.info,
+                                  color: _cookieStatus!.startsWith('成功')
+                                      ? Colors.green
+                                      : Colors.orange,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _cookieStatus!,
+                                    style: TextStyle(
+                                      color: _cookieStatus!.startsWith('成功')
+                                          ? Colors.green.shade700
+                                          : Colors.orange.shade700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               
               // Pass Key输入（仅NexusPHP类型显示）
               if (_selectedSiteType.requiresPassKey) ...[
@@ -938,7 +1076,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
                   ),
                   obscureText: true,
                   validator: (value) {
-                    // Pass Key 现在对所有站点类型都是可选的
+                    if (_selectedSiteType.requiresPassKey && (value == null || value.trim().isEmpty)) {
+                      return '请输入Pass Key';
+                    }
                     return null;
                   },
                 ),
@@ -1207,8 +1347,8 @@ class _ProfileView extends StatelessWidget {
           const SizedBox(height: 12),
           Text('用户名: ${profile.username}'),
           Text('魔力值: ${Formatters.bonus(profile.bonus)}'),
-          Text('上传: ${Formatters.dataFromBytes(profile.uploadedBytes)}'),
-          Text('下载: ${Formatters.dataFromBytes(profile.downloadedBytes)}'),
+          Text('上传: ${profile.uploadedBytesString}'),
+          Text('下载: ${profile.downloadedBytesString}'),
           Text('分享率: ${Formatters.shareRate(profile.shareRate)}'),
         ],
       ),

@@ -588,10 +588,10 @@ class _HomePageState extends State<HomePage> {
                               runSpacing: 4,
                               children: [
                                 Text(
-                                  '↑ ${Formatters.dataFromBytes(_profile!.uploadedBytes)}',
+                                  '↑ ${_profile!.uploadedBytesString}',
                                 ),
                                 Text(
-                                  '↓ ${Formatters.dataFromBytes(_profile!.downloadedBytes)}',
+                                  '↓ ${_profile!.downloadedBytesString}',
                                 ),
                                 Text(
                                   '比率 ${Formatters.shareRate(_profile!.shareRate)}',

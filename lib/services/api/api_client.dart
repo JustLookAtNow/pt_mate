@@ -7,6 +7,8 @@ class MemberProfile {
   final double shareRate;
   final int uploadedBytes;
   final int downloadedBytes;
+  final String uploadedBytesString; // 上传量字符串格式，如"1.2 GB"
+  final String downloadedBytesString; // 下载量字符串格式，如"500 MB"
   final String? userId; // 用户ID，NexusPHP类型从data.data.id获取
 
   MemberProfile({
@@ -15,6 +17,8 @@ class MemberProfile {
     required this.shareRate,
     required this.uploadedBytes,
     required this.downloadedBytes,
+    required this.uploadedBytesString,
+    required this.downloadedBytesString,
     this.userId,
   });
 
