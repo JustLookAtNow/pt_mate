@@ -303,7 +303,9 @@ class NexusPHPAdapter implements SiteAdapter {
     }
     final List<SearchCategoryConfig> categories = [];
     // 默认塞个综合进来
-    categories.add(SearchCategoryConfig(id:'all', displayName: '综合', parameters: '{}'),);
+    categories.add(
+      SearchCategoryConfig(id: 'all', displayName: '综合', parameters: '{}'),
+    );
     try {
       final response = await _dio.get('/api/v1/sections');
 
@@ -312,19 +314,28 @@ class NexusPHPAdapter implements SiteAdapter {
         if (data['ret'] == 0 && data['data'] != null) {
           // 双循环遍历sections和categories
           final sectionsData = data['data']['data'] as List;
+          var onlyOne = false;
+          if (sectionsData.length == 1) {
+            onlyOne = true;
+          }
           for (final section in sectionsData) {
             final sectionName = section['name'] as String;
-            final sectionDisplayName = section['display_name'] as String;
+            final sectionDisplayName = (section['display_name'] as String)
+                .replaceAll(RegExp(r'[\s\u200B-\u200D\uFEFF]'), '');
             final categoriesData = section['categories'] as List;
 
             for (final category in categoriesData) {
               final categoryId = category['id'];
-              final categoryName = category['name'] as String;
-
+              final categoryName = (category['name'] as String).replaceAll(
+                RegExp(r'[\s\u200B-\u200D\uFEFF]'),
+                '',
+              );
               categories.add(
                 SearchCategoryConfig(
                   id: '${sectionName}_$categoryId',
-                  displayName: '$sectionDisplayName.$categoryName',
+                  displayName: onlyOne
+                      ? categoryName
+                      : '$sectionDisplayName.$categoryName',
                   parameters: '{"category":"$sectionName#$categoryId"}',
                 ),
               );
