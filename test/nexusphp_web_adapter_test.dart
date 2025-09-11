@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:beautiful_soup_dart/beautiful_soup.dart';
 import 'dart:io';
 
+import 'package:pt_mate/services/api/api_client.dart';
+
 void main() {
   group('NexusPHP Web Adapter Tests', () {
     late List<File> htmlFiles;
@@ -83,8 +85,10 @@ void main() {
             final tds = row.children;
 
             if (tds.length > 6) {
+              final titleTd = tds[1].findAll('td')[1];
+
               // 提取种子ID（从详情链接中）
-              final detailLink = tds[1].find('a[href*="details.php"]');
+              final detailLink = titleTd.find('a[href*="details.php"]');
               String torrentId = '';
               if (detailLink != null) {
                 final href = detailLink.attributes['href'] ?? '';
@@ -95,7 +99,7 @@ void main() {
               }
 
               // 提取主标题（去除换行）
-              final titleElement = tds[1].find('a[href*="details.php"] b');
+              final titleElement = titleTd.find('a[href*="details.php"] b');
               String title = '';
               if (titleElement != null) {
                 title = titleElement.text
@@ -104,14 +108,32 @@ void main() {
                     .trim();
               }
 
-              // 提取描述：从tds[1].findAll('td')[1].innerHtml从后往前匹配，遇到html标签时停止，只要后面的纯文本
-              final fullText = tds[1].findAll('td')[1].innerHtml;
-              String description = fullText.replaceAll(RegExp(r'<[^>]+>.*?</[^>]+>'), '')
-              .replaceAll(RegExp(r'<[^>]+>'), '')
-              .replaceAll(RegExp(r'\s+'), ' ')
-              .trim();
-              
-
+              // 提取描述：从tds[1].findAll('td')[1].innerHtml中提取纯文本
+              final fullText = titleTd.innerHtml;
+              String description = fullText
+                  .replaceAll(RegExp(r'<[^>]+>.*?</[^>]+>'), '')
+                  .replaceAll(RegExp(r'<[^>]+>'), '')
+                  .replaceAll(RegExp(r'\s+'), ' ')
+                  .trim();
+              // 提取下载记录
+              DownloadStatus status = DownloadStatus.none;
+              final downloadDiv = titleTd.find('div', attrs: {'title': true});
+              if (downloadDiv != null) {
+                final downloadTitle = downloadDiv.getAttrValue('title');
+                RegExp regExp = RegExp(r'(\d+)\%');
+                final match = regExp.firstMatch(downloadTitle!);
+                if (match != null) {
+                  final percent = match.group(1);
+                  if (percent != null) {
+                    int percentInt = int.parse(percent);
+                    if (percentInt == 100) {
+                      status = DownloadStatus.completed;
+                    }else{
+                      status = DownloadStatus.downloading;
+                    }
+                  }
+                }
+              }
               // 提取大小（第5列，索引4）
               String size = tds[4].text.replaceAll('\n', ' ').trim();
 
@@ -172,6 +194,7 @@ void main() {
                     print('Remaining Time: $remainingTime');
                   }
                 }
+                print('Download Status: $status');
                 print('---');
 
                 //只输出前5个种子以避免输出过长

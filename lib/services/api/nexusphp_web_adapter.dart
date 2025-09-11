@@ -207,7 +207,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
           try {
             // 提取种子ID（从详情链接中）
-            final detailLink = tds[1].find('a[href*="details.php"]');
+            final titleTd = tds[1].findAll('td')[1];
+            final detailLink = titleTd.find('a[href*="details.php"]');
             if (detailLink == null) continue;
 
             final href = detailLink.attributes['href'] ?? '';
@@ -218,7 +219,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
             if (torrentId.isEmpty) continue;
 
             // 提取主标题（去除换行）
-            final titleElement = tds[1].find('a[href*="details.php"] b');
+            final titleElement = titleTd.find('a[href*="details.php"] b');
             String title = '';
             if (titleElement != null) {
               title = titleElement.text
@@ -228,13 +229,31 @@ class NexusPHPWebAdapter extends SiteAdapter {
             }
 
             // 提取描述：从tds[1].findAll('td')[1].innerHtml从后往前匹配，遇到html标签时停止，只要后面的纯文本
-            final fullText = tds[1].findAll('td')[1].innerHtml;
+            final fullText = titleTd.innerHtml;
             String description = fullText
                 .replaceAll(RegExp(r'<[^>]+>.*?</[^>]+>'), '')
                 .replaceAll(RegExp(r'<[^>]+>'), '')
                 .replaceAll(RegExp(r'\s+'), ' ')
                 .trim();
-
+             // 提取下载记录
+              DownloadStatus status = DownloadStatus.none;
+              final downloadDiv = titleTd.find('div', attrs: {'title': true});
+              if (downloadDiv != null) {
+                final downloadTitle = downloadDiv.getAttrValue('title');
+                RegExp regExp = RegExp(r'(\d+)\%');
+                final match = regExp.firstMatch(downloadTitle!);
+                if (match != null) {
+                  final percent = match.group(1);
+                  if (percent != null) {
+                    int percentInt = int.parse(percent);
+                    if (percentInt == 100) {
+                      status = DownloadStatus.completed;
+                    }else{
+                      status = DownloadStatus.downloading;
+                    }
+                  }
+                }
+              }
             // 提取大小（第5列，索引4）
             final sizeText = tds[4].text.replaceAll('\n', ' ').trim();
 
@@ -282,7 +301,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
               }
             }
 
-            // 解析文件大小为字节数，因为有按大小排序，陛下
+            // 解析文件大小为字节数，因为有按大小排序，所以要处理单位
             int sizeInBytes = 0;
             final sizeMatch = RegExp(r'([\d.]+)\s*(\w+)').firstMatch(sizeText);
             if (sizeMatch != null) {
@@ -306,7 +325,11 @@ class NexusPHPWebAdapter extends SiteAdapter {
                   sizeInBytes = sizeValue.round();
               }
             }
-
+            //收藏信息
+            final starTd = tds[1].findAll('td')[3];
+            final starImg = starTd.find('img', class_: 'bookmark');
+            final collection = starImg != null;
+            
             torrents.add(
               TorrentItem(
                 id: torrentId,
@@ -320,6 +343,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
                 seeders: int.tryParse(seedersText) ?? 0,
                 leechers: int.tryParse(leechersText) ?? 0,
                 sizeBytes: sizeInBytes,
+                downloadStatus: status,
+                collection: collection,
                 imageList: [], // 暂时不解析图片列表
               ),
             );
@@ -453,6 +478,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
     required List<String> tids,
   }) async {
     // TODO: 实现查询下载历史
+    //getusertorrentlistajax.php?userid=20148&type=seeding
+    //getusertorrentlistajax.php?userid=20148&type=uploaded
     throw UnimplementedError('queryHistory not implemented');
   }
 
