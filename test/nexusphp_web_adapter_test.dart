@@ -85,6 +85,12 @@ void main() {
             final tds = row.children;
 
             if (tds.length > 6) {
+            //收藏信息
+            final starTd = tds[1].findAll('td')[3];
+            final starImg = starTd.find('img', class_: 'delbookmark');
+            final collection = starImg == null;
+            print('  Found collection: $collection');
+
               final titleTd = tds[1].findAll('td')[1];
 
               // 提取种子ID（从详情链接中）

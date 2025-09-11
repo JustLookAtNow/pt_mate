@@ -327,9 +327,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
             }
             //收藏信息
             final starTd = tds[1].findAll('td')[3];
-            final starImg = starTd.find('img', class_: 'bookmark');
-            final collection = starImg != null;
-            
+            final starImg = starTd.find('img', class_: 'delbookmark');
+            final collection = starImg == null;
             torrents.add(
               TorrentItem(
                 id: torrentId,
