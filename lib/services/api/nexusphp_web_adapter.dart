@@ -461,8 +461,13 @@ class NexusPHPWebAdapter extends SiteAdapter {
     required String id,
     required bool make,
   }) async {
-    // TODO: 实现切换种子收藏状态
-    throw UnimplementedError('toggleCollection not implemented');
+    try {
+      // 发送GET请求到bookmark.php，传入torrentid参数
+      // 根据用户要求，不需要关注mark字段，直接请求即可自动切换收藏状态
+      await _dio.get('/bookmark.php', queryParameters: {'torrentid': id});
+    } catch (e) {
+      throw Exception('切换收藏状态失败: $e');
+    }
   }
 
   @override
