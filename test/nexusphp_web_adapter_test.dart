@@ -106,29 +106,11 @@ void main() {
 
               // 提取描述：从tds[1].findAll('td')[1].innerHtml从后往前匹配，遇到html标签时停止，只要后面的纯文本
               final fullText = tds[1].findAll('td')[1].innerHtml;
-              String description = '';
-              // 从后往前查找，找到最后一个html标签的位置
-              int lastTagIndex = -1;
-              for (int i = fullText.length - 1; i >= 0; i--) {
-                if (fullText[i] == '>') {
-                  // 找到标签结束符，向前查找对应的开始符
-                  for (int j = i - 1; j >= 0; j--) {
-                    if (fullText[j] == '<') {
-                      lastTagIndex = i;
-                      break;
-                    }
-                  }
-                  break;
-                }
-              }
-
-              if (lastTagIndex != -1 && lastTagIndex < fullText.length - 1) {
-                description = fullText
-                    .substring(lastTagIndex + 1)
-                    .replaceAll('\n', ' ')
-                    .replaceAll(RegExp(r'\s+'), ' ')
-                    .trim();
-              }
+              String description = fullText.replaceAll(RegExp(r'<[^>]+>.*?</[^>]+>'), '')
+              .replaceAll(RegExp(r'<[^>]+>'), '')
+              .replaceAll(RegExp(r'\s+'), ' ')
+              .trim();
+              
 
               // 提取大小（第5列，索引4）
               String size = tds[4].text.replaceAll('\n', ' ').trim();
