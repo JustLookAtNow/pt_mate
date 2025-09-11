@@ -44,7 +44,7 @@ enum SiteType {
       case SiteType.nexusphp:
         return false;
       case SiteType.nexusphpweb:
-        return true;
+        return false; // 改为可选，从fetchMemberProfile获取
     }
   }
 }

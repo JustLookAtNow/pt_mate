@@ -96,7 +96,7 @@ class _LaunchDeciderState extends State<LaunchDecider> {
     try {
       final site = await StorageService.instance.getActiveSiteConfig();
       await ApiService.instance.init();
-      if (site != null && (site.apiKey ?? '').isNotEmpty) {
+      if (site != null && ((site.apiKey ?? '').isNotEmpty || (site.cookie ?? '').isNotEmpty)) {
         // 验证 key 是否可用
         await ApiService.instance.fetchMemberProfile();
         _target = const HomePage();

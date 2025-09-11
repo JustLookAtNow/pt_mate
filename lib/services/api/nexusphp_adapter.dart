@@ -94,6 +94,7 @@ class NexusPHPAdapter implements SiteAdapter {
       uploadedBytesString: Formatters.dataFromBytes(uploadedBytes),
       downloadedBytesString: Formatters.dataFromBytes(downloadedBytes),
       userId: data['id']?.toString(), // 从data.data.id获取用户ID
+      passKey: null, // NexusPHP API类型不提供passKey
     );
   }
 

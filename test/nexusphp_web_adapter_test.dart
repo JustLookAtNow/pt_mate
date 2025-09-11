@@ -58,6 +58,19 @@ void main() {
         if (!fileName.startsWith('torrents')) {
           continue;
         }
+        int totalPage = 0;
+        final pagination = soup.find('div', id: 'footer')!.find('script')?.text;
+        if (pagination != null) {
+          print('  Found pagination');
+          final pageMatch = RegExp(
+            r'var\s+maxpage\s*=\s*(\d+);',
+          ).firstMatch(pagination);
+          if (pageMatch != null) {
+            totalPage = int.parse(pageMatch.group(1) ?? '0');
+            print('  Found total page: $totalPage');
+          }
+        }
+
         final table = soup.find('table', class_: 'torrents');
         if (table != null) {
           print('  Found torrent table');
@@ -194,13 +207,47 @@ void main() {
       print('\n=== User Information Extraction ===');
 
       for (final fileName in soups.keys) {
+        if (!fileName.startsWith('usercp2')) {
+          continue;
+        }
         final soup = soups[fileName]!;
         print('\nProcessing file: $fileName');
+
+        var settingInfoTds = soup
+            .find('td', id: 'outer')!
+            .children[2]
+            .findAll('td');
+        var passkeyTd = false;
+        var passKey = '';
+        for (var td in settingInfoTds) {
+          if (passkeyTd) {
+            print(td.text);
+            passKey = td.text.trim();
+            break;
+          }
+          if (td.text.contains('密钥')) {
+            passkeyTd = true;
+          }
+        }
+        print('  Passkey: $passKey');
         var userInfo = soup
             .find('table', id: 'info_block')!
             .find('span', class_: 'medium');
 
         if (userInfo != null) {
+          final allLink = userInfo.findAll('a');
+          // 过滤 href 中含有 "abc" 的
+          for (var a in allLink) {
+            final href = a.attributes['href'];
+            if (href != null && href.contains('userdetails.php?id=')) {
+              RegExp regExp = RegExp(r'userdetails.php\?id=(\d+)');
+              final match = regExp.firstMatch(href);
+              if (match != null) {
+                print('  User ID: ${match.group(1)}');
+              }
+            }
+          }
+
           final username = userInfo.find('span')!.a!.b!.text.trim();
           final textInfo = userInfo.text.trim();
           print('  Username: $username');

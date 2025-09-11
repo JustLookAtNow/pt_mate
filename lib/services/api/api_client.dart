@@ -10,6 +10,7 @@ class MemberProfile {
   final String uploadedBytesString; // 上传量字符串格式，如"1.2 GB"
   final String downloadedBytesString; // 下载量字符串格式，如"500 MB"
   final String? userId; // 用户ID，NexusPHP类型从data.data.id获取
+  final String? passKey; // Pass Key，nexusphpweb类型从usercp.php获取
 
   MemberProfile({
     required this.username,
@@ -20,6 +21,7 @@ class MemberProfile {
     required this.uploadedBytesString,
     required this.downloadedBytesString,
     this.userId,
+    this.passKey,
   });
 
   // fromJson 方法已移至各站点适配器中实现

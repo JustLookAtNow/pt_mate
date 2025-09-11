@@ -85,6 +85,7 @@ class MTeamAdapter extends SiteAdapter {
       downloadedBytes: downloadedBytes,
       uploadedBytesString: Formatters.dataFromBytes(uploadedBytes),
       downloadedBytesString: Formatters.dataFromBytes(downloadedBytes),
+      passKey: null, // M-Team类型不提供passKey
     );
   }
   

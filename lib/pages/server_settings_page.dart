@@ -624,15 +624,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
   Future<void> _resetSearchCategories() async {
     // 检查必要的配置是否完整
     if (_selectedSiteType == SiteType.nexusphpweb) {
-      // nexusphpweb类型需要passkey和cookie
-      if (_passKeyController.text.trim().isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('请先填写Pass Key')),
-          );
-        }
-        return;
-      }
+      // nexusphpweb类型需要cookie
       if (_savedCookie == null || _savedCookie!.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -770,8 +762,14 @@ class _SiteEditPageState extends State<SiteEditPage> {
       await ApiService.instance.setActiveSite(site);
       final profile = await ApiService.instance.fetchMemberProfile();
       
-      // 创建包含userId的最终站点配置
-      final finalSite = site.copyWith(userId: profile.userId);
+      // 创建包含userId和passKey的最终站点配置
+      // 优先使用用户填写的passKey，如果没有填写则使用从fetchMemberProfile获取的
+      final userPassKey = _passKeyController.text.trim();
+      final finalPassKey = userPassKey.isNotEmpty ? userPassKey : profile.passKey;
+      final finalSite = site.copyWith(
+        userId: profile.userId,
+        passKey: finalPassKey,
+      );
       
       if (widget.site != null) {
         await StorageService.instance.updateSiteConfig(finalSite);
