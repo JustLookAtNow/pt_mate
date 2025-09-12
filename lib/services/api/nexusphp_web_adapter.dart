@@ -7,6 +7,7 @@ import 'package:beautiful_soup_dart/beautiful_soup.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:crypto/crypto.dart';
+import 'package:intl/intl.dart';
 import 'dart:convert';
 
 /// Cookie过期异常
@@ -26,6 +27,45 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
   @override
   SiteConfig get siteConfig => _siteConfig;
+
+  /// 将相对时间格式转换为绝对时间格式
+  /// 例如："7时28分钟" -> "2025-08-27 21:16:48"
+  String? _convertRelativeTimeToAbsolute(String? relativeTime) {
+    if (relativeTime == null || relativeTime.isEmpty) {
+      return null;
+    }
+
+    final now = DateTime.now();
+    int totalMinutes = 0;
+
+    // 解析天数
+    final dayMatch = RegExp(r'(\d+)天').firstMatch(relativeTime);
+    if (dayMatch != null) {
+      final days = int.tryParse(dayMatch.group(1) ?? '0') ?? 0;
+      totalMinutes += days * 24 * 60;
+    }
+
+    // 解析小时数
+    final hourMatch = RegExp(r'(\d+)时').firstMatch(relativeTime);
+    if (hourMatch != null) {
+      final hours = int.tryParse(hourMatch.group(1) ?? '0') ?? 0;
+      totalMinutes += hours * 60;
+    }
+
+    // 解析分钟数
+    final minuteMatch = RegExp(r'(\d+)分').firstMatch(relativeTime);
+    if (minuteMatch != null) {
+      final minutes = int.tryParse(minuteMatch.group(1) ?? '0') ?? 0;
+      totalMinutes += minutes;
+    }
+
+    // 计算绝对时间
+    final absoluteTime = now.add(Duration(minutes: totalMinutes));
+    
+    // 使用DateFormat格式化为 "yyyy-MM-dd HH:mm:ss" 格式
+    final formatter = DateFormat('yyyy-MM-dd HH:mm:ss');
+    return formatter.format(absoluteTime);
+  }
 
   @override
   Future<void> init(SiteConfig config) async {
@@ -368,9 +408,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
                 name: title,
                 smallDescr: description,
                 discount: promoType?.isNotEmpty == true ? promoType : null,
-                discountEndTime: remainingTime?.isNotEmpty == true
-                    ? remainingTime
-                    : null,
+                discountEndTime: _convertRelativeTimeToAbsolute(remainingTime),
                 downloadUrl: null, // 暂时不提供直接下载链接
                 seeders: int.tryParse(seedersText) ?? 0,
                 leechers: int.tryParse(leechersText) ?? 0,
