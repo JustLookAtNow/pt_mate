@@ -44,6 +44,122 @@ class AppState extends ChangeNotifier {
   }
 }
 
+class _CategoryFilterDialog extends StatefulWidget {
+  final List<SearchCategoryConfig> categories;
+  final int selectedCategoryIndex;
+  final String keyword;
+
+  const _CategoryFilterDialog({
+    required this.categories,
+    required this.selectedCategoryIndex,
+    required this.keyword,
+  });
+
+  @override
+  State<_CategoryFilterDialog> createState() => _CategoryFilterDialogState();
+}
+
+class _CategoryFilterDialogState extends State<_CategoryFilterDialog> {
+  late int _selectedCategoryIndex;
+  late TextEditingController _keywordController;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCategoryIndex = widget.selectedCategoryIndex;
+    _keywordController = TextEditingController(text: widget.keyword);
+  }
+
+  @override
+  void dispose() {
+    _keywordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('分类筛选'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 搜索框
+            Text('搜索关键词', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _keywordController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: '输入关键词（可选）',
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // 分类选择
+            Text('选择分类', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            if (widget.categories.isEmpty)
+              const Text('暂无可用分类', style: TextStyle(color: Colors.grey))
+            else
+              SizedBox(
+                height: 200,
+                child: RadioGroup<int>(
+                  groupValue: _selectedCategoryIndex,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _selectedCategoryIndex = value;
+                      });
+                    }
+                  },
+                  child: ListView.builder(
+                    itemCount: widget.categories.length,
+                    itemBuilder: (context, index) {
+                      final category = widget.categories[index];
+                      final isSelected = index == _selectedCategoryIndex;
+                      return ListTile(
+                        title: Text(category.displayName),
+                        leading: Radio<int>(
+                          value: index,
+                        ),
+                        selected: isSelected,
+                        selectedTileColor: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                        onTap: () {
+                          setState(() {
+                            _selectedCategoryIndex = index;
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () {
+            Navigator.of(context).pop({
+              'categoryIndex': _selectedCategoryIndex,
+              'keyword': _keywordController.text,
+            });
+          },
+          child: const Text('确定'),
+        ),
+      ],
+    );
+  }
+}
+
 class MTeamApp extends StatelessWidget {
   const MTeamApp({super.key});
 
@@ -165,6 +281,12 @@ class _HomePageState extends State<HomePage> {
   
   // 当前站点配置
   SiteConfig? _currentSite;
+  
+  // 用户信息展开状态
+  bool _userInfoExpanded = false;
+  
+  // 分类筛选弹窗状态
+
 
   Widget _buildStatChip(BuildContext context, String text, Color color) {
     return Container(
@@ -256,7 +378,8 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       // 分类加载失败时显示错误信息
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.showSnackBar(
           SnackBar(content: Text('重新加载分类失败: $e')),
         );
       }
@@ -540,6 +663,44 @@ class _HomePageState extends State<HomePage> {
     _performCollectionRequest(item, newCollectionState);
   }
 
+  Future<void> _showCategoryFilterDialog() async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _CategoryFilterDialog(
+         categories: _categories,
+         selectedCategoryIndex: _selectedCategoryIndex,
+         keyword: _keywordCtrl.text,
+       ),
+    );
+    
+    if (result != null) {
+      final newCategoryIndex = result['categoryIndex'] as int?;
+      final newKeyword = result['keyword'] as String?;
+      
+      if (mounted) {
+        setState(() {
+          if (newCategoryIndex != null && newCategoryIndex >= 0 && newCategoryIndex < _categories.length) {
+            _selectedCategoryIndex = newCategoryIndex;
+          }
+          if (newKeyword != null) {
+            _keywordCtrl.text = newKeyword;
+          }
+        });
+      }
+      
+      if (_currentSite?.features.supportTorrentSearch ?? true) {
+        _search(reset: true);
+      } else {
+        if (mounted) {
+          final messenger = ScaffoldMessenger.of(context);
+          messenger.showSnackBar(
+            const SnackBar(content: Text('当前站点不支持搜索功能')),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _performCollectionRequest(TorrentItem item, bool newCollectionState) async {
     // 检查请求间隔
     final now = DateTime.now();
@@ -626,12 +787,18 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             actions: const [QbSpeedIndicator()],
-            backgroundColor: Theme.of(context).colorScheme.primary,
+            backgroundColor: Theme.of(context).brightness == Brightness.light 
+                ? Theme.of(context).colorScheme.primary 
+                : Theme.of(context).colorScheme.surface,
             iconTheme: IconThemeData(
-              color: Theme.of(context).colorScheme.onPrimary,
+              color: Theme.of(context).brightness == Brightness.light 
+                  ? Theme.of(context).colorScheme.onPrimary 
+                  : Theme.of(context).colorScheme.onSurface,
             ),
             titleTextStyle: TextStyle(
-              color: Theme.of(context).colorScheme.onPrimary,
+              color: Theme.of(context).brightness == Brightness.light 
+                  ? Theme.of(context).colorScheme.onPrimary 
+                  : Theme.of(context).colorScheme.onSurface,
               fontSize: 20,
               fontWeight: FontWeight.w500,
             ),
@@ -652,69 +819,84 @@ class _HomePageState extends State<HomePage> {
                     width: 1,
                   ),
                 ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.1),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.person_outline,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _userInfoExpanded = !_userInfoExpanded;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.1),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Column(
+                        children: [
+                          Row(
                             children: [
-                              Text(
-                                _profile!.username,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontWeight: FontWeight.w600,
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                                child: Text(
+                                  _profile!.username.isNotEmpty ? _profile!.username[0].toUpperCase() : 'U',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
                                 ),
                               ),
-                              const SizedBox(height: 6),
-                              Wrap(
-                                spacing: 12,
-                                runSpacing: 4,
-                                children: [
-                                  _buildStatChip(
-                                    context,
-                                    '↑ ${_profile!.uploadedBytesString}',
-                                    Colors.green,
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _profile!.username,
+                                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                  _buildStatChip(
-                                    context,
-                                    '↓ ${_profile!.downloadedBytesString}',
-                                    Colors.blue,
-                                  ),
-                                  _buildStatChip(
-                                    context,
-                                    '比率 ${Formatters.shareRate(_profile!.shareRate)}',
-                                    Colors.orange,
-                                  ),
-                                  _buildStatChip(
-                                    context,
-                                    '魔力 ${Formatters.bonus(_profile!.bonus)}',
-                                    Colors.purple,
-                                  ),
-                                ],
+                                ),
+                              ),
+                              Icon(
+                                _userInfoExpanded ? Icons.expand_less : Icons.expand_more,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 20,
                               ),
                             ],
                           ),
-                        ),
-                      ],
+                          if (_userInfoExpanded) ...[
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 4,
+                              children: [
+                                _buildStatChip(
+                                  context,
+                                  '↑ ${_profile!.uploadedBytesString}',
+                                  Colors.green,
+                                ),
+                                _buildStatChip(
+                                  context,
+                                  '↓ ${_profile!.downloadedBytesString}',
+                                  Colors.blue,
+                                ),
+                                _buildStatChip(
+                                  context,
+                                  '比率 ${Formatters.shareRate(_profile!.shareRate)}',
+                                  Colors.orange,
+                                ),
+                                _buildStatChip(
+                                  context,
+                                  '魔力 ${Formatters.bonus(_profile!.bonus)}',
+                                  Colors.purple,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -724,83 +906,75 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.all(12),
             child: Column(
               children: [
-                // 分类下拉菜单 - 仅在站点支持分类搜索功能时显示
-                if (_currentSite?.features.supportCategories ?? true) ...[
-                  DropdownButton<int>(
-                    value: _categories.isNotEmpty && _selectedCategoryIndex >= 0 && _selectedCategoryIndex < _categories.length ? _selectedCategoryIndex : null,
-                    isExpanded: true, // 让下拉按钮占满容器宽度
-                    items: _categories.asMap().entries.map((entry) => 
-                      DropdownMenuItem(
-                        value: entry.key,
-                        child: Text(
-                          entry.value.displayName,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.left,
-                        ),
-                      ),
-                    ).toList(),
-                    onChanged: (v) {
-                      if (v != null && v >= 0 && v < _categories.length) {
-                        setState(() => _selectedCategoryIndex = v);
-                        if (_currentSite?.features.supportTorrentSearch ?? true) {
-                          _search(reset: true);
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('当前站点不支持搜索功能')),
-                          );
-                        }
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                ],
                 Row(
                   children: [
+                    // 分类按钮 - 仅在站点支持分类搜索功能时显示
+                    if (_currentSite?.features.supportCategories ?? true)
+                      IconButton(
+                        onPressed: () {
+                          _showCategoryFilterDialog();
+                        },
+                        icon: const Icon(Icons.category, size: 20),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                          foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.all(8),
+                        ),
+                        tooltip: _categories.isNotEmpty && _selectedCategoryIndex >= 0 && _selectedCategoryIndex < _categories.length
+                            ? _categories[_selectedCategoryIndex].displayName
+                            : '分类筛选',
+                      ),
+                    if (_currentSite?.features.supportCategories ?? true)
+                      const SizedBox(width: 8),
                     Expanded(
-                  child: TextField(
-                    controller: _keywordCtrl,
-                    textInputAction: TextInputAction.search,
-                    enabled: _currentSite?.features.supportTorrentSearch ?? true,
-                    decoration: InputDecoration(
-                      hintText: (_currentSite?.features.supportTorrentSearch ?? true) 
-                          ? '输入关键词（可选）' 
-                          : '当前站点不支持搜索功能',
-                      border: OutlineInputBorder(
-                        borderRadius: const BorderRadius.all(Radius.circular(25)),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                      child: TextField(
+                        controller: _keywordCtrl,
+                        textInputAction: TextInputAction.search,
+                        enabled: _currentSite?.features.supportTorrentSearch ?? true,
+                        decoration: InputDecoration(
+                          hintText: (_currentSite?.features.supportTorrentSearch ?? true) 
+                              ? '输入关键词（可选）' 
+                              : '当前站点不支持搜索功能',
+                          border: OutlineInputBorder(
+                            borderRadius: const BorderRadius.all(Radius.circular(25)),
+                            borderSide: BorderSide(
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: const BorderRadius.all(Radius.circular(25)),
+                            borderSide: BorderSide(
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: const BorderRadius.all(Radius.circular(25)),
+                            borderSide: BorderSide(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: const BorderRadius.all(Radius.circular(25)),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: const BorderRadius.all(Radius.circular(25)),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
+                        onSubmitted: (_) {
+                          if (_currentSite?.features.supportTorrentSearch ?? true) {
+                            _search(reset: true);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('当前站点不支持搜索功能')),
+                            );
+                          }
+                        },
                       ),
                     ),
-                    onSubmitted: (_) {
-                      if (_currentSite?.features.supportTorrentSearch ?? true) {
-                        _search(reset: true);
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('当前站点不支持搜索功能')),
-                        );
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
+                    const SizedBox(width: 8),
                 if (_currentSite?.features.supportCollection == true)
                   IconButton(
                     onPressed: () {
@@ -1464,7 +1638,9 @@ class _AppDrawer extends StatelessWidget {
           children: [
             DrawerHeader(
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
+                color: Theme.of(context).brightness == Brightness.light 
+                    ? Theme.of(context).colorScheme.primary 
+                    : Theme.of(context).colorScheme.surface,
               ),
               child: Align(
                 alignment: Alignment.bottomLeft,
@@ -1473,7 +1649,9 @@ class _AppDrawer extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onPrimary,
+                    color: Theme.of(context).brightness == Brightness.light 
+                        ? Theme.of(context).colorScheme.onPrimary 
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),

@@ -139,13 +139,17 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
                 Icon(
                   Icons.cloud_download,
                   size: 16,
-                  color: Theme.of(context).colorScheme.onPrimary,
+                  color: Theme.of(context).brightness == Brightness.light 
+                      ? Theme.of(context).colorScheme.onPrimary 
+                      : Theme.of(context).colorScheme.onSurface,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   '↑${Formatters.speedFromBytesPerSec(info.upSpeed)} ↓${Formatters.speedFromBytesPerSec(info.dlSpeed)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onPrimary,
+                    color: Theme.of(context).brightness == Brightness.light 
+                        ? Theme.of(context).colorScheme.onPrimary 
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ],
@@ -154,7 +158,9 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
             Text(
               '剩余空间: ${Formatters.dataFromBytes(serverState.freeSpaceOnDisk)}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.8),
+                color: (Theme.of(context).brightness == Brightness.light 
+                    ? Theme.of(context).colorScheme.onPrimary 
+                    : Theme.of(context).colorScheme.onSurface).withValues(alpha: 0.8),
               ),
             ),
           ],
