@@ -209,18 +209,24 @@ class _HomePageState extends State<HomePage> {
       final storageService = Provider.of<StorageService>(context, listen: false);
       final activeSite = await storageService.getActiveSiteConfig();
       final categories = activeSite?.searchCategories ?? SearchCategoryConfig.getDefaultConfigs();
-      setState(() {
-        _currentSite = activeSite;
-        _categories = categories;
-        _selectedCategoryIndex = categories.isNotEmpty ? 0 : -1;
-      });
+      if (mounted) {
+        setState(() {
+          _currentSite = activeSite;
+          _categories = categories;
+          _selectedCategoryIndex = categories.isNotEmpty ? 0 : -1;
+        });
+      }
       
       // 拉取用户基础信息
       final prof = await ApiService.instance.fetchMemberProfile();
-      setState(() => _profile = prof);
+      if (mounted) setState(() => _profile = prof);
     } catch (e) {
-      // 用户信息失败不阻塞首页使用，仅提示
-      setState(() => _error = _error ?? e.toString());
+      if (e.toString().contains('CookieExpiredException')) {
+        _showCookieExpiredDialog();
+      } else {
+        // 用户信息失败不阻塞首页使用，仅提示
+        if (mounted) setState(() => _error = _error ?? e.toString());
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -236,15 +242,17 @@ class _HomePageState extends State<HomePage> {
       final storageService = Provider.of<StorageService>(context, listen: false);
       final activeSite = await storageService.getActiveSiteConfig();
       final categories = activeSite?.searchCategories ?? SearchCategoryConfig.getDefaultConfigs();
-      setState(() {
-        _categories = categories;
-        // 如果当前选中的分类索引超出范围，重置为第一个分类
-        if (categories.isNotEmpty && (_selectedCategoryIndex < 0 || _selectedCategoryIndex >= categories.length)) {
-          _selectedCategoryIndex = 0;
-        } else if (categories.isEmpty) {
-          _selectedCategoryIndex = -1;
-        }
-      });
+      if (mounted) {
+        setState(() {
+          _categories = categories;
+          // 如果当前选中的分类索引超出范围，重置为第一个分类
+          if (categories.isNotEmpty && (_selectedCategoryIndex < 0 || _selectedCategoryIndex >= categories.length)) {
+            _selectedCategoryIndex = 0;
+          } else if (categories.isEmpty) {
+            _selectedCategoryIndex = -1;
+          }
+        });
+      }
     } catch (e) {
       // 分类加载失败时显示错误信息
       if (mounted) {
@@ -259,10 +267,41 @@ class _HomePageState extends State<HomePage> {
     try {
       final prof = await ApiService.instance.fetchMemberProfile();
       if (mounted) setState(() => _profile = prof);
-    } catch (_) {
-      // 忽略用户信息失败
+    } catch (e) {
+      if (e.toString().contains('CookieExpiredException')) {
+        _showCookieExpiredDialog();
+      }
+      // 忽略其他用户信息失败
     }
     await _search(reset: true);
+  }
+
+  void _showCookieExpiredDialog() {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('登录已过期'),
+        content: const Text('您的登录状态已过期，请重新设置Cookie以继续使用。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const ServerSettingsPage(),
+                ),
+              );
+            },
+            child: const Text('去设置'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onScroll() {
@@ -289,10 +328,12 @@ class _HomePageState extends State<HomePage> {
       _sortBy = 'none';
       _sortAscending = false;
     }
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       // 获取当前分类的额外参数 - 仅在站点支持高级搜索功能时使用
       Map<String, dynamic>? additionalParams;
@@ -313,13 +354,15 @@ class _HomePageState extends State<HomePage> {
         onlyFav: _onlyFavorites ? 1 : null,
         additionalParams: additionalParams,
       );
-      setState(() {
-        _items.addAll(res.items);
-        _totalPages = res.totalPages;
-        _hasMore = _pageNumber < _totalPages;
-      });
+      if (mounted) {
+        setState(() {
+          _items.addAll(res.items);
+          _totalPages = res.totalPages;
+          _hasMore = _pageNumber < _totalPages;
+        });
+      }
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -359,16 +402,18 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onSortSelected(String sortType) {
-    setState(() {
-      if (_sortBy == sortType) {
-        // 如果选择相同的排序类型，切换升序/降序
-        _sortAscending = !_sortAscending;
-      } else {
-        // 选择新的排序类型，默认降序
-        _sortBy = sortType;
-        _sortAscending = false;
-      }
-    });
+    if (mounted) {
+      setState(() {
+        if (_sortBy == sortType) {
+          // 如果选择相同的排序类型，切换升序/降序
+          _sortAscending = !_sortAscending;
+        } else {
+          // 选择新的排序类型，默认降序
+          _sortBy = sortType;
+          _sortAscending = false;
+        }
+      });
+    }
     _sortItems();
   }
 
@@ -395,7 +440,7 @@ class _HomePageState extends State<HomePage> {
       return _sortAscending ? comparison : -comparison;
     });
 
-    setState(() {}); // 触发重建以显示排序结果
+    if (mounted) setState(() {}); // 触发重建以显示排序结果
   }
 
   void _onTorrentTap(TorrentItem item) {
@@ -470,7 +515,7 @@ class _HomePageState extends State<HomePage> {
     
     // 立即更新UI状态
     final index = _items.indexWhere((t) => t.id == item.id);
-    if (index != -1) {
+    if (index != -1 && mounted) {
       setState(() {
         _items[index] = TorrentItem(
           id: item.id,
@@ -523,7 +568,7 @@ class _HomePageState extends State<HomePage> {
       _pendingCollectionRequests.remove(item.id);
       
       final index = _items.indexWhere((t) => t.id == item.id);
-      if (index != -1) {
+      if (index != -1 && mounted) {
         setState(() {
           _items[index] = TorrentItem(
             id: item.id,
@@ -759,9 +804,11 @@ class _HomePageState extends State<HomePage> {
                 if (_currentSite?.features.supportCollection == true)
                   IconButton(
                     onPressed: () {
-                      setState(() {
-                        _onlyFavorites = !_onlyFavorites;
-                      });
+                      if (mounted) {
+                        setState(() {
+                          _onlyFavorites = !_onlyFavorites;
+                        });
+                      }
                       if (_currentSite?.features.supportTorrentSearch ?? true) {
                         _search(reset: true);
                       } else {
@@ -1159,7 +1206,7 @@ class _HomePageState extends State<HomePage> {
 
   // 长按触发选中模式
   void _onLongPress(TorrentItem item) {
-    if (!_isSelectionMode) {
+    if (!_isSelectionMode && mounted) {
       // 使用 Flutter 内置的触觉反馈，提供原生的震动体验
       HapticFeedback.mediumImpact();
       setState(() {
@@ -1171,24 +1218,28 @@ class _HomePageState extends State<HomePage> {
 
   // 切换选中状态
   void _onToggleSelection(TorrentItem item) {
-    setState(() {
-      if (_selectedItems.contains(item.id)) {
-        _selectedItems.remove(item.id);
-        if (_selectedItems.isEmpty) {
-          _isSelectionMode = false;
+    if (mounted) {
+      setState(() {
+        if (_selectedItems.contains(item.id)) {
+          _selectedItems.remove(item.id);
+          if (_selectedItems.isEmpty) {
+            _isSelectionMode = false;
+          }
+        } else {
+          _selectedItems.add(item.id);
         }
-      } else {
-        _selectedItems.add(item.id);
-      }
-    });
+      });
+    }
   }
 
   // 取消选中模式
   void _onCancelSelection() {
-    setState(() {
-      _isSelectionMode = false;
-      _selectedItems.clear();
-    });
+    if (mounted) {
+      setState(() {
+        _isSelectionMode = false;
+        _selectedItems.clear();
+      });
+    }
   }
 
   // 批量收藏

@@ -9,6 +9,15 @@ import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 
+/// Cookie过期异常
+class CookieExpiredException implements Exception {
+  final String message;
+  CookieExpiredException(this.message);
+  
+  @override
+  String toString() => 'CookieExpiredException: $message';
+}
+
 /// NexusPHP Web站点适配器
 /// 用于处理基于Web接口的NexusPHP站点
 class NexusPHPWebAdapter extends SiteAdapter {
@@ -31,6 +40,30 @@ class NexusPHPWebAdapter extends SiteAdapter {
     if (_siteConfig.cookie != null && _siteConfig.cookie!.isNotEmpty) {
       _dio.options.headers['Cookie'] = _siteConfig.cookie;
     }
+    
+    // 添加响应拦截器处理302重定向
+    _dio.interceptors.add(InterceptorsWrapper(
+      onResponse: (response, handler) {
+        // 检查是否是302重定向到登录页面
+        if (response.statusCode == 302) {
+          final location = response.headers.value('location');
+          if (location != null && location.contains('login')) {
+            throw CookieExpiredException('Cookie已过期，请重新登录更新Cookie');
+          }
+        }
+        handler.next(response);
+      },
+      onError: (error, handler) {
+        // 检查DioException中的响应状态码
+        if (error.response?.statusCode == 302) {
+          final location = error.response?.headers.value('location');
+          if (location != null && location.contains('login')) {
+            throw CookieExpiredException('Cookie已过期，请重新登录更新Cookie');
+          }
+        }
+        handler.next(error);
+      },
+    ));
   }
 
   @override

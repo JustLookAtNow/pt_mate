@@ -207,6 +207,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                         
                         return Card(
                           margin: const EdgeInsets.only(bottom: 8),
+                          color: isActive 
+                              ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
+                              : null,
                           child: ListTile(
                             leading: CircleAvatar(
                               backgroundColor: isActive
@@ -219,11 +222,35 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                     : Theme.of(context).colorScheme.onSurfaceVariant,
                               ),
                             ),
-                            title: Text(
-                              site.name,
-                              style: TextStyle(
-                                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                              ),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    site.name,
+                                    style: TextStyle(
+                                      fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                                if (isActive)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.primary,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      'active',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Theme.of(context).colorScheme.onPrimary,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,26 +276,6 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                         ),
                                       ),
                                     ),
-                                    if (isActive) ...[
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Theme.of(context).colorScheme.primary,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          '当前',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Theme.of(context).colorScheme.onPrimary,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
                                   ],
                                 ),
                               ],
