@@ -125,7 +125,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     }
   }
 
-  String _preprocessColorTags(String content) {
+  String preprocessColorTags(String content) {
     // 常见颜色名称到十六进制代码的映射
     final Map<String, String> colorMap = {
       'red': 'FF0000',
@@ -168,7 +168,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
 
 
-  Widget _buildBBCodeContent(String content) {
+  Widget buildBBCodeContent(String content) {
     String processedContent = content;
     
     // 预处理Markdown格式的图片，转换为BBCode格式
@@ -185,14 +185,23 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     
     // 预处理[url][img][/img][/url]嵌套标签，提取图片URL
     processedContent = processedContent.replaceAllMapped(
-      RegExp(r'\[url=([^\]]+)\]\[img\]([^\]]+)\[/img\]\[/url\]', caseSensitive: false),
-      (match) => '[img]${match.group(2)}[/img]',
+      RegExp(
+        r'\[url\=[^\]]*\](.*?)\[/url\]',
+        caseSensitive: false,
+        dotAll: true,
+      ),
+      (match) => match.group(1)!,
     );
-    
+
     // 预处理[code]标签，转换为等宽字体显示
     processedContent = processedContent.replaceAllMapped(
-      RegExp(r'\[code\]([^\]]*?)\[/code\]', caseSensitive: false, dotAll: true),
-      (match) => '[font=monospace][color=#666666]${match.group(1)}[/color][/font]',
+      RegExp(
+        r'\[code\]\s*(.*?)\s*\[/code\]',
+        caseSensitive: false,
+        dotAll: true,
+      ),
+      (match) =>
+          '[font=monospace][color=#666666]${match.group(1)}[/color][/font]',
     );
     
     // 提取图片URL用于统计
@@ -203,7 +212,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     }
     
     // 预处理颜色标签
-    processedContent = _preprocessColorTags(processedContent);
+    processedContent = preprocessColorTags(processedContent);
     
     // 如果不显示图片，替换图片标签为占位符
     if (!_showImages && _imageUrls.isNotEmpty) {
@@ -336,7 +345,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                                 ],
                               ),
                               const SizedBox(height: 16),
-                              _buildBBCodeContent(_detail?.descr?.toString() ?? '暂无描述'),
+                              buildBBCodeContent(_detail?.descr?.toString() ?? '暂无描述'),
                             ],
                           ),
                         ),
