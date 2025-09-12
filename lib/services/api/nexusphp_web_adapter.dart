@@ -112,10 +112,10 @@ class NexusPHPWebAdapter extends SiteAdapter {
       final ratioMatch = RegExp(r'分享率:\s*([^\s]+)').firstMatch(textInfo);
       final ratio = ratioMatch?.group(1)?.trim() ?? '0';
 
-      final uploadMatch = RegExp(r'上传量:\s*([^\s]+)').firstMatch(textInfo);
+      final uploadMatch = RegExp(r'上传量:\s*(.*?B)').firstMatch(textInfo);
       final uploadString = uploadMatch?.group(1)?.trim() ?? '0 B';
 
-      final downloadMatch = RegExp(r'下载量:\s*([^\s]+)').firstMatch(textInfo);
+      final downloadMatch = RegExp(r'下载量:\s*(.*?B)').firstMatch(textInfo);
       final downloadString = downloadMatch?.group(1)?.trim() ?? '0 B';
 
       final bonusMatch = RegExp(r':\s*([^\s]+)\s*\[签到').firstMatch(textInfo);

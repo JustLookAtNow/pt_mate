@@ -265,9 +265,9 @@ void main() {
           print('  Text Info: $textInfo');
           final ratioMatch = RegExp(r'分享率:\s*([^\s]+)').firstMatch(textInfo);
           final ratio = ratioMatch?.group(1)?.trim();
-          final uploadMatch = RegExp(r'上传量:\s*([^\s]+)').firstMatch(textInfo);
+          final uploadMatch = RegExp(r'上传量:\s*(.*?B)').firstMatch(textInfo);
           final upload = uploadMatch?.group(1)?.trim();
-          final downloadMatch = RegExp(r'下载量:\s*([^\s]+)').firstMatch(textInfo);
+          final downloadMatch = RegExp(r'下载量:\s*(.*?B)').firstMatch(textInfo);
           final download = downloadMatch?.group(1)?.trim();
           final bonusMatch = RegExp(
             r':\s*([^\s]+)\s*\[签到',
