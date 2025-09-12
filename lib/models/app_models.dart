@@ -3,7 +3,8 @@ import 'dart:convert';
 // 网站类型枚举
 enum SiteType {
   mteam('M-Team', 'M-Team 站点', 'API Key (x-api-key)', '从 控制台-实验室-存储令牌 获取并粘贴此处'),
-  nexusphp('NexusPHP', 'NexusPHP(1.9+)站点', 'API Key (访问令牌)', '控制面板-设定首页-访问令牌（权限都勾上）'),
+  nexusphp('NexusPHP', 'NexusPHP(1.9+ with api)', 'API Key (访问令牌)', '控制面板-设定首页-访问令牌（权限都勾上）'),
+  nexusphpweb('NexusPHPWeb', 'NexusPHP(web)', 'Cookie认证', '通过网页登录获取认证信息'),
   // 未来可以添加其他站点类型
   // gazelle('Gazelle', 'Gazelle 站点'),
   ;
@@ -15,11 +16,13 @@ enum SiteType {
   final String apiKeyHint;
 
   String get passKeyLabel {
-    switch (this) {
+    switch (this) {   
       case SiteType.mteam:
         return 'Pass Key'; // M-Team通常不需要passKey
       case SiteType.nexusphp:
         return 'Pass Key (可选)';
+      case SiteType.nexusphpweb:
+        return 'Pass Key';
     }
   }
 
@@ -29,6 +32,8 @@ enum SiteType {
         return '请输入Pass Key（可选）';
       case SiteType.nexusphp:
         return '控制面板-设定首页-密钥（可选）';
+      case SiteType.nexusphpweb:
+        return '控制面板-设定首页-密钥（必填）';
     }
   }
 
@@ -38,6 +43,8 @@ enum SiteType {
         return false;
       case SiteType.nexusphp:
         return false;
+      case SiteType.nexusphpweb:
+        return false; // 改为可选，从fetchMemberProfile获取
     }
   }
 }
@@ -128,6 +135,7 @@ class SiteConfig {
   final String baseUrl; // e.g. https://kp.m-team.cc/
   final String? apiKey; // x-api-key
   final String? passKey; // NexusPHP类型网站的passKey
+  final String? cookie; // NexusPHPWeb类型网站的登录cookie
   final String? userId; // 用户ID，从fetchMemberProfile获取
   final SiteType siteType; // 网站类型
   final bool isActive; // 是否激活
@@ -140,6 +148,7 @@ class SiteConfig {
     required this.baseUrl,
     this.apiKey,
     this.passKey,
+    this.cookie,
     this.userId,
     this.siteType = SiteType.mteam,
     this.isActive = true,
@@ -153,6 +162,7 @@ class SiteConfig {
     String? baseUrl,
     String? apiKey,
     String? passKey,
+    String? cookie,
     String? userId,
     SiteType? siteType,
     bool? isActive,
@@ -164,6 +174,7 @@ class SiteConfig {
         baseUrl: baseUrl ?? this.baseUrl,
         apiKey: apiKey ?? this.apiKey,
         passKey: passKey ?? this.passKey,
+        cookie: cookie ?? this.cookie,
         userId: userId ?? this.userId,
         siteType: siteType ?? this.siteType,
         isActive: isActive ?? this.isActive,
@@ -177,6 +188,7 @@ class SiteConfig {
         'baseUrl': baseUrl,
         'apiKey': apiKey,
         'passKey': passKey,
+        'cookie': cookie,
         'userId': userId,
         'siteType': siteType.id,
         'isActive': isActive,
@@ -216,6 +228,7 @@ class SiteConfig {
       baseUrl: json['baseUrl'] as String,
       apiKey: json['apiKey'] as String?,
       passKey: json['passKey'] as String?,
+      cookie: json['cookie'] as String?,
       userId: json['userId'] as String?,
       siteType: SiteType.values.firstWhere(
         (type) => type.id == (json['siteType'] as String? ?? 'M-Team'),

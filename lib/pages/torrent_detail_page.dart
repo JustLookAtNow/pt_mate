@@ -183,6 +183,18 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       (match) => '[b]${match.group(1)}[/b]',
     );
     
+    // 预处理[url][img][/img][/url]嵌套标签，提取图片URL
+    processedContent = processedContent.replaceAllMapped(
+      RegExp(r'\[url=([^\]]+)\]\[img\]([^\]]+)\[/img\]\[/url\]', caseSensitive: false),
+      (match) => '[img]${match.group(2)}[/img]',
+    );
+    
+    // 预处理[code]标签，转换为等宽字体显示
+    processedContent = processedContent.replaceAllMapped(
+      RegExp(r'\[code\]([^\]]*?)\[/code\]', caseSensitive: false, dotAll: true),
+      (match) => '[font=monospace][color=#666666]${match.group(1)}[/color][/font]',
+    );
+    
     // 提取图片URL用于统计
     _imageUrls.clear();
     final imgRegex = RegExp(r'\[img\]([^\]]+)\[/img\]', caseSensitive: false);

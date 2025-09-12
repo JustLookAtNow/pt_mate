@@ -96,7 +96,7 @@ class _LaunchDeciderState extends State<LaunchDecider> {
     try {
       final site = await StorageService.instance.getActiveSiteConfig();
       await ApiService.instance.init();
-      if (site != null && (site.apiKey ?? '').isNotEmpty) {
+      if (site != null && ((site.apiKey ?? '').isNotEmpty || (site.cookie ?? '').isNotEmpty)) {
         // 验证 key 是否可用
         await ApiService.instance.fetchMemberProfile();
         _target = const HomePage();
@@ -166,6 +166,28 @@ class _HomePageState extends State<HomePage> {
   // 当前站点配置
   SiteConfig? _currentSite;
 
+  Widget _buildStatChip(BuildContext context, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha:0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color.withValues(alpha: 0.8),
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -187,18 +209,24 @@ class _HomePageState extends State<HomePage> {
       final storageService = Provider.of<StorageService>(context, listen: false);
       final activeSite = await storageService.getActiveSiteConfig();
       final categories = activeSite?.searchCategories ?? SearchCategoryConfig.getDefaultConfigs();
-      setState(() {
-        _currentSite = activeSite;
-        _categories = categories;
-        _selectedCategoryIndex = categories.isNotEmpty ? 0 : -1;
-      });
+      if (mounted) {
+        setState(() {
+          _currentSite = activeSite;
+          _categories = categories;
+          _selectedCategoryIndex = categories.isNotEmpty ? 0 : -1;
+        });
+      }
       
       // 拉取用户基础信息
       final prof = await ApiService.instance.fetchMemberProfile();
-      setState(() => _profile = prof);
+      if (mounted) setState(() => _profile = prof);
     } catch (e) {
-      // 用户信息失败不阻塞首页使用，仅提示
-      setState(() => _error = _error ?? e.toString());
+      if (e.toString().contains('CookieExpiredException')) {
+        _showCookieExpiredDialog();
+      } else {
+        // 用户信息失败不阻塞首页使用，仅提示
+        if (mounted) setState(() => _error = _error ?? e.toString());
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -214,15 +242,17 @@ class _HomePageState extends State<HomePage> {
       final storageService = Provider.of<StorageService>(context, listen: false);
       final activeSite = await storageService.getActiveSiteConfig();
       final categories = activeSite?.searchCategories ?? SearchCategoryConfig.getDefaultConfigs();
-      setState(() {
-        _categories = categories;
-        // 如果当前选中的分类索引超出范围，重置为第一个分类
-        if (categories.isNotEmpty && (_selectedCategoryIndex < 0 || _selectedCategoryIndex >= categories.length)) {
-          _selectedCategoryIndex = 0;
-        } else if (categories.isEmpty) {
-          _selectedCategoryIndex = -1;
-        }
-      });
+      if (mounted) {
+        setState(() {
+          _categories = categories;
+          // 如果当前选中的分类索引超出范围，重置为第一个分类
+          if (categories.isNotEmpty && (_selectedCategoryIndex < 0 || _selectedCategoryIndex >= categories.length)) {
+            _selectedCategoryIndex = 0;
+          } else if (categories.isEmpty) {
+            _selectedCategoryIndex = -1;
+          }
+        });
+      }
     } catch (e) {
       // 分类加载失败时显示错误信息
       if (mounted) {
@@ -237,10 +267,41 @@ class _HomePageState extends State<HomePage> {
     try {
       final prof = await ApiService.instance.fetchMemberProfile();
       if (mounted) setState(() => _profile = prof);
-    } catch (_) {
-      // 忽略用户信息失败
+    } catch (e) {
+      if (e.toString().contains('CookieExpiredException')) {
+        _showCookieExpiredDialog();
+      }
+      // 忽略其他用户信息失败
     }
     await _search(reset: true);
+  }
+
+  void _showCookieExpiredDialog() {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('登录已过期'),
+        content: const Text('您的登录状态已过期，请重新设置Cookie以继续使用。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const ServerSettingsPage(),
+                ),
+              );
+            },
+            child: const Text('去设置'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onScroll() {
@@ -267,10 +328,12 @@ class _HomePageState extends State<HomePage> {
       _sortBy = 'none';
       _sortAscending = false;
     }
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       // 获取当前分类的额外参数 - 仅在站点支持高级搜索功能时使用
       Map<String, dynamic>? additionalParams;
@@ -291,13 +354,15 @@ class _HomePageState extends State<HomePage> {
         onlyFav: _onlyFavorites ? 1 : null,
         additionalParams: additionalParams,
       );
-      setState(() {
-        _items.addAll(res.items);
-        _totalPages = res.totalPages;
-        _hasMore = _pageNumber < _totalPages;
-      });
+      if (mounted) {
+        setState(() {
+          _items.addAll(res.items);
+          _totalPages = res.totalPages;
+          _hasMore = _pageNumber < _totalPages;
+        });
+      }
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -337,16 +402,18 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onSortSelected(String sortType) {
-    setState(() {
-      if (_sortBy == sortType) {
-        // 如果选择相同的排序类型，切换升序/降序
-        _sortAscending = !_sortAscending;
-      } else {
-        // 选择新的排序类型，默认降序
-        _sortBy = sortType;
-        _sortAscending = false;
-      }
-    });
+    if (mounted) {
+      setState(() {
+        if (_sortBy == sortType) {
+          // 如果选择相同的排序类型，切换升序/降序
+          _sortAscending = !_sortAscending;
+        } else {
+          // 选择新的排序类型，默认降序
+          _sortBy = sortType;
+          _sortAscending = false;
+        }
+      });
+    }
     _sortItems();
   }
 
@@ -373,7 +440,7 @@ class _HomePageState extends State<HomePage> {
       return _sortAscending ? comparison : -comparison;
     });
 
-    setState(() {}); // 触发重建以显示排序结果
+    if (mounted) setState(() {}); // 触发重建以显示排序结果
   }
 
   void _onTorrentTap(TorrentItem item) {
@@ -448,7 +515,7 @@ class _HomePageState extends State<HomePage> {
     
     // 立即更新UI状态
     final index = _items.indexWhere((t) => t.id == item.id);
-    if (index != -1) {
+    if (index != -1 && mounted) {
       setState(() {
         _items[index] = TorrentItem(
           id: item.id,
@@ -501,7 +568,7 @@ class _HomePageState extends State<HomePage> {
       _pendingCollectionRequests.remove(item.id);
       
       final index = _items.indexWhere((t) => t.id == item.id);
-      if (index != -1) {
+      if (index != -1 && mounted) {
         setState(() {
           _items[index] = TorrentItem(
             id: item.id,
@@ -559,6 +626,15 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             actions: const [QbSpeedIndicator()],
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            iconTheme: IconThemeData(
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
+            titleTextStyle: TextStyle(
+              color: Theme.of(context).colorScheme.onPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           drawer: _AppDrawer(onSettingsChanged: _reloadCategories),
       body: Column(
@@ -568,83 +644,119 @@ class _HomePageState extends State<HomePage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
               child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.person_outline),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _profile!.username,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 4,
-                              children: [
-                                Text(
-                                  '↑ ${Formatters.dataFromBytes(_profile!.uploadedBytes)}',
-                                ),
-                                Text(
-                                  '↓ ${Formatters.dataFromBytes(_profile!.downloadedBytes)}',
-                                ),
-                                Text(
-                                  '比率 ${Formatters.shareRate(_profile!.shareRate)}',
-                                ),
-                                Text('魔力 ${Formatters.bonus(_profile!.bonus)}'),
-                              ],
-                            ),
-                          ],
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.1),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.person_outline,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _profile!.username,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 4,
+                                children: [
+                                  _buildStatChip(
+                                    context,
+                                    '↑ ${_profile!.uploadedBytesString}',
+                                    Colors.green,
+                                  ),
+                                  _buildStatChip(
+                                    context,
+                                    '↓ ${_profile!.downloadedBytesString}',
+                                    Colors.blue,
+                                  ),
+                                  _buildStatChip(
+                                    context,
+                                    '比率 ${Formatters.shareRate(_profile!.shareRate)}',
+                                    Colors.orange,
+                                  ),
+                                  _buildStatChip(
+                                    context,
+                                    '魔力 ${Formatters.bonus(_profile!.bonus)}',
+                                    Colors.purple,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Row(
+            child: Column(
               children: [
                 // 分类下拉菜单 - 仅在站点支持分类搜索功能时显示
                 if (_currentSite?.features.supportCategories ?? true) ...[
-                  SizedBox(
-                    width: 80, // 限制最大宽度
-                    child: DropdownButton<int>(
-                      value: _categories.isNotEmpty && _selectedCategoryIndex >= 0 && _selectedCategoryIndex < _categories.length ? _selectedCategoryIndex : null,
-                      isExpanded: true, // 让下拉按钮占满容器宽度
-                      items: _categories.asMap().entries.map((entry) => 
-                        DropdownMenuItem(
-                          value: entry.key,
-                          child: Text(
-                            entry.value.displayName,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.left,
-                          ),
+                  DropdownButton<int>(
+                    value: _categories.isNotEmpty && _selectedCategoryIndex >= 0 && _selectedCategoryIndex < _categories.length ? _selectedCategoryIndex : null,
+                    isExpanded: true, // 让下拉按钮占满容器宽度
+                    items: _categories.asMap().entries.map((entry) => 
+                      DropdownMenuItem(
+                        value: entry.key,
+                        child: Text(
+                          entry.value.displayName,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.left,
                         ),
-                      ).toList(),
-                      onChanged: (v) {
-                        if (v != null && v >= 0 && v < _categories.length) {
-                          setState(() => _selectedCategoryIndex = v);
-                          if (_currentSite?.features.supportTorrentSearch ?? true) {
-                            _search(reset: true);
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('当前站点不支持搜索功能')),
-                            );
-                          }
+                      ),
+                    ).toList(),
+                    onChanged: (v) {
+                      if (v != null && v >= 0 && v < _categories.length) {
+                        setState(() => _selectedCategoryIndex = v);
+                        if (_currentSite?.features.supportTorrentSearch ?? true) {
+                          _search(reset: true);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('当前站点不支持搜索功能')),
+                          );
                         }
-                      },
-                    ),
+                      }
+                    },
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(height: 8),
                 ],
-                Expanded(
+                Row(
+                  children: [
+                    Expanded(
                   child: TextField(
                     controller: _keywordCtrl,
                     textInputAction: TextInputAction.search,
@@ -653,14 +765,23 @@ class _HomePageState extends State<HomePage> {
                       hintText: (_currentSite?.features.supportTorrentSearch ?? true) 
                           ? '输入关键词（可选）' 
                           : '当前站点不支持搜索功能',
-                      border: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(25)),
+                      border: OutlineInputBorder(
+                        borderRadius: const BorderRadius.all(Radius.circular(25)),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                        ),
                       ),
-                      enabledBorder: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(25)),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: const BorderRadius.all(Radius.circular(25)),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                        ),
                       ),
-                      focusedBorder: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(25)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: const BorderRadius.all(Radius.circular(25)),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
@@ -683,9 +804,11 @@ class _HomePageState extends State<HomePage> {
                 if (_currentSite?.features.supportCollection == true)
                   IconButton(
                     onPressed: () {
-                      setState(() {
-                        _onlyFavorites = !_onlyFavorites;
-                      });
+                      if (mounted) {
+                        setState(() {
+                          _onlyFavorites = !_onlyFavorites;
+                        });
+                      }
                       if (_currentSite?.features.supportTorrentSearch ?? true) {
                         _search(reset: true);
                       } else {
@@ -835,6 +958,8 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                     ),
+                  ],
+                ),
                   ],
                 ),
               ],
@@ -1081,7 +1206,7 @@ class _HomePageState extends State<HomePage> {
 
   // 长按触发选中模式
   void _onLongPress(TorrentItem item) {
-    if (!_isSelectionMode) {
+    if (!_isSelectionMode && mounted) {
       // 使用 Flutter 内置的触觉反馈，提供原生的震动体验
       HapticFeedback.mediumImpact();
       setState(() {
@@ -1093,24 +1218,28 @@ class _HomePageState extends State<HomePage> {
 
   // 切换选中状态
   void _onToggleSelection(TorrentItem item) {
-    setState(() {
-      if (_selectedItems.contains(item.id)) {
-        _selectedItems.remove(item.id);
-        if (_selectedItems.isEmpty) {
-          _isSelectionMode = false;
+    if (mounted) {
+      setState(() {
+        if (_selectedItems.contains(item.id)) {
+          _selectedItems.remove(item.id);
+          if (_selectedItems.isEmpty) {
+            _isSelectionMode = false;
+          }
+        } else {
+          _selectedItems.add(item.id);
         }
-      } else {
-        _selectedItems.add(item.id);
-      }
-    });
+      });
+    }
   }
 
   // 取消选中模式
   void _onCancelSelection() {
-    setState(() {
-      _isSelectionMode = false;
-      _selectedItems.clear();
-    });
+    if (mounted) {
+      setState(() {
+        _isSelectionMode = false;
+        _selectedItems.clear();
+      });
+    }
   }
 
   // 批量收藏
@@ -1333,22 +1462,35 @@ class _AppDrawer extends StatelessWidget {
       child: SafeArea(
         child: ListView(
           children: [
-            const DrawerHeader(
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+              ),
               child: Align(
                 alignment: Alignment.bottomLeft,
                 child: Text(
                   'PT Mate',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
                 ),
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.home_outlined),
+              leading: Icon(
+                Icons.home_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               title: const Text('主页'),
               onTap: () => Navigator.of(context).pop(),
             ),
             ListTile(
-              leading: const Icon(Icons.download_outlined),
+              leading: Icon(
+                Icons.download_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               title: const Text('下载器设置'),
               onTap: () {
                 Navigator.of(context).pop();
@@ -1360,7 +1502,10 @@ class _AppDrawer extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.dns),
+              leading: Icon(
+                Icons.dns,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               title: const Text('服务器配置'),
               onTap: () {
                 Navigator.of(context).pop();
@@ -1373,7 +1518,10 @@ class _AppDrawer extends StatelessWidget {
             ),
 
             ListTile(
-              leading: const Icon(Icons.settings_outlined),
+              leading: Icon(
+                Icons.settings_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               title: const Text('设置'),
               onTap: () async {
                 Navigator.of(context).pop();
@@ -1385,7 +1533,10 @@ class _AppDrawer extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.info_outline),
+              leading: Icon(
+                Icons.info_outline,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               title: const Text('关于'),
               onTap: () {
                 Navigator.of(context).pop();

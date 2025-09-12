@@ -49,3 +49,5 @@ app.*.map.json
 upload_apks.sh
 
 mise.toml
+
+test/html

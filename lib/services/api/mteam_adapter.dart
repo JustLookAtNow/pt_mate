@@ -3,6 +3,7 @@ import '../../models/app_models.dart';
 import 'site_adapter.dart';
 import 'api_client.dart';
 import '../site_config_service.dart';
+import '../../utils/format.dart';
 
 /// M-Team站点适配器实现
 class MTeamAdapter extends SiteAdapter {
@@ -72,12 +73,19 @@ class MTeamAdapter extends SiteAdapter {
     final mc = json['memberCount'] as Map<String, dynamic>?;
     double parseDouble(dynamic v) => v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
     int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
+    
+    final uploadedBytes = parseInt(mc?['uploaded']);
+    final downloadedBytes = parseInt(mc?['downloaded']);
+    
     return MemberProfile(
       username: (json['username'] ?? '').toString(),
       bonus: parseDouble(mc?['bonus']),
       shareRate: parseDouble(mc?['shareRate']),
-      uploadedBytes: parseInt(mc?['uploaded']),
-      downloadedBytes: parseInt(mc?['downloaded']),
+      uploadedBytes: uploadedBytes,
+      downloadedBytes: downloadedBytes,
+      uploadedBytesString: Formatters.dataFromBytes(uploadedBytes),
+      downloadedBytesString: Formatters.dataFromBytes(downloadedBytes),
+      passKey: null, // M-Team类型不提供passKey
     );
   }
   
