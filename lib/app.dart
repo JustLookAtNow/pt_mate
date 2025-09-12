@@ -166,6 +166,28 @@ class _HomePageState extends State<HomePage> {
   // 当前站点配置
   SiteConfig? _currentSite;
 
+  Widget _buildStatChip(BuildContext context, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha:0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color.withValues(alpha: 0.8),
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -559,6 +581,15 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             actions: const [QbSpeedIndicator()],
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            iconTheme: IconThemeData(
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
+            titleTextStyle: TextStyle(
+              color: Theme.of(context).colorScheme.onPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           drawer: _AppDrawer(onSettingsChanged: _reloadCategories),
       body: Column(
@@ -568,41 +599,78 @@ class _HomePageState extends State<HomePage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
               child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.person_outline),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _profile!.username,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 4,
-                              children: [
-                                Text(
-                                  '↑ ${_profile!.uploadedBytesString}',
-                                ),
-                                Text(
-                                  '↓ ${_profile!.downloadedBytesString}',
-                                ),
-                                Text(
-                                  '比率 ${Formatters.shareRate(_profile!.shareRate)}',
-                                ),
-                                Text('魔力 ${Formatters.bonus(_profile!.bonus)}'),
-                              ],
-                            ),
-                          ],
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.1),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.person_outline,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _profile!.username,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 4,
+                                children: [
+                                  _buildStatChip(
+                                    context,
+                                    '↑ ${_profile!.uploadedBytesString}',
+                                    Colors.green,
+                                  ),
+                                  _buildStatChip(
+                                    context,
+                                    '↓ ${_profile!.downloadedBytesString}',
+                                    Colors.blue,
+                                  ),
+                                  _buildStatChip(
+                                    context,
+                                    '比率 ${Formatters.shareRate(_profile!.shareRate)}',
+                                    Colors.orange,
+                                  ),
+                                  _buildStatChip(
+                                    context,
+                                    '魔力 ${Formatters.bonus(_profile!.bonus)}',
+                                    Colors.purple,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -652,14 +720,23 @@ class _HomePageState extends State<HomePage> {
                       hintText: (_currentSite?.features.supportTorrentSearch ?? true) 
                           ? '输入关键词（可选）' 
                           : '当前站点不支持搜索功能',
-                      border: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(25)),
+                      border: OutlineInputBorder(
+                        borderRadius: const BorderRadius.all(Radius.circular(25)),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                        ),
                       ),
-                      enabledBorder: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(25)),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: const BorderRadius.all(Radius.circular(25)),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                        ),
                       ),
-                      focusedBorder: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(25)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: const BorderRadius.all(Radius.circular(25)),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
@@ -1334,22 +1411,35 @@ class _AppDrawer extends StatelessWidget {
       child: SafeArea(
         child: ListView(
           children: [
-            const DrawerHeader(
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+              ),
               child: Align(
                 alignment: Alignment.bottomLeft,
                 child: Text(
                   'PT Mate',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
                 ),
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.home_outlined),
+              leading: Icon(
+                Icons.home_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               title: const Text('主页'),
               onTap: () => Navigator.of(context).pop(),
             ),
             ListTile(
-              leading: const Icon(Icons.download_outlined),
+              leading: Icon(
+                Icons.download_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               title: const Text('下载器设置'),
               onTap: () {
                 Navigator.of(context).pop();
@@ -1361,7 +1451,10 @@ class _AppDrawer extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.dns),
+              leading: Icon(
+                Icons.dns,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               title: const Text('服务器配置'),
               onTap: () {
                 Navigator.of(context).pop();
@@ -1374,7 +1467,10 @@ class _AppDrawer extends StatelessWidget {
             ),
 
             ListTile(
-              leading: const Icon(Icons.settings_outlined),
+              leading: Icon(
+                Icons.settings_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               title: const Text('设置'),
               onTap: () async {
                 Navigator.of(context).pop();
@@ -1386,7 +1482,10 @@ class _AppDrawer extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.info_outline),
+              leading: Icon(
+                Icons.info_outline,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               title: const Text('关于'),
               onTap: () {
                 Navigator.of(context).pop();
