@@ -1,5 +1,171 @@
 import 'dart:convert';
 
+// 用户资料信息
+class MemberProfile {
+  final String username;
+  final double bonus; // magic points
+  final double shareRate;
+  final int uploadedBytes;
+  final int downloadedBytes;
+  final String uploadedBytesString; // 上传量字符串格式，如"1.2 GB"
+  final String downloadedBytesString; // 下载量字符串格式，如"500 MB"
+  final String? userId; // 用户ID，NexusPHP类型从data.data.id获取
+  final String? passKey; // Pass Key，nexusphpweb类型从usercp.php获取
+
+  MemberProfile({
+    required this.username,
+    required this.bonus,
+    required this.shareRate,
+    required this.uploadedBytes,
+    required this.downloadedBytes,
+    required this.uploadedBytesString,
+    required this.downloadedBytesString,
+    this.userId,
+    this.passKey,
+  });
+}
+
+// 种子详情
+class TorrentDetail {
+  final String descr;
+  
+  TorrentDetail({required this.descr});
+}
+
+// 下载状态枚举
+enum DownloadStatus {
+  none,        // 未下载
+  downloading, // 下载中
+  completed,   // 已完成
+}
+
+// 种子项目
+class TorrentItem {
+  final String id;
+  final String name;
+  final String smallDescr;
+  final DiscountType discount; // 优惠类型枚举
+  final String? discountEndTime; // e.g., 2025-08-27 21:16:48
+  final String? downloadUrl; //下载链接，有些网站可以直接通过列表接口获取到
+  final int seeders;
+  final int leechers;
+  final int sizeBytes;
+  final List<String> imageList;
+  final DownloadStatus downloadStatus;
+  final bool collection; // 是否已收藏
+
+  TorrentItem({
+    required this.id,
+    required this.name,
+    required this.smallDescr,
+    this.discount = DiscountType.normal,
+    required this.discountEndTime,
+    required this.downloadUrl,
+    required this.seeders,
+    required this.leechers,
+    required this.sizeBytes,
+    required this.imageList,
+    this.downloadStatus = DownloadStatus.none,
+    this.collection = false,
+  });
+}
+
+// 种子搜索结果
+class TorrentSearchResult {
+  final int pageNumber;
+  final int pageSize;
+  final int total;
+  final int totalPages;
+  final List<TorrentItem> items;
+
+  TorrentSearchResult({
+    required this.pageNumber,
+    required this.pageSize,
+    required this.total,
+    required this.totalPages,
+    required this.items,
+  });
+}
+
+// 优惠类型枚举
+enum DiscountType {
+  normal('NORMAL'),
+  free('FREE'),
+  twoXFree('2xFREE'),
+  percent10('PERCENT_10'),
+  percent20('PERCENT_20'),
+  percent30('PERCENT_30'),
+  percent40('PERCENT_40'),
+  percent50('PERCENT_50'),
+  percent60('PERCENT_60'),
+  percent70('PERCENT_70'),
+  percent80('PERCENT_80'),
+  percent90('PERCENT_90');
+
+  const DiscountType(this.value);
+  final String value;
+
+
+  
+  // 获取显示文本
+  String get displayText {
+    switch (this) {
+      case DiscountType.normal:
+        return '';
+      case DiscountType.free:
+        return 'FREE';
+      case DiscountType.twoXFree:
+        return '2xFREE';
+      case DiscountType.percent10:
+        return '10%';
+      case DiscountType.percent20:
+        return '20%';
+      case DiscountType.percent30:
+        return '30%';
+      case DiscountType.percent40:
+        return '40%';
+      case DiscountType.percent50:
+        return '50%';
+      case DiscountType.percent60:
+        return '60%';
+      case DiscountType.percent70:
+        return '70%';
+      case DiscountType.percent80:
+        return '80%';
+      case DiscountType.percent90:
+        return '90%';
+    }
+  }
+  
+  // 获取显示颜色类型
+  DiscountColorType get colorType {
+    switch (this) {
+      case DiscountType.normal:
+        return DiscountColorType.none;
+      case DiscountType.free:
+      case DiscountType.twoXFree:
+        return DiscountColorType.green;
+      case DiscountType.percent10:
+      case DiscountType.percent20:
+      case DiscountType.percent30:
+      case DiscountType.percent40:
+      case DiscountType.percent50:
+      case DiscountType.percent60:
+      case DiscountType.percent70:
+      case DiscountType.percent80:
+      case DiscountType.percent90:
+        return DiscountColorType.yellow;
+    }
+  }
+}
+
+// 优惠显示颜色类型
+enum DiscountColorType {
+  none,
+  green,
+  yellow,
+}
+
 // 网站类型枚举
 enum SiteType {
   mteam('M-Team', 'M-Team 站点', 'API Key (x-api-key)', '从 控制台-实验室-存储令牌 获取并粘贴此处'),

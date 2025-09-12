@@ -3,7 +3,6 @@ import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import '../../models/app_models.dart';
-import 'api_client.dart';
 import 'site_adapter.dart';
 import '../site_config_service.dart';
 import '../../utils/format.dart';
@@ -13,6 +12,7 @@ import '../../utils/format.dart';
 class NexusPHPAdapter implements SiteAdapter {
   late SiteConfig _siteConfig;
   late Dio _dio;
+  Map<String, String>? _discountMapping;
 
   @override
   SiteConfig get siteConfig => _siteConfig;
@@ -20,6 +20,10 @@ class NexusPHPAdapter implements SiteAdapter {
   @override
   Future<void> init(SiteConfig config) async {
     _siteConfig = config;
+
+    // 加载优惠类型映射配置
+    await _loadDiscountMapping();
+
     _dio = Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 15),
@@ -44,6 +48,45 @@ class NexusPHPAdapter implements SiteAdapter {
         },
       ),
     );
+  }
+
+  /// 加载优惠类型映射配置
+  Future<void> _loadDiscountMapping() async {
+    try {
+      final template = await SiteConfigService.getDefaultTemplate('NexusPHP');
+      if (template != null && template['discountMapping'] != null) {
+        _discountMapping = Map<String, String>.from(
+          template['discountMapping'],
+        );
+      }
+      final specialMapping = await SiteConfigService.getDiscountMapping(
+        _siteConfig.baseUrl,
+      );
+      if (specialMapping.isNotEmpty) {
+        _discountMapping?.addAll(specialMapping);
+      }
+    } catch (e) {
+      // 使用默认映射
+      _discountMapping = {};
+    }
+  }
+
+  /// 从字符串解析优惠类型
+  DiscountType _parseDiscountType(String? str) {
+    if (str == null || str.isEmpty) return DiscountType.normal;
+
+    final mapping = _discountMapping ?? {};
+    final enumValue = mapping[str];
+
+    if (enumValue != null) {
+      for (final type in DiscountType.values) {
+        if (type.value == enumValue) {
+          return type;
+        }
+      }
+    }
+
+    return DiscountType.normal;
   }
 
   /// 构建请求头，包含Bearer Token认证
@@ -84,7 +127,7 @@ class NexusPHPAdapter implements SiteAdapter {
   MemberProfile _parseMemberProfile(Map<String, dynamic> data) {
     final uploadedBytes = (data['uploaded'] ?? 0).toInt();
     final downloadedBytes = (data['downloaded'] ?? 0).toInt();
-    
+
     return MemberProfile(
       username: data['username'] ?? '',
       bonus: (data['bonus'] ?? 0).toDouble(),
@@ -163,16 +206,16 @@ class NexusPHPAdapter implements SiteAdapter {
 
   TorrentItem _parseTorrentItem(Map<String, dynamic> item) {
     // 解析促销信息
-    String discount = 'Normal';
+    String discountText = 'Normal';
     final promotionInfo = item['promotion_info'] as Map<String, dynamic>?;
     if (promotionInfo != null) {
       final originalText = promotionInfo['text'] as String? ?? 'Normal';
       // 映射促销信息以兼容现有的显示逻辑
       if (originalText.toLowerCase().contains('2x') &&
           originalText.toLowerCase().contains('free')) {
-        discount = 'Free*2';
+        discountText = 'Free*2';
       } else {
-        discount = originalText;
+        discountText = originalText;
       }
     }
 
@@ -180,7 +223,7 @@ class NexusPHPAdapter implements SiteAdapter {
       id: (item['id'] as int).toString(),
       name: item['name'] as String,
       smallDescr: item['small_descr'] as String? ?? '',
-      discount: discount,
+      discount: _parseDiscountType(discountText),
       discountEndTime: null, // 暂时没有
       downloadUrl: item['download_url'] as String?,
       seeders: item['seeders'] as int,

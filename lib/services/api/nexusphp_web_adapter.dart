@@ -1,5 +1,4 @@
 import '../../models/app_models.dart';
-import 'api_client.dart';
 import 'site_adapter.dart';
 import '../site_config_service.dart';
 import 'package:dio/dio.dart';
@@ -14,7 +13,7 @@ import 'dart:convert';
 class CookieExpiredException implements Exception {
   final String message;
   CookieExpiredException(this.message);
-  
+
   @override
   String toString() => 'CookieExpiredException: $message';
 }
@@ -24,6 +23,7 @@ class CookieExpiredException implements Exception {
 class NexusPHPWebAdapter extends SiteAdapter {
   late SiteConfig _siteConfig;
   late Dio _dio;
+  Map<String, String>? _discountMapping;
 
   @override
   SiteConfig get siteConfig => _siteConfig;
@@ -37,6 +37,13 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
     final now = DateTime.now();
     int totalMinutes = 0;
+
+    // 解析月数
+    final monthMatch = RegExp(r'(\d+)月').firstMatch(relativeTime);
+    if (monthMatch != null) {
+      final months = int.tryParse(monthMatch.group(1) ?? '0') ?? 0;
+      totalMinutes += months * 30 * 24 * 60;
+    }
 
     // 解析天数
     final dayMatch = RegExp(r'(\d+)天').firstMatch(relativeTime);
@@ -61,7 +68,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
     // 计算绝对时间
     final absoluteTime = now.add(Duration(minutes: totalMinutes));
-    
+
     // 使用DateFormat格式化为 "yyyy-MM-dd HH:mm:ss" 格式
     final formatter = DateFormat('yyyy-MM-dd HH:mm:ss');
     return formatter.format(absoluteTime);
@@ -70,40 +77,87 @@ class NexusPHPWebAdapter extends SiteAdapter {
   @override
   Future<void> init(SiteConfig config) async {
     _siteConfig = config;
+
+    // 加载优惠类型映射配置
+    await _loadDiscountMapping();
+
     _dio = Dio();
     _dio.options.baseUrl = _siteConfig.baseUrl;
     _dio.options.headers['User-Agent'] =
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
     _dio.options.responseType = ResponseType.plain; // 设置为plain避免JSON解析警告
-    
+
     // 设置Cookie
     if (_siteConfig.cookie != null && _siteConfig.cookie!.isNotEmpty) {
       _dio.options.headers['Cookie'] = _siteConfig.cookie;
     }
-    
+
     // 添加响应拦截器处理302重定向
-    _dio.interceptors.add(InterceptorsWrapper(
-      onResponse: (response, handler) {
-        // 检查是否是302重定向到登录页面
-        if (response.statusCode == 302) {
-          final location = response.headers.value('location');
-          if (location != null && location.contains('login')) {
-            throw CookieExpiredException('Cookie已过期，请重新登录更新Cookie');
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onResponse: (response, handler) {
+          // 检查是否是302重定向到登录页面
+          if (response.statusCode == 302) {
+            final location = response.headers.value('location');
+            if (location != null && location.contains('login')) {
+              throw CookieExpiredException('Cookie已过期，请重新登录更新Cookie');
+            }
           }
-        }
-        handler.next(response);
-      },
-      onError: (error, handler) {
-        // 检查DioException中的响应状态码
-        if (error.response?.statusCode == 302) {
-          final location = error.response?.headers.value('location');
-          if (location != null && location.contains('login')) {
-            throw CookieExpiredException('Cookie已过期，请重新登录更新Cookie');
+          handler.next(response);
+        },
+        onError: (error, handler) {
+          // 检查DioException中的响应状态码
+          if (error.response?.statusCode == 302) {
+            final location = error.response?.headers.value('location');
+            if (location != null && location.contains('login')) {
+              throw CookieExpiredException('Cookie已过期，请重新登录更新Cookie');
+            }
           }
+          handler.next(error);
+        },
+      ),
+    );
+  }
+
+  /// 加载优惠类型映射配置
+  Future<void> _loadDiscountMapping() async {
+    try {
+      final template = await SiteConfigService.getDefaultTemplate(
+        'NexusPHPWeb',
+      );
+      if (template != null && template['discountMapping'] != null) {
+        _discountMapping = Map<String, String>.from(
+          template['discountMapping'],
+        );
+      }
+      final specialMapping = await SiteConfigService.getDiscountMapping(
+        _siteConfig.baseUrl,
+      );
+      if (specialMapping.isNotEmpty) {
+        _discountMapping?.addAll(specialMapping);
+      }
+    } catch (e) {
+      // 使用默认映射
+      _discountMapping = {};
+    }
+  }
+
+  /// 从字符串解析优惠类型
+  DiscountType _parseDiscountType(String? str) {
+    if (str == null || str.isEmpty) return DiscountType.normal;
+
+    final mapping = _discountMapping ?? {};
+    final enumValue = mapping[str];
+
+    if (enumValue != null) {
+      for (final type in DiscountType.values) {
+        if (type.value == enumValue) {
+          return type;
         }
-        handler.next(error);
-      },
-    ));
+      }
+    }
+
+    return DiscountType.normal;
   }
 
   @override
@@ -308,25 +362,25 @@ class NexusPHPWebAdapter extends SiteAdapter {
                 .replaceAll(RegExp(r'<[^>]+>'), '')
                 .replaceAll(RegExp(r'\s+'), ' ')
                 .trim();
-             // 提取下载记录
-              DownloadStatus status = DownloadStatus.none;
-              final downloadDiv = titleTd.find('div', attrs: {'title': true});
-              if (downloadDiv != null) {
-                final downloadTitle = downloadDiv.getAttrValue('title');
-                RegExp regExp = RegExp(r'(\d+)\%');
-                final match = regExp.firstMatch(downloadTitle!);
-                if (match != null) {
-                  final percent = match.group(1);
-                  if (percent != null) {
-                    int percentInt = int.parse(percent);
-                    if (percentInt == 100) {
-                      status = DownloadStatus.completed;
-                    }else{
-                      status = DownloadStatus.downloading;
-                    }
+            // 提取下载记录
+            DownloadStatus status = DownloadStatus.none;
+            final downloadDiv = titleTd.find('div', attrs: {'title': true});
+            if (downloadDiv != null) {
+              final downloadTitle = downloadDiv.getAttrValue('title');
+              RegExp regExp = RegExp(r'(\d+)\%');
+              final match = regExp.firstMatch(downloadTitle!);
+              if (match != null) {
+                final percent = match.group(1);
+                if (percent != null) {
+                  int percentInt = int.parse(percent);
+                  if (percentInt == 100) {
+                    status = DownloadStatus.completed;
+                  } else {
+                    status = DownloadStatus.downloading;
                   }
                 }
               }
+            }
             // 提取大小（第5列，索引4）
             final sizeText = tds[4].text.replaceAll('\n', ' ').trim();
 
@@ -407,7 +461,9 @@ class NexusPHPWebAdapter extends SiteAdapter {
                 id: torrentId,
                 name: title,
                 smallDescr: description,
-                discount: promoType?.isNotEmpty == true ? promoType : null,
+                discount: _parseDiscountType(
+                  promoType?.isNotEmpty == true ? promoType : null,
+                ),
                 discountEndTime: _convertRelativeTimeToAbsolute(remainingTime),
                 downloadUrl: null, // 暂时不提供直接下载链接
                 seeders: int.tryParse(seedersText) ?? 0,
@@ -511,7 +567,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
   }
 
   /// 生成下载Hash令牌
-  /// 
+  ///
   /// 参数:
   /// - [passkey] 站点passkey
   /// - [id] 种子ID

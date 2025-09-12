@@ -54,6 +54,44 @@ class SiteConfigService {
     }
   }
 
+  // 获取默认的优惠映射配置
+  static Future<Map<String, String>> getDiscountMapping(
+    String baseUrl,
+  ) async {
+    try {
+      // 从assets读取JSON文件
+      final String jsonString = await rootBundle.loadString(_configPath);
+      final Map<String, dynamic> jsonData = json.decode(jsonString);
+
+      final List<dynamic> presetSitesJson = jsonData['presetSites'] ?? [];
+
+      // 通过baseUrl匹配预设站点
+
+      // 标准化baseUrl，移除末尾的斜杠
+      final normalizedBaseUrl = baseUrl.endsWith('/')
+          ? baseUrl.substring(0, baseUrl.length - 1)
+          : baseUrl;
+
+      for (final siteJson in presetSitesJson) {
+        final presetBaseUrl = siteJson['baseUrl'] as String?;
+        if (presetBaseUrl != null) {
+          final normalizedPresetUrl = presetBaseUrl.endsWith('/')
+              ? presetBaseUrl.substring(0, presetBaseUrl.length - 1)
+              : presetBaseUrl;
+          if (normalizedPresetUrl == normalizedBaseUrl) {
+            final Map<dynamic, dynamic> discountMap =
+                siteJson['discountMapping'] ?? {};
+            return discountMap.map((key, value) => MapEntry(key as String, value as String));
+          }
+        }
+      }
+      return {};
+    } catch (e) {
+      // 如果加载失败，返回空对象
+      return {};
+    }
+  }
+
   /// 根据站点类型获取默认的搜索分类配置
   /// 优先匹配baseUrl，然后类型
   static Future<List<SearchCategoryConfig>> getDefaultSearchCategories(
@@ -70,16 +108,24 @@ class SiteConfigService {
       // 通过baseUrl匹配预设站点
       if (baseUrl != null && baseUrl.isNotEmpty) {
         // 标准化baseUrl，移除末尾的斜杠
-        final normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
-        
+        final normalizedBaseUrl = baseUrl.endsWith('/')
+            ? baseUrl.substring(0, baseUrl.length - 1)
+            : baseUrl;
+
         for (final siteJson in presetSitesJson) {
           final presetBaseUrl = siteJson['baseUrl'] as String?;
           if (presetBaseUrl != null) {
-            final normalizedPresetUrl = presetBaseUrl.endsWith('/') ? presetBaseUrl.substring(0, presetBaseUrl.length - 1) : presetBaseUrl;
+            final normalizedPresetUrl = presetBaseUrl.endsWith('/')
+                ? presetBaseUrl.substring(0, presetBaseUrl.length - 1)
+                : presetBaseUrl;
             if (normalizedPresetUrl == normalizedBaseUrl) {
-              final List<dynamic> categoriesJson = siteJson['searchCategories'] ?? [];
+              final List<dynamic> categoriesJson =
+                  siteJson['searchCategories'] ?? [];
               return categoriesJson
-                  .map((categoryJson) => SearchCategoryConfig.fromJson(categoryJson))
+                  .map(
+                    (categoryJson) =>
+                        SearchCategoryConfig.fromJson(categoryJson),
+                  )
                   .toList();
             }
           }

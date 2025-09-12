@@ -36,7 +36,8 @@
         "downloadHistory": true,
         "categorySearch": true,
         "advancedSearch": true
-      }
+      },
+      "discountMapping": {}
     },
     {
       "id": "mteam-tp",
@@ -74,7 +75,8 @@
         "downloadHistory": true,
         "categorySearch": true,
         "advancedSearch": true
-      }
+      },
+      "discountMapping": {}
     },
     {
       "id": "mteam-api",
@@ -112,7 +114,8 @@
         "downloadHistory": true,
         "categorySearch": true,
         "advancedSearch": true
-      }
+      },
+      "discountMapping": {}
     },
     {
       "id": "ptskit",
@@ -150,7 +153,8 @@
         "downloadHistory": false,
         "categorySearch": true,
         "advancedSearch": true
-      }
+      },
+      "discountMapping": {}
     },
     {
       "id": "hxpt",
@@ -167,7 +171,8 @@
         "downloadHistory": false,
         "categorySearch": true,
         "advancedSearch": true
-      }
+      },
+      "discountMapping": {}
     },
     {
       "id": "mypt",
@@ -184,7 +189,8 @@
         "downloadHistory": false,
         "categorySearch": true,
         "advancedSearch": true
-      }
+      },
+      "discountMapping": {}
     },
     {
       "id": "afun",
@@ -201,7 +207,8 @@
         "downloadHistory": true,
         "categorySearch": true,
         "advancedSearch": true
-      }
+      },
+      "discountMapping": {}
     }
   ],
   "defaultTemplates": {
@@ -239,6 +246,19 @@
         "downloadHistory": true,
         "categorySearch": true,
         "advancedSearch": true
+      },
+      "discountMapping": {
+        "FREE": "FREE",
+        "PERCENT_10": "PERCENT_10",
+        "PERCENT_20": "PERCENT_20",
+        "PERCENT_30": "PERCENT_30",
+        "PERCENT_40": "PERCENT_40",
+        "PERCENT_50": "PERCENT_50",
+        "PERCENT_60": "PERCENT_60",
+        "PERCENT_70": "PERCENT_70",
+        "PERCENT_80": "PERCENT_80",
+        "PERCENT_90": "PERCENT_90",
+        "NORMAL": "NORMAL"
       }
     },
     "NexusPHP": {
@@ -255,20 +275,50 @@
         "categorySearch": true,
         "advancedSearch": true
       },
-      "NexusPHPWeb": {
-        "name": "NexusPHP web",
-        "baseUrl": "https://",
-        "searchCategories": [],
-        "features": {
-          "userProfile": true,
-          "torrentSearch": true,
-          "torrentDetail": true,
-          "download": true,
-          "favorites": true,
-          "downloadHistory": true,
-          "categorySearch": true,
-          "advancedSearch": true
-        }
+      "discountMapping": {
+        "Free": "FREE",
+        "Free*2": "2xFREE",
+        "2X 50%": "2xFREE",
+        "10%": "PERCENT_10",
+        "20%": "PERCENT_20",
+        "30%": "PERCENT_30",
+        "40%": "PERCENT_40",
+        "50%": "PERCENT_50",
+        "60%": "PERCENT_60",
+        "70%": "PERCENT_70",
+        "80%": "PERCENT_80",
+        "90%": "PERCENT_90",
+        "Normal": "NORMAL"
+      }
+    },
+    "NexusPHPWeb": {
+      "name": "NexusPHP web",
+      "baseUrl": "https://",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      },
+      "discountMapping": {
+        "Free": "FREE",
+        "2X Free": "2xFREE",
+        "2X 50%": "2xFREE",
+        "10%": "PERCENT_10",
+        "20%": "PERCENT_20",
+        "30%": "PERCENT_30",
+        "40%": "PERCENT_40",
+        "50%": "PERCENT_50",
+        "60%": "PERCENT_60",
+        "70%": "PERCENT_70",
+        "80%": "PERCENT_80",
+        "90%": "PERCENT_90",
+        "Normal": "NORMAL"
       }
     }
   }

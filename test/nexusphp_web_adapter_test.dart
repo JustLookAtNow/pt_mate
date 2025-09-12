@@ -2,9 +2,9 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:beautiful_soup_dart/beautiful_soup.dart';
+import 'package:pt_mate/models/app_models.dart';
 import 'dart:io';
 
-import 'package:pt_mate/services/api/api_client.dart';
 
 void main() {
   group('NexusPHP Web Adapter Tests', () {

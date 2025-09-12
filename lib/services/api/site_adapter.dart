@@ -1,5 +1,4 @@
 import '../../models/app_models.dart';
-import 'api_client.dart';
 import 'mteam_adapter.dart';
 import 'nexusphp_adapter.dart';
 import 'nexusphp_web_adapter.dart';

@@ -1,14 +1,14 @@
 import 'package:dio/dio.dart';
 import '../../models/app_models.dart';
-import 'site_adapter.dart';
-import 'api_client.dart';
 import '../site_config_service.dart';
+import 'site_adapter.dart';
 import '../../utils/format.dart';
 
 /// M-Team站点适配器实现
 class MTeamAdapter extends SiteAdapter {
   late SiteConfig _siteConfig;
   late Dio _dio;
+  Map<String, String>? _discountMapping;
   
   @override
   SiteConfig get siteConfig => _siteConfig;
@@ -16,6 +16,9 @@ class MTeamAdapter extends SiteAdapter {
   @override
   Future<void> init(SiteConfig config) async {
     _siteConfig = config;
+    
+    // 加载优惠类型映射配置
+    await _loadDiscountMapping();
     
     _dio = Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 15),
@@ -46,6 +49,40 @@ class MTeamAdapter extends SiteAdapter {
       
       return handler.next(options);
     }));
+  }
+  
+  /// 加载优惠类型映射配置
+  Future<void> _loadDiscountMapping() async {
+    try {
+      final template = await SiteConfigService.getDefaultTemplate('M-Team');
+      if (template != null && template['discountMapping'] != null) {
+        _discountMapping = Map<String, String>.from(template['discountMapping']);
+      }
+      final specialMapping = await SiteConfigService.getDiscountMapping(_siteConfig.baseUrl);
+      if (specialMapping.isNotEmpty) {
+        _discountMapping?.addAll(specialMapping);
+      }
+    } catch (e) {
+      _discountMapping = {};
+    }
+  }
+  
+  /// 从字符串解析优惠类型
+  DiscountType _parseDiscountType(String? str) {
+    if (str == null || str.isEmpty) return DiscountType.normal;
+    
+    final mapping = _discountMapping ?? {};
+    final enumValue = mapping[str];
+    
+    if (enumValue != null) {
+      for (final type in DiscountType.values) {
+        if (type.value == enumValue) {
+          return type;
+        }
+      }
+    }
+    
+    return DiscountType.normal;
   }
   
   @override
@@ -243,7 +280,7 @@ class MTeamAdapter extends SiteAdapter {
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       smallDescr: (json['smallDescr'] ?? '').toString(),
-      discount: discount,
+      discount: _parseDiscountType(discount),
       discountEndTime: discountEndTime,
       downloadUrl: null,
       seeders: parseInt(status['seeders']),

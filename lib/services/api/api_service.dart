@@ -1,7 +1,6 @@
 import '../../models/app_models.dart';
 import '../storage/storage_service.dart';
 import 'site_adapter.dart';
-import 'api_client.dart';
 
 /// 统一的API服务管理器
 /// 负责管理不同站点的适配器实例

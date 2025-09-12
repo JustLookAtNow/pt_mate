@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'models/app_models.dart';
 import 'pages/torrent_detail_page.dart';
 import 'services/api/api_service.dart';
-import 'services/api/api_client.dart';
 import 'services/storage/storage_service.dart';
 import 'services/theme/theme_manager.dart';
 
@@ -491,37 +490,37 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Color _discountColor(String d) {
-    if (d.toUpperCase().startsWith('FREE')) return Colors.green;
-    if (d.toUpperCase().startsWith('PERCENT_')) return Colors.amber;
-    return Colors.grey;
+  Color _discountColor(DiscountType d) {
+    switch (d.colorType) {
+      case DiscountColorType.green:
+        return Colors.green;
+      case DiscountColorType.yellow:
+        return Colors.amber;
+      case DiscountColorType.none:
+        return Colors.grey;
+    }
   }
 
-  String _discountText(String d, String? endTime) {
-    if (d.toUpperCase().startsWith('FREE')) {
-      if (endTime != null && endTime.isNotEmpty) {
-        try {
-          final endDateTime = DateTime.parse(endTime);
-          final now = DateTime.now();
-          final difference = endDateTime.difference(now);
-          final hoursLeft = difference.inHours;
+  String _discountText(DiscountType d, String? endTime) {
+    final baseText = d.displayText;
+    
+    if ((d == DiscountType.free || d == DiscountType.twoXFree) && 
+        endTime != null && endTime.isNotEmpty) {
+      try {
+        final endDateTime = DateTime.parse(endTime);
+        final now = DateTime.now();
+        final difference = endDateTime.difference(now);
+        final hoursLeft = difference.inHours;
 
-          if (hoursLeft > 0) {
-            return '$d ${hoursLeft}h';
-          } else {
-            return d;
-          }
-        } catch (e) {
-          return d;
+        if (hoursLeft > 0) {
+          return '$baseText ${hoursLeft}h';
         }
+      } catch (e) {
+        // 解析失败，返回基础文本
       }
-      return d;
     }
-    if (d.toUpperCase().startsWith('PERCENT_')) {
-      final p = d.split('_').last;
-      return '$p%';
-    }
-    return d;
+    
+    return baseText;
   }
 
   void _onSortSelected(String sortType) {
@@ -1218,21 +1217,21 @@ class _HomePageState extends State<HomePage> {
                                   const SizedBox(height: 4),
                                   Row(
                                     children: [
-                                      if (t.discount != null)
+                                      if (t.discount != DiscountType.normal)
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 6,
                                             vertical: 2,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: _discountColor(t.discount!),
+                                            color: _discountColor(t.discount),
                                             borderRadius: BorderRadius.circular(
                                               4,
                                             ),
                                           ),
                                           child: Text(
                                             _discountText(
-                                              t.discount!,
+                                              t.discount,
                                               t.discountEndTime,
                                             ),
                                             style: const TextStyle(
@@ -1241,7 +1240,7 @@ class _HomePageState extends State<HomePage> {
                                             ),
                                           ),
                                         ),
-                                      const SizedBox(width: 6),
+                                      if (t.discount != DiscountType.normal) const SizedBox(width: 6),
                                       _buildSeedLeechInfo(
                                         t.seeders,
                                         t.leechers,
