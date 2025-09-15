@@ -8,6 +8,9 @@ on:
 jobs:
   close-stale-help-wanted:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
 
     steps:
       - name: Check out repo
