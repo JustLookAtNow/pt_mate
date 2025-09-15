@@ -12,10 +12,10 @@ import 'services/theme/theme_manager.dart';
 
 import 'utils/format.dart';
 import 'services/qbittorrent/qb_client.dart';
-import 'pages/settings_page.dart';
-import 'pages/about_page.dart';
+
 import 'pages/server_settings_page.dart';
 import 'widgets/qb_speed_indicator.dart';
+import 'widgets/app_drawer.dart';
 
 class AppState extends ChangeNotifier {
   SiteConfig? _site;
@@ -830,7 +830,10 @@ class _HomePageState extends State<HomePage> {
               fontWeight: FontWeight.w500,
             ),
           ),
-          drawer: _AppDrawer(onSettingsChanged: _reloadCategories),
+          drawer: AppDrawer(
+            currentRoute: '/',
+            onSettingsChanged: _reloadCategories,
+          ),
       body: Column(
         children: [
           // 顶部用户基础信息 - 仅在站点支持用户资料功能时显示
@@ -1646,114 +1649,6 @@ class _HomePageState extends State<HomePage> {
       case DownloadStatus.none:
         return const SizedBox(width: 20); // 占位，保持布局一致
     }
-  }
-}
-
-
-
-// 应用左侧抽屉
-class _AppDrawer extends StatelessWidget {
-  final VoidCallback? onSettingsChanged;
-  
-  const _AppDrawer({this.onSettingsChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Drawer(
-      child: SafeArea(
-        child: ListView(
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.light 
-                    ? Theme.of(context).colorScheme.primary 
-                    : Theme.of(context).colorScheme.surface,
-              ),
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Text(
-                  'PT Mate',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).brightness == Brightness.light 
-                        ? Theme.of(context).colorScheme.onPrimary 
-                        : Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ),
-            ),
-            ListTile(
-              leading: Icon(
-                Icons.home_outlined,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              title: const Text('主页'),
-              onTap: () => Navigator.of(context).pop(),
-            ),
-            ListTile(
-              leading: Icon(
-                Icons.download_outlined,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              title: const Text('下载器设置'),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const DownloaderSettingsPage(),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: Icon(
-                Icons.dns,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              title: const Text('服务器配置'),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const ServerSettingsPage(),
-                  ),
-                );
-              },
-            ),
-
-            ListTile(
-              leading: Icon(
-                Icons.settings_outlined,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              title: const Text('设置'),
-              onTap: () async {
-                Navigator.of(context).pop();
-                await Navigator.of(
-                  context,
-                ).push(MaterialPageRoute(builder: (_) => const SettingsPage()));
-                // 从设置页面返回后，重新加载分类配置
-                onSettingsChanged?.call();
-              },
-            ),
-            ListTile(
-              leading: Icon(
-                Icons.info_outline,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              title: const Text('关于'),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.of(
-                  context,
-                ).push(MaterialPageRoute(builder: (_) => const AboutPage()));
-              },
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

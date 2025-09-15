@@ -4,6 +4,7 @@ import '../services/storage/storage_service.dart';
 import '../services/qbittorrent/qb_client.dart';
 import '../models/app_models.dart';
 import '../widgets/qb_speed_indicator.dart';
+import '../widgets/app_drawer.dart';
 
 class DownloaderSettingsPage extends StatefulWidget {
   const DownloaderSettingsPage({super.key});
@@ -225,6 +226,12 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('下载器设置'),
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         actions: [
           IconButton(
             tooltip: '测试默认下载器',
@@ -249,6 +256,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
           fontWeight: FontWeight.w500,
         ),
       ),
+      drawer: const AppDrawer(currentRoute: '/downloader_settings'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(

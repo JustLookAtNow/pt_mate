@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../services/storage/storage_service.dart';
 import '../services/theme/theme_manager.dart';
 import '../widgets/qb_speed_indicator.dart';
+import '../widgets/app_drawer.dart';
 import 'backup_restore_page.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -18,6 +19,12 @@ class SettingsPage extends StatelessWidget {
         backgroundColor: Theme.of(context).brightness == Brightness.light 
             ? Theme.of(context).colorScheme.primary 
             : Theme.of(context).colorScheme.surface,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         iconTheme: IconThemeData(
           color: Theme.of(context).brightness == Brightness.light 
               ? Theme.of(context).colorScheme.onPrimary 
@@ -32,6 +39,7 @@ class SettingsPage extends StatelessWidget {
         ),
         actions: const [QbSpeedIndicator()],
       ),
+      drawer: const AppDrawer(currentRoute: '/settings'),
       body: const _SettingsBody(),
     );
   }

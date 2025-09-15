@@ -7,6 +7,7 @@ import '../services/api/api_service.dart';
 import '../services/site_config_service.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/nexusphp_web_login.dart';
+import '../widgets/app_drawer.dart';
 
 import '../utils/format.dart';
 import '../app.dart';
@@ -139,25 +140,11 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('服务器设置'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () async {
-            final navigator = Navigator.of(context);
-            // 检查是否有可用的站点配置
-            final site = await StorageService.instance.getActiveSiteConfig();
-            if (!mounted) return;
-            
-            if (site != null && (site.apiKey ?? '').isNotEmpty) {
-              // 有配置，回到首页
-              navigator.pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const HomePage()),
-                (route) => false,
-              );
-            } else {
-              // 没有配置，退出应用
-              navigator.pop();
-            }
-          },
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
         ),
         actions: const [QbSpeedIndicator()],
         backgroundColor: Theme.of(context).brightness == Brightness.light 
@@ -176,6 +163,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           fontWeight: FontWeight.w500,
         ),
       ),
+      drawer: const AppDrawer(currentRoute: '/server_settings'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
