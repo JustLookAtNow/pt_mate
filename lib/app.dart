@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
+import 'package:pt_mate/pages/downloader_settings_page.dart';
 
 import 'models/app_models.dart';
 import 'pages/torrent_detail_page.dart';
@@ -19,11 +20,41 @@ import 'widgets/qb_speed_indicator.dart';
 class AppState extends ChangeNotifier {
   SiteConfig? _site;
   SiteConfig? get site => _site;
+  
+  bool _isInitialized = false;
+  bool get isInitialized => _isInitialized;
+  
+  Completer<void>? _initCompleter;
 
   Future<void> loadInitial() async {
-    _site = await StorageService.instance.getActiveSiteConfig();
-    await ApiService.instance.init();
-    notifyListeners();
+    if (_initCompleter != null) {
+      return _initCompleter!.future;
+    }
+    
+    _initCompleter = Completer<void>();
+    
+    try {
+      _site = await StorageService.instance.getActiveSiteConfig();
+      await ApiService.instance.init();
+      _isInitialized = true;
+      notifyListeners();
+      _initCompleter!.complete();
+    } catch (e) {
+      _initCompleter!.completeError(e);
+      rethrow;
+    }
+  }
+  
+  Future<void> waitForInitialization() async {
+    if (_isInitialized) return;
+    if (_initCompleter != null) {
+      return _initCompleter!.future;
+    }
+    // 如果还没开始初始化，等待一下
+    await Future.delayed(const Duration(milliseconds: 50));
+    if (_initCompleter != null) {
+      return _initCompleter!.future;
+    }
   }
 
   Future<void> setSite(SiteConfig site) async {
@@ -159,6 +190,8 @@ class _CategoryFilterDialogState extends State<_CategoryFilterDialog> {
   }
 }
 
+
+
 class MTeamApp extends StatelessWidget {
   const MTeamApp({super.key});
 
@@ -181,60 +214,13 @@ class MTeamApp extends StatelessWidget {
             theme: themeManager.lightTheme,
             darkTheme: themeManager.darkTheme,
             themeMode: themeManager.flutterThemeMode,
-            home: const LaunchDecider(),
+            home: const HomePage(),
           );
         },
       ),
     );
   }
 }
-
-class LaunchDecider extends StatefulWidget {
-  const LaunchDecider({super.key});
-
-  @override
-  State<LaunchDecider> createState() => _LaunchDeciderState();
-}
-
-class _LaunchDeciderState extends State<LaunchDecider> {
-  bool _checking = true;
-  Widget? _target;
-
-  @override
-  void initState() {
-    super.initState();
-    _check();
-  }
-
-  Future<void> _check() async {
-    // 自动检测会话：如果有活跃站点信息且 profile 测试通过 -> HomePage
-    try {
-      final site = await StorageService.instance.getActiveSiteConfig();
-      await ApiService.instance.init();
-      if (site != null && ((site.apiKey ?? '').isNotEmpty || (site.cookie ?? '').isNotEmpty)) {
-        // 验证 key 是否可用
-        await ApiService.instance.fetchMemberProfile();
-        _target = const HomePage();
-      } else {
-        _target = const ServerSettingsPage();
-      }
-    } catch (_) {
-      _target = const ServerSettingsPage();
-    } finally {
-      if (mounted) setState(() => _checking = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_checking) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    return _target ?? const ServerSettingsPage();
-  }
-}
-
-
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -326,10 +312,45 @@ class _HomePageState extends State<HomePage> {
   Future<void> _init() async {
     setState(() => _loading = true);
     try {
-      // 加载当前活跃站点的分类配置
-      final storageService = Provider.of<StorageService>(context, listen: false);
-      final activeSite = await storageService.getActiveSiteConfig();
-      final categories = activeSite?.searchCategories ?? SearchCategoryConfig.getDefaultConfigs();
+      // 等待AppState初始化完成
+      final appState = Provider.of<AppState>(context, listen: false);
+      
+      // 等待AppState完全初始化完成
+      await appState.waitForInitialization();
+      
+      // 如果没有站点配置，说明确实没有配置
+      if (appState.site == null) {
+        if (mounted) {
+          setState(() {
+            _currentSite = null;
+            _categories = SearchCategoryConfig.getDefaultConfigs();
+            _selectedCategoryIndex = -1;
+            _loading = false;
+          });
+          // 显示友好提示
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('请先配置服务器信息'),
+              action: SnackBarAction(
+                label: '去设置',
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const ServerSettingsPage(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        }
+        return;
+      }
+      
+      final activeSite = appState.site!;
+      final categories = activeSite.searchCategories.isNotEmpty 
+          ? activeSite.searchCategories 
+          : SearchCategoryConfig.getDefaultConfigs();
       if (mounted) {
         setState(() {
           _currentSite = activeSite;
@@ -478,7 +499,14 @@ class _HomePageState extends State<HomePage> {
       );
       if (mounted) {
         setState(() {
-          _items.addAll(res.items);
+          // 如果是重置搜索或第一页，清空现有数据
+          if (reset || _pageNumber == 1) {
+            _items.clear();
+          }
+          // 去重处理：过滤掉已存在的项目ID
+          final existingIds = _items.map((item) => item.id).toSet();
+          final newItems = res.items.where((item) => !existingIds.contains(item.id)).toList();
+          _items.addAll(newItems);
           _totalPages = res.totalPages;
           _hasMore = _pageNumber < _totalPages;
         });
@@ -1729,896 +1757,6 @@ class _AppDrawer extends StatelessWidget {
   }
 }
 
-class DownloaderSettingsPage extends StatefulWidget {
-  const DownloaderSettingsPage({super.key});
-
-  @override
-  State<DownloaderSettingsPage> createState() => _DownloaderSettingsPageState();
-}
-
-class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
-  List<QbClientConfig> _clients = [];
-  String? _defaultId;
-  bool _loading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final clients = await StorageService.instance.loadQbClients();
-      final def = await StorageService.instance.loadDefaultQbId();
-      if (mounted) {
-        setState(() {
-          _clients = clients;
-          _defaultId = def;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _addOrEdit({QbClientConfig? existing}) async {
-    final result = await showDialog<_QbEditorResult>(
-      context: context,
-      builder: (_) => _QbClientEditorDialog(existing: existing),
-    );
-    if (result == null) return;
-    // 保存
-    final updated = [..._clients];
-    final idx = existing == null
-        ? -1
-        : updated.indexWhere((c) => c.id == existing.id);
-    final cfg = result.config;
-    if (idx >= 0) {
-      updated[idx] = cfg;
-    } else {
-      updated.add(cfg);
-    }
-    await StorageService.instance.saveQbClients(updated, defaultId: _defaultId);
-    if ((result.password ?? '').isNotEmpty) {
-      await StorageService.instance.saveQbPassword(cfg.id, result.password!);
-    }
-    await _load();
-  }
-
-  Future<void> _delete(QbClientConfig c) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('删除下载器'),
-        content: Text('确定删除下载器“${c.name}”吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    final list = _clients.where((e) => e.id != c.id).toList();
-    await StorageService.instance.saveQbClients(
-      list,
-      defaultId: _defaultId == c.id ? null : _defaultId,
-    );
-    await StorageService.instance.deleteQbPassword(c.id);
-    await _load();
-  }
-
-  Future<void> _setDefault(QbClientConfig c) async {
-    setState(() => _defaultId = c.id);
-    await StorageService.instance.saveQbClients(_clients, defaultId: c.id);
-  }
-
-  Future<void> _testDefault() async {
-    final id = _defaultId;
-    if (id == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先在列表中选择一个默认下载器')));
-      return;
-    }
-    final c = _clients.firstWhere(
-      (e) => e.id == id,
-      orElse: () => _clients.first,
-    );
-    await _test(c);
-  }
-
-  Future<void> _test(QbClientConfig c) async {
-    // 获取密码
-    var password = await StorageService.instance.loadQbPassword(c.id);
-    if ((password ?? '').isEmpty) {
-      if (!mounted) return;
-      password = await showDialog<String>(
-        context: context,
-        builder: (_) => _PasswordPromptDialog(name: c.name),
-      );
-      if ((password ?? '').isEmpty) return;
-    }
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              '正在测试连接…',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    try {
-      await QbService.instance.testConnection(config: c, password: password!);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green[700], size: 20),
-              const SizedBox(width: 12),
-              Text(
-                '连接成功',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Theme.of(
-            context,
-          ).colorScheme.surfaceContainerHighest,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                Icons.error,
-                color: Theme.of(context).colorScheme.onErrorContainer,
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  '连接失败：$e',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onErrorContainer,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  Future<void> _openCategoriesTags(QbClientConfig c) async {
-    // 优先读取已保存密码；若无则提示输入
-    var pwd = await StorageService.instance.loadQbPassword(c.id);
-    if ((pwd ?? '').isEmpty) {
-      if (!mounted) return;
-      pwd = await showDialog<String>(
-        context: context,
-        builder: (_) => _PasswordPromptDialog(name: c.name),
-      );
-      if ((pwd ?? '').isEmpty) return;
-    }
-    if (!mounted) return;
-    await showDialog(
-      context: context,
-      builder: (_) => _QbCategoriesTagsDialog(config: c, password: pwd!),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('下载器设置'),
-        actions: [
-          IconButton(
-            tooltip: '测试默认下载器',
-            onPressed: _testDefault,
-            icon: const Icon(Icons.wifi_tethering),
-          ),
-          const QbSpeedIndicator(),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ),
-                Expanded(
-                  child: RadioGroup<String>(
-                    groupValue: _defaultId,
-                    onChanged: (String? value) {
-                      if (value != null) {
-                        final client = _clients.firstWhere(
-                          (c) => c.id == value,
-                        );
-                        _setDefault(client);
-                      }
-                    },
-                    child: ListView.builder(
-                      itemCount: _clients.length,
-                      itemBuilder: (_, i) {
-                        final c = _clients[i];
-                        final subtitle =
-                            '${c.host}:${c.port}  ·  ${c.username}';
-                        return ListTile(
-                          leading: Radio<String>(value: c.id),
-                          title: Text(c.name),
-                          subtitle: Text(subtitle),
-                          onTap: () => _addOrEdit(existing: c),
-                          trailing: Wrap(
-                            spacing: 8,
-                            children: [
-                              IconButton(
-                                tooltip: '测试连接',
-                                onPressed: () => _test(c),
-                                icon: const Icon(Icons.wifi_tethering),
-                              ),
-                              IconButton(
-                                tooltip: '分类与标签',
-                                onPressed: () => _openCategoriesTags(c),
-                                icon: const Icon(Icons.folder_open),
-                              ),
-                              IconButton(
-                                tooltip: '删除',
-                                onPressed: () => _delete(c),
-                                icon: const Icon(Icons.delete_outline),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _addOrEdit(),
-        icon: const Icon(Icons.add),
-        label: const Text('新增下载器'),
-      ),
-    );
-  }
-}
-
-class _PasswordPromptDialog extends StatefulWidget {
-  final String name;
-  const _PasswordPromptDialog({required this.name});
-
-  @override
-  State<_PasswordPromptDialog> createState() => _PasswordPromptDialogState();
-}
-
-class _PasswordPromptDialogState extends State<_PasswordPromptDialog> {
-  final _pwdCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _pwdCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('输入“${widget.name}”密码'),
-      content: TextField(
-        controller: _pwdCtrl,
-        obscureText: true,
-        decoration: const InputDecoration(
-          labelText: '密码',
-          border: OutlineInputBorder(),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _pwdCtrl.text.trim()),
-          child: const Text('确定'),
-        ),
-      ],
-    );
-  }
-}
-
-class _QbEditorResult {
-  final QbClientConfig config;
-  final String? password;
-  _QbEditorResult(this.config, this.password);
-}
-
-class _QbClientEditorDialog extends StatefulWidget {
-  final QbClientConfig? existing;
-  const _QbClientEditorDialog({this.existing});
-
-  @override
-  State<_QbClientEditorDialog> createState() => _QbClientEditorDialogState();
-}
-
-class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
-  final _nameCtrl = TextEditingController();
-  final _hostCtrl = TextEditingController();
-  final _portCtrl = TextEditingController(text: '8080');
-  final _userCtrl = TextEditingController();
-  final _pwdCtrl = TextEditingController();
-  bool _testing = false;
-  String? _testMsg;
-  bool? _testOk;
-  bool _useLocalRelay = false; // 本地中转选项状态
-
-  @override
-  void initState() {
-    super.initState();
-    final e = widget.existing;
-    if (e != null) {
-      _nameCtrl.text = e.name;
-      _hostCtrl.text = e.host;
-      _portCtrl.text = e.port.toString();
-      _userCtrl.text = e.username;
-      _useLocalRelay = e.useLocalRelay; // 初始化本地中转状态
-    }
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _hostCtrl.dispose();
-    _portCtrl.dispose();
-    _userCtrl.dispose();
-    _pwdCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _onSubmit() async {
-    final name = _nameCtrl.text.trim();
-    final host = _hostCtrl.text.trim();
-    final port = int.tryParse(_portCtrl.text.trim());
-    final user = _userCtrl.text.trim();
-    final pwd = _pwdCtrl.text.trim();
-    if (name.isEmpty || host.isEmpty || port == null || user.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请完整填写名称、主机、端口、用户名')));
-      return;
-    }
-    final id =
-        widget.existing?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
-    final cfg = QbClientConfig(
-      id: id,
-      name: name,
-      host: host,
-      port: port,
-      username: user,
-      useLocalRelay: _useLocalRelay, // 包含本地中转选项
-    );
-    // 可选先测连
-    Navigator.of(context).pop(_QbEditorResult(cfg, pwd.isEmpty ? null : pwd));
-  }
-
-  Future<void> _testConnection() async {
-    final name = _nameCtrl.text.trim();
-    final host = _hostCtrl.text.trim();
-    final port = int.tryParse(_portCtrl.text.trim());
-    final user = _userCtrl.text.trim();
-    final pwd = _pwdCtrl.text.trim();
-
-    if (name.isEmpty ||
-        host.isEmpty ||
-        port == null ||
-        user.isEmpty ||
-        pwd.isEmpty) {
-      setState(() {
-        _testOk = false;
-        _testMsg = '请完整填写名称、主机、端口、用户名和密码后再测试';
-      });
-      return;
-    }
-
-    setState(() {
-      _testing = true;
-      _testMsg = null;
-    });
-    try {
-      final cfg = QbClientConfig(
-        id: widget.existing?.id ?? 'temp',
-        name: name,
-        host: host,
-        port: port,
-        username: user,
-        useLocalRelay: _useLocalRelay, // 包含本地中转选项
-      );
-
-      await QbService.instance.testConnection(config: cfg, password: pwd);
-      if (!mounted) return;
-      setState(() {
-        _testOk = true;
-        _testMsg = '连接成功';
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _testOk = false;
-        _testMsg = '连接失败：$e';
-      });
-    } finally {
-      if (mounted) setState(() => _testing = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      child: Container(
-        width: 420,
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.8,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 标题栏
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: const BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey, width: 0.5),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.existing == null ? '新增下载器' : '编辑下载器',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // 内容区域
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: _nameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: '名称',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _hostCtrl,
-                      decoration: const InputDecoration(
-                        labelText: '主机/IP（可含协议）',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _portCtrl,
-                      decoration: const InputDecoration(
-                        labelText: '端口',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _userCtrl,
-                      decoration: const InputDecoration(
-                        labelText: '用户名',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _pwdCtrl,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: '密码（仅用于保存/测试，不会明文入库）',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // 本地中转选项
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '本地中转',
-                                  style: Theme.of(context).textTheme.titleSmall,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '启用后先下载种子文件到本地，再提交给 qBittorrent',
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(color: Colors.grey.shade600),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Switch(
-                            value: _useLocalRelay,
-                            onChanged: (value) {
-                              setState(() {
-                                _useLocalRelay = value;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (_testMsg != null) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _testOk == true
-                              ? Theme.of(context).colorScheme.primaryContainer
-                              : Theme.of(context).colorScheme.errorContainer,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: _testOk == true
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _testOk == true
-                                  ? Icons.check_circle
-                                  : Icons.error_outline,
-                              size: 18,
-                              color: _testOk == true
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.error,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _testMsg!,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: _testOk == true
-                                      ? Theme.of(
-                                          context,
-                                        ).colorScheme.onPrimaryContainer
-                                      : Theme.of(
-                                          context,
-                                        ).colorScheme.onErrorContainer,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            // 按钮栏
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: Colors.grey, width: 0.5)),
-              ),
-              child: Column(
-                children: [
-                  // 测试按钮单独一排
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _testing ? null : _testConnection,
-                        icon: _testing
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.wifi_tethering),
-                        label: Text(_testing ? '测试中…' : '测试连接'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // 取消和保存按钮一排
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('取消'),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: _onSubmit,
-                        child: const Text('保存'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _QbCategoriesTagsDialog extends StatefulWidget {
-  final QbClientConfig config;
-  final String password;
-  const _QbCategoriesTagsDialog({required this.config, required this.password});
-
-  @override
-  State<_QbCategoriesTagsDialog> createState() =>
-      _QbCategoriesTagsDialogState();
-}
-
-class _QbCategoriesTagsDialogState extends State<_QbCategoriesTagsDialog> {
-  List<String> _categories = [];
-  List<String> _tags = [];
-  bool _loading = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCacheThenRefresh();
-  }
-
-  Future<void> _loadCacheThenRefresh() async {
-    // 先读取本地缓存，提升首屏体验
-    final cachedCats = await StorageService.instance.loadQbCategories(
-      widget.config.id,
-    );
-    final cachedTags = await StorageService.instance.loadQbTags(
-      widget.config.id,
-    );
-    if (mounted) {
-      setState(() {
-        _categories = cachedCats;
-        _tags = cachedTags;
-      });
-    }
-    // 再尝试远程拉取
-    await _refresh();
-  }
-
-  Future<void> _refresh() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final cats = await QbService.instance.fetchCategories(
-        config: widget.config,
-        password: widget.password,
-      );
-      final tags = await QbService.instance.fetchTags(
-        config: widget.config,
-        password: widget.password,
-      );
-      if (!mounted) return;
-      setState(() {
-        _categories = cats;
-        _tags = tags;
-        _error = null;
-      });
-      // 成功后写入本地缓存
-      await StorageService.instance.saveQbCategories(widget.config.id, cats);
-      await StorageService.instance.saveQbTags(widget.config.id, tags);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = '拉取失败：$e';
-      });
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('分类与标签 - ${widget.config.name}'),
-      content: SizedBox(
-        width: 460,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_error != null) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFEBEE),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFEA4335)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        size: 18,
-                        color: Color(0xFFEA4335),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ],
-              Row(
-                children: [
-                  const Icon(Icons.folder, size: 18),
-                  const SizedBox(width: 6),
-                  const Text(
-                    '分类',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(width: 8),
-                  if (_loading)
-                    const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (_categories.isEmpty)
-                const Text(
-                  '暂无分类，点击右下角“刷新”尝试获取…',
-                  style: TextStyle(color: Colors.black54),
-                )
-              else
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _categories
-                      .map((e) => Chip(label: Text(e)))
-                      .toList(),
-                ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  const Icon(Icons.label_outline, size: 18),
-                  const SizedBox(width: 6),
-                  const Text(
-                    '标签',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (_tags.isEmpty)
-                const Text(
-                  '暂无标签，点击右下角“刷新”尝试获取…',
-                  style: TextStyle(color: Colors.black54),
-                )
-              else
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _tags.map((e) => Chip(label: Text(e))).toList(),
-                ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('关闭'),
-        ),
-        OutlinedButton.icon(
-          onPressed: _loading ? null : _refresh,
-          icon: _loading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.refresh),
-          label: Text(_loading ? '刷新中…' : '刷新'),
-        ),
-      ],
-    );
-  }
-}
-
 class _BatchDownloadDialog extends StatefulWidget {
   final int itemCount;
 
@@ -2752,10 +1890,7 @@ class _BatchDownloadDialogState extends State<_BatchDownloadDialog> {
   }
 
   Future<String?> _promptPassword(String clientName) async {
-    return await showDialog<String>(
-      context: context,
-      builder: (_) => _PasswordPromptDialog(name: clientName),
-    );
+    return await PasswordPromptDialog.show(context, clientName);
   }
 
   Future<void> _onSubmit() async {
@@ -2809,11 +1944,7 @@ class _BatchDownloadDialogState extends State<_BatchDownloadDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '将下载 ${widget.itemCount} 个种子文件',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
 
                 // 选择下载器
                 Text('下载器', style: Theme.of(context).textTheme.titleSmall),
@@ -3111,10 +2242,7 @@ class _TorrentDownloadDialogState extends State<_TorrentDownloadDialog> {
   }
 
   Future<String?> _promptPassword(String clientName) async {
-    return await showDialog<String>(
-      context: context,
-      builder: (_) => _PasswordPromptDialog(name: clientName),
-    );
+    return await PasswordPromptDialog.show(context, clientName);
   }
 
   Future<void> _onSubmit() async {

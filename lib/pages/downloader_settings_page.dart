@@ -163,8 +163,13 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
               color: Theme.of(context).colorScheme.onPrimaryContainer,
             ),
             const SizedBox(width: 12),
-            const Expanded(
-              child: Text('连接成功'),
+            Expanded(
+              child: Text(
+                '连接成功',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+              ),
             ),
           ],
         ),
@@ -204,7 +209,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       if (!mounted) return;
       pwd = await showDialog<String>(
         context: context,
-        builder: (_) => _PasswordPromptDialog(name: c.name),
+        builder: (_) => PasswordPromptDialog(name: c.name),
       );
       if ((pwd ?? '').isEmpty) return;
     }
@@ -228,6 +233,21 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
           ),
           const QbSpeedIndicator(),
         ],
+        backgroundColor: Theme.of(context).brightness == Brightness.light 
+            ? Theme.of(context).colorScheme.primary 
+            : Theme.of(context).colorScheme.surface,
+        iconTheme: IconThemeData(
+          color: Theme.of(context).brightness == Brightness.light 
+              ? Theme.of(context).colorScheme.onPrimary 
+              : Theme.of(context).colorScheme.onSurface,
+        ),
+        titleTextStyle: TextStyle(
+          color: Theme.of(context).brightness == Brightness.light 
+              ? Theme.of(context).colorScheme.onPrimary 
+              : Theme.of(context).colorScheme.onSurface,
+          fontSize: 20,
+          fontWeight: FontWeight.w500,
+        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -298,15 +318,24 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
   }
 }
 
-class _PasswordPromptDialog extends StatefulWidget {
+// 公共密码提示对话框，供其他页面使用
+class PasswordPromptDialog extends StatefulWidget {
   final String name;
-  const _PasswordPromptDialog({required this.name});
+  const PasswordPromptDialog({super.key, required this.name});
 
   @override
-  State<_PasswordPromptDialog> createState() => _PasswordPromptDialogState();
+  State<PasswordPromptDialog> createState() => _PasswordPromptDialogState();
+
+  // 静态方法，方便其他页面调用
+  static Future<String?> show(BuildContext context, String clientName) async {
+    return await showDialog<String>(
+      context: context,
+      builder: (_) => PasswordPromptDialog(name: clientName),
+    );
+  }
 }
 
-class _PasswordPromptDialogState extends State<_PasswordPromptDialog> {
+class _PasswordPromptDialogState extends State<PasswordPromptDialog> {
   final _pwdCtrl = TextEditingController();
 
   @override

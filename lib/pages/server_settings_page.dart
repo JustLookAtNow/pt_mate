@@ -55,8 +55,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     final appState = context.read<AppState>();
     
     try {
-      await StorageService.instance.setActiveSiteId(siteId);
-      await appState.loadInitial();
+      await appState.setActiveSite(siteId);
       setState(() => _activeSiteId = siteId);
       if (mounted) {
         scaffoldMessenger.showSnackBar(
@@ -149,9 +148,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             if (!mounted) return;
             
             if (site != null && (site.apiKey ?? '').isNotEmpty) {
-              // 有配置，回到LaunchDecider让它重新决定跳转
+              // 有配置，回到首页
               navigator.pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const LaunchDecider()),
+                MaterialPageRoute(builder: (context) => const HomePage()),
                 (route) => false,
               );
             } else {
@@ -161,6 +160,21 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           },
         ),
         actions: const [QbSpeedIndicator()],
+        backgroundColor: Theme.of(context).brightness == Brightness.light 
+            ? Theme.of(context).colorScheme.primary 
+            : Theme.of(context).colorScheme.surface,
+        iconTheme: IconThemeData(
+          color: Theme.of(context).brightness == Brightness.light 
+              ? Theme.of(context).colorScheme.onPrimary 
+              : Theme.of(context).colorScheme.onSurface,
+        ),
+        titleTextStyle: TextStyle(
+          color: Theme.of(context).brightness == Brightness.light 
+              ? Theme.of(context).colorScheme.onPrimary 
+              : Theme.of(context).colorScheme.onSurface,
+          fontSize: 20,
+          fontWeight: FontWeight.w500,
+        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

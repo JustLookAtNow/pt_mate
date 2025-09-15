@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../services/storage/storage_service.dart';
 import '../services/theme/theme_manager.dart';
 import '../widgets/qb_speed_indicator.dart';
+import 'backup_restore_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -14,6 +15,21 @@ class SettingsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('设置'),
+        backgroundColor: Theme.of(context).brightness == Brightness.light 
+            ? Theme.of(context).colorScheme.primary 
+            : Theme.of(context).colorScheme.surface,
+        iconTheme: IconThemeData(
+          color: Theme.of(context).brightness == Brightness.light 
+              ? Theme.of(context).colorScheme.onPrimary 
+              : Theme.of(context).colorScheme.onSurface,
+        ),
+        titleTextStyle: TextStyle(
+          color: Theme.of(context).brightness == Brightness.light 
+              ? Theme.of(context).colorScheme.onPrimary 
+              : Theme.of(context).colorScheme.onSurface,
+          fontSize: 20,
+          fontWeight: FontWeight.w500,
+        ),
         actions: const [QbSpeedIndicator()],
       ),
       body: const _SettingsBody(),
@@ -120,6 +136,29 @@ class _SettingsBody extends StatelessWidget {
         const SizedBox(height: 8),
         Card(
           child: _AutoLoadImagesTile(),
+        ),
+        const SizedBox(height: 16),
+        
+        // 备份恢复
+        Text(
+          '数据管理',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.backup),
+            title: const Text('备份与恢复'),
+            subtitle: const Text('导出或导入应用数据'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const BackupRestorePage(),
+                ),
+              );
+            },
+          ),
         ),
         const SizedBox(height: 16),
         
