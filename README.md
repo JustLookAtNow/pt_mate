@@ -25,11 +25,13 @@
 - **响应式布局**：适配不同屏幕尺寸
 - **图片查看器**：支持缩放、平移的全屏图片浏览
 - **安全存储**：敏感信息（Passkey、密码）安全加密存储
+- **数据备份**：支持导出应用配置和数据到本地文件
+- **数据恢复**：支持从备份文件导入配置和数据，快速恢复应用状态
 
 ### 截图
-![截图1](screenshots/Screenshot_1.jpg)
-![截图2](screenshots/Screenshot_2.jpg)
-![截图3](screenshots/Screenshot_3.jpg)
+![截图1](screenshots/1.jpg)
+![截图2](screenshots/2.jpg)
+![截图3](screenshots/3.jpg)
 
 
 ## 使用说明
@@ -90,26 +92,61 @@ mode:"normal";teams:["44","9","43"]
 
 配置完成后，在主页面的分类下拉框中选择对应分类即可使用自定义的查询条件进行搜索。
 
+### NexusPHP Web 类型站点使用说明
+
+对于 NexusPHP Web 类型的站点，应用会弹出内置的登录界面供用户完成登录认证。
+
+#### 登录流程
+1. 选择 NexusPHP Web 类型站点后，应用会自动弹出登录界面
+2. 在弹出的界面中输入用户名和密码完成登录
+3. 登录成功后，应用会自动获取必要的 Cookie 信息
+4. 正常情况下登录界面会自动关闭
+
+#### 手动关闭登录界面
+如果登录已完成但界面长时间没有自动关闭，您可以：
+- 点击登录界面右上角的关闭按钮手动关闭
+- 手动关闭不会影响 Cookie 的获取和保存
+- 关闭后即可正常使用站点功能
+
 ## 项目结构
 
 ```
 lib/
-├── app.dart                    # 应用入口、路由配置
-├── main.dart                   # 主函数
+├── app.dart                        # 应用入口、路由配置
+├── main.dart                       # 主函数
 ├── models/
-│   └── app_models.dart         # 数据模型定义
+│   └── app_models.dart             # 数据模型定义
 ├── pages/
-│   └── torrent_detail_page.dart # 种子详情页面
+│   ├── about_page.dart             # 关于页面
+│   ├── backup_restore_page.dart    # 备份恢复页面
+│   ├── downloader_settings_page.dart # 下载器设置页面
+│   ├── server_settings_page.dart   # 服务器设置页面
+│   ├── settings_page.dart          # 设置页面
+│   └── torrent_detail_page.dart    # 种子详情页面
 ├── services/
-│   ├── api/
-│   │   └── api_client.dart     # PT站点 API 客户端
-│   ├── qbittorrent/
-│   │   └── qb_client.dart      # qBittorrent API 封装
-│   ├── storage/
-│   │   └── storage_service.dart # 本地存储服务
-│   └── image_http_client.dart  # 图片加载客户端
-└── utils/
-    └── format.dart             # 格式化工具函数
+│   ├── api/                        # API 服务
+│   │   ├── api_client.dart         # PT站点 API 客户端
+│   │   ├── mteam_adapter.dart      # M-Team 适配器
+│   │   └── nexusphp_adapter.dart   # NexusPHP 适配器
+│   ├── qbittorrent/                # qBittorrent 相关
+│   │   ├── qb_client.dart          # qBittorrent API 封装
+│   │   └── qb_models.dart          # qBittorrent 数据模型
+│   ├── storage/                    # 存储服务
+│   │   ├── storage_keys.dart       # 存储键定义
+│   │   └── storage_service.dart    # 本地存储服务
+│   ├── theme/                      # 主题服务
+│   │   └── theme_service.dart      # 主题管理
+│   ├── backup_service.dart         # 备份恢复服务
+│   ├── image_http_client.dart      # 图片加载客户端
+│   └── site_config_service.dart    # 站点配置服务
+├── utils/
+│   ├── backup_migrators.dart       # 备份数据迁移器
+│   └── format.dart                 # 格式化工具函数
+└── widgets/
+    ├── app_drawer.dart             # 应用侧边栏
+    ├── nexusphp_web_login.dart     # NexusPHP Web 登录组件
+    ├── qb_speed_indicator.dart     # qBittorrent 速度指示器
+    └── server_settings_back_button.dart # 服务器设置返回按钮
 ```
 
 ## 技术栈
