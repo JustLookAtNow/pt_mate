@@ -29,9 +29,9 @@
 - **数据恢复**：支持从备份文件导入配置和数据，快速恢复应用状态
 
 ### 截图
-![截图1](screenshots/1.jpg)
-![截图2](screenshots/2.jpg)
-![截图3](screenshots/3.jpg)
+<img src="screenshots/1.jpg" width="300" alt="截图1">
+<img src="screenshots/2.jpg" width="300" alt="截图2">
+<img src="screenshots/3.jpg" width="300" alt="截图3">
 
 
 ## 使用说明
