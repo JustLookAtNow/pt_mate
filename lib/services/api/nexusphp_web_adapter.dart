@@ -218,20 +218,25 @@ class NexusPHPWebAdapter extends SiteAdapter {
       // 提取PassKey
       String? passKey;
       final outerTd = soup.find('td', id: 'outer');
-      if (outerTd != null && outerTd.children.length > 2) {
-        final settingInfoTds = outerTd.children[2].findAll('td');
-        bool passkeyTd = false;
-        for (final td in settingInfoTds) {
-          if (passkeyTd) {
-            passKey = td.text.trim();
+      if (outerTd != null) {
+        final tables = outerTd.children;
+        var thisTable = false;
+        var mainText = '';
+        for (var table in tables) {
+          if (thisTable) {
+            mainText = table.text;
             break;
           }
-          if (td.text.contains('密钥')) {
-            passkeyTd = true;
+          if (table.getAttrValue('class') == 'main') {
+            thisTable = true;
           }
         }
-      }
 
+        final passKeyMatch = RegExp(r'密钥\s*([^\s]{32})').firstMatch(mainText);
+        if (passKeyMatch != null) {
+          passKey = passKeyMatch.group(1)?.trim();
+        }
+      }
       // 提取userId
 
       // 将字符串格式的数据转换为数字（简单转换，实际可能需要更复杂的逻辑）
@@ -333,10 +338,18 @@ class NexusPHPWebAdapter extends SiteAdapter {
           if (tds.length <= 6) continue;
 
           try {
+            final rowTds = tds[1].findAll('td');
             // 提取种子ID（从详情链接中）
-            final titleTd = tds[1].findAll('td')[1];
-            final detailLink = titleTd.find('a[href*="details.php"]');
-            if (detailLink == null) continue;
+            var titleTd = rowTds[1];
+            var detailLink = titleTd.find('a[href*="details.php"]');
+            var containsIcon = true;
+            if (detailLink == null) {
+              //有些网站没封面，可以从第一个td试试
+              containsIcon = false;
+              titleTd = rowTds[0];
+              detailLink = titleTd.find('a[href*="details.php"]');
+              if (detailLink == null) continue;
+            }
 
             final href = detailLink.attributes['href'] ?? '';
             final idMatch = RegExp(r'id=(\d+)').firstMatch(href);
@@ -453,7 +466,10 @@ class NexusPHPWebAdapter extends SiteAdapter {
               }
             }
             //收藏信息
-            final starTd = tds[1].findAll('td')[3];
+            var starTd = rowTds[2];
+            if (containsIcon) {
+              starTd = rowTds[3];
+            }
             final starImg = starTd.find('img', class_: 'delbookmark');
             final collection = starImg == null;
             torrents.add(
@@ -675,11 +691,17 @@ class NexusPHPWebAdapter extends SiteAdapter {
     final outerElement = soup.find('#outer');
     if (outerElement == null) return categories;
 
-    final tables = outerElement.findAll('table');
-    if (tables.length < 2) return categories;
+    final formElement = outerElement.find(
+      'form',
+      attrs: {'action': 'usercp.php'},
+    );
 
-    final table2 = tables[1]; // 第2个table（索引1）
-    final infoTables = table2.findAll('table');
+    if (formElement == null) return categories;
+    final table2 = formElement.find('table');
+
+    final infoTables = table2?.findAll('table');
+
+    if (infoTables == null) return categories;
 
     int batchIndex = 1;
     var currentBatch = <Map<String, String>>[];
