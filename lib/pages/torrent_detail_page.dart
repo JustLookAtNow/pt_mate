@@ -5,6 +5,9 @@ import 'package:flutter_bbcode/flutter_bbcode.dart';
 import '../services/api/api_service.dart';
 import '../services/storage/storage_service.dart';
 import '../services/image_http_client.dart';
+import '../models/app_models.dart';
+import '../services/qbittorrent/qb_client.dart';
+import '../widgets/torrent_download_dialog.dart';
 
 // 自定义IMG标签处理器
 class CustomImgTag extends AdvancedTag {
@@ -191,14 +194,18 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
   }
 }
 
+
+
 class TorrentDetailPage extends StatefulWidget {
-  final String torrentId;
-  final String torrentName;
+  final TorrentItem torrentItem;
+  final SiteFeatures siteFeatures;
+  final List<QbClientConfig> qbClients;
 
   const TorrentDetailPage({
     super.key,
-    required this.torrentId,
-    required this.torrentName,
+    required this.torrentItem,
+    required this.siteFeatures,
+    required this.qbClients,
   });
 
   @override
@@ -211,10 +218,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   dynamic _detail;
   bool _showImages = false;
   final List<String> _imageUrls = [];
+  late TorrentItem _currentItem;
 
   @override
   void initState() {
     super.initState();
+    _currentItem = widget.torrentItem;
     _loadDetail();
     _loadAutoLoadImagesSetting();
   }
@@ -238,7 +247,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     }
 
     try {
-      final detail = await ApiService.instance.fetchTorrentDetail(widget.torrentId);
+      final detail = await ApiService.instance.fetchTorrentDetail(widget.torrentItem.id);
       if (mounted) {
         setState(() {
           _detail = detail;
@@ -254,6 +263,113 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       }
     }
   }
+
+  Future<void> _onDownload() async {
+    try {
+      // 1. 获取下载 URL
+      final url = await ApiService.instance.genDlToken(id: _currentItem.id, url: _currentItem.downloadUrl);
+
+      // 2. 弹出对话框让用户选择下载器设置
+      if (!mounted) return;
+      final result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (_) => TorrentDownloadDialog(
+          torrentName: _currentItem.name,
+          downloadUrl: url,
+        ),
+      );
+      
+      if (result == null) return; // 用户取消了
+      
+      // 3. 从对话框结果中获取设置
+      final clientConfig = result['clientConfig'] as QbClientConfig;
+      final password = result['password'] as String;
+      final category = result['category'] as String?;
+      final tags = result['tags'] as List<String>?;
+      final savePath = result['savePath'] as String?;
+      final autoTMM = result['autoTMM'] as bool?;
+
+      // 4. 发送到 qBittorrent
+      await QbService.instance.addTorrentByUrl(
+        config: clientConfig,
+        password: password,
+        url: url,
+        category: category,
+        tags: tags,
+        savePath: savePath,
+        autoTMM: autoTMM,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已成功发送"${_currentItem.name}"到 ${clientConfig.name}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('下载失败：$e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _onToggleCollection() async {
+    final newCollectionState = !_currentItem.collection;
+    
+    // 立即更新UI状态
+    if (mounted) {
+      setState(() {
+        _currentItem = TorrentItem(
+          id: _currentItem.id,
+          name: _currentItem.name,
+          smallDescr: _currentItem.smallDescr,
+          discount: _currentItem.discount,
+          discountEndTime: _currentItem.discountEndTime,
+          downloadUrl: _currentItem.downloadUrl,
+          seeders: _currentItem.seeders,
+          leechers: _currentItem.leechers,
+          sizeBytes: _currentItem.sizeBytes,
+          imageList: _currentItem.imageList,
+          downloadStatus: _currentItem.downloadStatus,
+          collection: newCollectionState,
+        );
+      });
+    }
+
+    // 异步后台请求
+    try {
+      await ApiService.instance.toggleCollection(
+        id: _currentItem.id,
+        make: newCollectionState,
+      );
+    } catch (e) {
+      // 请求失败，恢复原状态
+      if (mounted) {
+        setState(() {
+          _currentItem = TorrentItem(
+            id: _currentItem.id,
+            name: _currentItem.name,
+            smallDescr: _currentItem.smallDescr,
+            discount: _currentItem.discount,
+            discountEndTime: _currentItem.discountEndTime,
+            downloadUrl: _currentItem.downloadUrl,
+            seeders: _currentItem.seeders,
+            leechers: _currentItem.leechers,
+            sizeBytes: _currentItem.sizeBytes,
+            imageList: _currentItem.imageList,
+            downloadStatus: _currentItem.downloadStatus,
+            collection: !newCollectionState,
+          );
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('收藏操作失败：$e')),
+        );
+      }
+    }
+  }
+
+
 
   String preprocessColorTags(String content) {
     // 常见颜色名称到十六进制代码的映射
@@ -415,7 +531,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: SelectableText(
-          widget.torrentName,
+          widget.torrentItem.name,
           style: TextStyle(
             fontSize: 16, 
             color: Theme.of(context).brightness == Brightness.light 
@@ -501,6 +617,30 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                     ],
                   ),
                 ),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          // 收藏按钮
+          FloatingActionButton(
+            heroTag: "favorite",
+            onPressed: _onToggleCollection,
+            backgroundColor: _currentItem.collection ? Colors.red : null,
+            tooltip: _currentItem.collection ? '取消收藏' : '收藏',
+            child: Icon(
+              _currentItem.collection ? Icons.favorite : Icons.favorite_border,
+              color: _currentItem.collection ? Colors.white : null,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // 下载按钮
+          FloatingActionButton(
+            heroTag: "download",
+            onPressed: _onDownload,
+            tooltip: '下载',
+            child: const Icon(Icons.download_outlined),
+          ),
+        ],
+      ),
     );
   }
 }
