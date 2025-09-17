@@ -348,18 +348,28 @@ class CustomSizeTag extends WrappedStyleTag {
     // 尝试解析为数字
     final double? numValue = double.tryParse(sizeValue);
     if (numValue == null) {
-      return 14.0; // 默认字体大小
+      return 12.8; // 默认字体大小 (14.0 * 0.8)
     }
 
     if (numValue < 10) {
-      // 值在10以下：作为倍数（相对于基础字体大小14）
-      return 14.0 * numValue;
+      // 值在10以下：按照HTML <font> 标签 size 属性映射，统一缩小到80%
+      // Font=1:8px, Font=2:10.4px, Font=3:12.8px, Font=4:14.4px, Font=5:19.2px, Font=6:25.6px, Font=7:38.4px
+      switch (numValue.toInt()) {
+        case 1: return 8.0;   // 10.0 * 0.8
+        case 2: return 10.4;  // 13.0 * 0.8
+        case 3: return 12.8;  // 16.0 * 0.8
+        case 4: return 14.4;  // 18.0 * 0.8
+        case 5: return 19.2;  // 24.0 * 0.8
+        case 6: return 25.6;  // 32.0 * 0.8
+        case 7: return 38.4;  // 48.0 * 0.8
+        default: return 12.8; // 默认为 size=3 的大小 (16.0 * 0.8)
+      }
     } else if (numValue <= 100) {
-      // 值在10-100：作为px绝对值
-      return numValue;
+      // 值在10-100：作为px绝对值，缩小到80%
+      return numValue * 0.8;
     } else {
-      // 值大于100：作为百分比倍数（除以100后乘以基础字体大小）
-      return 14.0 * (numValue / 100);
+      // 值大于100：作为百分比倍数（除以100后乘以基础字体大小），缩小到80%
+      return 12.8 * (numValue / 100); // 11.2 = 14.0 * 0.8
     }
   }
 }
