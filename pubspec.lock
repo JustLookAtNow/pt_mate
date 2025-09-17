@@ -34,7 +34,7 @@ packages:
     source: hosted
     version: "2.13.0"
   bbob_dart:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: bbob_dart
       sha256: f085e9ab7d23640d56028fb316ca27227eab410c7c75214a35659b88eb18c497

@@ -53,6 +53,7 @@ dependencies:
   dart_jsonwebtoken: ^2.14.0
   crypto: ^3.0.3
   flutter_bbcode: ^1.5.1
+  bbob_dart: ^0.2.1
   webview_flutter: ^4.9.0
   flutter_inappwebview: ^6.0.0
   beautiful_soup_dart: ^0.3.0
