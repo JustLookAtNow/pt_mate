@@ -611,23 +611,10 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   Future<void> _onToggleCollection() async {
     final newCollectionState = !_currentItem.collection;
 
-    // 立即更新UI状态
+    // 立即更新UI状态 - 使用copyWith只更新collection属性
     if (mounted) {
       setState(() {
-        _currentItem = TorrentItem(
-          id: _currentItem.id,
-          name: _currentItem.name,
-          smallDescr: _currentItem.smallDescr,
-          discount: _currentItem.discount,
-          discountEndTime: _currentItem.discountEndTime,
-          downloadUrl: _currentItem.downloadUrl,
-          seeders: _currentItem.seeders,
-          leechers: _currentItem.leechers,
-          sizeBytes: _currentItem.sizeBytes,
-          imageList: _currentItem.imageList,
-          downloadStatus: _currentItem.downloadStatus,
-          collection: newCollectionState,
-        );
+        _currentItem = _currentItem.copyWith(collection: newCollectionState);
       });
     }
 
@@ -638,23 +625,10 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         make: newCollectionState,
       );
     } catch (e) {
-      // 请求失败，恢复原状态
+      // 请求失败，恢复原状态 - 使用copyWith只更新collection属性
       if (mounted) {
         setState(() {
-          _currentItem = TorrentItem(
-            id: _currentItem.id,
-            name: _currentItem.name,
-            smallDescr: _currentItem.smallDescr,
-            discount: _currentItem.discount,
-            discountEndTime: _currentItem.discountEndTime,
-            downloadUrl: _currentItem.downloadUrl,
-            seeders: _currentItem.seeders,
-            leechers: _currentItem.leechers,
-            sizeBytes: _currentItem.sizeBytes,
-            imageList: _currentItem.imageList,
-            downloadStatus: _currentItem.downloadStatus,
-            collection: !newCollectionState,
-          );
+          _currentItem = _currentItem.copyWith(collection: !newCollectionState);
         });
         ScaffoldMessenger.of(
           context,

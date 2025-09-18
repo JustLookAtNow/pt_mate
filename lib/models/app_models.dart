@@ -68,6 +68,36 @@ class TorrentItem {
     this.downloadStatus = DownloadStatus.none,
     this.collection = false,
   });
+
+  TorrentItem copyWith({
+    String? id,
+    String? name,
+    String? smallDescr,
+    DiscountType? discount,
+    String? discountEndTime,
+    String? downloadUrl,
+    int? seeders,
+    int? leechers,
+    int? sizeBytes,
+    List<String>? imageList,
+    DownloadStatus? downloadStatus,
+    bool? collection,
+  }) {
+    return TorrentItem(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      smallDescr: smallDescr ?? this.smallDescr,
+      discount: discount ?? this.discount,
+      discountEndTime: discountEndTime ?? this.discountEndTime,
+      downloadUrl: downloadUrl ?? this.downloadUrl,
+      seeders: seeders ?? this.seeders,
+      leechers: leechers ?? this.leechers,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
+      imageList: imageList ?? this.imageList,
+      downloadStatus: downloadStatus ?? this.downloadStatus,
+      collection: collection ?? this.collection,
+    );
+  }
 }
 
 // 种子搜索结果
