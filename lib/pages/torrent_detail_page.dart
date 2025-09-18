@@ -939,6 +939,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       (match) => '[b]${match.group(1)}[/b]',
     );
 
+    // 预处理[*]标签，转换为BBCode粗体格式
+    processedContent = processedContent.replaceAllMapped(
+      RegExp(r'\[\*\]([^\[]*?)(?=\[|\s*$)', dotAll: true),
+      (match) => '[b]${match.group(1)?.trim() ?? ''}[/b]',
+    );
+
     // 预处理[url][img][/img][/url]嵌套标签，提取图片URL
     processedContent = processedContent.replaceAllMapped(
       RegExp(
