@@ -1427,13 +1427,17 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: SelectableText(
-          widget.torrentItem.name,
+          widget.torrentItem.name.length > 50 
+              ? '${widget.torrentItem.name.substring(0, 50)}...'
+              : widget.torrentItem.name,
           style: TextStyle(
             fontSize: 16,
             color: Theme.of(context).brightness == Brightness.light
                 ? Theme.of(context).colorScheme.onPrimary
                 : Theme.of(context).colorScheme.onSurface,
+            overflow: TextOverflow.ellipsis,
           ),
+          maxLines: 2,
         ),
         backgroundColor: Theme.of(context).brightness == Brightness.light
             ? Theme.of(context).colorScheme.primary
