@@ -39,25 +39,25 @@ dependencies:
   dio: ^5.7.0
   shared_preferences: ^2.3.2
   path_provider: ^2.1.4
-  permission_handler: ^11.3.1
+  permission_handler: ^12.0.1
   flutter_secure_storage: ^9.2.2
   intl: ^0.20.2
   http_parser: ^4.1.0
   dynamic_color: ^1.7.0
   flutter_colorpicker: ^1.1.0
   url_launcher: ^6.3.1
-  package_info_plus: ^8.0.2
-  flutter_local_notifications: ^18.0.1
+  package_info_plus: ^9.0.0
+  flutter_local_notifications: ^19.4.2
   flutter_downloader: ^1.11.8
-  device_info_plus: ^10.1.2
-  dart_jsonwebtoken: ^2.14.0
+  device_info_plus: ^12.1.0
+  dart_jsonwebtoken: ^3.2.0
   crypto: ^3.0.3
   flutter_bbcode: ^1.5.1
   bbob_dart: ^0.2.1
   webview_flutter: ^4.9.0
   flutter_inappwebview: ^6.0.0
   beautiful_soup_dart: ^0.3.0
-  file_picker: ^8.1.2
+  file_picker: ^10.3.3
 
 
 dev_dependencies:
