@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:ui';
 import 'package:provider/provider.dart';
 import 'package:flutter_bbcode/flutter_bbcode.dart';
 import 'package:bbob_dart/bbob_dart.dart' as bbob;
@@ -297,6 +298,114 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// 自定义Hide标签处理器
+class CustomHideTag extends WrappedStyleTag {
+  CustomHideTag() : super("hide");
+
+  @override
+  List<InlineSpan> wrap(
+    FlutterRenderer renderer,
+    bbob.Element element,
+    List<InlineSpan> spans,
+  ) {
+    return [
+      WidgetSpan(
+        child: CustomHideDisplay(
+          content: spans,
+        ),
+      ),
+    ];
+  }
+}
+
+class CustomHideDisplay extends StatefulWidget {
+  final List<InlineSpan> content;
+
+  const CustomHideDisplay({
+    super.key,
+    required this.content,
+  });
+
+  @override
+  State<CustomHideDisplay> createState() => _CustomHideDisplayState();
+}
+
+class _CustomHideDisplayState extends State<CustomHideDisplay> {
+  bool _isVisible = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _isVisible = !_isVisible;
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Stack(
+          children: [
+            // 内容层
+            Container(
+              padding: const EdgeInsets.all(8),
+              child: RichText(
+                text: TextSpan(
+                  children: widget.content,
+                  style: DefaultTextStyle.of(context).style,
+                ),
+              ),
+            ),
+            // 毛玻璃遮罩层
+            if (!_isVisible)
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(5),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 3.0, sigmaY: 3.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.visibility,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '点击显示隐藏内容',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -910,6 +1019,10 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     // 添加自定义size标签处理逻辑
     stylesheet.tags['size'] = CustomSizeTag();
     stylesheet.tags['SIZE'] = CustomSizeTag();
+    
+    // 添加自定义hide标签处理逻辑
+    stylesheet.tags['hide'] = CustomHideTag();
+    stylesheet.tags['HIDE'] = CustomHideTag();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
