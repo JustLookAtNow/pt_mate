@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
 
-
 import 'models/app_models.dart';
 import 'pages/torrent_detail_page.dart';
 import 'services/api/api_service.dart';
@@ -21,19 +20,19 @@ import 'widgets/torrent_download_dialog.dart';
 class AppState extends ChangeNotifier {
   SiteConfig? _site;
   SiteConfig? get site => _site;
-  
+
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
-  
+
   Completer<void>? _initCompleter;
 
   Future<void> loadInitial() async {
     if (_initCompleter != null) {
       return _initCompleter!.future;
     }
-    
+
     _initCompleter = Completer<void>();
-    
+
     try {
       _site = await StorageService.instance.getActiveSiteConfig();
       await ApiService.instance.init();
@@ -45,7 +44,7 @@ class AppState extends ChangeNotifier {
       rethrow;
     }
   }
-  
+
   Future<void> waitForInitialization() async {
     if (_isInitialized) return;
     if (_initCompleter != null) {
@@ -129,7 +128,7 @@ class _CategoryFilterDialogState extends State<_CategoryFilterDialog> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // 分类选择
             Text('选择分类', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
@@ -154,11 +153,11 @@ class _CategoryFilterDialogState extends State<_CategoryFilterDialog> {
                       final isSelected = index == _selectedCategoryIndex;
                       return ListTile(
                         title: Text(category.displayName),
-                        leading: Radio<int>(
-                          value: index,
-                        ),
+                        leading: Radio<int>(value: index),
                         selected: isSelected,
-                        selectedTileColor: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                        selectedTileColor: Theme.of(
+                          context,
+                        ).colorScheme.primaryContainer.withValues(alpha: 0.3),
                         onTap: () {
                           setState(() {
                             _selectedCategoryIndex = index;
@@ -175,6 +174,12 @@ class _CategoryFilterDialogState extends State<_CategoryFilterDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.outline,
+              width: 1.0,
+            ),
+          ),
           child: const Text('取消'),
         ),
         FilledButton(
@@ -190,8 +195,6 @@ class _CategoryFilterDialogState extends State<_CategoryFilterDialog> {
     );
   }
 }
-
-
 
 class MTeamApp extends StatelessWidget {
   const MTeamApp({super.key});
@@ -261,32 +264,28 @@ class _HomePageState extends State<HomePage> {
   // 收藏请求间隔控制
   DateTime? _lastCollectionRequest;
   final Map<String, bool> _pendingCollectionRequests = <String, bool>{};
-  
+
   // 下载请求状态管理
   final Set<String> _pendingDownloadRequests = <String>{};
-  
+
   // 当前站点配置
   SiteConfig? _currentSite;
-  
+
   // QB客户端配置
   List<QbClientConfig> _qbClients = [];
-  
+
   // 用户信息展开状态
   bool _userInfoExpanded = false;
-  
-  // 分类筛选弹窗状态
 
+  // 分类筛选弹窗状态
 
   Widget _buildStatChip(BuildContext context, String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha:0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withValues(alpha: 0.3),
-          width: 1,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
       ),
       child: Text(
         text,
@@ -318,10 +317,10 @@ class _HomePageState extends State<HomePage> {
     try {
       // 等待AppState初始化完成
       final appState = Provider.of<AppState>(context, listen: false);
-      
+
       // 等待AppState完全初始化完成
       await appState.waitForInitialization();
-      
+
       // 如果没有站点配置，说明确实没有配置
       if (appState.site == null) {
         if (mounted) {
@@ -350,10 +349,10 @@ class _HomePageState extends State<HomePage> {
         }
         return;
       }
-      
+
       final activeSite = appState.site!;
-      final categories = activeSite.searchCategories.isNotEmpty 
-          ? activeSite.searchCategories 
+      final categories = activeSite.searchCategories.isNotEmpty
+          ? activeSite.searchCategories
           : SearchCategoryConfig.getDefaultConfigs();
       if (mounted) {
         setState(() {
@@ -362,11 +361,11 @@ class _HomePageState extends State<HomePage> {
           _selectedCategoryIndex = categories.isNotEmpty ? 0 : -1;
         });
       }
-      
+
       // 加载QB客户端配置
       final qbClients = await StorageService.instance.loadQbClients();
       if (mounted) setState(() => _qbClients = qbClients);
-      
+
       // 拉取用户基础信息
       final prof = await ApiService.instance.fetchMemberProfile();
       if (mounted) setState(() => _profile = prof);
@@ -389,14 +388,21 @@ class _HomePageState extends State<HomePage> {
   Future<void> _reloadCategories() async {
     try {
       // 重新加载当前活跃站点的分类配置
-      final storageService = Provider.of<StorageService>(context, listen: false);
+      final storageService = Provider.of<StorageService>(
+        context,
+        listen: false,
+      );
       final activeSite = await storageService.getActiveSiteConfig();
-      final categories = activeSite?.searchCategories ?? SearchCategoryConfig.getDefaultConfigs();
+      final categories =
+          activeSite?.searchCategories ??
+          SearchCategoryConfig.getDefaultConfigs();
       if (mounted) {
         setState(() {
           _categories = categories;
           // 如果当前选中的分类索引超出范围，重置为第一个分类
-          if (categories.isNotEmpty && (_selectedCategoryIndex < 0 || _selectedCategoryIndex >= categories.length)) {
+          if (categories.isNotEmpty &&
+              (_selectedCategoryIndex < 0 ||
+                  _selectedCategoryIndex >= categories.length)) {
             _selectedCategoryIndex = 0;
           } else if (categories.isEmpty) {
             _selectedCategoryIndex = -1;
@@ -407,9 +413,7 @@ class _HomePageState extends State<HomePage> {
       // 分类加载失败时显示错误信息
       if (mounted) {
         final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          SnackBar(content: Text('重新加载分类失败: $e')),
-        );
+        messenger.showSnackBar(SnackBar(content: Text('重新加载分类失败: $e')));
       }
     }
   }
@@ -437,6 +441,12 @@ class _HomePageState extends State<HomePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outline,
+                width: 1.0,
+              ),
+            ),
             child: const Text('取消'),
           ),
           TextButton(
@@ -488,14 +498,16 @@ class _HomePageState extends State<HomePage> {
     try {
       // 获取当前分类的额外参数 - 仅在站点支持高级搜索功能时使用
       Map<String, dynamic>? additionalParams;
-      if ((_currentSite?.features.supportAdvancedSearch ?? true) && 
-          _categories.isNotEmpty && _selectedCategoryIndex >= 0 && _selectedCategoryIndex < _categories.length) {
+      if ((_currentSite?.features.supportAdvancedSearch ?? true) &&
+          _categories.isNotEmpty &&
+          _selectedCategoryIndex >= 0 &&
+          _selectedCategoryIndex < _categories.length) {
         final currentCategory = _categories[_selectedCategoryIndex];
         if (currentCategory.parameters.isNotEmpty) {
           additionalParams = currentCategory.parseParameters();
         }
       }
-      
+
       final res = await ApiService.instance.searchTorrents(
         keyword: _keywordCtrl.text.trim().isEmpty
             ? null
@@ -513,7 +525,9 @@ class _HomePageState extends State<HomePage> {
           }
           // 去重处理：过滤掉已存在的项目ID
           final existingIds = _items.map((item) => item.id).toSet();
-          final newItems = res.items.where((item) => !existingIds.contains(item.id)).toList();
+          final newItems = res.items
+              .where((item) => !existingIds.contains(item.id))
+              .toList();
           _items.addAll(newItems);
           _totalPages = res.totalPages;
           _hasMore = _pageNumber < _totalPages;
@@ -539,9 +553,10 @@ class _HomePageState extends State<HomePage> {
 
   String _discountText(DiscountType d, String? endTime) {
     final baseText = d.displayText;
-    
-    if ((d == DiscountType.free || d == DiscountType.twoXFree) && 
-        endTime != null && endTime.isNotEmpty) {
+
+    if ((d == DiscountType.free || d == DiscountType.twoXFree) &&
+        endTime != null &&
+        endTime.isNotEmpty) {
       try {
         final endDateTime = DateTime.parse(endTime);
         final now = DateTime.now();
@@ -555,7 +570,7 @@ class _HomePageState extends State<HomePage> {
         // 解析失败，返回基础文本
       }
     }
-    
+
     return baseText;
   }
 
@@ -604,12 +619,12 @@ class _HomePageState extends State<HomePage> {
   void _onTorrentTap(TorrentItem item) {
     // 检查站点是否支持种子详情功能
     if (_currentSite?.features.supportTorrentDetail == false) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('当前站点不支持种子详情功能')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('当前站点不支持种子详情功能')));
       return;
     }
-    
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => TorrentDetailPage(
@@ -624,20 +639,21 @@ class _HomePageState extends State<HomePage> {
   Future<void> _onDownload(TorrentItem item) async {
     try {
       // 1. 获取下载 URL
-      final url = await ApiService.instance.genDlToken(id: item.id,url: item.downloadUrl);
+      final url = await ApiService.instance.genDlToken(
+        id: item.id,
+        url: item.downloadUrl,
+      );
 
       // 2. 弹出对话框让用户选择下载器设置
       if (!mounted) return;
       final result = await showDialog<Map<String, dynamic>>(
         context: context,
-        builder: (_) => TorrentDownloadDialog(
-          torrentName: item.name,
-          downloadUrl: url,
-        ),
+        builder: (_) =>
+            TorrentDownloadDialog(torrentName: item.name, downloadUrl: url),
       );
-      
+
       if (result == null) return; // 用户取消了
-      
+
       // 3. 从对话框结果中获取设置
       final clientConfig = result['clientConfig'] as QbClientConfig;
       final password = result['password'] as String;
@@ -673,7 +689,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _onToggleCollection(TorrentItem item) async {
     final newCollectionState = !item.collection;
-    
+
     // 立即更新UI状态
     final index = _items.indexWhere((t) => t.id == item.id);
     if (index != -1 && mounted) {
@@ -705,19 +721,21 @@ class _HomePageState extends State<HomePage> {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _CategoryFilterDialog(
-         categories: _categories,
-         selectedCategoryIndex: _selectedCategoryIndex,
-         keyword: _keywordCtrl.text,
-       ),
+        categories: _categories,
+        selectedCategoryIndex: _selectedCategoryIndex,
+        keyword: _keywordCtrl.text,
+      ),
     );
-    
+
     if (result != null) {
       final newCategoryIndex = result['categoryIndex'] as int?;
       final newKeyword = result['keyword'] as String?;
-      
+
       if (mounted) {
         setState(() {
-          if (newCategoryIndex != null && newCategoryIndex >= 0 && newCategoryIndex < _categories.length) {
+          if (newCategoryIndex != null &&
+              newCategoryIndex >= 0 &&
+              newCategoryIndex < _categories.length) {
             _selectedCategoryIndex = newCategoryIndex;
           }
           if (newKeyword != null) {
@@ -725,27 +743,30 @@ class _HomePageState extends State<HomePage> {
           }
         });
       }
-      
+
       if (_currentSite?.features.supportTorrentSearch ?? true) {
         _search(reset: true);
       } else {
         if (mounted) {
           final messenger = ScaffoldMessenger.of(context);
-          messenger.showSnackBar(
-            const SnackBar(content: Text('当前站点不支持搜索功能')),
-          );
+          messenger.showSnackBar(const SnackBar(content: Text('当前站点不支持搜索功能')));
         }
       }
     }
   }
 
-  Future<void> _performCollectionRequest(TorrentItem item, bool newCollectionState) async {
+  Future<void> _performCollectionRequest(
+    TorrentItem item,
+    bool newCollectionState,
+  ) async {
     // 检查请求间隔
     final now = DateTime.now();
     if (_lastCollectionRequest != null) {
       final timeDiff = now.difference(_lastCollectionRequest!);
       if (timeDiff.inMilliseconds < 1000) {
-        await Future.delayed(Duration(milliseconds: 1000 - timeDiff.inMilliseconds));
+        await Future.delayed(
+          Duration(milliseconds: 1000 - timeDiff.inMilliseconds),
+        );
       }
     }
     _lastCollectionRequest = DateTime.now();
@@ -765,7 +786,7 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       // 请求失败，恢复原状态
       _pendingCollectionRequests.remove(item.id);
-      
+
       final index = _items.indexWhere((t) => t.id == item.id);
       if (index != -1 && mounted) {
         setState(() {
@@ -803,14 +824,14 @@ class _HomePageState extends State<HomePage> {
     return Consumer<AppState>(
       builder: (context, appState, child) {
         // 当AppState变化时，检查是否需要重新初始化
-        if (appState.site != null && 
+        if (appState.site != null &&
             (_currentSite == null || _currentSite!.id != appState.site!.id)) {
           // 站点发生变化，需要重新初始化
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _init();
           });
         }
-        
+
         return Scaffold(
           appBar: AppBar(
             title: Text.rich(
@@ -825,17 +846,17 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             actions: const [QbSpeedIndicator()],
-            backgroundColor: Theme.of(context).brightness == Brightness.light 
-                ? Theme.of(context).colorScheme.primary 
+            backgroundColor: Theme.of(context).brightness == Brightness.light
+                ? Theme.of(context).colorScheme.primary
                 : Theme.of(context).colorScheme.surface,
             iconTheme: IconThemeData(
-              color: Theme.of(context).brightness == Brightness.light 
-                  ? Theme.of(context).colorScheme.onPrimary 
+              color: Theme.of(context).brightness == Brightness.light
+                  ? Theme.of(context).colorScheme.onPrimary
                   : Theme.of(context).colorScheme.onSurface,
             ),
             titleTextStyle: TextStyle(
-              color: Theme.of(context).brightness == Brightness.light 
-                  ? Theme.of(context).colorScheme.onPrimary 
+              color: Theme.of(context).brightness == Brightness.light
+                  ? Theme.of(context).colorScheme.onPrimary
                   : Theme.of(context).colorScheme.onSurface,
               fontSize: 20,
               fontWeight: FontWeight.w500,
@@ -845,576 +866,656 @@ class _HomePageState extends State<HomePage> {
             currentRoute: '/',
             onSettingsChanged: _reloadCategories,
           ),
-      body: Column(
-        children: [
-          // 顶部用户基础信息 - 仅在站点支持用户资料功能时显示
-          if (_profile != null && (appState.site?.features.supportMemberProfile ?? true))
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              child: Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                    width: 1,
-                  ),
-                ),
-                child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      _userInfoExpanded = !_userInfoExpanded;
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    decoration: BoxDecoration(
+          body: Column(
+            children: [
+              // 顶部用户基础信息 - 仅在站点支持用户资料功能时显示
+              if (_profile != null &&
+                  (appState.site?.features.supportMemberProfile ?? true))
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.1),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 16,
-                                backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                                child: Text(
-                                  _profile!.username.isNotEmpty ? _profile!.username[0].toUpperCase() : 'U',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.primary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _profile!.username,
-                                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    color: Theme.of(context).colorScheme.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              Icon(
-                                _userInfoExpanded ? Icons.expand_less : Icons.expand_more,
-                                color: Theme.of(context).colorScheme.primary,
-                                size: 20,
-                              ),
-                            ],
-                          ),
-                          if (_userInfoExpanded) ...[
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 4,
-                              children: [
-                                _buildStatChip(
-                                  context,
-                                  '↑ ${_profile!.uploadedBytesString}',
-                                  Colors.green,
-                                ),
-                                _buildStatChip(
-                                  context,
-                                  '↓ ${_profile!.downloadedBytesString}',
-                                  Colors.blue,
-                                ),
-                                _buildStatChip(
-                                  context,
-                                  '比率 ${Formatters.shareRate(_profile!.shareRate)}',
-                                  Colors.orange,
-                                ),
-                                _buildStatChip(
-                                  context,
-                                  '魔力 ${Formatters.bonus(_profile!.bonus)}',
-                                  Colors.purple,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
+                      side: BorderSide(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.3),
+                        width: 1,
                       ),
                     ),
-                  ),
-                ),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    // 分类按钮 - 仅在站点支持分类搜索功能时显示
-                    if (_currentSite?.features.supportCategories ?? true)
-                      IconButton(
-                        onPressed: () {
-                          _showCategoryFilterDialog();
-                        },
-                        icon: const Icon(Icons.category, size: 20),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                          foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.all(8),
-                        ),
-                        tooltip: _categories.isNotEmpty && _selectedCategoryIndex >= 0 && _selectedCategoryIndex < _categories.length
-                            ? _categories[_selectedCategoryIndex].displayName
-                            : '分类筛选',
-                      ),
-                    if (_currentSite?.features.supportCategories ?? true)
-                      const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _keywordCtrl,
-                        textInputAction: TextInputAction.search,
-                        enabled: _currentSite?.features.supportTorrentSearch ?? true,
-                        decoration: InputDecoration(
-                          hintText: (_currentSite?.features.supportTorrentSearch ?? true) 
-                              ? '输入关键词（可选）' 
-                              : '当前站点不支持搜索功能',
-                          border: OutlineInputBorder(
-                            borderRadius: const BorderRadius.all(Radius.circular(25)),
-                            borderSide: BorderSide(
-                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: const BorderRadius.all(Radius.circular(25)),
-                            borderSide: BorderSide(
-                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: const BorderRadius.all(Radius.circular(25)),
-                            borderSide: BorderSide(
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                        ),
-                        onSubmitted: (_) {
-                          if (_currentSite?.features.supportTorrentSearch ?? true) {
-                            _search(reset: true);
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('当前站点不支持搜索功能')),
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                if (_currentSite?.features.supportCollection == true)
-                  IconButton(
-                    onPressed: () {
-                      if (mounted) {
+                    child: InkWell(
+                      onTap: () {
                         setState(() {
-                          _onlyFavorites = !_onlyFavorites;
+                          _userInfoExpanded = !_userInfoExpanded;
                         });
-                      }
-                      if (_currentSite?.features.supportTorrentSearch ?? true) {
-                        _search(reset: true);
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('当前站点不支持搜索功能')),
-                        );
-                      }
-                    },
-                    icon: Icon(
-                      _onlyFavorites ? Icons.favorite : Icons.favorite_border,
-                      color: _onlyFavorites
-                          ? Theme.of(context).colorScheme.secondary
-                          : null,
-                    ),
-                    tooltip: _onlyFavorites ? '显示全部' : '仅显示收藏',
-                  ),
-                const SizedBox(width: 8),
-                PopupMenuButton<String>(
-                  onSelected: _onSortSelected,
-                  icon: Icon(
-                    _sortBy == 'none' ? Icons.sort : Icons.sort,
-                    color: _sortBy == 'none'
-                        ? null
-                        : Theme.of(context).colorScheme.secondary,
-                  ),
-                  tooltip: '排序',
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'none',
+                      },
+                      borderRadius: BorderRadius.circular(12),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: _sortBy == 'none'
-                              ? Theme.of(
-                                  context,
-                                ).colorScheme.primary.withValues(alpha: 0.1)
-                              : null,
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primaryContainer.withValues(alpha: 0.1),
                         ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.clear,
-                              color: _sortBy == 'none'
-                                  ? Theme.of(context).colorScheme.secondary
-                                  : null,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text('默认排序'),
-                          ],
-                        ),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'size',
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _sortBy == 'size'
-                              ? Theme.of(
-                                  context,
-                                ).colorScheme.primary.withValues(alpha: 0.1)
-                              : null,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _sortBy == 'size' && _sortAscending
-                                  ? Icons.arrow_upward
-                                  : Icons.arrow_downward,
-                              color: _sortBy == 'size'
-                                  ? Theme.of(context).colorScheme.secondary
-                                  : null,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text('按大小排序'),
-                          ],
-                        ),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'upload',
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _sortBy == 'upload'
-                              ? Theme.of(
-                                  context,
-                                ).colorScheme.primary.withValues(alpha: 0.1)
-                              : null,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _sortBy == 'upload' && _sortAscending
-                                  ? Icons.arrow_upward
-                                  : Icons.arrow_downward,
-                              color: _sortBy == 'upload'
-                                  ? Theme.of(context).colorScheme.secondary
-                                  : null,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text('按上传量排序'),
-                          ],
-                        ),
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'download',
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _sortBy == 'download'
-                              ? Theme.of(
-                                  context,
-                                ).colorScheme.primary.withValues(alpha: 0.1)
-                              : null,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _sortBy == 'download' && _sortAscending
-                                  ? Icons.arrow_upward
-                                  : Icons.arrow_downward,
-                              color: _sortBy == 'download'
-                                  ? Theme.of(context).colorScheme.secondary
-                                  : null,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text('按下载量排序'),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if (_loading) const LinearProgressIndicator(),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(_error!, style: const TextStyle(color: Colors.red)),
-            ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _refresh,
-              child: ListView.builder(
-                controller: _scrollCtrl,
-                physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: _items.length + (_hasMore ? 1 : 0),
-                itemBuilder: (_, i) {
-                  if (i >= _items.length) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(
-                        child: SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                    );
-                  }
-                  final t = _items[i];
-                  final isSelected = _selectedItems.contains(t.id);
-                  return GestureDetector(
-                    onTap: () => _isSelectionMode
-                        ? _onToggleSelection(t)
-                        : _onTorrentTap(t),
-                    onLongPress: () => _onLongPress(t),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? Theme.of(
-                                context,
-                              ).colorScheme.primary.withValues(alpha: 0.1)
-                            : null,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
                                 children: [
-                                  Text(
-                                    t.name,
-                                    style: Theme.of(
+                                  CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: Theme.of(context)
+                                        .colorScheme
+                                        .primary
+                                        .withValues(alpha: 0.1),
+                                    child: Text(
+                                      _profile!.username.isNotEmpty
+                                          ? _profile!.username[0].toUpperCase()
+                                          : 'U',
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      _profile!.username,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ),
+                                  Icon(
+                                    _userInfoExpanded
+                                        ? Icons.expand_less
+                                        : Icons.expand_more,
+                                    color: Theme.of(
                                       context,
-                                    ).textTheme.titleMedium,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    t.smallDescr,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: Theme.of(
-                                            context,
-                                          ).textTheme.bodySmall?.color,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      if (t.discount != DiscountType.normal)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: _discountColor(t.discount),
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            _discountText(
-                                              t.discount,
-                                              t.discountEndTime,
-                                            ),
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      if (t.discount != DiscountType.normal) const SizedBox(width: 6),
-                                      _buildSeedLeechInfo(
-                                        t.seeders,
-                                        t.leechers,
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Text(
-                                        Formatters.dataFromBytes(t.sizeBytes),
-                                      ),
-                                      const Spacer(),
-                                      // 下载状态图标 - 仅在站点支持下载历史功能时显示
-                                      if (_currentSite?.features.supportHistory ?? true)
-                                        _buildDownloadStatusIcon(
-                                          t.downloadStatus,
-                                        ),
-                                    ],
+                                    ).colorScheme.primary,
+                                    size: 20,
                                   ),
                                 ],
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // 收藏按钮 - 仅在站点支持收藏功能时显示
-                                if (_currentSite?.features.supportCollection ?? true)
-                                  IconButton(
-                                    onPressed: () => _onToggleCollection(t),
-                                    icon: Icon(
-                                      t.collection
-                                          ? Icons.favorite
-                                          : Icons.favorite_border,
-                                      color: t.collection ? Colors.red : null,
+                              if (_userInfoExpanded) ...[
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 12,
+                                  runSpacing: 4,
+                                  children: [
+                                    _buildStatChip(
+                                      context,
+                                      '↑ ${_profile!.uploadedBytesString}',
+                                      Colors.green,
                                     ),
-                                    tooltip: t.collection ? '取消收藏' : '收藏',
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(
-                                      minWidth: 40,
-                                      minHeight: 40,
+                                    _buildStatChip(
+                                      context,
+                                      '↓ ${_profile!.downloadedBytesString}',
+                                      Colors.blue,
                                     ),
-                                  ),
-                                // 下载按钮 - 仅在站点支持下载功能时显示
-                                if (_currentSite?.features.supportDownload ?? true)
-                                  IconButton(
-                                    onPressed: () => _onDownload(t),
-                                    icon: const Icon(Icons.download_outlined),
-                                    tooltip: '下载',
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(
-                                      minWidth: 40,
-                                      minHeight: 40,
+                                    _buildStatChip(
+                                      context,
+                                      '比率 ${Formatters.shareRate(_profile!.shareRate)}',
+                                      Colors.orange,
                                     ),
-                                  ),
+                                    _buildStatChip(
+                                      context,
+                                      '魔力 ${Formatters.bonus(_profile!.bonus)}',
+                                      Colors.purple,
+                                    ),
+                                  ],
+                                ),
                               ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        // 分类按钮 - 仅在站点支持分类搜索功能时显示
+                        if (_currentSite?.features.supportCategories ?? true)
+                          IconButton(
+                            onPressed: () {
+                              _showCategoryFilterDialog();
+                            },
+                            icon: const Icon(Icons.category, size: 20),
+                            style: IconButton.styleFrom(
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primaryContainer,
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.onPrimaryContainer,
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.all(8),
+                            ),
+                            tooltip:
+                                _categories.isNotEmpty &&
+                                    _selectedCategoryIndex >= 0 &&
+                                    _selectedCategoryIndex < _categories.length
+                                ? _categories[_selectedCategoryIndex]
+                                      .displayName
+                                : '分类筛选',
+                          ),
+                        if (_currentSite?.features.supportCategories ?? true)
+                          const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _keywordCtrl,
+                            textInputAction: TextInputAction.search,
+                            enabled:
+                                _currentSite?.features.supportTorrentSearch ??
+                                true,
+                            decoration: InputDecoration(
+                              hintText:
+                                  (_currentSite
+                                          ?.features
+                                          .supportTorrentSearch ??
+                                      true)
+                                  ? '输入关键词（可选）'
+                                  : '当前站点不支持搜索功能',
+                              border: OutlineInputBorder(
+                                borderRadius: const BorderRadius.all(
+                                  Radius.circular(25),
+                                ),
+                                borderSide: BorderSide(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: const BorderRadius.all(
+                                  Radius.circular(25),
+                                ),
+                                borderSide: BorderSide(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: const BorderRadius.all(
+                                  Radius.circular(25),
+                                ),
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                            onSubmitted: (_) {
+                              if (_currentSite?.features.supportTorrentSearch ??
+                                  true) {
+                                _search(reset: true);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('当前站点不支持搜索功能')),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (_currentSite?.features.supportCollection == true)
+                          IconButton(
+                            onPressed: () {
+                              if (mounted) {
+                                setState(() {
+                                  _onlyFavorites = !_onlyFavorites;
+                                });
+                              }
+                              if (_currentSite?.features.supportTorrentSearch ??
+                                  true) {
+                                _search(reset: true);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('当前站点不支持搜索功能')),
+                                );
+                              }
+                            },
+                            icon: Icon(
+                              _onlyFavorites
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              color: _onlyFavorites
+                                  ? Theme.of(context).colorScheme.secondary
+                                  : null,
+                            ),
+                            tooltip: _onlyFavorites ? '显示全部' : '仅显示收藏',
+                          ),
+                        const SizedBox(width: 8),
+                        PopupMenuButton<String>(
+                          onSelected: _onSortSelected,
+                          icon: Icon(
+                            _sortBy == 'none' ? Icons.sort : Icons.sort,
+                            color: _sortBy == 'none'
+                                ? null
+                                : Theme.of(context).colorScheme.secondary,
+                          ),
+                          tooltip: '排序',
+                          itemBuilder: (context) => [
+                            PopupMenuItem(
+                              value: 'none',
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: _sortBy == 'none'
+                                      ? Theme.of(context).colorScheme.primary
+                                            .withValues(alpha: 0.1)
+                                      : null,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.clear,
+                                      color: _sortBy == 'none'
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.secondary
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text('默认排序'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'size',
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: _sortBy == 'size'
+                                      ? Theme.of(context).colorScheme.primary
+                                            .withValues(alpha: 0.1)
+                                      : null,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _sortBy == 'size' && _sortAscending
+                                          ? Icons.arrow_upward
+                                          : Icons.arrow_downward,
+                                      color: _sortBy == 'size'
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.secondary
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text('按大小排序'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'upload',
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: _sortBy == 'upload'
+                                      ? Theme.of(context).colorScheme.primary
+                                            .withValues(alpha: 0.1)
+                                      : null,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _sortBy == 'upload' && _sortAscending
+                                          ? Icons.arrow_upward
+                                          : Icons.arrow_downward,
+                                      color: _sortBy == 'upload'
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.secondary
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text('按上传量排序'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'download',
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: _sortBy == 'download'
+                                      ? Theme.of(context).colorScheme.primary
+                                            .withValues(alpha: 0.1)
+                                      : null,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _sortBy == 'download' && _sortAscending
+                                          ? Icons.arrow_upward
+                                          : Icons.arrow_downward,
+                                      color: _sortBy == 'download'
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.secondary
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text('按下载量排序'),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      ),
+                      ],
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
-            ),
-          ),
-          // 选中模式下的操作栏
-          if (_isSelectionMode)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                border: Border(
-                  top: BorderSide(
-                    color: Theme.of(context).dividerColor,
-                    width: 1,
+              if (_loading) const LinearProgressIndicator(),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: ListView.builder(
+                    controller: _scrollCtrl,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: _items.length + (_hasMore ? 1 : 0),
+                    itemBuilder: (_, i) {
+                      if (i >= _items.length) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        );
+                      }
+                      final t = _items[i];
+                      final isSelected = _selectedItems.contains(t.id);
+                      return GestureDetector(
+                        onTap: () => _isSelectionMode
+                            ? _onToggleSelection(t)
+                            : _onTorrentTap(t),
+                        onLongPress: () => _onLongPress(t),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: 0.1)
+                                : null,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 4,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        t.name,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleMedium,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        t.smallDescr,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              color: Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall?.color,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          if (t.discount != DiscountType.normal)
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: _discountColor(
+                                                  t.discount,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                _discountText(
+                                                  t.discount,
+                                                  t.discountEndTime,
+                                                ),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                          if (t.discount != DiscountType.normal)
+                                            const SizedBox(width: 6),
+                                          _buildSeedLeechInfo(
+                                            t.seeders,
+                                            t.leechers,
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Text(
+                                            Formatters.dataFromBytes(
+                                              t.sizeBytes,
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          // 下载状态图标 - 仅在站点支持下载历史功能时显示
+                                          if (_currentSite
+                                                  ?.features
+                                                  .supportHistory ??
+                                              true)
+                                            _buildDownloadStatusIcon(
+                                              t.downloadStatus,
+                                            ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // 收藏按钮 - 仅在站点支持收藏功能时显示
+                                    if (_currentSite
+                                            ?.features
+                                            .supportCollection ??
+                                        true)
+                                      IconButton(
+                                        onPressed: () => _onToggleCollection(t),
+                                        icon: Icon(
+                                          t.collection
+                                              ? Icons.favorite
+                                              : Icons.favorite_border,
+                                          color: t.collection
+                                              ? Colors.red
+                                              : null,
+                                        ),
+                                        tooltip: t.collection ? '取消收藏' : '收藏',
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 40,
+                                          minHeight: 40,
+                                        ),
+                                      ),
+                                    // 下载按钮 - 仅在站点支持下载功能时显示
+                                    if (_currentSite
+                                            ?.features
+                                            .supportDownload ??
+                                        true)
+                                      IconButton(
+                                        onPressed: () => _onDownload(t),
+                                        icon: const Icon(
+                                          Icons.download_outlined,
+                                        ),
+                                        tooltip: '下载',
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 40,
+                                          minHeight: 40,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _onCancelSelection,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.secondary,
-                        foregroundColor: Theme.of(
-                          context,
-                        ).colorScheme.onSecondary,
+              // 选中模式下的操作栏
+              if (_isSelectionMode)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    border: Border(
+                      top: BorderSide(
+                        color: Theme.of(context).dividerColor,
+                        width: 1,
                       ),
-                      child: const Text('取消'),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  // 批量收藏按钮 - 仅在站点支持收藏功能时显示
-                  if (_currentSite?.features.supportCollection ?? true) ...[
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _selectedItems.isNotEmpty
-                            ? _onBatchFavorite
-                            : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _onCancelSelection,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.secondary,
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.onSecondary,
+                          ),
+                          child: const Text('取消'),
                         ),
-                        child: Text('收藏 (${_selectedItems.length})'),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  // 批量下载按钮 - 仅在站点支持下载功能时显示
-                  if (_currentSite?.features.supportDownload ?? true)
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _selectedItems.isNotEmpty
-                            ? _onBatchDownload
-                            : null,
-                        style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Theme.of(
-                          context,
-                        ).colorScheme.onPrimary,
-                      ),
-                      child: Text('下载 (${_selectedItems.length})'),
-                    ),
+                      const SizedBox(width: 12),
+                      // 批量收藏按钮 - 仅在站点支持收藏功能时显示
+                      if (_currentSite?.features.supportCollection ?? true) ...[
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _selectedItems.isNotEmpty
+                                ? _onBatchFavorite
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: Text('收藏 (${_selectedItems.length})'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      // 批量下载按钮 - 仅在站点支持下载功能时显示
+                      if (_currentSite?.features.supportDownload ?? true)
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _selectedItems.isNotEmpty
+                                ? _onBatchDownload
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.onPrimary,
+                            ),
+                            child: Text('下载 (${_selectedItems.length})'),
+                          ),
+                        ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
+                ),
+            ],
+          ),
+        );
       },
     );
   }
@@ -1465,7 +1566,7 @@ class _HomePageState extends State<HomePage> {
         .where((item) => _selectedItems.contains(item.id))
         .toList();
     _onCancelSelection(); // 立即取消选择模式
-    
+
     // 显示开始收藏的提示
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1476,25 +1577,24 @@ class _HomePageState extends State<HomePage> {
     // 异步处理收藏
     _performBatchFavorite(selectedItems);
   }
-  
+
   Future<void> _performBatchFavorite(List<TorrentItem> items) async {
     int successCount = 0;
     int failureCount = 0;
-    
-    
+
     for (int i = 0; i < items.length; i++) {
       final item = items[i];
       try {
         await _onToggleCollection(item);
         successCount++;
-        
+
         // 间隔控制
         if (i < items.length - 1) {
           await Future.delayed(Duration(seconds: 2));
         }
       } catch (e) {
         failureCount++;
-         if (mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('收藏失败: ${item.name}, 错误: $e'),
@@ -1504,12 +1604,12 @@ class _HomePageState extends State<HomePage> {
         }
       }
     }
-    
+
     // 显示最终结果
     if (mounted) {
       final total = items.length;
       final message = '已成功收藏/取消收藏 $successCount/$total 个';
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
@@ -1527,24 +1627,27 @@ class _HomePageState extends State<HomePage> {
     final selectedItems = _items
         .where((item) => _selectedItems.contains(item.id))
         .toList();
-    
+
     // 显示批量下载设置对话框
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => TorrentDownloadDialog(
-        itemCount: selectedItems.length,
-      ),
+      builder: (context) =>
+          TorrentDownloadDialog(itemCount: selectedItems.length),
     );
-    
+
     if (result == null) return; // 用户取消了
-    
+
     _onCancelSelection(); // 取消选择模式
-    
+
     // 显示开始下载的提示
     if (mounted) {
       final clientConfig = result['clientConfig'] as QbClientConfig;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('开始批量下载${selectedItems.length}个项目到${clientConfig.name}...')),
+        SnackBar(
+          content: Text(
+            '开始批量下载${selectedItems.length}个项目到${clientConfig.name}...',
+          ),
+        ),
       );
     }
 
@@ -1559,7 +1662,7 @@ class _HomePageState extends State<HomePage> {
       result['autoTMM'] as bool?,
     );
   }
-  
+
   Future<void> _performBatchDownload(
     List<TorrentItem> items,
     QbClientConfig clientConfig,
@@ -1571,19 +1674,22 @@ class _HomePageState extends State<HomePage> {
   ) async {
     int successCount = 0;
     int failureCount = 0;
-    
+
     for (final item in items) {
       try {
         // 检查是否在待处理列表中
         if (_pendingDownloadRequests.contains(item.id)) {
           continue;
         }
-        
+
         _pendingDownloadRequests.add(item.id);
-        
+
         // 获取下载 URL
-        final url = await ApiService.instance.genDlToken(id: item.id,url: item.downloadUrl);
-        
+        final url = await ApiService.instance.genDlToken(
+          id: item.id,
+          url: item.downloadUrl,
+        );
+
         // 发送到 qBittorrent
         await QbService.instance.addTorrentByUrl(
           config: clientConfig,
@@ -1594,9 +1700,9 @@ class _HomePageState extends State<HomePage> {
           savePath: savePath,
           autoTMM: autoTMM,
         );
-        
+
         successCount++;
-        
+
         // 添加延迟避免请求过快
         await Future.delayed(const Duration(milliseconds: 500));
       } catch (e) {
@@ -1614,13 +1720,13 @@ class _HomePageState extends State<HomePage> {
         _pendingDownloadRequests.remove(item.id);
       }
     }
-    
+
     // 显示最终结果
     if (mounted) {
       final message = failureCount == 0
           ? '批量下载完成，成功$successCount个项目'
           : '批量下载完成，成功$successCount个，失败$failureCount个';
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),

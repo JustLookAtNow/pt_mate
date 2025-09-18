@@ -41,9 +41,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载站点配置失败: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('加载站点配置失败: $e')));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -54,7 +54,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     if (!mounted) return;
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final appState = context.read<AppState>();
-    
+
     try {
       await appState.setActiveSite(siteId);
       setState(() => _activeSiteId = siteId);
@@ -65,9 +65,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       }
     } catch (e) {
       if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text('切换站点失败: $e')),
-        );
+        scaffoldMessenger.showSnackBar(SnackBar(content: Text('切换站点失败: $e')));
       }
     }
   }
@@ -81,9 +79,15 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
+            style: TextButton.styleFrom(
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outline,
+                width: 1.0,
+              ),
+            ),
             child: const Text('取消'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('删除'),
           ),
@@ -96,15 +100,15 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         await StorageService.instance.deleteSiteConfig(site.id);
         await _loadSites();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('站点已删除')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('站点已删除')));
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('删除站点失败: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('删除站点失败: $e')));
         }
       }
     }
@@ -147,17 +151,17 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           ),
         ),
         actions: const [QbSpeedIndicator()],
-        backgroundColor: Theme.of(context).brightness == Brightness.light 
-            ? Theme.of(context).colorScheme.primary 
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? Theme.of(context).colorScheme.primary
             : Theme.of(context).colorScheme.surface,
         iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.light 
-              ? Theme.of(context).colorScheme.onPrimary 
+          color: Theme.of(context).brightness == Brightness.light
+              ? Theme.of(context).colorScheme.onPrimary
               : Theme.of(context).colorScheme.onSurface,
         ),
         titleTextStyle: TextStyle(
-          color: Theme.of(context).brightness == Brightness.light 
-              ? Theme.of(context).colorScheme.onPrimary 
+          color: Theme.of(context).brightness == Brightness.light
+              ? Theme.of(context).colorScheme.onPrimary
               : Theme.of(context).colorScheme.onSurface,
           fontSize: 20,
           fontWeight: FontWeight.w500,
@@ -182,16 +186,18 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                           const SizedBox(height: 16),
                           Text(
                             '暂无服务器配置',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.outline,
-                            ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.outline,
+                                ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             '点击右下角按钮添加第一个服务器',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.outline,
-                            ),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.outline,
+                                ),
                           ),
                         ],
                       ),
@@ -205,22 +211,27 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                       itemBuilder: (context, index) {
                         final site = _sites[index];
                         final isActive = site.id == _activeSiteId;
-                        
+
                         return Card(
                           margin: const EdgeInsets.only(bottom: 8),
-                          color: isActive 
-                              ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
+                          color: isActive
+                              ? Theme.of(context).colorScheme.primaryContainer
+                                    .withValues(alpha: 0.3)
                               : null,
                           child: ListTile(
                             leading: CircleAvatar(
                               backgroundColor: isActive
                                   ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.surfaceContainerHighest,
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerHighest,
                               child: Icon(
                                 Icons.dns,
                                 color: isActive
                                     ? Theme.of(context).colorScheme.onPrimary
-                                    : Theme.of(context).colorScheme.onSurfaceVariant,
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                               ),
                             ),
                             title: Row(
@@ -229,7 +240,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                   child: Text(
                                     site.name,
                                     style: TextStyle(
-                                      fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                                      fontWeight: isActive
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
                                     ),
                                   ),
                                 ),
@@ -240,14 +253,18 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                       vertical: 2,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.primary,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
                                       'active',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Theme.of(context).colorScheme.onPrimary,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onPrimary,
                                       ),
                                     ),
                                   ),
@@ -266,14 +283,18 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.primaryContainer,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primaryContainer,
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
                                         site.siteType.displayName,
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onPrimaryContainer,
                                         ),
                                       ),
                                     ),
@@ -323,7 +344,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                 ),
                               ],
                             ),
-                            onTap: isActive ? null : () => _setActiveSite(site.id),
+                            onTap: isActive
+                                ? null
+                                : () => _setActiveSite(site.id),
                           ),
                         );
                       },
@@ -356,7 +379,9 @@ class _CategoryEditDialogState extends State<_CategoryEditDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.category.displayName);
-    _parametersController = TextEditingController(text: widget.category.parameters);
+    _parametersController = TextEditingController(
+      text: widget.category.parameters,
+    );
   }
 
   @override
@@ -386,7 +411,8 @@ class _CategoryEditDialogState extends State<_CategoryEditDialog> {
               controller: _parametersController,
               decoration: const InputDecoration(
                 labelText: '请求参数',
-                hintText: '推荐JSON格式：{"mode": "normal", "teams": ["44", "9", "43"]}',
+                hintText:
+                    '推荐JSON格式：{"mode": "normal", "teams": ["44", "9", "43"]}',
               ),
               maxLines: 4,
             ),
@@ -405,6 +431,12 @@ class _CategoryEditDialogState extends State<_CategoryEditDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.outline,
+              width: 1.0,
+            ),
+          ),
           child: const Text('取消'),
         ),
         FilledButton(
@@ -412,9 +444,9 @@ class _CategoryEditDialogState extends State<_CategoryEditDialog> {
             final name = _nameController.text.trim();
             final parameters = _parametersController.text.trim();
             if (name.isEmpty || parameters.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请填写完整信息')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('请填写完整信息')));
               return;
             }
             final result = widget.category.copyWith(
@@ -446,7 +478,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
   final _baseUrlController = TextEditingController();
   final _apiKeyController = TextEditingController();
   final _passKeyController = TextEditingController();
-  
+
   SiteType _selectedSiteType = SiteType.mteam;
   int _presetIndex = -1; // -1 表示自定义
   bool _loading = false;
@@ -475,14 +507,14 @@ class _SiteEditPageState extends State<SiteEditPage> {
       _searchCategories = [];
     }
   }
-  
+
   Future<void> _loadPresetSites() async {
     try {
       final presets = await SiteConfigService.loadPresetSites();
       setState(() {
         _presetSites = presets;
       });
-      
+
       // 如果是编辑现有站点，检查是否是预设站点
       if (widget.site != null) {
         for (int i = 0; i < presets.length; i++) {
@@ -501,18 +533,22 @@ class _SiteEditPageState extends State<SiteEditPage> {
       });
     }
   }
-  
+
   Future<void> _loadDefaultFeatures(SiteType siteType) async {
     try {
-      final defaultTemplate = await SiteConfigService.getDefaultTemplate(siteType.id);
+      final defaultTemplate = await SiteConfigService.getDefaultTemplate(
+        siteType.id,
+      );
       if (defaultTemplate != null && defaultTemplate['features'] != null) {
         setState(() {
-          _siteFeatures = SiteFeatures.fromJson(defaultTemplate['features'] as Map<String, dynamic>);
+          _siteFeatures = SiteFeatures.fromJson(
+            defaultTemplate['features'] as Map<String, dynamic>,
+          );
         });
       } else {
         // 如果没有找到默认模板，使用硬编码的默认值
         setState(() {
-          _siteFeatures = siteType == SiteType.nexusphp 
+          _siteFeatures = siteType == SiteType.nexusphp
               ? const SiteFeatures(
                   supportMemberProfile: true,
                   supportTorrentSearch: true,
@@ -529,7 +565,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
     } catch (e) {
       // 加载失败时使用硬编码的默认值
       setState(() {
-        _siteFeatures = siteType == SiteType.nexusphp 
+        _siteFeatures = siteType == SiteType.nexusphp
             ? const SiteFeatures(
                 supportMemberProfile: true,
                 supportTorrentSearch: true,
@@ -544,9 +580,6 @@ class _SiteEditPageState extends State<SiteEditPage> {
       });
     }
   }
-  
-
-
 
   @override
   void dispose() {
@@ -562,7 +595,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
     if (widget.site != null) {
       id = widget.site!.id;
     } else {
-      id = 'site-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1000)}';
+      id =
+          'site-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1000)}';
     }
 
     if (_presetIndex >= 0 && _presetIndex < _presetSites.length) {
@@ -572,41 +606,47 @@ class _SiteEditPageState extends State<SiteEditPage> {
         name: preset.name,
         baseUrl: preset.baseUrl,
         apiKey: _apiKeyController.text.trim(),
-        passKey: _passKeyController.text.trim().isEmpty ? null : _passKeyController.text.trim(),
+        passKey: _passKeyController.text.trim().isEmpty
+            ? null
+            : _passKeyController.text.trim(),
         siteType: _selectedSiteType,
         searchCategories: _searchCategories,
         features: _siteFeatures,
         cookie: _selectedSiteType == SiteType.nexusphpweb ? _savedCookie : null,
       );
     }
-    
+
     var baseUrl = _baseUrlController.text.trim();
     if (baseUrl.isNotEmpty && !baseUrl.endsWith('/')) {
       baseUrl = '$baseUrl/';
     }
-    
+
     return SiteConfig(
-        id: id,
-        name: _nameController.text.trim().isEmpty
-            ? '自定义站点'
-            : _nameController.text.trim(),
-        baseUrl: baseUrl.isEmpty ? 'https://api.m-team.cc/' : baseUrl,
-        apiKey: _apiKeyController.text.trim(),
-        passKey: _passKeyController.text.trim().isEmpty ? null : _passKeyController.text.trim(),
-        siteType: _selectedSiteType,
-        searchCategories: _searchCategories,
-        features: _siteFeatures,
-        cookie: _selectedSiteType == SiteType.nexusphpweb ? _savedCookie : null,
-      );
+      id: id,
+      name: _nameController.text.trim().isEmpty
+          ? '自定义站点'
+          : _nameController.text.trim(),
+      baseUrl: baseUrl.isEmpty ? 'https://api.m-team.cc/' : baseUrl,
+      apiKey: _apiKeyController.text.trim(),
+      passKey: _passKeyController.text.trim().isEmpty
+          ? null
+          : _passKeyController.text.trim(),
+      siteType: _selectedSiteType,
+      searchCategories: _searchCategories,
+      features: _siteFeatures,
+      cookie: _selectedSiteType == SiteType.nexusphpweb ? _savedCookie : null,
+    );
   }
 
   void _addSearchCategory() {
     setState(() {
-      _searchCategories.add(SearchCategoryConfig(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        displayName: '新分类',
-        parameters: '{"mode": "normal"}',
-      ));
+      _searchCategories.add(
+        SearchCategoryConfig(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          displayName: '新分类',
+          parameters: '{"mode": "normal"}',
+        ),
+      );
     });
   }
 
@@ -635,9 +675,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // nexusphpweb类型需要cookie
       if (_savedCookie == null || _savedCookie!.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('请先完成登录获取Cookie')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('请先完成登录获取Cookie')));
         }
         return;
       }
@@ -645,19 +685,19 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // 其他类型需要API Key
       if (_apiKeyController.text.trim().isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('请先填写API Key')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('请先填写API Key')));
         }
         return;
       }
     }
-    
+
     try {
       // 创建临时站点配置用于获取分类
       final tempSite = _composeCurrentSite();
       await ApiService.instance.setActiveSite(tempSite);
-      
+
       // 从适配器获取分类配置
       final adapter = ApiService.instance.activeAdapter;
       if (adapter != null) {
@@ -665,7 +705,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
         setState(() {
           _searchCategories = List.from(categories);
         });
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('已成功加载 ${categories.length} 个分类配置')),
@@ -679,11 +719,11 @@ class _SiteEditPageState extends State<SiteEditPage> {
       setState(() {
         _searchCategories = SearchCategoryConfig.getDefaultConfigs();
       });
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('获取分类配置失败，已使用默认配置: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('获取分类配置失败，已使用默认配置: $e')));
       }
     }
   }
@@ -696,10 +736,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
   ) {
     return SwitchListTile(
       title: Text(title),
-      subtitle: Text(
-        subtitle,
-        style: Theme.of(context).textTheme.bodySmall,
-      ),
+      subtitle: Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
       value: value,
       onChanged: onChanged,
       contentPadding: EdgeInsets.zero,
@@ -708,19 +745,19 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
   Future<void> _testConnection() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() {
       _loading = true;
       _error = null;
       _profile = null;
     });
-    
+
     try {
       // 如果搜索分类为空，先重置分类配置
       if (_searchCategories.isEmpty) {
         await _resetSearchCategories();
       }
-      
+
       final site = _composeCurrentSite();
       // 临时设置站点进行测试
       await ApiService.instance.setActiveSite(site);
@@ -735,7 +772,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     // 如果搜索分类为空，先重置分类配置
     if (_searchCategories.isEmpty) {
       setState(() {
@@ -743,7 +780,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
         _error = null;
         _profile = null;
       });
-      
+
       try {
         await _resetSearchCategories();
       } catch (e) {
@@ -752,33 +789,35 @@ class _SiteEditPageState extends State<SiteEditPage> {
         return;
       }
     }
-    
+
     final site = _composeCurrentSite();
     if (site.baseUrl.isEmpty) {
       setState(() => _error = '请输入有效的站点地址');
       return;
     }
-    
+
     setState(() {
       _loading = true;
       _error = null;
       _profile = null;
     });
-    
+
     try {
       // 先验证连接并获取用户信息
       await ApiService.instance.setActiveSite(site);
       final profile = await ApiService.instance.fetchMemberProfile();
-      
+
       // 创建包含userId和passKey的最终站点配置
       // 优先使用用户填写的passKey，如果没有填写则使用从fetchMemberProfile获取的
       final userPassKey = _passKeyController.text.trim();
-      final finalPassKey = userPassKey.isNotEmpty ? userPassKey : profile.passKey;
+      final finalPassKey = userPassKey.isNotEmpty
+          ? userPassKey
+          : profile.passKey;
       final finalSite = site.copyWith(
         userId: profile.userId,
         passKey: finalPassKey,
       );
-      
+
       if (widget.site != null) {
         await StorageService.instance.updateSiteConfig(finalSite);
         // 更新现有站点后，如果是当前活跃站点，需要重新初始化适配器
@@ -803,7 +842,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
           await appState.setActiveSite(finalSite.id);
         }
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(widget.site != null ? '站点已更新' : '站点已添加')),
@@ -850,7 +889,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
   @override
   Widget build(BuildContext context) {
     final presets = _presetSites;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.site != null ? '编辑服务器' : '添加服务器'),
@@ -865,15 +904,19 @@ class _SiteEditPageState extends State<SiteEditPage> {
             children: [
               // 网站类型选择
               DropdownButtonFormField<SiteType>(
-                  initialValue: _selectedSiteType,
+                initialValue: _selectedSiteType,
                 decoration: const InputDecoration(
                   labelText: '网站类型',
                   border: OutlineInputBorder(),
                 ),
-                items: SiteType.values.map((type) => DropdownMenuItem(
-                  value: type,
-                  child: Text(type.displayName),
-                )).toList(),
+                items: SiteType.values
+                    .map(
+                      (type) => DropdownMenuItem(
+                        value: type,
+                        child: Text(type.displayName),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (value) {
                   if (value != null) {
                     setState(() {
@@ -886,9 +929,11 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 },
               ),
               const SizedBox(height: 16),
-              
+
               // 预设站点选择
-              if (presets.where((site) => site.siteType == _selectedSiteType).isNotEmpty) ...[
+              if (presets
+                  .where((site) => site.siteType == _selectedSiteType)
+                  .isNotEmpty) ...[
                 DropdownButtonFormField<int>(
                   initialValue: _presetIndex,
                   decoration: const InputDecoration(
@@ -906,10 +951,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                             maxLines: 1,
                           ),
                         ),
-                    const DropdownMenuItem(
-                      value: -1,
-                      child: Text('自定义…'),
-                    ),
+                    const DropdownMenuItem(value: -1, child: Text('自定义…')),
                   ],
                   onChanged: (value) {
                     if (value != null) {
@@ -917,7 +959,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         _presetIndex = value;
                         _profile = null;
                         _error = null;
-                        
+
                         // 当选择预设站点时，分类配置保持为空
                         if (value >= 0 && value < _presetSites.length) {
                           _searchCategories = [];
@@ -933,7 +975,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 ),
                 const SizedBox(height: 16),
               ],
-              
+
               // 自定义配置（当选择自定义时显示）
               if (_presetIndex < 0) ...[
                 TextFormField(
@@ -969,7 +1011,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 ),
                 const SizedBox(height: 16),
               ],
-              
+
               // API Key输入或登录按钮
               if (_selectedSiteType != SiteType.nexusphpweb) ...[
                 TextFormField(
@@ -1070,7 +1112,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 ),
                 const SizedBox(height: 16),
               ],
-              
+
               // Pass Key输入（仅NexusPHP类型显示）
               if (_selectedSiteType.requiresPassKey) ...[
                 TextFormField(
@@ -1082,7 +1124,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
                   ),
                   obscureText: true,
                   validator: (value) {
-                    if (_selectedSiteType.requiresPassKey && (value == null || value.trim().isEmpty)) {
+                    if (_selectedSiteType.requiresPassKey &&
+                        (value == null || value.trim().isEmpty)) {
                       return '请输入Pass Key';
                     }
                     return null;
@@ -1091,7 +1134,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 const SizedBox(height: 16),
               ],
               const SizedBox(height: 8),
-              
+
               // 查询分类配置
               Card(
                 child: Padding(
@@ -1155,7 +1198,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.delete),
-                                    onPressed: () => _deleteSearchCategory(index),
+                                    onPressed: () =>
+                                        _deleteSearchCategory(index),
                                   ),
                                 ],
                               ),
@@ -1167,7 +1211,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // 功能配置
               Card(
                 child: Padding(
@@ -1190,7 +1234,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         '获取用户个人信息和统计数据',
                         _siteFeatures.supportMemberProfile,
                         (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(supportMemberProfile: value);
+                          _siteFeatures = _siteFeatures.copyWith(
+                            supportMemberProfile: value,
+                          );
                         }),
                       ),
                       _buildFeatureSwitch(
@@ -1198,7 +1244,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         '搜索和浏览种子资源',
                         _siteFeatures.supportTorrentSearch,
                         (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(supportTorrentSearch: value);
+                          _siteFeatures = _siteFeatures.copyWith(
+                            supportTorrentSearch: value,
+                          );
                         }),
                       ),
                       _buildFeatureSwitch(
@@ -1206,7 +1254,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         '查看种子的详细信息',
                         _siteFeatures.supportTorrentDetail,
                         (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(supportTorrentDetail: value);
+                          _siteFeatures = _siteFeatures.copyWith(
+                            supportTorrentDetail: value,
+                          );
                         }),
                       ),
                       _buildFeatureSwitch(
@@ -1214,7 +1264,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         '生成下载链接和下载种子',
                         _siteFeatures.supportDownload,
                         (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(supportDownload: value);
+                          _siteFeatures = _siteFeatures.copyWith(
+                            supportDownload: value,
+                          );
                         }),
                       ),
                       _buildFeatureSwitch(
@@ -1222,7 +1274,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         '收藏和取消收藏种子',
                         _siteFeatures.supportCollection,
                         (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(supportCollection: value);
+                          _siteFeatures = _siteFeatures.copyWith(
+                            supportCollection: value,
+                          );
                         }),
                       ),
                       _buildFeatureSwitch(
@@ -1230,7 +1284,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         '查看种子下载历史记录',
                         _siteFeatures.supportHistory,
                         (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(supportHistory: value);
+                          _siteFeatures = _siteFeatures.copyWith(
+                            supportHistory: value,
+                          );
                         }),
                       ),
                       _buildFeatureSwitch(
@@ -1238,7 +1294,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         '按分类筛选搜索结果',
                         _siteFeatures.supportCategories,
                         (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(supportCategories: value);
+                          _siteFeatures = _siteFeatures.copyWith(
+                            supportCategories: value,
+                          );
                         }),
                       ),
                       _buildFeatureSwitch(
@@ -1246,7 +1304,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         '使用高级搜索参数和过滤器',
                         _siteFeatures.supportAdvancedSearch,
                         (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(supportAdvancedSearch: value);
+                          _siteFeatures = _siteFeatures.copyWith(
+                            supportAdvancedSearch: value,
+                          );
                         }),
                       ),
                     ],
@@ -1254,7 +1314,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // 操作按钮
               Row(
                 children: [
@@ -1272,10 +1332,10 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 ],
               ),
               const SizedBox(height: 16),
-              
+
               // 加载指示器
               if (_loading) const LinearProgressIndicator(),
-              
+
               // 错误信息
               if (_error != null) ...[
                 const SizedBox(height: 16),
@@ -1296,7 +1356,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         child: Text(
                           _error!,
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onErrorContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onErrorContainer,
                           ),
                         ),
                       ),
@@ -1304,7 +1366,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                   ),
                 ),
               ],
-              
+
               // 用户信息显示
               if (_profile != null) ...[
                 const SizedBox(height: 16),

@@ -227,6 +227,12 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.outline,
+              width: 1.0,
+            ),
+          ),
           child: const Text('取消'),
         ),
         if (_clients.isNotEmpty && _selectedClient != null)

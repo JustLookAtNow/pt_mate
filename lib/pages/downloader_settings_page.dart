@@ -65,7 +65,10 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       } else {
         updated.add(cfg);
       }
-      await StorageService.instance.saveQbClients(updated, defaultId: _defaultId);
+      await StorageService.instance.saveQbClients(
+        updated,
+        defaultId: _defaultId,
+      );
       if (result.password != null) {
         await StorageService.instance.saveQbPassword(
           result.config.id,
@@ -75,10 +78,12 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('保存失败：$e'),
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('保存失败：$e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
     }
   }
 
@@ -91,6 +96,12 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outline,
+                width: 1.0,
+              ),
+            ),
             child: const Text('取消'),
           ),
           FilledButton(
@@ -111,33 +122,40 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('删除失败：$e'),
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('删除失败：$e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
     }
   }
 
   Future<void> _setDefault(QbClientConfig config) async {
     try {
-      await StorageService.instance.saveQbClients(_clients, defaultId: config.id);
+      await StorageService.instance.saveQbClients(
+        _clients,
+        defaultId: config.id,
+      );
       setState(() {
         _defaultId = config.id;
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('设置失败：$e'),
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('设置失败：$e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
     }
   }
 
   Future<void> _testDefault() async {
     if (_defaultId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先设置默认下载器')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先设置默认下载器')));
       return;
     }
     final client = _clients.firstWhere((c) => c.id == _defaultId);
@@ -149,76 +167,62 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       final pwd = await StorageService.instance.loadQbPassword(c.id);
       if ((pwd ?? '').isEmpty) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先保存密码')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('请先保存密码')));
         return;
       }
       await QbService.instance.testConnection(config: c, password: pwd!);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              Icons.check_circle,
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                '连接成功',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                Icons.check_circle,
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '连接成功',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          behavior: SnackBarBehavior.floating,
         ),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        behavior: SnackBarBehavior.floating,
-      ));
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              Icons.error_outline,
-              color: Theme.of(context).colorScheme.onErrorContainer,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                '连接失败：$e',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onErrorContainer,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                Icons.error_outline,
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '连接失败：$e',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          behavior: SnackBarBehavior.floating,
         ),
-        backgroundColor: Theme.of(context).colorScheme.errorContainer,
-        behavior: SnackBarBehavior.floating,
-      ));
-    }
-  }
-
-  Future<void> _openCategoriesTags(QbClientConfig c) async {
-    // 优先读取已保存密码；若无则提示输入
-    var pwd = await StorageService.instance.loadQbPassword(c.id);
-    if ((pwd ?? '').isEmpty) {
-      if (!mounted) return;
-      pwd = await showDialog<String>(
-        context: context,
-        builder: (_) => PasswordPromptDialog(name: c.name),
       );
-      if ((pwd ?? '').isEmpty) return;
     }
-    if (!mounted) return;
-    await showDialog(
-      context: context,
-      builder: (_) => _QbCategoriesTagsDialog(config: c, password: pwd!),
-    );
   }
 
   @override
@@ -240,17 +244,17 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
           ),
           const QbSpeedIndicator(),
         ],
-        backgroundColor: Theme.of(context).brightness == Brightness.light 
-            ? Theme.of(context).colorScheme.primary 
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? Theme.of(context).colorScheme.primary
             : Theme.of(context).colorScheme.surface,
         iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.light 
-              ? Theme.of(context).colorScheme.onPrimary 
+          color: Theme.of(context).brightness == Brightness.light
+              ? Theme.of(context).colorScheme.onPrimary
               : Theme.of(context).colorScheme.onSurface,
         ),
         titleTextStyle: TextStyle(
-          color: Theme.of(context).brightness == Brightness.light 
-              ? Theme.of(context).colorScheme.onPrimary 
+          color: Theme.of(context).brightness == Brightness.light
+              ? Theme.of(context).colorScheme.onPrimary
               : Theme.of(context).colorScheme.onSurface,
           fontSize: 20,
           fontWeight: FontWeight.w500,
@@ -274,7 +278,9 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                     groupValue: _defaultId,
                     onChanged: (String? value) {
                       if (value != null) {
-                        final client = _clients.firstWhere((c) => c.id == value);
+                        final client = _clients.firstWhere(
+                          (c) => c.id == value,
+                        );
                         _setDefault(client);
                       }
                     },
@@ -282,26 +288,20 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                       itemCount: _clients.length,
                       itemBuilder: (_, i) {
                         final c = _clients[i];
-                        final subtitle = '${c.host}:${c.port}  ·  ${c.username}';
+                        final subtitle =
+                            '${c.host}:${c.port}  ·  ${c.username}';
                         return ListTile(
-                          leading: Radio<String>(
-                            value: c.id,
-                          ),
+                          leading: Radio<String>(value: c.id),
                           title: Text(c.name),
                           subtitle: Text(subtitle),
                           onTap: () => _addOrEdit(existing: c),
                           trailing: Wrap(
-                            spacing: 8,
+                            spacing: 1,
                             children: [
                               IconButton(
                                 tooltip: '测试连接',
                                 onPressed: () => _test(c),
                                 icon: const Icon(Icons.wifi_tethering),
-                              ),
-                              IconButton(
-                                tooltip: '分类与标签',
-                                onPressed: () => _openCategoriesTags(c),
-                                icon: const Icon(Icons.folder_open),
                               ),
                               IconButton(
                                 tooltip: '删除',
@@ -367,6 +367,12 @@ class _PasswordPromptDialogState extends State<PasswordPromptDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.outline,
+              width: 1.0,
+            ),
+          ),
           child: const Text('取消'),
         ),
         FilledButton(
@@ -517,7 +523,9 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Colors.grey, width: 0.5)),
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey, width: 0.5),
+                ),
               ),
               child: Row(
                 children: [
@@ -599,9 +607,8 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
                                 const SizedBox(height: 4),
                                 Text(
                                   '启用后先下载种子文件到本地，再提交给 qBittorrent',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.grey.shade600,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: Colors.grey.shade600),
                                 ),
                               ],
                             ),
@@ -654,8 +661,12 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: _testOk == true
-                                      ? Theme.of(context).colorScheme.onPrimaryContainer
-                                      : Theme.of(context).colorScheme.onErrorContainer,
+                                      ? Theme.of(
+                                          context,
+                                        ).colorScheme.onPrimaryContainer
+                                      : Theme.of(
+                                          context,
+                                        ).colorScheme.onErrorContainer,
                                 ),
                               ),
                             ),
@@ -685,7 +696,9 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.wifi_tethering),
                         label: Text(_testing ? '测试中…' : '测试连接'),
@@ -699,6 +712,12 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
                     children: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.outline,
+                            width: 1.0,
+                          ),
+                        ),
                         child: const Text('取消'),
                       ),
                       const SizedBox(width: 8),
@@ -717,8 +736,6 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
     );
   }
 }
-
-
 
 class _QbCategoriesTagsDialog extends StatefulWidget {
   final QbClientConfig config;
@@ -803,40 +820,37 @@ class _QbCategoriesTagsDialogState extends State<_QbCategoriesTagsDialog> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(_error!, style: const TextStyle(color: Colors.red)),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _refresh,
-                          child: const Text('重试'),
-                        ),
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(_error!, style: const TextStyle(color: Colors.red)),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _refresh,
+                      child: const Text('重试'),
+                    ),
+                  ],
+                ),
+              )
+            : DefaultTabController(
+                length: 2,
+                child: Column(
+                  children: [
+                    const TabBar(
+                      tabs: [
+                        Tab(text: '分类'),
+                        Tab(text: '标签'),
                       ],
                     ),
-                  )
-                : DefaultTabController(
-                    length: 2,
-                    child: Column(
-                      children: [
-                        const TabBar(
-                          tabs: [
-                            Tab(text: '分类'),
-                            Tab(text: '标签'),
-                          ],
-                        ),
-                        Expanded(
-                          child: TabBarView(
-                            children: [
-                              _buildList(_categories),
-                              _buildList(_tags),
-                            ],
-                          ),
-                        ),
-                      ],
+                    Expanded(
+                      child: TabBarView(
+                        children: [_buildList(_categories), _buildList(_tags)],
+                      ),
                     ),
-                  ),
+                  ],
+                ),
+              ),
       ),
       actions: [
         TextButton(
@@ -844,26 +858,19 @@ class _QbCategoriesTagsDialogState extends State<_QbCategoriesTagsDialog> {
           child: const Text('关闭'),
         ),
         if (!_loading && _error == null)
-          TextButton(
-            onPressed: _refresh,
-            child: const Text('刷新'),
-          ),
+          TextButton(onPressed: _refresh, child: const Text('刷新')),
       ],
     );
   }
 
   Widget _buildList(List<String> items) {
     if (items.isEmpty) {
-      return const Center(
-        child: Text('暂无数据'),
-      );
+      return const Center(child: Text('暂无数据'));
     }
     return ListView.builder(
       itemCount: items.length,
       itemBuilder: (context, index) {
-        return ListTile(
-          title: Text(items[index]),
-        );
+        return ListTile(title: Text(items[index]));
       },
     );
   }

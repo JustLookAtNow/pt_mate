@@ -27,7 +27,7 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
       _statusMessage = message;
       _isError = isError;
     });
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -78,9 +78,9 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
         setState(() {
           _statusMessage = '正在恢复数据...';
         });
-        
+
         await _backupService.restoreBackup(backup);
-        
+
         // 备份恢复完成，显示重启提示对话框
         if (mounted) {
           await _showRestartDialog();
@@ -100,29 +100,36 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
 
   Future<bool> _showRestoreConfirmDialog() async {
     return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认恢复备份'),
-        content: const Text(
-          '恢复备份将会覆盖当前的所有应用数据，包括：\n\n'
-          '• 站点配置\n'
-          '• qBittorrent客户端配置\n'
-          '• 用户偏好设置\n'
-          '• 缓存数据\n\n'
-          '此操作无法撤销，请确认是否继续？',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('确认恢复备份'),
+            content: const Text(
+              '恢复备份将会覆盖当前的所有应用数据，包括：\n\n'
+              '• 站点配置\n'
+              '• qBittorrent客户端配置\n'
+              '• 用户偏好设置\n'
+              '• 缓存数据\n\n'
+              '此操作无法撤销，请确认是否继续？',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                style: TextButton.styleFrom(
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.outline,
+                    width: 1.0,
+                  ),
+                ),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('确认恢复'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('确认恢复'),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   Future<void> _showRestartDialog() async {
@@ -145,14 +152,14 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
             child: const Text('稍后重启'),
           ),
           FilledButton(
-             onPressed: () {
-               Navigator.of(context).pop();
-               // 退出应用，用户需要手动重启
-               // 使用exit(0)来完全退出应用
-               exit(0);
-             },
-             child: const Text('立即退出'),
-           ),
+            onPressed: () {
+              Navigator.of(context).pop();
+              // 退出应用，用户需要手动重启
+              // 使用exit(0)来完全退出应用
+              exit(0);
+            },
+            child: const Text('立即退出'),
+          ),
         ],
       ),
     );
@@ -206,17 +213,17 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('备份与恢复'),
-        backgroundColor: Theme.of(context).brightness == Brightness.light 
-            ? Theme.of(context).colorScheme.primary 
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? Theme.of(context).colorScheme.primary
             : Theme.of(context).colorScheme.surface,
         iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.light 
-              ? Theme.of(context).colorScheme.onPrimary 
+          color: Theme.of(context).brightness == Brightness.light
+              ? Theme.of(context).colorScheme.onPrimary
               : Theme.of(context).colorScheme.onSurface,
         ),
         titleTextStyle: TextStyle(
-          color: Theme.of(context).brightness == Brightness.light 
-              ? Theme.of(context).colorScheme.onPrimary 
+          color: Theme.of(context).brightness == Brightness.light
+              ? Theme.of(context).colorScheme.onPrimary
               : Theme.of(context).colorScheme.onSurface,
           fontSize: 20,
           fontWeight: FontWeight.w500,
@@ -233,27 +240,27 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
               title: '备份与恢复功能',
               description: '安全地备份和恢复您的应用数据，包括站点配置、客户端设置和用户偏好。',
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // 导出备份部分
             Text(
               '导出备份',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            
+
             _buildInfoCard(
               icon: Icons.backup,
               title: '创建备份文件',
               description: '将当前的应用数据导出为备份文件，可用于数据迁移或恢复。',
               iconColor: Colors.blue,
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             FilledButton.icon(
               onPressed: _isLoading ? null : _exportBackup,
               icon: const Icon(Icons.file_download),
@@ -262,27 +269,27 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
-            
+
             const SizedBox(height: 32),
-            
+
             // 导入备份部分
             Text(
               '导入备份',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            
+
             _buildInfoCard(
               icon: Icons.restore,
               title: '恢复备份数据',
               description: '从备份文件恢复应用数据。注意：此操作将覆盖当前所有数据。',
               iconColor: Colors.orange,
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             FilledButton.icon(
               onPressed: _isLoading ? null : _importBackup,
               icon: const Icon(Icons.file_upload),
@@ -291,9 +298,9 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
-            
+
             const SizedBox(height: 32),
-            
+
             // 注意事项
             Card(
               color: Theme.of(context).colorScheme.errorContainer,
@@ -311,10 +318,13 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                         const SizedBox(width: 8),
                         Text(
                           '重要提示',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onErrorContainer,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onErrorContainer,
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
                       ],
                     ),
@@ -332,12 +342,12 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                 ),
               ),
             ),
-            
+
             // 状态显示
             if (_statusMessage != null) ...[
               const SizedBox(height: 24),
               Card(
-                color: _isError 
+                color: _isError
                     ? Theme.of(context).colorScheme.errorContainer
                     : Theme.of(context).colorScheme.primaryContainer,
                 child: Padding(
@@ -353,19 +363,26 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                       else
                         Icon(
                           _isError ? Icons.error : Icons.check_circle,
-                          color: _isError 
+                          color: _isError
                               ? Theme.of(context).colorScheme.onErrorContainer
-                              : Theme.of(context).colorScheme.onPrimaryContainer,
+                              : Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
                         ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           _statusMessage!,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: _isError 
-                                ? Theme.of(context).colorScheme.onErrorContainer
-                                : Theme.of(context).colorScheme.onPrimaryContainer,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: _isError
+                                    ? Theme.of(
+                                        context,
+                                      ).colorScheme.onErrorContainer
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimaryContainer,
+                              ),
                         ),
                       ),
                     ],
