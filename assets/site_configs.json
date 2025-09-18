@@ -175,9 +175,9 @@
       "discountMapping": {}
     },
     {
-      "id": "mypt",
-      "name": "我的",
-      "baseUrl": "https://cc.mypt.cc/",
+      "id": "nexusphp",
+      "name": "nexusphp org",
+      "baseUrl": "https://dev.nexusphp.org/",
       "siteType": "NexusPHP",
       "searchCategories": [],
       "features": {
