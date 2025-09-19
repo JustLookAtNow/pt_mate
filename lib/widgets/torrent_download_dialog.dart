@@ -257,10 +257,45 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
             border: OutlineInputBorder(),
             isDense: true,
           ),
+          selectedItemBuilder: (context) {
+            return _clients.map((client) {
+              final screenWidth = MediaQuery.of(context).size.width;
+              // 响应式宽度：手机上限制最大宽度，大屏上允许更宽
+              final maxWidth = screenWidth > 600 
+                  ? screenWidth * 0.6  // 大屏上使用60%宽度
+                  : 240.0;  // 小屏上限制200px
+              
+              return SizedBox(
+                width: maxWidth,
+                child: Text(
+                  '${client.name} (${client.host}:${client.port})',
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              );
+            }).toList();
+          },
           items: _clients.map((client) {
             return DropdownMenuItem(
               value: client,
-              child: Text('${client.name} (${client.host}:${client.port})'),
+              child: Builder(
+                builder: (context) {
+                  final screenWidth = MediaQuery.of(context).size.width;
+                  // 响应式宽度：手机上限制最大宽度，大屏上允许更宽
+                  final maxWidth = screenWidth > 600 
+                      ? screenWidth * 0.6  // 大屏上使用60%宽度
+                      : 240.0;  // 小屏上限制200px
+                  
+                  return SizedBox(
+                    width: maxWidth,
+                    child: Text(
+                      '${client.name} (${client.host}:${client.port})',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  );
+                },
+              ),
             );
           }).toList(),
           onChanged: (client) {
