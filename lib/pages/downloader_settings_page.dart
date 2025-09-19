@@ -80,8 +80,14 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('保存失败：$e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          content: Text(
+            '保存失败：$e',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -124,8 +130,14 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('删除失败：$e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          content: Text(
+            '删除失败：$e',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -144,8 +156,14 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('设置失败：$e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          content: Text(
+            '设置失败：$e',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -155,7 +173,16 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
     if (_defaultId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('请先设置默认下载器')));
+      ).showSnackBar(SnackBar(
+        content: Text(
+          '请先设置默认下载器',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onErrorContainer,
+          ),
+        ),
+        backgroundColor: Theme.of(context).colorScheme.errorContainer,
+        behavior: SnackBarBehavior.floating,
+      ));
       return;
     }
     final client = _clients.firstWhere((c) => c.id == _defaultId);
@@ -169,7 +196,16 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
         if (!mounted) return;
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('请先保存密码')));
+        ).showSnackBar(SnackBar(
+          content: Text(
+            '请先保存密码',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          behavior: SnackBarBehavior.floating,
+        ));
         return;
       }
       await QbService.instance.testConnection(config: c, password: pwd!);

@@ -600,6 +600,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('已成功发送"${widget.torrentItem.name}"到 ${clientConfig.name}'),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -607,7 +609,18 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('下载失败：$e')));
+        ).showSnackBar(
+          SnackBar(
+            content: Text(
+              '下载失败：$e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }

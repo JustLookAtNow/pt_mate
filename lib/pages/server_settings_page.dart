@@ -43,7 +43,16 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('加载站点配置失败: $e')));
+        ).showSnackBar(SnackBar(
+          content: Text(
+            '加载站点配置失败: $e',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          behavior: SnackBarBehavior.fixed,
+        ));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -60,12 +69,32 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       setState(() => _activeSiteId = siteId);
       if (mounted) {
         scaffoldMessenger.showSnackBar(
-          const SnackBar(content: Text('已切换活跃站点')),
+          SnackBar(
+            content: Text(
+              '已切换活跃站点',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            behavior: SnackBarBehavior.fixed,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        scaffoldMessenger.showSnackBar(SnackBar(content: Text('切换站点失败: $e')));
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              '切换站点失败: $e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+            behavior: SnackBarBehavior.fixed,
+          ),
+        );
       }
     }
   }
@@ -102,13 +131,31 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('站点已删除')));
+          ).showSnackBar(SnackBar(
+            content: Text(
+              '站点已删除',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            behavior: SnackBarBehavior.fixed,
+          ));
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(SnackBar(content: Text('删除站点失败: $e')));
+          ).showSnackBar(SnackBar(
+            content: Text(
+              '删除站点失败: $e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+            behavior: SnackBarBehavior.fixed,
+          ));
         }
       }
     }
@@ -352,6 +399,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         onPressed: _addSite,
         child: const Icon(Icons.add),
       ),
+      floatingActionButtonLocation: const _CustomFloatingActionButtonLocation(),
     );
   }
 }
@@ -440,7 +488,18 @@ class _CategoryEditDialogState extends State<_CategoryEditDialog> {
             if (name.isEmpty || parameters.isEmpty) {
               ScaffoldMessenger.of(
                 context,
-              ).showSnackBar(const SnackBar(content: Text('请填写完整信息')));
+              ).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    '请填写完整信息',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                  behavior: SnackBarBehavior.fixed,
+                ),
+              );
               return;
             }
             final result = widget.category.copyWith(
@@ -671,7 +730,16 @@ class _SiteEditPageState extends State<SiteEditPage> {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('请先完成登录获取Cookie')));
+          ).showSnackBar(SnackBar(
+            content: Text(
+              '请先完成登录获取Cookie',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+            behavior: SnackBarBehavior.fixed,
+          ));
         }
         return;
       }
@@ -681,7 +749,16 @@ class _SiteEditPageState extends State<SiteEditPage> {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('请先填写API Key')));
+          ).showSnackBar(SnackBar(
+            content: Text(
+              '请先填写API Key',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+            behavior: SnackBarBehavior.fixed,
+          ));
         }
         return;
       }
@@ -702,7 +779,16 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('已成功加载 ${categories.length} 个分类配置')),
+            SnackBar(
+              content: Text(
+                '已成功加载 ${categories.length} 个分类配置',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+              ),
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              behavior: SnackBarBehavior.fixed,
+            ),
           );
         }
       } else {
@@ -717,7 +803,16 @@ class _SiteEditPageState extends State<SiteEditPage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('获取分类配置失败，已使用默认配置: $e')));
+        ).showSnackBar(SnackBar(
+          content: Text(
+            '获取分类配置失败，已使用默认配置: $e',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          behavior: SnackBarBehavior.fixed,
+        ));
       }
     }
   }
@@ -839,7 +934,16 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.site != null ? '站点已更新' : '站点已添加')),
+          SnackBar(
+            content: Text(
+              widget.site != null ? '站点已更新' : '站点已添加',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            behavior: SnackBarBehavior.fixed,
+          ),
         );
         widget.onSaved?.call();
         Navigator.of(context).pop();
@@ -1430,5 +1534,27 @@ class _ProfileView extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// 自定义FloatingActionButton位置，远离底边1.5cm，远离右边1cm
+class _CustomFloatingActionButtonLocation extends FloatingActionButtonLocation {
+  const _CustomFloatingActionButtonLocation();
+
+  @override
+  Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
+    // 1.5cm ≈ 57像素，1cm ≈ 38像素
+    const double bottomMargin = 80.0; // 1.5cm
+    const double rightMargin = 50.0;  // 1cm
+    
+    // 计算FloatingActionButton的位置
+    final double fabX = scaffoldGeometry.scaffoldSize.width - 
+                       scaffoldGeometry.floatingActionButtonSize.width - 
+                       rightMargin;
+    final double fabY = scaffoldGeometry.scaffoldSize.height - 
+                       scaffoldGeometry.floatingActionButtonSize.height - 
+                       bottomMargin;
+    
+    return Offset(fabX, fabY);
   }
 }

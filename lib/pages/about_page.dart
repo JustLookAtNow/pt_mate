@@ -77,9 +77,16 @@ class _AboutPageState extends State<AboutPage> {
                     await Clipboard.setData(ClipboardData(text: url.toString()));
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('无法直接打开链接，已复制到剪贴板，请手动粘贴到浏览器'),
-                          duration: Duration(seconds: 2),
+                        SnackBar(
+                          content: Text(
+                            '无法直接打开链接，已复制到剪贴板，请手动粘贴到浏览器',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                          duration: const Duration(seconds: 2),
+                          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                          behavior: SnackBarBehavior.floating,
                         ),
                       );
                     }
@@ -89,8 +96,15 @@ class _AboutPageState extends State<AboutPage> {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('操作失败: $e'),
+                        content: Text(
+                          '操作失败: $e',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onErrorContainer,
+                          ),
+                        ),
                         duration: const Duration(seconds: 2),
+                        backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                        behavior: SnackBarBehavior.floating,
                       ),
                     );
                   }

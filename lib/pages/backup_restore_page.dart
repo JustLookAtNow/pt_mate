@@ -30,8 +30,18 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
+        content: Text(
+          message,
+          style: TextStyle(
+            color: isError 
+                ? Theme.of(context).colorScheme.onErrorContainer
+                : Theme.of(context).colorScheme.onPrimaryContainer,
+          ),
+        ),
+        backgroundColor: isError 
+            ? Theme.of(context).colorScheme.errorContainer
+            : Theme.of(context).colorScheme.primaryContainer,
+        behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 3),
       ),
     );

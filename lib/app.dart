@@ -605,7 +605,13 @@ class _HomePageState extends State<HomePage> {
     if (_currentSite?.features.supportTorrentDetail == false) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('当前站点不支持种子详情功能')));
+      ).showSnackBar(
+        SnackBar(
+          content: const Text('当前站点不支持种子详情功能'),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
@@ -664,14 +670,24 @@ class _HomePageState extends State<HomePage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已成功发送"${item.name}"到 ${clientConfig.name}')),
+          SnackBar(
+            content: Text('已成功发送"${item.name}"到 ${clientConfig.name}'),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('下载失败：$e')));
+        ).showSnackBar(
+          SnackBar(
+            content: Text('下载失败：$e'),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }
@@ -724,7 +740,13 @@ class _HomePageState extends State<HomePage> {
       } else {
         if (mounted) {
           final messenger = ScaffoldMessenger.of(context);
-          messenger.showSnackBar(const SnackBar(content: Text('当前站点不支持搜索功能')));
+          messenger.showSnackBar(
+            SnackBar(
+              content: const Text('当前站点不支持搜索功能'),
+              backgroundColor: Theme.of(context).colorScheme.errorContainer,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
         }
       }
     }
@@ -772,7 +794,8 @@ class _HomePageState extends State<HomePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('收藏操作失败：$e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+            behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -1038,7 +1061,11 @@ class _HomePageState extends State<HomePage> {
                                 _search(reset: true);
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('当前站点不支持搜索功能')),
+                                  SnackBar(
+                                    content: const Text('当前站点不支持搜索功能'),
+                                    backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
                                 );
                               }
                             },
@@ -1058,7 +1085,11 @@ class _HomePageState extends State<HomePage> {
                                 _search(reset: true);
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('当前站点不支持搜索功能')),
+                                  SnackBar(
+                                    content: const Text('当前站点不支持搜索功能'),
+                                    backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
                                 );
                               }
                             },
@@ -1572,7 +1603,11 @@ class _HomePageState extends State<HomePage> {
     // 显示开始收藏的提示
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('开始批量收藏${selectedItems.length}个项目...')),
+        SnackBar(
+          content: Text('开始批量收藏${selectedItems.length}个项目...'),
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
 
@@ -1600,7 +1635,8 @@ class _HomePageState extends State<HomePage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('收藏失败: ${item.name}, 错误: $e'),
-              backgroundColor: Colors.red,
+              backgroundColor: Theme.of(context).colorScheme.errorContainer,
+              behavior: SnackBarBehavior.floating,
             ),
           );
         }
@@ -1615,7 +1651,10 @@ class _HomePageState extends State<HomePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: failureCount == 0 ? Colors.green : Colors.orange,
+          backgroundColor: failureCount == 0 
+            ? Theme.of(context).colorScheme.primaryContainer 
+            : Theme.of(context).colorScheme.errorContainer,
+          behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -1649,6 +1688,8 @@ class _HomePageState extends State<HomePage> {
           content: Text(
             '开始批量下载${selectedItems.length}个项目到${clientConfig.name}...',
           ),
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }

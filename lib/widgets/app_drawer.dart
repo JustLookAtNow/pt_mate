@@ -3,6 +3,7 @@ import '../pages/downloader_settings_page.dart';
 import '../pages/server_settings_page.dart';
 import '../pages/settings_page.dart';
 import '../pages/about_page.dart';
+import '../app.dart';
 
 class AppDrawer extends StatelessWidget {
   final VoidCallback? onSettingsChanged;
@@ -58,7 +59,24 @@ class AppDrawer extends StatelessWidget {
               }
               // 如果不在主页，导航到主页
               if (currentRoute != '/home' && currentRoute != '/') {
-                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                if (isFixedSidebar) {
+                  Navigator.of(context).pushReplacement(
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation1, animation2) => const HomePage(),
+                      settings: const RouteSettings(name: '/'),
+                      transitionDuration: Duration.zero,
+                      reverseTransitionDuration: Duration.zero,
+                    ),
+                  );
+                } else {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => const HomePage(),
+                      settings: const RouteSettings(name: '/'),
+                    ),
+                    (route) => false,
+                  );
+                }
               }
             },
           ),
@@ -71,11 +89,23 @@ class AppDrawer extends StatelessWidget {
                 Navigator.of(context).pop();
               }
               if (currentRoute != '/downloader_settings') {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const DownloaderSettingsPage(),
-                  ),
-                );
+                if (isFixedSidebar) {
+                  Navigator.of(context).pushReplacement(
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation1, animation2) => const DownloaderSettingsPage(),
+                      settings: const RouteSettings(name: '/downloader_settings'),
+                      transitionDuration: Duration.zero,
+                      reverseTransitionDuration: Duration.zero,
+                    ),
+                  );
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const DownloaderSettingsPage(),
+                      settings: const RouteSettings(name: '/downloader_settings'),
+                    ),
+                  );
+                }
               }
             },
           ),
@@ -88,11 +118,23 @@ class AppDrawer extends StatelessWidget {
                 Navigator.of(context).pop();
               }
               if (currentRoute != '/server_settings') {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const ServerSettingsPage(),
-                  ),
-                );
+                if (isFixedSidebar) {
+                  Navigator.of(context).pushReplacement(
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation1, animation2) => const ServerSettingsPage(),
+                      settings: const RouteSettings(name: '/server_settings'),
+                      transitionDuration: Duration.zero,
+                      reverseTransitionDuration: Duration.zero,
+                    ),
+                  );
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ServerSettingsPage(),
+                      settings: const RouteSettings(name: '/server_settings'),
+                    ),
+                  );
+                }
               }
             },
           ),
@@ -105,11 +147,25 @@ class AppDrawer extends StatelessWidget {
                 Navigator.of(context).pop();
               }
               if (currentRoute != '/settings') {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SettingsPage()),
-                );
-                // 从设置页面返回后，重新加载分类配置
-                onSettingsChanged?.call();
+                if (isFixedSidebar) {
+                  await Navigator.of(context).pushReplacement(
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation1, animation2) => const SettingsPage(),
+                      settings: const RouteSettings(name: '/settings'),
+                      transitionDuration: Duration.zero,
+                      reverseTransitionDuration: Duration.zero,
+                    ),
+                  );
+                } else {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SettingsPage(),
+                      settings: const RouteSettings(name: '/settings'),
+                    ),
+                  );
+                  // 从设置页面返回后，重新加载分类配置
+                  onSettingsChanged?.call();
+                }
               }
             },
           ),
@@ -122,9 +178,23 @@ class AppDrawer extends StatelessWidget {
                 Navigator.of(context).pop();
               }
               if (currentRoute != '/about') {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AboutPage()),
-                );
+                if (isFixedSidebar) {
+                  Navigator.of(context).pushReplacement(
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation1, animation2) => const AboutPage(),
+                      settings: const RouteSettings(name: '/about'),
+                      transitionDuration: Duration.zero,
+                      reverseTransitionDuration: Duration.zero,
+                    ),
+                  );
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AboutPage(),
+                      settings: const RouteSettings(name: '/about'),
+                    ),
+                  );
+                }
               }
             },
           ),
