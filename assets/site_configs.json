@@ -275,8 +275,8 @@
         "torrentSearch": true,
         "torrentDetail": true,
         "download": true,
-        "favorites": true,
-        "downloadHistory": true,
+        "favorites": false,
+        "downloadHistory": false,
         "categorySearch": true,
         "advancedSearch": true
       },
@@ -311,8 +311,8 @@
         "torrentSearch": true,
         "torrentDetail": true,
         "download": true,
-        "favorites": true,
-        "downloadHistory": true,
+        "favorites": false,
+        "downloadHistory": false,
         "categorySearch": true,
         "advancedSearch": true
       },
