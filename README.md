@@ -2,6 +2,13 @@
 
 基于 Flutter（Material Design 3）开发的私有种子站点客户端，支持多种PT站点的种子浏览、搜索和下载管理。目前支持M-Team和NexusPHP类型的站点。
 
+---
+
+📣 **官方交流群（Telegram）**
+
+[加入 PT Mate 官方交流群](https://t.me/pt_mate) 来获取最新公告、功能讨论与使用帮助。
+
+---
 ## 功能特性
 
 ### 核心功能
