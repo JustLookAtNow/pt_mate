@@ -330,22 +330,6 @@ class _HomePageState extends State<HomePage> {
             _selectedCategoryIndex = -1;
             _loading = false;
           });
-          // 显示友好提示
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('请先配置服务器信息'),
-              action: SnackBarAction(
-                label: '去设置',
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const ServerSettingsPage(),
-                    ),
-                  );
-                },
-              ),
-            ),
-          );
         }
         return;
       }
@@ -1242,25 +1226,68 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               Expanded(
-                child: RefreshIndicator(
-                  onRefresh: _refresh,
-                  child: ListView.builder(
-                    controller: _scrollCtrl,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: _items.length + (_hasMore ? 1 : 0),
-                    itemBuilder: (_, i) {
-                      if (i >= _items.length) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Center(
-                            child: SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
+                child: _currentSite == null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.settings_outlined,
+                                size: 64,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(height: 24),
+                              Text(
+                                '尚未配置站点信息',
+                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                '请先配置站点信息以开始使用应用',
+                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 32),
+                              FilledButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => const ServerSettingsPage(),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.add),
+                                label: const Text('配置站点'),
+                              ),
+                            ],
                           ),
-                        );
-                      }
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _refresh,
+                        child: ListView.builder(
+                          controller: _scrollCtrl,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: _items.length + (_hasMore ? 1 : 0),
+                          itemBuilder: (_, i) {
+                            if (i >= _items.length) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: Center(
+                                  child: SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                ),
+                              );
+                            }
                       final t = _items[i];
                       final isSelected = _selectedItems.contains(t.id);
                       return GestureDetector(
