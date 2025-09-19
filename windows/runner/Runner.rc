@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.github.justlookatnow" "\0"
-            VALUE "FileDescription", "flutter_application_m_team" "\0"
+            VALUE "FileDescription", "pt_mate" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "flutter_application_m_team" "\0"
+            VALUE "InternalName", "pt_mate" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2025 com.github.justlookatnow. All rights reserved." "\0"
-            VALUE "OriginalFilename", "flutter_application_m_team.exe" "\0"
-            VALUE "ProductName", "flutter_application_m_team" "\0"
+            VALUE "OriginalFilename", "pt_mate.exe" "\0"
+            VALUE "ProductName", "pt_mate" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
