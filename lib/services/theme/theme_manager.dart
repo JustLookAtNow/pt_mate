@@ -48,6 +48,19 @@ class ThemeManager extends ChangeNotifier {
         if (Platform.isMacOS) 'PingFang SC',
         if (Platform.isAndroid) 'Noto Sans CJK SC',
       ],
+      appBarTheme: AppBarTheme(
+        titleTextStyle: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w500,
+          color: colorScheme.onSurface,
+          fontFamilyFallback: [
+            if (Platform.isWindows) 'Microsoft YaHei',
+            if (Platform.isLinux) 'WenQuanYi Zen Hei',
+            if (Platform.isMacOS) 'PingFang SC',
+            if (Platform.isAndroid) 'Noto Sans CJK SC',
+          ],
+        ),
+      ),
     );
   }
 
@@ -73,6 +86,19 @@ class ThemeManager extends ChangeNotifier {
         if (Platform.isMacOS) 'PingFang SC',
         if (Platform.isAndroid) 'Noto Sans CJK SC',
       ],
+      appBarTheme: AppBarTheme(
+        titleTextStyle: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w500,
+          color: colorScheme.onSurface,
+          fontFamilyFallback: [
+            if (Platform.isWindows) 'Microsoft YaHei',
+            if (Platform.isLinux) 'WenQuanYi Zen Hei',
+            if (Platform.isMacOS) 'PingFang SC',
+            if (Platform.isAndroid) 'Noto Sans CJK SC',
+          ],
+        ),
+      ),
     );
   }
 
