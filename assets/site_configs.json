@@ -227,6 +227,150 @@
         "advancedSearch": true
       },
       "discountMapping": {}
+    },
+    {
+      "id": "kamept",
+      "name": "KamePT (龟站)",
+      "baseUrl": "https://kamept.com/",
+      "siteType": "NexusPHPWeb",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      },
+      "discountMapping": {}
+    },
+    {
+      "id": "rousi",
+      "name": "Rousi (肉丝)",
+      "baseUrl": "https://rousi.zip/",
+      "siteType": "NexusPHPWeb",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      },
+      "discountMapping": {}
+    },
+    {
+      "id": "rousiApi",
+      "name": "Rousi (肉丝)",
+      "baseUrl": "https://rousi.zip/",
+      "siteType": "NexusPHP",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      },
+      "discountMapping": {}
+    },
+    {
+      "id": "kelu",
+      "name": "Kelu (可鲁可撸)",
+      "baseUrl": "https://our.kelu.one/",
+      "siteType": "NexusPHPWeb",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      },
+      "discountMapping": {}
+    },
+    {
+      "id": "keluApi",
+      "name": "Kelu (可鲁可撸)",
+      "baseUrl": "https://our.kelu.one/",
+      "siteType": "NexusPHP",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      },
+      "discountMapping": {}
+    },
+    {
+      "id": "nicept",
+      "name": "NicePT (老师)",
+      "baseUrl": "https://www.nicept.net/",
+      "siteType": "NexusPHPWeb",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      },
+      "discountMapping": {}
+    },
+    {
+      "id": "ilolicon",
+      "name": "ilolicon (爱萝莉)",
+      "baseUrl": "https://share.ilolicon.com/",
+      "siteType": "NexusPHPWeb",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      },
+      "discountMapping": {}
+    },
+    {
+      "id": "hdfans",
+      "name": "HDFans (红豆饭)",
+      "baseUrl": "https://hdfans.org/",
+      "siteType": "NexusPHPWeb",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": true,
+        "categorySearch": true,
+        "advancedSearch": true
+      },
+      "discountMapping": {}
     }
   ],
   "defaultTemplates": {
