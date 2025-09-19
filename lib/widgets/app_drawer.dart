@@ -7,19 +7,24 @@ import '../pages/about_page.dart';
 class AppDrawer extends StatelessWidget {
   final VoidCallback? onSettingsChanged;
   final String? currentRoute;
+  final bool isFixedSidebar;
   
   const AppDrawer({
     super.key,
     this.onSettingsChanged,
     this.currentRoute,
+    this.isFixedSidebar = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Drawer(
-      child: SafeArea(
-        child: ListView(
-          children: [
+    final drawerContent = Container(
+      color: Theme.of(context).colorScheme.surface,
+      child: ListView(
+        padding: EdgeInsets.zero, // 移除默认的 padding，让 DrawerHeader 能够延伸到状态栏
+        children: [
+          // 只在非固定菜单模式下显示 header
+          if (!isFixedSidebar)
             DrawerHeader(
               decoration: BoxDecoration(
                 color: Theme.of(context).brightness == Brightness.light 
@@ -40,80 +45,99 @@ class AppDrawer extends StatelessWidget {
                 ),
               ),
             ),
-            _DrawerItem(
-              icon: Icons.home_outlined,
-              title: '主页',
-              isActive: currentRoute == '/home' || currentRoute == '/',
-              onTap: () {
+          // 固定菜单模式下添加一些顶部间距
+          if (isFixedSidebar)
+            const SizedBox(height: 16),
+          _DrawerItem(
+            icon: Icons.home_outlined,
+            title: '主页',
+            isActive: currentRoute == '/home' || currentRoute == '/',
+            onTap: () {
+              if (!isFixedSidebar) {
                 Navigator.of(context).pop();
-                // 如果不在主页，导航到主页
-                if (currentRoute != '/home' && currentRoute != '/') {
-                  Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-                }
-              },
-            ),
-            _DrawerItem(
-              icon: Icons.download_outlined,
-              title: '下载器设置',
-              isActive: currentRoute == '/downloader_settings',
-              onTap: () {
+              }
+              // 如果不在主页，导航到主页
+              if (currentRoute != '/home' && currentRoute != '/') {
+                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+              }
+            },
+          ),
+          _DrawerItem(
+            icon: Icons.download_outlined,
+            title: '下载器设置',
+            isActive: currentRoute == '/downloader_settings',
+            onTap: () {
+              if (!isFixedSidebar) {
                 Navigator.of(context).pop();
-                if (currentRoute != '/downloader_settings') {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const DownloaderSettingsPage(),
-                    ),
-                  );
-                }
-              },
-            ),
-            _DrawerItem(
-              icon: Icons.dns,
-              title: '服务器配置',
-              isActive: currentRoute == '/server_settings',
-              onTap: () {
+              }
+              if (currentRoute != '/downloader_settings') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const DownloaderSettingsPage(),
+                  ),
+                );
+              }
+            },
+          ),
+          _DrawerItem(
+            icon: Icons.dns,
+            title: '服务器配置',
+            isActive: currentRoute == '/server_settings',
+            onTap: () {
+              if (!isFixedSidebar) {
                 Navigator.of(context).pop();
-                if (currentRoute != '/server_settings') {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ServerSettingsPage(),
-                    ),
-                  );
-                }
-              },
-            ),
-            _DrawerItem(
-              icon: Icons.settings_outlined,
-              title: '设置',
-              isActive: currentRoute == '/settings',
-              onTap: () async {
+              }
+              if (currentRoute != '/server_settings') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ServerSettingsPage(),
+                  ),
+                );
+              }
+            },
+          ),
+          _DrawerItem(
+            icon: Icons.settings_outlined,
+            title: '设置',
+            isActive: currentRoute == '/settings',
+            onTap: () async {
+              if (!isFixedSidebar) {
                 Navigator.of(context).pop();
-                if (currentRoute != '/settings') {
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SettingsPage()),
-                  );
-                  // 从设置页面返回后，重新加载分类配置
-                  onSettingsChanged?.call();
-                }
-              },
-            ),
-            _DrawerItem(
-              icon: Icons.info_outline,
-              title: '关于',
-              isActive: currentRoute == '/about',
-              onTap: () {
+              }
+              if (currentRoute != '/settings') {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                );
+                // 从设置页面返回后，重新加载分类配置
+                onSettingsChanged?.call();
+              }
+            },
+          ),
+          _DrawerItem(
+            icon: Icons.info_outline,
+            title: '关于',
+            isActive: currentRoute == '/about',
+            onTap: () {
+              if (!isFixedSidebar) {
                 Navigator.of(context).pop();
-                if (currentRoute != '/about') {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AboutPage()),
-                  );
-                }
-              },
-            ),
-          ],
-        ),
+              }
+              if (currentRoute != '/about') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AboutPage()),
+                );
+              }
+            },
+          ),
+        ],
       ),
     );
+
+    // 根据 isFixedSidebar 参数决定返回 Drawer 还是直接返回内容
+    if (isFixedSidebar) {
+      return drawerContent;
+    } else {
+      return Drawer(child: drawerContent);
+    }
   }
 }
 

@@ -4,7 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../widgets/qb_speed_indicator.dart';
-import '../widgets/app_drawer.dart';
+import '../widgets/responsive_layout.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
@@ -31,15 +31,10 @@ class _AboutPageState extends State<AboutPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return ResponsiveLayout(
+      currentRoute: '/about',
       appBar: AppBar(
         title: const Text('关于'),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
         actions: const [QbSpeedIndicator()],
         backgroundColor: Theme.of(context).brightness == Brightness.light 
             ? Theme.of(context).colorScheme.primary 
@@ -57,7 +52,6 @@ class _AboutPageState extends State<AboutPage> {
           fontWeight: FontWeight.w500,
         ),
       ),
-      drawer: const AppDrawer(currentRoute: '/about'),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

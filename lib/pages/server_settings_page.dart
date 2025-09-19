@@ -7,7 +7,7 @@ import '../services/api/api_service.dart';
 import '../services/site_config_service.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/nexusphp_web_login.dart';
-import '../widgets/app_drawer.dart';
+import '../widgets/responsive_layout.dart';
 
 import '../utils/format.dart';
 import '../app.dart';
@@ -141,15 +141,10 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return ResponsiveLayout(
+      currentRoute: '/server_settings',
       appBar: AppBar(
         title: const Text('服务器设置'),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
         actions: const [QbSpeedIndicator()],
         backgroundColor: Theme.of(context).brightness == Brightness.light
             ? Theme.of(context).colorScheme.primary
@@ -167,7 +162,6 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           fontWeight: FontWeight.w500,
         ),
       ),
-      drawer: const AppDrawer(currentRoute: '/server_settings'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(

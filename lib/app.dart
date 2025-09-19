@@ -14,7 +14,7 @@ import 'services/qbittorrent/qb_client.dart';
 
 import 'pages/server_settings_page.dart';
 import 'widgets/qb_speed_indicator.dart';
-import 'widgets/app_drawer.dart';
+import 'widgets/responsive_layout.dart';
 import 'widgets/torrent_download_dialog.dart';
 
 class AppState extends ChangeNotifier {
@@ -809,7 +809,9 @@ class _HomePageState extends State<HomePage> {
           });
         }
 
-        return Scaffold(
+        return ResponsiveLayout(
+          currentRoute: '/',
+          onSettingsChanged: _reloadCategories,
           appBar: AppBar(
             title: Text.rich(
               TextSpan(
@@ -838,10 +840,6 @@ class _HomePageState extends State<HomePage> {
               fontSize: 20,
               fontWeight: FontWeight.w500,
             ),
-          ),
-          drawer: AppDrawer(
-            currentRoute: '/',
-            onSettingsChanged: _reloadCategories,
           ),
           body: Column(
             children: [
