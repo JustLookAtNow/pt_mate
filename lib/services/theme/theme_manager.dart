@@ -1,16 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import '../storage/storage_service.dart';
 
-enum AppThemeMode {
-  system,
-  light,
-  dark,
-}
+enum AppThemeMode { system, light, dark }
 
 class ThemeManager extends ChangeNotifier {
   final StorageService _storageService;
-  
+
   AppThemeMode _themeMode = AppThemeMode.system;
   bool _useDynamicColor = true;
   Color _seedColor = Colors.deepPurple;
@@ -31,7 +29,7 @@ class ThemeManager extends ChangeNotifier {
   // 获取当前的亮色主题
   ThemeData get lightTheme {
     ColorScheme colorScheme;
-    
+
     if (_useDynamicColor && _dynamicLightColorScheme != null) {
       colorScheme = _dynamicLightColorScheme!;
     } else {
@@ -40,17 +38,23 @@ class ThemeManager extends ChangeNotifier {
         brightness: Brightness.light,
       );
     }
-    
+
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
+      fontFamilyFallback: [
+        if (Platform.isWindows) 'Microsoft YaHei',
+        if (Platform.isLinux) 'WenQuanYi Zen Hei',
+        if (Platform.isMacOS) 'PingFang SC',
+        if (Platform.isAndroid) 'Noto Sans CJK SC',
+      ],
     );
   }
 
   // 获取当前的暗色主题
   ThemeData get darkTheme {
     ColorScheme colorScheme;
-    
+
     if (_useDynamicColor && _dynamicDarkColorScheme != null) {
       colorScheme = _dynamicDarkColorScheme!;
     } else {
@@ -59,10 +63,16 @@ class ThemeManager extends ChangeNotifier {
         brightness: Brightness.dark,
       );
     }
-    
+
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
+      fontFamilyFallback: [
+        if (Platform.isWindows) 'Microsoft YaHei',
+        if (Platform.isLinux) 'WenQuanYi Zen Hei',
+        if (Platform.isMacOS) 'PingFang SC',
+        if (Platform.isAndroid) 'Noto Sans CJK SC',
+      ],
     );
   }
 
@@ -83,7 +93,9 @@ class ThemeManager extends ChangeNotifier {
     final corePalette = await DynamicColorPlugin.getCorePalette();
     if (corePalette != null) {
       _dynamicLightColorScheme = corePalette.toColorScheme();
-      _dynamicDarkColorScheme = corePalette.toColorScheme(brightness: Brightness.dark);
+      _dynamicDarkColorScheme = corePalette.toColorScheme(
+        brightness: Brightness.dark,
+      );
       notifyListeners();
     }
   }
