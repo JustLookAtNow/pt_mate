@@ -616,7 +616,7 @@ class _HomePageState extends State<HomePage> {
     if (mounted) setState(() {}); // 触发重建以显示排序结果
   }
 
-  void _onTorrentTap(TorrentItem item) {
+  void _onTorrentTap(TorrentItem item) async {
     // 检查站点是否支持种子详情功能
     if (_currentSite?.features.supportTorrentDetail == false) {
       ScaffoldMessenger.of(
@@ -625,7 +625,7 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => TorrentDetailPage(
           torrentItem: item,
@@ -634,6 +634,11 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+    
+    // 从详情页返回后，刷新列表页状态以确保收藏状态同步
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _onDownload(TorrentItem item) async {
@@ -690,24 +695,10 @@ class _HomePageState extends State<HomePage> {
   Future<void> _onToggleCollection(TorrentItem item) async {
     final newCollectionState = !item.collection;
 
-    // 立即更新UI状态
-    final index = _items.indexWhere((t) => t.id == item.id);
-    if (index != -1 && mounted) {
+    // 立即更新UI状态 - 直接修改现有对象
+    if (mounted) {
       setState(() {
-        _items[index] = TorrentItem(
-          id: item.id,
-          name: item.name,
-          smallDescr: item.smallDescr,
-          discount: item.discount,
-          discountEndTime: item.discountEndTime,
-          downloadUrl: item.downloadUrl,
-          seeders: item.seeders,
-          leechers: item.leechers,
-          sizeBytes: item.sizeBytes,
-          imageList: item.imageList,
-          downloadStatus: item.downloadStatus,
-          collection: newCollectionState,
-        );
+        item.collection = newCollectionState;
       });
     }
 
@@ -787,23 +778,9 @@ class _HomePageState extends State<HomePage> {
       // 请求失败，恢复原状态
       _pendingCollectionRequests.remove(item.id);
 
-      final index = _items.indexWhere((t) => t.id == item.id);
-      if (index != -1 && mounted) {
+      if (mounted) {
         setState(() {
-          _items[index] = TorrentItem(
-            id: item.id,
-            name: item.name,
-            smallDescr: item.smallDescr,
-            discount: item.discount,
-            discountEndTime: item.discountEndTime,
-            downloadUrl: item.downloadUrl,
-            seeders: item.seeders,
-            leechers: item.leechers,
-            sizeBytes: item.sizeBytes,
-            imageList: item.imageList,
-            downloadStatus: item.downloadStatus,
-            collection: !newCollectionState, // 恢复原状态
-          );
+          item.collection = !newCollectionState; // 恢复原状态
         });
       }
 

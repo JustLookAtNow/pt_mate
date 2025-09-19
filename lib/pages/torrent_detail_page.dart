@@ -505,12 +505,16 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   dynamic _detail;
   bool _showImages = false;
   final List<String> _imageUrls = [];
-  late TorrentItem _currentItem;
+  late bool _isCollected; // 分离收藏状态为独立变量
+  
+  // BBCode渲染缓存
+  String? _cachedRawContent;
+  Widget? _cachedBBCodeWidget;
 
   @override
   void initState() {
     super.initState();
-    _currentItem = widget.torrentItem;
+    _isCollected = widget.torrentItem.collection;
     _loadDetail();
     _loadAutoLoadImagesSetting();
   }
@@ -557,8 +561,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     try {
       // 1. 获取下载 URL
       final url = await ApiService.instance.genDlToken(
-        id: _currentItem.id,
-        url: _currentItem.downloadUrl,
+        id: widget.torrentItem.id,
+        url: widget.torrentItem.downloadUrl,
       );
 
       // 2. 弹出对话框让用户选择下载器设置
@@ -566,7 +570,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       final result = await showDialog<Map<String, dynamic>>(
         context: context,
         builder: (_) => TorrentDownloadDialog(
-          torrentName: _currentItem.name,
+          torrentName: widget.torrentItem.name,
           downloadUrl: url,
         ),
       );
@@ -595,7 +599,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('已成功发送"${_currentItem.name}"到 ${clientConfig.name}'),
+            content: Text('已成功发送"${widget.torrentItem.name}"到 ${clientConfig.name}'),
           ),
         );
       }
@@ -609,26 +613,29 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   }
 
   Future<void> _onToggleCollection() async {
-    final newCollectionState = !_currentItem.collection;
+    final newCollectionState = !_isCollected;
 
-    // 立即更新UI状态 - 使用copyWith只更新collection属性
+    // 立即更新UI状态 - 只更新收藏状态变量
     if (mounted) {
       setState(() {
-        _currentItem = _currentItem.copyWith(collection: newCollectionState);
+        _isCollected = newCollectionState;
       });
     }
 
     // 异步后台请求
     try {
       await ApiService.instance.toggleCollection(
-        id: _currentItem.id,
+        id: widget.torrentItem.id,
         make: newCollectionState,
       );
+      
+      // 请求成功，直接更新传入的torrentItem对象
+      widget.torrentItem.collection = newCollectionState;
     } catch (e) {
-      // 请求失败，恢复原状态 - 使用copyWith只更新collection属性
+      // 请求失败，恢复原状态 - 只恢复收藏状态变量
       if (mounted) {
         setState(() {
-          _currentItem = _currentItem.copyWith(collection: !newCollectionState);
+          _isCollected = !newCollectionState;
         });
         ScaffoldMessenger.of(
           context,
@@ -922,6 +929,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   }
 
   Widget buildBBCodeContent(String content) {
+    // 检查缓存是否有效
+    final cacheKey = '$content|$_showImages'; // 包含显示图片状态的缓存键
+    if (_cachedRawContent == cacheKey && _cachedBBCodeWidget != null) {
+      return _cachedBBCodeWidget!;
+    }
+
     String processedContent = content;
 
     // 修复常见的BBCode格式错误
@@ -1004,7 +1017,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     stylesheet.tags['hide'] = CustomHideTag();
     stylesheet.tags['HIDE'] = CustomHideTag();
 
-    return Column(
+    // 构建最终的Widget
+    final widget = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 添加调试信息
@@ -1503,6 +1517,9 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                     onPressed: () {
                       setState(() {
                         _showImages = true;
+                        // 清除缓存，因为图片显示状态改变了
+                        _cachedRawContent = null;
+                        _cachedBBCodeWidget = null;
                       });
                     },
                     child: const Text('显示'),
@@ -1513,6 +1530,11 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
           ),
       ],
     );
+
+    // 更新缓存并返回widget
+    _cachedRawContent = cacheKey;
+    _cachedBBCodeWidget = widget;
+    return widget;
   }
 
   @override
@@ -1619,11 +1641,11 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
           FloatingActionButton(
             heroTag: "favorite",
             onPressed: _onToggleCollection,
-            backgroundColor: _currentItem.collection ? Colors.red : null,
-            tooltip: _currentItem.collection ? '取消收藏' : '收藏',
+            backgroundColor: _isCollected ? Colors.red : null,
+            tooltip: _isCollected ? '取消收藏' : '收藏',
             child: Icon(
-              _currentItem.collection ? Icons.favorite : Icons.favorite_border,
-              color: _currentItem.collection ? Colors.white : null,
+              _isCollected ? Icons.favorite : Icons.favorite_border,
+              color: _isCollected ? Colors.white : null,
             ),
           ),
           const SizedBox(height: 16),

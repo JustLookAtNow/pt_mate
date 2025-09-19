@@ -52,7 +52,7 @@ class TorrentItem {
   final int sizeBytes;
   final List<String> imageList;
   final DownloadStatus downloadStatus;
-  final bool collection; // 是否已收藏
+  bool collection; // 是否已收藏（改为可变）
 
   TorrentItem({
     required this.id,
