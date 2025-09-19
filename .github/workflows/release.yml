@@ -120,7 +120,6 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
-    # 移除对Android构建的依赖，实现并行构建
     
     steps:
     - name: Checkout code
@@ -172,7 +171,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: windows-artifact
-        path: Output/pt_mate-${{ steps.version.outputs.version }}-windows-x64.exe
+        path: windows/Output/pt_mate-${{ steps.version.outputs.version }}-windows-x64.exe
         retention-days: 1
 
 
