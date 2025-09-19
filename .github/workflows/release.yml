@@ -13,7 +13,7 @@ on:
 permissions:
   contents: write
 jobs:
-  build-android:
+  build-android-linux:
     runs-on: ubuntu-latest
     
     steps:
@@ -95,10 +95,32 @@ jobs:
           build/app/outputs/flutter-apk/pt_mate-${{ steps.version.outputs.version }}-arm64-v8a.apk
           build/app/outputs/flutter-apk/pt_mate-${{ steps.version.outputs.version }}-armeabi-v7a.apk
         retention-days: 1
+        
+    # 直接在Android构建后添加Linux构建步骤
+    - name: Install Linux dependencies
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y ninja-build libgtk-3-dev libblkid-dev libsecret-1-dev
+        
+    - name: Build Linux
+      run: flutter build linux --release
+      
+    - name: Create Linux package
+      run: |
+        mkdir -p pt_mate-${{ steps.version.outputs.version }}-linux-x64
+        cp -r build/linux/x64/release/bundle/* pt_mate-${{ steps.version.outputs.version }}-linux-x64/
+        tar -czf pt_mate-${{ steps.version.outputs.version }}-linux-x64.tar.gz pt_mate-${{ steps.version.outputs.version }}-linux-x64
+        
+    - name: Upload Linux artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-artifact
+        path: pt_mate-${{ steps.version.outputs.version }}-linux-x64.tar.gz
+        retention-days: 1
 
   build-windows:
     runs-on: windows-latest
-    needs: build-android
+    # 移除对Android构建的依赖，实现并行构建
     
     steps:
     - name: Checkout code
@@ -153,61 +175,11 @@ jobs:
         path: Output/pt_mate-${{ steps.version.outputs.version }}-windows-x64.exe
         retention-days: 1
 
-  build-linux:
-    runs-on: ubuntu-latest
-    needs: build-android
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event_name == 'workflow_dispatch' && 'master' || github.ref }}
-        
-    - name: Extract version from tag
-      id: version
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          TAG="${{ github.event.inputs.tag }}"
-        else
-          TAG=${GITHUB_REF#refs/tags/}
-        fi
-        VERSION=${TAG#v}
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "tag=$TAG" >> $GITHUB_OUTPUT
-        
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        flutter-version: '3.35.2'
-        channel: 'stable'
-        
-    - name: Install Linux dependencies
-      run: |
-        sudo apt-get update -y
-        sudo apt-get install -y ninja-build libgtk-3-dev libblkid-dev libsecret-1-dev
-        
-    - name: Get dependencies
-      run: flutter pub get
-      
-    - name: Build Linux
-      run: flutter build linux --release
-      
-    - name: Create Linux package
-      run: |
-        mkdir -p pt_mate-${{ steps.version.outputs.version }}-linux-x64
-        cp -r build/linux/x64/release/bundle/* pt_mate-${{ steps.version.outputs.version }}-linux-x64/
-        tar -czf pt_mate-${{ steps.version.outputs.version }}-linux-x64.tar.gz pt_mate-${{ steps.version.outputs.version }}-linux-x64
-        
-    - name: Upload Linux artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: linux-artifact
-        path: pt_mate-${{ steps.version.outputs.version }}-linux-x64.tar.gz
-        retention-days: 1
+
 
   create-release:
     runs-on: ubuntu-latest
-    needs: [build-android, build-windows, build-linux]
+    needs: [build-android-linux, build-windows]
     
     steps:
     - name: Checkout code
