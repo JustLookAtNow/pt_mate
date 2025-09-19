@@ -888,6 +888,21 @@ class _SiteEditPageState extends State<SiteEditPage> {
       appBar: AppBar(
         title: Text(widget.site != null ? '编辑服务器' : '添加服务器'),
         actions: const [QbSpeedIndicator()],
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.surface,
+        iconTheme: IconThemeData(
+          color: Theme.of(context).brightness == Brightness.light
+              ? Theme.of(context).colorScheme.onPrimary
+              : Theme.of(context).colorScheme.onSurface,
+        ),
+        titleTextStyle: TextStyle(
+          color: Theme.of(context).brightness == Brightness.light
+              ? Theme.of(context).colorScheme.onPrimary
+              : Theme.of(context).colorScheme.onSurface,
+          fontSize: 20,
+          fontWeight: FontWeight.w500,
+        ),
       ),
       body: Form(
         key: _formKey,
