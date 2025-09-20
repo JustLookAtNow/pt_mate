@@ -152,11 +152,14 @@ class NexusPHPAdapter implements SiteAdapter {
     final Map<String, dynamic> params = {
       'page': pageNumber.toString(),
       'per_page': pageSize.toString(),
-      'include_fields[torrent]': 'download_url',
+      'include_fields[torrent]': 'download_url,has_bookmarked',
     };
 
     if (keyword != null && keyword.isNotEmpty) {
       params['filter[title]'] = keyword;
+    }
+    if (onlyFav != null && onlyFav > 0) {
+      params['filter[bookmark]'] = onlyFav;
     }
     var url = '/api/v1/torrents';
     // 添加额外参数
@@ -230,7 +233,7 @@ class NexusPHPAdapter implements SiteAdapter {
       leechers: item['leechers'] as int,
       sizeBytes: item['size'] as int,
       downloadStatus: DownloadStatus.none, // 不支持
-      collection: false, // 不支持
+      collection: item['has_bookmarked'] as bool? ?? false, 
       imageList: const [], // 暂时没有图片列表
     );
   }
@@ -290,8 +293,38 @@ class NexusPHPAdapter implements SiteAdapter {
     required String id,
     required bool make,
   }) async {
-    // TODO: 实现NexusPHP收藏功能
-    // 临时实现，不执行任何操作
+    try {
+      final String endpoint;
+      if (make) {
+        // 添加收藏
+        endpoint = '/api/v1/bookmarks';
+      } else {
+        // 取消收藏
+        endpoint = '/api/v1/bookmarks/delete';
+      }
+
+      // 使用FormData发送请求
+      final formData = FormData.fromMap({'torrent_id': id});
+
+      final response = await _dio.post(
+        endpoint,
+        data: formData,
+        options: Options(headers: {'Accept': 'application/json'}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        // 检查API返回的结果
+        if (data != null && data['ret'] != null && data['ret'] != 0) {
+          throw Exception('收藏操作失败: ${data['msg'] ?? '未知错误'}');
+        }
+        // 成功，无需额外处理
+      } else {
+        throw Exception('HTTP错误: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('收藏操作失败: $e');
+    }
   }
 
   @override

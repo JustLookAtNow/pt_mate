@@ -42,23 +42,23 @@ class ThemeManager extends ChangeNotifier {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      fontFamilyFallback: [
-        if (Platform.isWindows) 'Microsoft YaHei',
-        if (Platform.isLinux) 'WenQuanYi Zen Hei',
-        if (Platform.isMacOS) 'PingFang SC',
-        if (Platform.isAndroid) 'Noto Sans CJK SC',
-      ],
+  fontFamily: switch (Platform.operatingSystem) {
+    'windows' => 'Microsoft YaHei',
+    'linux' => 'WenQuanYi Zen Hei',
+    'macos' => 'PingFang SC',
+    _ => null, // 默认不指定
+  },
       appBarTheme: AppBarTheme(
         titleTextStyle: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.w500,
           color: colorScheme.onSurface,
-          fontFamilyFallback: [
-            if (Platform.isWindows) 'Microsoft YaHei',
-            if (Platform.isLinux) 'WenQuanYi Zen Hei',
-            if (Platform.isMacOS) 'PingFang SC',
-            if (Platform.isAndroid) 'Noto Sans CJK SC',
-          ],
+      fontFamily: switch (Platform.operatingSystem) {
+        'windows' => 'Microsoft YaHei',
+        'linux' => 'WenQuanYi Zen Hei',
+        'macos' => 'PingFang SC',
+        _ => null,
+      },
         ),
       ),
     );
@@ -80,23 +80,23 @@ class ThemeManager extends ChangeNotifier {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      fontFamilyFallback: [
-        if (Platform.isWindows) 'Microsoft YaHei',
-        if (Platform.isLinux) 'WenQuanYi Zen Hei',
-        if (Platform.isMacOS) 'PingFang SC',
-        if (Platform.isAndroid) 'Noto Sans CJK SC',
-      ],
+      fontFamily: switch (Platform.operatingSystem) {
+        'windows' => 'Microsoft YaHei',
+        'linux' => 'WenQuanYi Zen Hei',
+        'macos' => 'PingFang SC',
+        _ => null, // 默认不指定
+      },
       appBarTheme: AppBarTheme(
         titleTextStyle: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.w500,
           color: colorScheme.onSurface,
-          fontFamilyFallback: [
-            if (Platform.isWindows) 'Microsoft YaHei',
-            if (Platform.isLinux) 'WenQuanYi Zen Hei',
-            if (Platform.isMacOS) 'PingFang SC',
-            if (Platform.isAndroid) 'Noto Sans CJK SC',
-          ],
+          fontFamily: switch (Platform.operatingSystem) {
+            'windows' => 'Microsoft YaHei',
+            'linux' => 'WenQuanYi Zen Hei',
+            'macos' => 'PingFang SC',
+            _ => null, // 默认不指定
+          },
         ),
       ),
     );

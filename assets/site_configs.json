@@ -203,7 +203,7 @@
         "torrentSearch": true,
         "torrentDetail": true,
         "download": true,
-        "favorites": false,
+        "favorites": true,
         "downloadHistory": false,
         "categorySearch": true,
         "advancedSearch": true

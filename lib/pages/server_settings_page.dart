@@ -916,7 +916,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
           // 通知AppState更新
           if (mounted) {
             final appState = context.read<AppState>();
-            await appState.loadInitial();
+            await appState.loadInitial(forceReload: true);
           }
         }
       } else {
@@ -1053,6 +1053,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                     labelText: '选择预设站点',
                     border: OutlineInputBorder(),
                   ),
+                  isExpanded: true, // 添加这个属性来防止溢出
                   items: [
                     for (int i = 0; i < presets.length; i++)
                       if (presets[i].siteType == _selectedSiteType)
@@ -1064,7 +1065,10 @@ class _SiteEditPageState extends State<SiteEditPage> {
                             maxLines: 1,
                           ),
                         ),
-                    const DropdownMenuItem(value: -1, child: Text('自定义…')),
+                    const DropdownMenuItem(
+                      value: -1, 
+                      child: Text('自定义…'),
+                    ),
                   ],
                   onChanged: (value) {
                     if (value != null) {

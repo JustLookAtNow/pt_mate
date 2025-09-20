@@ -24,11 +24,20 @@ class AppState extends ChangeNotifier {
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
 
+  // 配置版本号，用于检测站点配置变化
+  int _configVersion = 0;
+  int get configVersion => _configVersion;
+
   Completer<void>? _initCompleter;
 
-  Future<void> loadInitial() async {
-    if (_initCompleter != null) {
+  Future<void> loadInitial({bool forceReload = false}) async {
+    if (_initCompleter != null && !forceReload) {
       return _initCompleter!.future;
+    }
+
+    // 如果是强制重新加载，重置completer
+    if (forceReload) {
+      _initCompleter = null;
     }
 
     _initCompleter = Completer<void>();
@@ -37,11 +46,16 @@ class AppState extends ChangeNotifier {
       _site = await StorageService.instance.getActiveSiteConfig();
       await ApiService.instance.init();
       _isInitialized = true;
+      _configVersion++; // 增加配置版本号
+      print('AppState: loadInitial完成，配置版本号: $_configVersion, 强制重新加载: $forceReload');
       notifyListeners();
       _initCompleter!.complete();
     } catch (e) {
       _initCompleter!.completeError(e);
       rethrow;
+    } finally {
+      // 完成后重置completer，允许下次重新加载
+      _initCompleter = null;
     }
   }
 
@@ -244,6 +258,10 @@ class _HomePageState extends State<HomePage> {
 
   // 用户信息与搜索结果分页状态
   MemberProfile? _profile;
+  // QB客户端配置
+  List<QbClientConfig> _qbClients = [];
+  // 用户信息展开状态
+  bool _userInfoExpanded = false;
   final List<TorrentItem> _items = [];
   int _pageNumber = 1;
   final int _pageSize = 30;
@@ -270,39 +288,52 @@ class _HomePageState extends State<HomePage> {
 
   // 当前站点配置
   SiteConfig? _currentSite;
-
-  // QB客户端配置
-  List<QbClientConfig> _qbClients = [];
-
-  // 用户信息展开状态
-  bool _userInfoExpanded = false;
-
-  // 分类筛选弹窗状态
-
-  Widget _buildStatChip(BuildContext context, String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: color.withValues(alpha: 0.8),
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-
+  
+  // 配置版本号跟踪
+  int _lastConfigVersion = -1;
+  
+  // 防止重复处理重新初始化的标志
+  bool _isProcessingReload = false;
+  
+  // didChangeDependencies中一次性预同步标志，避免首次构建时出现null/-1
+  bool _didSyncFromAppState = false; // 首帧前从AppState预同步，避免首次渲染null/-1
+  bool _didInitialLoad = false; // 首次进入页面后的初始化是否已完成
+  
   @override
   void initState() {
     super.initState();
     _scrollCtrl.addListener(_onScroll);
-    _init(); // 进入时默认搜索“综合”类型
+    // 首次加载改为在 didChangeDependencies 完成预同步后触发，避免在AppState尚未就绪时执行
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_didSyncFromAppState) {
+      final appState = Provider.of<AppState>(context, listen: false);
+      if (appState.site != null) {
+        _currentSite = appState.site;
+        _lastConfigVersion = appState.configVersion;
+        print('HomePage: didChangeDependencies预同步 - 站点: ${_currentSite?.id}, 版本: $_lastConfigVersion');
+      }
+      _didSyncFromAppState = true;
+
+      // 预同步完成后触发一次初始化（仅一次）
+      if (!_didInitialLoad) {
+        _isProcessingReload = true;
+        final capturedSite = _currentSite; // 捕获当前站点，避免后续变化导致条件抖动
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!_didInitialLoad && capturedSite != null) {
+            await _init();
+            _didInitialLoad = true;
+            _isProcessingReload = false;
+          } else {
+            // 即使未触发初始化，也要释放标志位
+            _isProcessingReload = false;
+          }
+        });
+      }
+    }
   }
 
   @override
@@ -371,15 +402,15 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _reloadCategories() async {
     try {
-      // 重新加载当前活跃站点的分类配置
-      final storageService = Provider.of<StorageService>(
-        context,
-        listen: false,
-      );
-      final activeSite = await storageService.getActiveSiteConfig();
-      final categories =
-          activeSite?.searchCategories ??
-          SearchCategoryConfig.getDefaultConfigs();
+      // 从AppState获取最新的站点配置
+      final appState = Provider.of<AppState>(context, listen: false);
+      final activeSite = appState.site;
+      final categories = activeSite?.searchCategories.isNotEmpty == true
+          ? activeSite!.searchCategories
+          : SearchCategoryConfig.getDefaultConfigs();
+      
+      print('HomePage: _reloadCategories - 重新加载分类，分类数量: ${categories.length}');
+      
       if (mounted) {
         setState(() {
           _categories = categories;
@@ -808,12 +839,62 @@ class _HomePageState extends State<HomePage> {
     return Consumer<AppState>(
       builder: (context, appState, child) {
         // 当AppState变化时，检查是否需要重新初始化
-        if (appState.site != null &&
-            (_currentSite == null || _currentSite!.id != appState.site!.id)) {
-          // 站点发生变化，需要重新初始化
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _init();
-          });
+        if (!_isProcessingReload) {
+          bool needsReload = false;
+          String reloadReason = '';
+          
+          print('HomePage Consumer: 当前站点=${_currentSite?.id}, AppState站点=${appState.site?.id}, 配置版本=${appState.configVersion}, 上次版本=$_lastConfigVersion');
+          
+          if (appState.site != null) {
+            final isFirstSync = (_currentSite == null && _lastConfigVersion == -1);
+            // 首次同步：仅同步站点与版本，不触发重新加载
+            if (isFirstSync) {
+              print('HomePage: 首次同步（不重载） - 同步站点: ${appState.site!.id}, 版本: ${appState.configVersion}');
+              final currentSite = appState.site;
+              final currentConfigVersion = appState.configVersion;
+              WidgetsBinding.instance.addPostFrameCallback((_) async {
+                // 先同步站点与版本
+                _currentSite = currentSite;
+                _lastConfigVersion = currentConfigVersion;
+                // 若尚未进行过首次初始化，则触发一次初始化
+                if (!_didInitialLoad && !_isProcessingReload && _currentSite != null) {
+                  _isProcessingReload = true;
+                  await _init();
+                  _didInitialLoad = true;
+                  _isProcessingReload = false;
+                }
+              });
+            }
+            // 站点变化（排除首次同步情形）
+            else if (_currentSite != null && _currentSite!.id != appState.site!.id) {
+              needsReload = true;
+              reloadReason = '站点变化';
+              print('HomePage: 站点变化检测 - 当前站点: ${_currentSite?.id}, 新站点: ${appState.site!.id}');
+            }
+            // 配置版本变化（排除首次同步情形）
+            else if (_lastConfigVersion != -1 && _lastConfigVersion != appState.configVersion) {
+              needsReload = true;
+              reloadReason = '配置更新';
+              print('HomePage: 配置更新检测 - 上次版本: $_lastConfigVersion, 当前版本: ${appState.configVersion}');
+            }
+          }
+          
+          if (needsReload) {
+            print('HomePage: 检测到$reloadReason，重新初始化 - 配置版本: ${appState.configVersion}, 上次版本: $_lastConfigVersion');
+            // 设置标志，防止重复处理
+            _isProcessingReload = true;
+            // 捕获当前值，避免异步执行时值发生变化
+            final currentSite = appState.site;
+            final currentConfigVersion = appState.configVersion;
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              // 在PostFrameCallback中更新状态，避免在builder中触发重建
+              _currentSite = currentSite;
+              _lastConfigVersion = currentConfigVersion;
+              await _init();
+              // 重新初始化完成后重置标志
+              _isProcessingReload = false;
+            });
+          }
         }
 
         return ResponsiveLayout(
@@ -1809,5 +1890,24 @@ class _HomePageState extends State<HomePage> {
       case DownloadStatus.none:
         return const SizedBox(width: 20); // 占位，保持布局一致
     }
+  }
+
+  Widget _buildStatChip(BuildContext context, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color.withValues(alpha: 0.8),
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
   }
 }
