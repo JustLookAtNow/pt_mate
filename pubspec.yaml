@@ -60,6 +60,7 @@ dependencies:
   flutter_inappwebview: ^6.0.0
   beautiful_soup_dart: ^0.3.0
   file_picker: ^10.3.3
+  webdav_client: ^1.2.2
 
 
 dev_dependencies:

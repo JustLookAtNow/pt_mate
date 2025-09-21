@@ -9,6 +9,8 @@ import 'pages/torrent_detail_page.dart';
 import 'services/api/api_service.dart';
 import 'services/storage/storage_service.dart';
 import 'services/theme/theme_manager.dart';
+import 'services/backup_service.dart';
+import 'services/webdav_service.dart';
 
 import 'utils/format.dart';
 import 'services/qbittorrent/qb_client.dart';
@@ -50,6 +52,10 @@ class AppState extends ChangeNotifier {
       _configVersion++; // 增加配置版本号
       print('AppState: loadInitial完成，配置版本号: $_configVersion, 强制重新加载: $forceReload');
       notifyListeners();
+      
+      // 应用启动时检查自动同步
+      _checkAutoSync();
+      
       _initCompleter!.complete();
     } catch (e) {
       _initCompleter!.completeError(e);
@@ -86,6 +92,54 @@ class AppState extends ChangeNotifier {
       await ApiService.instance.setActiveSite(_site!);
     }
     notifyListeners();
+  }
+
+  /// 检查自动同步
+  Future<void> _checkAutoSync() async {
+    try {
+      final webdavService = WebDAVService.instance;
+      final config = await webdavService.loadConfig();
+      
+      // 检查是否启用了自动同步
+      if (config != null && config.autoSync) {
+        print('AppState: 检测到启用自动同步，开始执行自动同步检查');
+        
+        final backupService = BackupService(StorageService.instance);
+        
+        // 异步执行自动同步，不阻塞应用启动
+         Future.microtask(() async {
+           try {
+             // 检查是否有远程备份可以下载
+             final remoteBackups = await backupService.getWebDAVBackups();
+             if (remoteBackups.isNotEmpty) {
+               print('AppState: 发现${remoteBackups.length}个远程备份，准备自动同步最新的');
+               
+               // 获取最新的备份文件路径
+               final latestBackup = remoteBackups.first;
+               final backupPath = latestBackup['path'] as String;
+               
+               // 恢复最新的备份
+               final result = await backupService.restoreFromWebDAV(backupPath);
+               if (result.success) {
+                 print('AppState: 自动同步完成');
+               } else {
+                 print('AppState: 自动同步失败: ${result.message}');
+               }
+             } else {
+               print('AppState: 未发现远程备份，跳过自动同步');
+             }
+           } catch (e) {
+             print('AppState: 自动同步失败: $e');
+             // 自动同步失败不影响应用正常启动
+           }
+         });
+      } else {
+        print('AppState: 自动同步未启用或配置不存在');
+      }
+    } catch (e) {
+      print('AppState: 检查自动同步配置失败: $e');
+      // 配置检查失败不影响应用正常启动
+    }
   }
 }
 

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../models/app_models.dart';
 import 'storage/storage_service.dart';
 import '../utils/backup_migrators.dart';
+import 'webdav_service.dart';
 
 // 备份数据版本
 class BackupVersion {
@@ -74,8 +75,9 @@ class BackupService {
   static const String _backupFileExtension = '.json';
   
   final StorageService _storageService;
+  final WebDAVService _webdavService;
   
-  BackupService(this._storageService);
+  BackupService(this._storageService) : _webdavService = WebDAVService.instance;
   
   // 创建备份
   Future<BackupData> createBackup() async {
@@ -147,31 +149,33 @@ class BackupService {
       final backup = await createBackup();
       final timestamp = backup.timestamp.toIso8601String().replaceAll(':', '-');
       final fileName = '$_backupFilePrefix${backup.version}_$timestamp$_backupFileExtension';
+      final backupContent = jsonEncode(backup.toJson());
       
       String? result;
       if (defaultTargetPlatform == TargetPlatform.linux) {
-        // Linux平台：不设置fileName，让用户完全手动输入
+        // Linux平台：使用传统的文件路径方式
         result = await FilePicker.platform.saveFile(
           dialogTitle: '导出备份文件 (建议文件名: $fileName)',
           type: FileType.custom,
           allowedExtensions: ['json'],
         );
+        
+        if (result != null) {
+          final file = File(result);
+          await file.writeAsString(backupContent);
+        }
       } else {
-        // 其他平台：使用fileName参数
+        // Android和iOS平台：使用bytes参数直接保存文件内容
         result = await FilePicker.platform.saveFile(
           dialogTitle: '导出备份文件',
           fileName: fileName,
           type: FileType.custom,
           allowedExtensions: ['json'],
+          bytes: utf8.encode(backupContent),
         );
       }
       
-      if (result != null) {
-        final file = File(result);
-        await file.writeAsString(jsonEncode(backup.toJson()));
-        return result;
-      }
-      return null;
+      return result;
     } catch (e) {
       throw BackupException('导出备份失败: $e');
     }
@@ -331,6 +335,159 @@ class BackupService {
         success: false,
         message: '恢复失败: $e',
       );
+    }
+  }
+
+  // WebDAV集成方法
+
+  /// 创建备份并自动上传到WebDAV（如果已配置且启用）
+  Future<String?> exportBackupWithWebDAV() async {
+    try {
+      // 创建备份数据
+      final backupData = await createBackup();
+      final backupJson = jsonEncode(backupData.toJson());
+
+      // 检查WebDAV配置
+      final webdavConfig = await _webdavService.loadConfig();
+      if (webdavConfig != null && webdavConfig.isEnabled) {
+        try {
+          // 直接上传到WebDAV，不创建本地文件
+          await _webdavService.uploadBackup(backupJson);
+          // WebDAV上传成功，返回特殊标识表示上传到云端
+          return 'WebDAV云端备份';
+        } catch (e) {
+          // WebDAV上传失败，在Linux平台上直接抛出异常，避免文件选择器问题
+          if (defaultTargetPlatform == TargetPlatform.linux) {
+            throw BackupException('WebDAV上传失败: $e');
+          } else {
+            // 其他平台回退到本地备份
+            final localPath = await exportBackup();
+            return localPath;
+          }
+        }
+      } else {
+        // 没有WebDAV配置，创建本地备份文件
+        final localPath = await exportBackup();
+        return localPath;
+      }
+    } catch (e) {
+      throw BackupException('导出备份失败: $e');
+    }
+  }
+
+  /// 从WebDAV下载并恢复备份
+  Future<BackupRestoreResult> restoreFromWebDAV(String backupFileName) async {
+    try {
+      final webdavConfig = await _webdavService.loadConfig();
+      if (webdavConfig == null || !webdavConfig.isEnabled) {
+        return const BackupRestoreResult(
+          success: false,
+          message: 'WebDAV未配置或未启用',
+        );
+      }
+
+      // 从WebDAV下载备份内容
+      final backupContent = await _webdavService.downloadBackup(backupFileName);
+      if (backupContent == null) {
+        return const BackupRestoreResult(
+          success: false,
+          message: '从WebDAV下载备份失败',
+        );
+      }
+
+      // 解析备份内容
+      var json = jsonDecode(backupContent) as Map<String, dynamic>;
+      
+      // 检查是否需要数据迁移
+      final backupVersion = json['version'] as String? ?? '1.0.0';
+      if (backupVersion != BackupVersion.current) {
+        json = BackupMigrationManager.migrate(json, BackupVersion.current);
+      }
+      
+      final backup = BackupData.fromJson(json);
+      
+      // 恢复备份
+      await restoreBackup(backup);
+      
+      return const BackupRestoreResult(
+        success: true,
+        message: '从WebDAV恢复备份成功',
+      );
+    } catch (e) {
+      return BackupRestoreResult(
+        success: false,
+        message: '从WebDAV恢复备份失败: $e',
+      );
+    }
+  }
+
+  /// 获取WebDAV上的备份文件列表
+  Future<List<Map<String, dynamic>>> getWebDAVBackups() async {
+    try {
+      final webdavConfig = await _webdavService.loadConfig();
+      if (webdavConfig == null || !webdavConfig.isEnabled) {
+        return [];
+      }
+
+      return await _webdavService.getRemoteBackups();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// 检查是否应该执行自动WebDAV同步
+  Future<bool> shouldAutoSync() async {
+    try {
+      final webdavConfig = await _webdavService.loadConfig();
+      if (webdavConfig == null || !webdavConfig.isEnabled || !webdavConfig.autoSync) {
+        return false;
+      }
+
+      // 检查上次同步时间
+      if (webdavConfig.lastSyncTime == null) {
+        return true; // 从未同步过
+      }
+
+      final now = DateTime.now();
+      final lastSync = webdavConfig.lastSyncTime!;
+      final intervalMinutes = webdavConfig.syncIntervalMinutes;
+      
+      return now.difference(lastSync).inMinutes >= intervalMinutes;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 执行自动WebDAV同步
+  Future<void> performAutoSync() async {
+    try {
+      if (!await shouldAutoSync()) return;
+
+      final webdavConfig = await _webdavService.loadConfig();
+      if (webdavConfig == null || !webdavConfig.isEnabled) return;
+
+      // 上传到WebDAV
+      final success = await _webdavService.performAutoSync();
+      
+      // 更新同步状态
+      final updatedConfig = webdavConfig.copyWith(
+        lastSyncTime: DateTime.now(),
+        lastSyncStatus: success ? WebDAVSyncStatus.success : WebDAVSyncStatus.error,
+        lastSyncError: success ? null : '自动同步失败',
+      );
+      
+      await _webdavService.saveConfig(updatedConfig);
+    } catch (e) {
+      // 更新错误状态
+      final webdavConfig = await _webdavService.loadConfig();
+      if (webdavConfig != null) {
+        final updatedConfig = webdavConfig.copyWith(
+          lastSyncTime: DateTime.now(),
+          lastSyncStatus: WebDAVSyncStatus.error,
+          lastSyncError: '自动同步失败: $e',
+        );
+        await _webdavService.saveConfig(updatedConfig);
+      }
     }
   }
   

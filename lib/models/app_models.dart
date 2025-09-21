@@ -625,6 +625,155 @@ class QbClientConfig {
       );
 }
 
+// WebDAV同步状态枚举
+enum WebDAVSyncStatus {
+  idle,        // 空闲
+  syncing,     // 同步中
+  uploading,   // 上传中
+  downloading, // 下载中
+  success,     // 成功
+  error,       // 错误
+}
+
+// WebDAV配置类
+class WebDAVConfig {
+  final String id; // 唯一标识符
+  final String name; // 配置名称
+  final String serverUrl; // WebDAV服务器地址，如：https://dav.jianguoyun.com/dav/
+  final String username; // 用户名
+  // 注意：密码通过安全存储单独管理，不再作为模型字段
+  final String remotePath; // 远程路径，如：/PTMate/backups/
+  final bool isEnabled; // 是否启用
+  final bool autoSync; // 是否自动同步
+  final int syncIntervalMinutes; // 自动同步间隔（分钟）
+  final DateTime? lastSyncTime; // 最后同步时间
+  final WebDAVSyncStatus lastSyncStatus; // 最后同步状态
+  final String? lastSyncError; // 最后同步错误信息
+
+  const WebDAVConfig({
+    required this.id,
+    required this.name,
+    required this.serverUrl,
+    required this.username,
+    this.remotePath = '/PTMate/backups/',
+    this.isEnabled = false,
+    this.autoSync = false,
+    this.syncIntervalMinutes = 60,
+    this.lastSyncTime,
+    this.lastSyncStatus = WebDAVSyncStatus.idle,
+    this.lastSyncError,
+  });
+
+  WebDAVConfig copyWith({
+    String? id,
+    String? name,
+    String? serverUrl,
+    String? username,
+    String? remotePath,
+    bool? isEnabled,
+    bool? autoSync,
+    int? syncIntervalMinutes,
+    DateTime? lastSyncTime,
+    WebDAVSyncStatus? lastSyncStatus,
+    String? lastSyncError,
+  }) => WebDAVConfig(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        serverUrl: serverUrl ?? this.serverUrl,
+        username: username ?? this.username,
+        remotePath: remotePath ?? this.remotePath,
+        isEnabled: isEnabled ?? this.isEnabled,
+        autoSync: autoSync ?? this.autoSync,
+        syncIntervalMinutes: syncIntervalMinutes ?? this.syncIntervalMinutes,
+        lastSyncTime: lastSyncTime ?? this.lastSyncTime,
+        lastSyncStatus: lastSyncStatus ?? this.lastSyncStatus,
+        lastSyncError: lastSyncError ?? this.lastSyncError,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'serverUrl': serverUrl,
+        'username': username,
+        // 注意：密码通过安全存储单独管理，不包含在JSON中
+        'remotePath': remotePath,
+        'isEnabled': isEnabled,
+        'autoSync': autoSync,
+        'syncIntervalMinutes': syncIntervalMinutes,
+        'lastSyncTime': lastSyncTime?.toIso8601String(),
+        'lastSyncStatus': lastSyncStatus.name,
+        'lastSyncError': lastSyncError,
+      };
+
+  factory WebDAVConfig.fromJson(Map<String, dynamic> json) => WebDAVConfig(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        serverUrl: json['serverUrl'] as String,
+        username: json['username'] as String,
+        // 注意：密码通过安全存储单独管理，不从JSON中读取
+        remotePath: json['remotePath'] as String? ?? '/PTMate/backups/',
+        isEnabled: json['isEnabled'] as bool? ?? false,
+        autoSync: json['autoSync'] as bool? ?? false,
+        syncIntervalMinutes: json['syncIntervalMinutes'] as int? ?? 60,
+        lastSyncTime: json['lastSyncTime'] != null 
+            ? DateTime.parse(json['lastSyncTime'] as String) 
+            : null,
+        lastSyncStatus: WebDAVSyncStatus.values.firstWhere(
+          (status) => status.name == (json['lastSyncStatus'] as String? ?? 'idle'),
+          orElse: () => WebDAVSyncStatus.idle,
+        ),
+        lastSyncError: json['lastSyncError'] as String?,
+      );
+
+  @override
+  String toString() => jsonEncode(toJson());
+
+  // 创建默认配置
+  static WebDAVConfig createDefault() => WebDAVConfig(
+        id: 'default-${DateTime.now().millisecondsSinceEpoch}',
+        name: '默认WebDAV配置',
+        serverUrl: '',
+        username: '',
+      );
+
+  // 常用WebDAV服务提供商的预设配置
+  static List<WebDAVPreset> getPresets() => [
+        WebDAVPreset(
+          name: '坚果云',
+          serverUrl: 'https://dav.jianguoyun.com/dav/',
+          description: '使用坚果云的WebDAV服务，需要在坚果云设置中开启第三方应用管理并创建应用密码',
+        ),
+        WebDAVPreset(
+          name: 'Nextcloud',
+          serverUrl: 'https://your-nextcloud.com/remote.php/dav/files/username/',
+          description: '自建或第三方Nextcloud服务，请替换为您的实际服务器地址',
+        ),
+        WebDAVPreset(
+          name: 'ownCloud',
+          serverUrl: 'https://your-owncloud.com/remote.php/webdav/',
+          description: '自建或第三方ownCloud服务，请替换为您的实际服务器地址',
+        ),
+        WebDAVPreset(
+          name: 'Box',
+          serverUrl: 'https://dav.box.com/dav/',
+          description: 'Box云存储的WebDAV接口',
+        ),
+      ];
+}
+
+// WebDAV预设配置
+class WebDAVPreset {
+  final String name;
+  final String serverUrl;
+  final String description;
+
+  const WebDAVPreset({
+    required this.name,
+    required this.serverUrl,
+    required this.description,
+  });
+}
+
 class Defaults {
   // 预设站点配置现在从JSON文件加载
   // 使用 SiteConfigService.loadPresetSites() 来获取预设站点

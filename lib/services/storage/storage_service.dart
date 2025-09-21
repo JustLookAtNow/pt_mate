@@ -35,6 +35,10 @@ class StorageKeys {
   // 非安全存储的降级 Key（例如 Linux 桌面端 keyring 被锁定时）
   static const String legacySiteApiKeyFallback = 'site.apiKey.fallback';
 
+  // WebDAV密码安全存储
+  static String webdavPassword(String configId) => 'webdav.password.$configId';
+  static String webdavPasswordFallback(String configId) => 'webdav.password.fallback.$configId';
+
   // 主题相关
   static const String themeMode = 'theme.mode'; // system | light | dark
   static const String themeUseDynamic = 'theme.useDynamic'; // bool
@@ -414,6 +418,51 @@ class StorageService {
     return prefs.getString(StorageKeys.defaultDownloadSavePath);
   }
 
-  // 查询条件配置现在已集成到站点配置中，不再需要全局配置方法
-  // 如需访问查询分类配置，请通过站点配置获取：siteConfig.searchCategories
+  // WebDAV密码安全存储方法
+  Future<void> saveWebDAVPassword(String configId, String? password) async {
+    if (password == null || password.isEmpty) {
+      await deleteWebDAVPassword(configId);
+      return;
+    }
+    
+    try {
+      await _secure.write(key: StorageKeys.webdavPassword(configId), value: password);
+      // 清理降级存储
+      final prefs = await _prefs;
+      await prefs.remove(StorageKeys.webdavPasswordFallback(configId));
+    } catch (_) {
+      // 当桌面环境的 keyring 被锁定或不可用时，降级到本地存储，避免崩溃
+      final prefs = await _prefs;
+      await prefs.setString(StorageKeys.webdavPasswordFallback(configId), password);
+    }
+  }
+
+  Future<String?> loadWebDAVPassword(String configId) async {
+    try {
+      final password = await _secure.read(key: StorageKeys.webdavPassword(configId));
+      if (password != null && password.isNotEmpty) return password;
+    } catch (_) {
+      // 读取失败时，从降级存储取值
+    }
+    
+    // 若安全存储读取到的值为空或为 null，则继续尝试降级存储
+    final prefs = await _prefs;
+    final fallback = prefs.getString(StorageKeys.webdavPasswordFallback(configId));
+    if (fallback != null && fallback.isNotEmpty) {
+      return fallback;
+    }
+    
+    return null;
+  }
+
+  Future<void> deleteWebDAVPassword(String configId) async {
+    try {
+      await _secure.delete(key: StorageKeys.webdavPassword(configId));
+    } catch (_) {
+      // ignore
+    }
+    
+    final prefs = await _prefs;
+    await prefs.remove(StorageKeys.webdavPasswordFallback(configId));
+  }
 }
