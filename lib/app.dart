@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
@@ -232,6 +233,17 @@ class MTeamApp extends StatelessWidget {
             theme: themeManager.lightTheme,
             darkTheme: themeManager.darkTheme,
             themeMode: themeManager.flutterThemeMode,
+            // 添加本地化配置
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('zh', 'CN'), // 中文简体
+              Locale('en', 'US'), // 英文
+            ],
+            locale: const Locale('zh', 'CN'), // 默认使用中文简体
             home: const HomePage(),
           );
         },

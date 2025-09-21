@@ -191,7 +191,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     return ResponsiveLayout(
       currentRoute: '/server_settings',
       appBar: AppBar(
-        title: const Text('服务器设置'),
+        title: const Text('服务器配置'),
         actions: const [QbSpeedIndicator()],
         backgroundColor: Theme.of(context).brightness == Brightness.light
             ? Theme.of(context).colorScheme.primary

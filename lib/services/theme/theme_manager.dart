@@ -19,6 +19,47 @@ class ThemeManager extends ChangeNotifier {
     _loadThemeSettings();
   }
 
+  // 获取字体fallback配置
+  List<String> _getFontFallback() {
+    switch (Platform.operatingSystem) {
+      case 'windows':
+        return [
+          'Microsoft YaHei UI',
+          'Microsoft YaHei',
+          'SimHei',
+          'SimSun',
+          'Arial Unicode MS',
+          'sans-serif',
+        ];
+      case 'linux':
+        return [
+          'WenQuanYi Zen Hei',
+          'Noto Sans CJK SC',
+          'Source Han Sans SC',
+          'DejaVu Sans',
+          'Liberation Sans',
+          'sans-serif',
+        ];
+      case 'macos':
+        return [
+          'PingFang SC',
+          'Hiragino Sans GB',
+          'STHeiti',
+          'Arial Unicode MS',
+          'Helvetica Neue',
+          'sans-serif',
+        ];
+      default:
+        return [
+          'Roboto',
+          'Noto Sans CJK SC',
+          'Source Han Sans SC',
+          'Arial Unicode MS',
+          'sans-serif',
+        ];
+    }
+  }
+
   // Getters
   AppThemeMode get themeMode => _themeMode;
   bool get useDynamicColor => _useDynamicColor;
@@ -42,23 +83,13 @@ class ThemeManager extends ChangeNotifier {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-  fontFamily: switch (Platform.operatingSystem) {
-    'windows' => 'Microsoft YaHei',
-    'linux' => 'WenQuanYi Zen Hei',
-    'macos' => 'PingFang SC',
-    _ => null, // 默认不指定
-  },
+      fontFamilyFallback: _getFontFallback(),
       appBarTheme: AppBarTheme(
         titleTextStyle: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.w500,
           color: colorScheme.onSurface,
-      fontFamily: switch (Platform.operatingSystem) {
-        'windows' => 'Microsoft YaHei',
-        'linux' => 'WenQuanYi Zen Hei',
-        'macos' => 'PingFang SC',
-        _ => null,
-      },
+          fontFamilyFallback: _getFontFallback(),
         ),
       ),
     );
@@ -80,23 +111,13 @@ class ThemeManager extends ChangeNotifier {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      fontFamily: switch (Platform.operatingSystem) {
-        'windows' => 'Microsoft YaHei',
-        'linux' => 'WenQuanYi Zen Hei',
-        'macos' => 'PingFang SC',
-        _ => null, // 默认不指定
-      },
+      fontFamilyFallback: _getFontFallback(),
       appBarTheme: AppBarTheme(
         titleTextStyle: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.w500,
           color: colorScheme.onSurface,
-          fontFamily: switch (Platform.operatingSystem) {
-            'windows' => 'Microsoft YaHei',
-            'linux' => 'WenQuanYi Zen Hei',
-            'macos' => 'PingFang SC',
-            _ => null, // 默认不指定
-          },
+          fontFamilyFallback: _getFontFallback(),
         ),
       ),
     );
