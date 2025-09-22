@@ -12,6 +12,7 @@ import 'services/storage/storage_service.dart';
 import 'services/theme/theme_manager.dart';
 import 'services/backup_service.dart';
 import 'services/webdav_service.dart';
+import 'providers/aggregate_search_provider.dart';
 
 import 'utils/format.dart';
 import 'services/qbittorrent/qb_client.dart';
@@ -297,6 +298,7 @@ class MTeamApp extends StatelessWidget {
           create: (_) =>
               ThemeManager(StorageService.instance)..initializeDynamicColor(),
         ),
+        ChangeNotifierProvider(create: (_) => AggregateSearchProvider()),
         Provider<StorageService>(create: (_) => StorageService.instance),
       ],
       child: Consumer<ThemeManager>(
@@ -518,7 +520,17 @@ class _HomePageState extends State<HomePage> {
       // 分类加载失败时显示错误信息
       if (mounted) {
         final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(SnackBar(content: Text('重新加载分类失败: $e')));
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              '重新加载分类失败: $e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          ),
+        );
       }
     }
   }
@@ -696,7 +708,12 @@ class _HomePageState extends State<HomePage> {
         context,
       ).showSnackBar(
         SnackBar(
-          content: const Text('当前站点不支持种子详情功能'),
+          content: Text(
+            '当前站点不支持种子详情功能',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
           backgroundColor: Theme.of(context).colorScheme.errorContainer,
           behavior: SnackBarBehavior.floating,
         ),
@@ -772,7 +789,12 @@ class _HomePageState extends State<HomePage> {
           context,
         ).showSnackBar(
           SnackBar(
-            content: Text('下载失败：$e'),
+            content: Text(
+              '下载失败：$e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
             backgroundColor: Theme.of(context).colorScheme.errorContainer,
             behavior: SnackBarBehavior.floating,
           ),
@@ -831,7 +853,12 @@ class _HomePageState extends State<HomePage> {
           final messenger = ScaffoldMessenger.of(context);
           messenger.showSnackBar(
             SnackBar(
-              content: const Text('当前站点不支持搜索功能'),
+              content: Text(
+                '当前站点不支持搜索功能',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
+              ),
               backgroundColor: Theme.of(context).colorScheme.errorContainer,
               behavior: SnackBarBehavior.floating,
             ),
@@ -882,7 +909,12 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('收藏操作失败：$e'),
+            content: Text(
+              '收藏操作失败：$e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
             backgroundColor: Theme.of(context).colorScheme.errorContainer,
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),
@@ -1211,7 +1243,12 @@ class _HomePageState extends State<HomePage> {
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: const Text('当前站点不支持搜索功能'),
+                                    content: Text(
+                                      '当前站点不支持搜索功能',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onErrorContainer,
+                                      ),
+                                    ),
                                     backgroundColor: Theme.of(context).colorScheme.errorContainer,
                                     behavior: SnackBarBehavior.floating,
                                   ),
@@ -1235,7 +1272,12 @@ class _HomePageState extends State<HomePage> {
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: const Text('当前站点不支持搜索功能'),
+                                    content: Text(
+                                      '当前站点不支持搜索功能',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onErrorContainer,
+                                      ),
+                                    ),
                                     backgroundColor: Theme.of(context).colorScheme.errorContainer,
                                     behavior: SnackBarBehavior.floating,
                                   ),
@@ -1612,7 +1654,12 @@ class _HomePageState extends State<HomePage> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('开始批量收藏${selectedItems.length}个项目...'),
+          content: Text(
+            '开始批量收藏${selectedItems.length}个项目...',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
+            ),
+          ),
           backgroundColor: Theme.of(context).colorScheme.primaryContainer,
           behavior: SnackBarBehavior.floating,
         ),
@@ -1642,7 +1689,12 @@ class _HomePageState extends State<HomePage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('收藏失败: ${item.name}, 错误: $e'),
+              content: Text(
+                '收藏失败: ${item.name}, 错误: $e',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
+              ),
               backgroundColor: Theme.of(context).colorScheme.errorContainer,
               behavior: SnackBarBehavior.floating,
             ),
@@ -1658,7 +1710,14 @@ class _HomePageState extends State<HomePage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Text(
+            message,
+            style: TextStyle(
+              color: failureCount == 0
+                  ? Theme.of(context).colorScheme.onPrimaryContainer
+                  : Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
           backgroundColor: failureCount == 0 
             ? Theme.of(context).colorScheme.primaryContainer 
             : Theme.of(context).colorScheme.errorContainer,
@@ -1695,6 +1754,9 @@ class _HomePageState extends State<HomePage> {
         SnackBar(
           content: Text(
             '开始批量下载${selectedItems.length}个项目到${clientConfig.name}...',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
+            ),
           ),
           backgroundColor: Theme.of(context).colorScheme.primaryContainer,
           behavior: SnackBarBehavior.floating,
@@ -1761,8 +1823,13 @@ class _HomePageState extends State<HomePage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('下载失败: ${item.name}, 错误: $e'),
-              backgroundColor: Colors.red,
+              content: Text(
+                '下载失败: ${item.name}, 错误: $e',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
+              ),
+              backgroundColor: Theme.of(context).colorScheme.errorContainer,
               duration: const Duration(seconds: 2),
             ),
           );
@@ -1780,8 +1847,17 @@ class _HomePageState extends State<HomePage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message),
-          backgroundColor: failureCount == 0 ? null : Colors.orange,
+          content: Text(
+            message,
+            style: TextStyle(
+              color: failureCount == 0
+                  ? Theme.of(context).colorScheme.onPrimaryContainer
+                  : Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
+          backgroundColor: failureCount == 0
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Theme.of(context).colorScheme.errorContainer,
           duration: const Duration(seconds: 2),
         ),
       );

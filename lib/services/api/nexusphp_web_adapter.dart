@@ -276,6 +276,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
       // 构建查询参数
       final queryParams = <String, dynamic>{
         'page': pageNumber - 1, // 页面从0开始
+        'pageSize': pageSize,
         'incldead': 1, // 添加默认参数
       };
 

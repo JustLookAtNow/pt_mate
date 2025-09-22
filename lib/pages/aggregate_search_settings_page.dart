@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
-import '../widgets/responsive_layout.dart';
 import '../widgets/qb_speed_indicator.dart';
 
 class AggregateSearchSettingsPage extends StatefulWidget {
@@ -53,7 +52,15 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
       if (mounted) {
         setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载设置失败: $e')),
+          SnackBar(
+            content: Text(
+              '加载设置失败: $e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          ),
         );
       }
     }
@@ -65,13 +72,29 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
       await storage.saveAggregateSearchSettings(_settings);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('设置已保存')),
+          SnackBar(
+            content: Text(
+              '设置已保存',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存设置失败: $e')),
+          SnackBar(
+            content: Text(
+              '保存设置失败: $e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          ),
         );
       }
     }
@@ -79,8 +102,7 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
 
   @override
   Widget build(BuildContext context) {
-    return ResponsiveLayout(
-      currentRoute: '/aggregate_search_settings',
+    return Scaffold(
       appBar: AppBar(
         title: const Text('聚合搜索设置'),
         backgroundColor: Theme.of(context).brightness == Brightness.light 
@@ -422,13 +444,29 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
               onPressed: () {
                 if (nameController.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('请输入配置名称')),
+                    SnackBar(
+                      content: Text(
+                        '请输入配置名称',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
+                      ),
+                      backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                    ),
                   );
                   return;
                 }
                 if (selectedSiteIds.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('请至少选择一个站点')),
+                    SnackBar(
+                      content: Text(
+                        '请至少选择一个站点',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
+                      ),
+                      backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                    ),
                   );
                   return;
                 }

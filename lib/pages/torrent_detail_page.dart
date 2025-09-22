@@ -599,7 +599,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('已成功发送"${widget.torrentItem.name}"到 ${clientConfig.name}'),
+            content: Text(
+              '已成功发送"${widget.torrentItem.name}"到 ${clientConfig.name}',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
             backgroundColor: Theme.of(context).colorScheme.primaryContainer,
             behavior: SnackBarBehavior.floating,
           ),
@@ -652,7 +657,17 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         });
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('收藏操作失败：$e')));
+        ).showSnackBar(
+          SnackBar(
+            content: Text(
+              '收藏操作失败：$e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          ),
+        );
       }
     }
   }

@@ -69,7 +69,7 @@ class TorrentListItem extends StatelessWidget {
         ),
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -83,7 +83,7 @@ class TorrentListItem extends StatelessWidget {
                         text: TextSpan(
                           children: [
                             TextSpan(
-                              text: siteName,
+                              text: ' $siteName ',
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: Theme.of(
@@ -93,17 +93,18 @@ class TorrentListItem extends StatelessWidget {
                                       context,
                                     ).colorScheme.primary,
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 11,
+                                    fontSize: 14,
                                   ),
                             ),
+
                             TextSpan(
-                              text: torrent.name,
+                              text: ' ${torrent.name}',
                               style: TextStyle(
                                 color: Theme.of(
                                   context,
                                 ).textTheme.titleMedium?.color,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 11,
+                                fontSize: 14,
                               ),
                             ),
                           ],
@@ -115,7 +116,7 @@ class TorrentListItem extends StatelessWidget {
                         style: TextStyle(
                           color: Theme.of(context).textTheme.titleMedium?.color,
                           fontWeight: FontWeight.bold,
-                          fontSize: 11,
+                          fontSize: 14,
                         ),
                       ),
                     const SizedBox(height: 4),
@@ -124,7 +125,7 @@ class TorrentListItem extends StatelessWidget {
                       torrent.smallDescr,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).textTheme.bodySmall?.color,
-                        fontSize: 9,
+                        fontSize: 12,
                       ),
                     ),
                     const SizedBox(height: 4),

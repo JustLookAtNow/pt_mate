@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/app_models.dart';
+import '../services/storage/storage_service.dart';
+import '../services/api/api_service.dart';
+import '../services/aggregate_search_service.dart';
+import '../services/qbittorrent/qb_client.dart';
+import '../providers/aggregate_search_provider.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/torrent_list_item.dart';
-import '../models/app_models.dart';
-import '../services/storage/storage_service.dart';
-import '../services/aggregate_search_service.dart';
 import '../widgets/torrent_download_dialog.dart';
-import '../services/qbittorrent/qb_client.dart';
-import '../pages/torrent_detail_page.dart';
-import '../services/api/api_service.dart';
+import 'torrent_detail_page.dart';
 
 class AggregateSearchPage extends StatefulWidget {
   const AggregateSearchPage({super.key});
@@ -20,28 +21,10 @@ class AggregateSearchPage extends StatefulWidget {
 
 class _AggregateSearchPageState extends State<AggregateSearchPage> {
   final TextEditingController _searchController = TextEditingController();
-  String _selectedStrategy = '';
-  String _sortBy = 'none';
-  bool _sortAscending = false;
-  List<AggregateSearchConfig> _searchConfigs = [];
-  bool _loading = true;
   
-  // 搜索相关状态
-  bool _searching = false;
-  List<AggregateSearchResultItem> _searchResults = [];
-  Map<String, String> _searchErrors = {};
-  AggregateSearchProgress? _searchProgress;
-
   @override
   void initState() {
     super.initState();
-    _loadSearchConfigs();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // 当页面重新显示时刷新配置
     _loadSearchConfigs();
   }
 
@@ -52,580 +35,543 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   }
 
   Future<void> _loadSearchConfigs() async {
+    final provider = Provider.of<AggregateSearchProvider>(context, listen: false);
+    
     try {
       final storage = Provider.of<StorageService>(context, listen: false);
       final settings = await storage.loadAggregateSearchSettings();
 
       if (mounted) {
-        setState(() {
-          _searchConfigs = settings.searchConfigs
-              .where((config) => config.isActive)
-              .toList();
-          _loading = false;
-
-          // 设置默认选中的策略
-          if (_searchConfigs.isNotEmpty && _selectedStrategy.isEmpty) {
-            // 优先选择"所有站点"配置
-            final allSitesConfig = _searchConfigs.firstWhere(
-              (config) => config.isAllSitesType,
-              orElse: () => _searchConfigs.first,
-            );
-            _selectedStrategy = allSitesConfig.id;
-          }
-
-          // 如果当前选中的策略不在激活列表中，重新选择
-          if (!_searchConfigs.any((config) => config.id == _selectedStrategy)) {
-            _selectedStrategy = _searchConfigs.isNotEmpty
-                ? _searchConfigs.first.id
-                : '';
-          }
-        });
+        provider.setSearchConfigs(settings.searchConfigs
+            .where((config) => config.isActive)
+            .toList());
+        provider.setLoading(false);
+        provider.initializeDefaultStrategy();
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _loading = false);
+        provider.setLoading(false);
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('加载搜索配置失败: $e')));
+        ).showSnackBar(
+          SnackBar(
+            content: Text(
+              '加载搜索配置失败: $e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          ),
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return ResponsiveLayout(
-      currentRoute: '/aggregate_search',
-      appBar: AppBar(
-        title: const Text('聚合搜索'),
-        backgroundColor: Theme.of(context).brightness == Brightness.light
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.surface,
-        iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.light
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
-        ),
-        titleTextStyle: TextStyle(
-          color: Theme.of(context).brightness == Brightness.light
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
-          fontSize: 20,
-          fontWeight: FontWeight.w500,
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () async {
-              await Navigator.pushNamed(context, '/aggregate_search_settings');
-              // 从设置页面返回后刷新配置
-              _loadSearchConfigs();
-            },
-            tooltip: '聚合搜索设置',
+    return Consumer<AggregateSearchProvider>(
+      builder: (context, provider, child) {
+        // 同步搜索框内容
+        if (_searchController.text != provider.searchKeyword) {
+          _searchController.text = provider.searchKeyword;
+        }
+        
+        return ResponsiveLayout(
+          currentRoute: '/aggregate_search',
+          appBar: AppBar(
+            title: const Text('聚合搜索'),
+            backgroundColor: Theme.of(context).brightness == Brightness.light
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.surface,
+            iconTheme: IconThemeData(
+              color: Theme.of(context).brightness == Brightness.light
+                  ? Theme.of(context).colorScheme.onPrimary
+                  : Theme.of(context).colorScheme.onSurface,
+            ),
+            titleTextStyle: TextStyle(
+              color: Theme.of(context).brightness == Brightness.light
+                  ? Theme.of(context).colorScheme.onPrimary
+                  : Theme.of(context).colorScheme.onSurface,
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.settings),
+                onPressed: () async {
+                  await Navigator.pushNamed(context, '/aggregate_search_settings');
+                  // 从设置页面返回后刷新配置
+                  _loadSearchConfigs();
+                },
+                tooltip: '聚合搜索设置',
+              ),
+              const QbSpeedIndicator(),
+            ],
           ),
-          const QbSpeedIndicator(),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 搜索区域
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 紧凑的搜索控件行
-                          Row(
+          body: provider.loading
+              ? const Center(child: CircularProgressIndicator())
+              : Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 搜索区域
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // 搜索策略选择
-                              Expanded(
-                                flex: 2,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withValues(alpha: 0.3),
-                                    ),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: DropdownButton<String>(
-                                    value: _selectedStrategy,
-                                    isExpanded: true,
-                                    underline: const SizedBox(),
-                                    isDense: true,
-                                    items: _searchConfigs.map((config) {
-                                      return DropdownMenuItem<String>(
-                                        value: config.id,
-                                        child: Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                config.name,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                            Text(
-                                              config.type == 'all'
-                                                  ? '(全部)'
-                                                  : '(${config.enabledSiteIds.length})',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.onSurfaceVariant,
-                                              ),
-                                            ),
-                                          ],
+                              // 紧凑的搜索控件行
+                              Row(
+                                children: [
+                                  // 搜索策略选择
+                                  Expanded(
+                                    flex: 2,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 0,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                              .withValues(alpha: 0.3),
                                         ),
-                                      );
-                                    }).toList(),
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        setState(() {
-                                          _selectedStrategy = value;
-                                        });
-                                      }
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: DropdownButton<String>(
+                                        value: provider.selectedStrategy.isEmpty ? null : provider.selectedStrategy,
+                                        hint: const Text('选择搜索策略'),
+                                        isExpanded: true,
+                                        underline: const SizedBox(),
+                                        items: provider.searchConfigs.map((config) {
+                                          return DropdownMenuItem<String>(
+                                            value: config.id,
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  config.isAllSitesType
+                                                      ? Icons.public
+                                                      : Icons.group,
+                                                  size: 16,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Text(
+                                                    config.name,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }).toList(),
+                                        onChanged: (value) {
+                                          if (value != null) {
+                                            provider.setSelectedStrategy(value);
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // 搜索输入框
+                                  Expanded(
+                                    flex: 3,
+                                    child: TextField(
+                                      controller: _searchController,
+                                      decoration: InputDecoration(
+                                        hintText: '输入搜索关键词',
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        contentPadding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                        suffixIcon: IconButton(
+                                          icon: const Icon(Icons.search),
+                                          onPressed: () => _performSearch(_searchController.text),
+                                        ),
+                                      ),
+                                      onSubmitted: _performSearch,
+                                      onChanged: (value) {
+                                        provider.setSearchKeyword(value);
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // 排序选择
+                                  PopupMenuButton<String>(
+                                    icon: Icon(
+                                      Icons.sort,
+                                      color: provider.sortBy != 'none'
+                                          ? Theme.of(context).colorScheme.primary
+                                          : null,
+                                    ),
+                                    tooltip: '排序方式',
+                                    onSelected: (value) {
+                                      provider.setSortBy(value);
+                                      _resortCurrentResults();
                                     },
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
+                                    itemBuilder: (context) => [
+                                      PopupMenuItem(
+                                        value: 'none',
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: provider.sortBy == 'none'
+                                                ? Theme.of(context)
+                                                    .colorScheme
+                                                    .primaryContainer
+                                                    .withValues(alpha: 0.3)
+                                                : null,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.clear,
+                                                color: provider.sortBy == 'none'
+                                                    ? Theme.of(
+                                                        context,
+                                                      ).colorScheme.secondary
+                                                    : null,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Text('默认排序'),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
 
-                              // 搜索框
-                              Expanded(
-                                flex: 2,
-                                child: TextField(
-                                  controller: _searchController,
-                                  textInputAction: TextInputAction.search,
-                                  decoration: InputDecoration(
-                                    hintText: '输入关键词',
-                                    border: OutlineInputBorder(
-                                      borderRadius: const BorderRadius.all(
-                                        Radius.circular(25),
+                                      PopupMenuItem(
+                                        value: 'size',
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: provider.sortBy == 'size'
+                                                ? Theme.of(context)
+                                                    .colorScheme
+                                                    .primaryContainer
+                                                    .withValues(alpha: 0.3)
+                                                : null,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                provider.sortAscending
+                                                    ? Icons.arrow_upward
+                                                    : Icons.arrow_downward,
+                                                color: provider.sortBy == 'size'
+                                                    ? Theme.of(
+                                                        context,
+                                                      ).colorScheme.secondary
+                                                    : null,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Text('按大小排序'),
+                                            ],
+                                          ),
+                                        ),
                                       ),
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary
-                                            .withValues(alpha: 0.3),
-                                      ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: const BorderRadius.all(
-                                        Radius.circular(25),
-                                      ),
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary
-                                            .withValues(alpha: 0.3),
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: const BorderRadius.all(
-                                        Radius.circular(25),
-                                      ),
-                                      borderSide: BorderSide(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.primary,
-                                      ),
-                                    ),
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 12,
-                                    ),
-                                  ),
-                                  onSubmitted: _performSearch,
-                                ),
-                              ),
 
-                              // 排序选择
-                              PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  setState(() {
-                                    if (_sortBy == value) {
-                                      _sortAscending = !_sortAscending;
-                                    } else {
-                                      _sortBy = value;
-                                      _sortAscending = false;
-                                    }
-                                  });
-                                },
-                                icon: Icon(
-                                  Icons.sort,
-                                  color: _sortBy == 'none'
-                                      ? null
-                                      : Theme.of(context).colorScheme.secondary,
-                                ),
-                                tooltip: '排序',
-                                itemBuilder: (context) => [
-                                  PopupMenuItem(
-                                    value: 'none',
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: _sortBy == 'none'
-                                            ? Theme.of(context)
-                                                  .colorScheme
-                                                  .primary
-                                                  .withValues(alpha: 0.1)
-                                            : null,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.clear,
-                                            color: _sortBy == 'none'
-                                                ? Theme.of(
-                                                    context,
-                                                  ).colorScheme.secondary
+                                      PopupMenuItem(
+                                        value: 'seeders',
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: provider.sortBy == 'seeders'
+                                                ? Theme.of(context)
+                                                    .colorScheme
+                                                    .primaryContainer
+                                                    .withValues(alpha: 0.3)
                                                 : null,
+                                            borderRadius: BorderRadius.circular(4),
                                           ),
-                                          const SizedBox(width: 8),
-                                          const Text('默认排序'),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'time',
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: _sortBy == 'time'
-                                            ? Theme.of(context)
-                                                  .colorScheme
-                                                  .primary
-                                                  .withValues(alpha: 0.1)
-                                            : null,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            _sortBy == 'time' && _sortAscending
-                                                ? Icons.arrow_upward
-                                                : Icons.arrow_downward,
-                                            color: _sortBy == 'time'
-                                                ? Theme.of(
-                                                    context,
-                                                  ).colorScheme.secondary
-                                                : null,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
                                           ),
-                                          const SizedBox(width: 8),
-                                          const Text('按时间排序'),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'size',
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: _sortBy == 'size'
-                                            ? Theme.of(context)
-                                                  .colorScheme
-                                                  .primary
-                                                  .withValues(alpha: 0.1)
-                                            : null,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            _sortBy == 'size' && _sortAscending
-                                                ? Icons.arrow_upward
-                                                : Icons.arrow_downward,
-                                            color: _sortBy == 'size'
-                                                ? Theme.of(
-                                                    context,
-                                                  ).colorScheme.secondary
-                                                : null,
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                provider.sortAscending
+                                                    ? Icons.arrow_upward
+                                                    : Icons.arrow_downward,
+                                                color: provider.sortBy == 'seeders'
+                                                    ? Theme.of(
+                                                        context,
+                                                      ).colorScheme.secondary
+                                                    : null,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Text('按做种数排序'),
+                                            ],
                                           ),
-                                          const SizedBox(width: 8),
-                                          const Text('按大小排序'),
-                                        ],
+                                        ),
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                  PopupMenuItem(
-                                    value: 'seeders',
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: _sortBy == 'seeders'
-                                            ? Theme.of(context)
-                                                  .colorScheme
-                                                  .primary
-                                                  .withValues(alpha: 0.1)
-                                            : null,
-                                        borderRadius: BorderRadius.circular(4),
+                                  // 排序方向切换
+                                  if (provider.sortBy != 'none')
+                                    IconButton(
+                                      icon: Icon(
+                                        provider.sortAscending
+                                            ? Icons.keyboard_arrow_up
+                                            : Icons.keyboard_arrow_down,
+                                        color: Theme.of(context).colorScheme.primary,
                                       ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            _sortBy == 'seeders' &&
-                                                    _sortAscending
-                                                ? Icons.arrow_upward
-                                                : Icons.arrow_downward,
-                                            color: _sortBy == 'seeders'
-                                                ? Theme.of(
-                                                    context,
-                                                  ).colorScheme.secondary
-                                                : null,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          const Text('按做种排序'),
-                                        ],
-                                      ),
+                                      tooltip: provider.sortAscending ? '升序' : '降序',
+                                      onPressed: () {
+                                        provider.setSortAscending(!provider.sortAscending);
+                                        _resortCurrentResults();
+                                      },
                                     ),
-                                  ),
                                 ],
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 搜索结果区域
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  '搜索结果',
-                                  style: Theme.of(context).textTheme.titleMedium,
-                                ),
-                                if (_searchResults.isNotEmpty)
-                                  Text(
-                                    '共 ${_searchResults.length} 条结果',
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: Theme.of(context).colorScheme.outline,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            // 搜索进度指示器
-                            if (_searching) ...[
-                              if (_searchProgress != null) ...[
-                                LinearProgressIndicator(
-                                  value: _searchProgress!.progress,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _searchProgress!.currentSite != null
-                                      ? '正在搜索: ${_searchProgress!.currentSite} (${_searchProgress!.completedSites}/${_searchProgress!.totalSites})'
-                                      : '正在搜索... (${_searchProgress!.completedSites}/${_searchProgress!.totalSites})',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ] else ...[
-                                const LinearProgressIndicator(),
-                                const SizedBox(height: 8),
-                                const Text('正在准备搜索...'),
-                              ],
-                              const SizedBox(height: 16),
-                            ],
-                            
-                            // 搜索错误信息
-                            if (_searchErrors.isNotEmpty && !_searching) ...[
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.errorContainer,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '部分站点搜索失败:',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                        color: Theme.of(context).colorScheme.onErrorContainer,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    ..._searchErrors.entries.map((entry) => Text(
-                                      '• ${entry.key}: ${entry.value}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Theme.of(context).colorScheme.onErrorContainer,
-                                      ),
-                                    )),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-                            
-                            // 搜索结果列表
-                            Expanded(
-                              child: _searchResults.isEmpty && !_searching
-                                  ? Center(
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.search_off,
-                                            size: 64,
-                                            color: Theme.of(context).colorScheme.outline,
-                                          ),
-                                          const SizedBox(height: 16),
-                                          Text(
-                                            '暂无搜索结果',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodyLarge
-                                                ?.copyWith(
-                                                  color: Theme.of(context).colorScheme.outline,
-                                                ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            '请输入关键词并选择搜索策略开始搜索',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodyMedium
-                                                ?.copyWith(
-                                                  color: Theme.of(context).colorScheme.outline,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  : ListView.builder(
-                                      itemCount: _searchResults.length,
-                                      itemBuilder: (context, index) {
-                                        final item = _searchResults[index];
-                                        return TorrentListItem(
-                                          torrent: item.torrent,
-                                          isSelected: false,
-                                          isSelectionMode: false,
-                                          isAggregateMode: true,
-                                          siteName: item.siteName,
-                                          onTap: () => _onTorrentTap(item),
-                                          onDownload: () => _onTorrentDownload(item),
-                                          // 聚合搜索模式下不支持收藏功能
-                                          onToggleCollection: null,
-                                        );
-                                      },
-                                    ),
-                            ),
-                          ],
                         ),
                       ),
-                    ),
+
+                      const SizedBox(height: 16),
+
+                      // 搜索进度指示器
+                      if (provider.searching) ...[
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      '正在搜索...',
+                                      style: Theme.of(context).textTheme.titleSmall,
+                                    ),
+                                  ],
+                                ),
+                                if (provider.searchProgress != null) ...[
+                                  const SizedBox(height: 8),
+                                  LinearProgressIndicator(
+                                    value: provider.searchProgress!.completedSites /
+                                        provider.searchProgress!.totalSites,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${provider.searchProgress!.completedSites}/${provider.searchProgress!.totalSites} 个站点',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // 搜索结果
+                      Expanded(
+                        child: provider.searchResults.isEmpty && !provider.searching
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.search,
+                                      size: 64,
+                                      color: Theme.of(context).colorScheme.outline,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      '输入关键词开始搜索',
+                                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                            color: Theme.of(context).colorScheme.outline,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                itemCount: provider.searchResults.length,
+                                itemBuilder: (context, index) {
+                                  final item = provider.searchResults[index];
+                                  return Card(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    child: TorrentListItem(
+                                      torrent: item.torrent,
+                                      isSelected: false,
+                                      isSelectionMode: false,
+                                      isAggregateMode: true,
+                                      siteName: item.siteName,
+                                      onTap: () => _onTorrentTap(item),
+                                      onDownload: () => _showDownloadDialog(item),
+                                      onToggleCollection: null,
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+        );
+      },
     );
+  }
+
+  /// 应用排序到搜索结果
+  List<AggregateSearchResultItem> _applySorting(List<AggregateSearchResultItem> items, String sortBy, bool sortAscending) {
+    if (sortBy == 'none' || items.isEmpty) {
+      return List.from(items);
+    }
+
+    final sortedItems = List<AggregateSearchResultItem>.from(items);
+    
+    switch (sortBy) {
+      case 'size':
+        // 按文件大小排序
+        sortedItems.sort((a, b) {
+          final comparison = a.torrent.sizeBytes.compareTo(b.torrent.sizeBytes);
+          return sortAscending ? comparison : -comparison;
+        });
+        break;
+      case 'seeders':
+        // 按做种数排序
+        sortedItems.sort((a, b) {
+          final comparison = a.torrent.seeders.compareTo(b.torrent.seeders);
+          return sortAscending ? comparison : -comparison;
+        });
+        break;
+    }
+    
+    return sortedItems;
+  }
+
+  /// 重新排序当前搜索结果
+  void _resortCurrentResults() {
+    final provider = Provider.of<AggregateSearchProvider>(context, listen: false);
+    if (provider.searchResults.isNotEmpty) {
+      final sortedResults = _applySorting(provider.searchResults, provider.sortBy, provider.sortAscending);
+      provider.setSearchResults(sortedResults);
+    }
   }
 
   void _performSearch(String query) async {
     if (query.trim().isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('请输入搜索关键词')));
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            '请输入搜索关键词',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+        ),
+      );
       return;
     }
 
-    if (_selectedStrategy.isEmpty) {
+    final provider = Provider.of<AggregateSearchProvider>(context, listen: false);
+    
+    if (provider.selectedStrategy.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('请选择搜索策略')));
+      ).showSnackBar(
+        SnackBar(
+          content: Text(
+            '请选择搜索策略',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+        ),
+      );
       return;
     }
 
-    setState(() {
-      _searching = true;
-      _searchResults.clear();
-      _searchErrors.clear();
-      _searchProgress = null;
-    });
+    provider.setSearching(true);
+    provider.setSearchResults([]);
+    provider.setSearchErrors({});
+    provider.setSearchProgress(null);
 
     try {
       final result = await AggregateSearchService.instance.performAggregateSearch(
         keyword: query.trim(),
-        configId: _selectedStrategy,
-        maxResultsPerSite: 5,
+        configId: provider.selectedStrategy,
+        maxResultsPerSite: 10,
         onProgress: (progress) {
           if (mounted) {
-            setState(() {
-              _searchProgress = progress;
-            });
+            provider.setSearchProgress(progress);
           }
         },
       );
 
       if (mounted) {
-        setState(() {
-          _searchResults = result.items;
-          _searchErrors = result.errors;
-          _searching = false;
-          _searchProgress = null;
-        });
+        final sortedResults = _applySorting(result.items, provider.sortBy, provider.sortAscending);
+        provider.setSearchResults(sortedResults);
+        provider.setSearchErrors(result.errors);
+        provider.setSearching(false);
+        provider.setSearchProgress(null);
 
         // 显示搜索结果摘要
         final message = '搜索完成：共找到 ${result.items.length} 条结果，'
             '成功搜索 ${result.successSites}/${result.totalSites} 个站点';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
+          SnackBar(
+            content: Text(
+              message,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _searching = false;
-          _searchProgress = null;
-        });
+        provider.setSearching(false);
+        provider.setSearchProgress(null);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('搜索失败：$e')),
+          SnackBar(
+            content: Text(
+              '搜索失败：$e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          ),
         );
       }
     }
   }
-
-
 
   Future<void> _onTorrentTap(AggregateSearchResultItem item) async {
     try {
@@ -658,7 +604,12 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('打开详情失败: $e'),
+            content: Text(
+              '打开详情失败: $e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
             backgroundColor: Theme.of(context).colorScheme.errorContainer,
             behavior: SnackBarBehavior.floating,
           ),
@@ -667,7 +618,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     }
   }
 
-  Future<void> _onTorrentDownload(AggregateSearchResultItem item) async {
+  Future<void> _showDownloadDialog(AggregateSearchResultItem item) async {
     try {
       // 1. 获取种子所属站点的配置
       final storage = Provider.of<StorageService>(context, listen: false);
@@ -706,6 +657,37 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       final autoTMM = result['autoTMM'] as bool?;
 
       // 5. 发送到 qBittorrent
+      await _onTorrentDownload(item, clientConfig, password, url, category, tags, savePath, autoTMM);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '下载失败: $e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _onTorrentDownload(
+    AggregateSearchResultItem item,
+    QbClientConfig clientConfig,
+    String password,
+    String url,
+    String? category,
+    List<String>? tags,
+    String? savePath,
+    bool? autoTMM,
+  ) async {
+    try {
+      // 发送到 qBittorrent
       await QbService.instance.addTorrentByUrl(
         config: clientConfig,
         password: password,
@@ -719,7 +701,12 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('已成功发送"${item.torrent.name}"到 ${clientConfig.name}'),
+            content: Text(
+              '已成功发送"${item.torrent.name}"到 ${clientConfig.name}',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
             backgroundColor: Theme.of(context).colorScheme.primaryContainer,
             behavior: SnackBarBehavior.floating,
           ),
@@ -729,7 +716,12 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('下载失败: $e'),
+            content: Text(
+              '下载失败: $e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
             backgroundColor: Theme.of(context).colorScheme.errorContainer,
             behavior: SnackBarBehavior.floating,
           ),
