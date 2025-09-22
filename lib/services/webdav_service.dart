@@ -6,6 +6,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/app_models.dart';
 import 'storage/storage_service.dart';
 
+// 连接测试结果类
+class WebDAVTestResult {
+  final bool success;
+  final String? errorMessage;
+  
+  WebDAVTestResult({required this.success, this.errorMessage});
+}
+
 class WebDAVService {
   static const String _configKey = 'webdav_config';
   static const String _lastSyncKey = 'webdav_last_sync';
@@ -126,14 +134,18 @@ class WebDAVService {
 
 
   // 连接测试
-  Future<bool> testConnection([WebDAVConfig? config, String? password]) async {
+  Future<WebDAVTestResult> testConnection([WebDAVConfig? config, String? password]) async {
     try {
       final testConfig = config ?? await loadConfig();
-      if (testConfig == null) return false;
+      if (testConfig == null) {
+        return WebDAVTestResult(success: false, errorMessage: '未找到WebDAV配置');
+      }
       
       // 获取密码：优先使用传入的密码，否则从安全存储中获取
       final testPassword = password ?? await _storageService.loadWebDAVPassword(testConfig.id);
-      if (testPassword == null || testPassword.isEmpty) return false;
+      if (testPassword == null || testPassword.isEmpty) {
+        return WebDAVTestResult(success: false, errorMessage: '密码不能为空');
+      }
       
       final client = webdav.newClient(
         testConfig.serverUrl,
@@ -146,9 +158,21 @@ class WebDAVService {
       
       // 尝试读取根目录
       await client.readDir('/');
-      return true;
+      return WebDAVTestResult(success: true);
     } catch (e) {
-      return false;
+      String errorMessage = '连接失败';
+      if (e.toString().contains('timeout')) {
+        errorMessage = '连接超时，请检查服务器地址和网络连接';
+      } else if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
+        errorMessage = '用户名或密码错误';
+      } else if (e.toString().contains('404') || e.toString().contains('Not Found')) {
+        errorMessage = '服务器地址不正确或WebDAV服务未启用';
+      } else if (e.toString().contains('SSL') || e.toString().contains('certificate')) {
+        errorMessage = 'SSL证书验证失败，请检查HTTPS配置';
+      } else {
+        errorMessage = '连接失败: ${e.toString()}';
+      }
+      return WebDAVTestResult(success: false, errorMessage: errorMessage);
     }
   }
 
@@ -334,7 +358,8 @@ class WebDAVService {
       return WebDAVSyncStatus.idle;
     }
     
-    if (!await testConnection()) {
+    final testResult = await testConnection();
+    if (!testResult.success) {
       return WebDAVSyncStatus.error;
     }
     

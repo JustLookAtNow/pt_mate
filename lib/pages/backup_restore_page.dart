@@ -239,7 +239,7 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
     final TextEditingController usernameController = TextEditingController();
     final TextEditingController passwordController = TextEditingController();
     final TextEditingController remotePathController = TextEditingController(
-      text: '/backups',
+      text: '/PTMate',
     );
 
     if (_selectedConfig != null) {
@@ -252,194 +252,234 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
       remotePathController.text = _selectedConfig!.remotePath;
     }
     if (!mounted) return;
+    bool isLoading = false;
+    String? errorMessage;
+
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(_selectedConfig == null ? '添加WebDAV配置' : '编辑WebDAV配置'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: '配置名称',
-                  hintText: '例如：我的云盘',
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Text(_selectedConfig == null ? '添加WebDAV配置' : '编辑WebDAV配置'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: '配置名称',
+                      hintText: '例如：我的云盘',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: serverUrlController,
+                    decoration: const InputDecoration(
+                      labelText: '服务器地址',
+                      hintText: 'https://example.com/webdav',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: usernameController,
+                    decoration: const InputDecoration(labelText: '用户名'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: passwordController,
+                    decoration: const InputDecoration(labelText: '密码'),
+                    obscureText: true,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: remotePathController,
+                    decoration: const InputDecoration(
+                      labelText: '远程路径',
+                      hintText: '/PTMate',
+                    ),
+                  ),
+                  if (isLoading) ...[
+                    const SizedBox(height: 16),
+                    const Row(
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        SizedBox(width: 8),
+                        Text('正在测试连接...'),
+                      ],
+                    ),
+                  ],
+                  if (errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onErrorContainer,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              errorMessage!,
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onErrorContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: TextButton.styleFrom(
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.outline,
+                    width: 1.0,
+                  ),
                 ),
+                child: const Text('取消'),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: serverUrlController,
-                decoration: const InputDecoration(
-                  labelText: '服务器地址',
-                  hintText: 'https://example.com/webdav',
+              if (_selectedConfig != null)
+                TextButton(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          final navigator = Navigator.of(context);
+                          final currentContext = context;
+                          // 删除当前配置
+                          await _webdavService.deleteConfig();
+                          await _loadWebDAVConfigs();
+                          if (mounted && currentContext.mounted) {
+                            navigator.pop();
+                            // 延迟显示消息，确保对话框完全关闭
+                            Future.delayed(
+                              const Duration(milliseconds: 100),
+                              () {
+                                if (mounted && currentContext.mounted) {
+                                  _showWebDAVMessage('WebDAV配置已删除');
+                                }
+                              },
+                            );
+                          }
+                        },
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.error,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: const Text('删除'),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: usernameController,
-                decoration: const InputDecoration(labelText: '用户名'),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: passwordController,
-                decoration: const InputDecoration(labelText: '密码'),
-                obscureText: true,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: remotePathController,
-                decoration: const InputDecoration(
-                  labelText: '远程路径',
-                  hintText: '/PTMate',
-                ),
+              FilledButton(
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        setDialogState(() {
+                          errorMessage = null;
+                        });
+
+                        if (nameController.text.isEmpty ||
+                            serverUrlController.text.isEmpty ||
+                            usernameController.text.isEmpty ||
+                            passwordController.text.isEmpty) {
+                          setDialogState(() {
+                            errorMessage = '请填写所有必填字段';
+                          });
+                          return;
+                        }
+
+                        final config = WebDAVConfig(
+                          id:
+                              _selectedConfig?.id ??
+                              DateTime.now().millisecondsSinceEpoch.toString(),
+                          name: nameController.text,
+                          serverUrl: serverUrlController.text,
+                          username: usernameController.text,
+                          remotePath: remotePathController.text,
+                          isEnabled: true,
+                          autoSync: false,
+                          syncIntervalMinutes: 60,
+                          lastSyncTime: null,
+                          lastSyncStatus: WebDAVSyncStatus.idle,
+                          lastSyncError: null,
+                        );
+
+                        try {
+                          // 测试连接
+                          setDialogState(() {
+                            isLoading = true;
+                          });
+
+                          final testResult = await _webdavService
+                              .testConnection(config, passwordController.text);
+
+                          if (testResult.success) {
+                            await _webdavService.saveConfig(
+                              config,
+                              password: passwordController.text,
+                            );
+                            await _loadWebDAVConfigs();
+                            final currentContext = context;
+                            if (mounted && currentContext.mounted) {
+                              Navigator.of(currentContext).pop();
+                              // 延迟显示消息，确保对话框完全关闭
+                              Future.delayed(
+                                const Duration(milliseconds: 100),
+                                () {
+                                  if (mounted && currentContext.mounted) {
+                                    _showWebDAVMessage('WebDAV配置保存成功');
+                                  }
+                                },
+                              );
+                            }
+                          } else {
+                            setDialogState(() {
+                              errorMessage =
+                                  testResult.errorMessage ?? '连接测试失败，请检查配置';
+                            });
+                          }
+                        } catch (e) {
+                          setDialogState(() {
+                            errorMessage = '保存配置时发生错误: $e';
+                          });
+                        } finally {
+                          setDialogState(() {
+                            isLoading = false;
+                          });
+                        }
+                      },
+                child: const Text('保存'),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          if (_selectedConfig != null)
-            TextButton(
-              onPressed: () async {
-                final navigator = Navigator.of(context);
-                // 清除当前配置
-                await _webdavService.saveConfig(
-                  WebDAVConfig(
-                    id: '',
-                    name: '',
-                    serverUrl: '',
-                    username: '',
-                    remotePath: '',
-                    isEnabled: false,
-                    autoSync: false,
-                    syncIntervalMinutes: 60,
-                    lastSyncTime: null,
-                    lastSyncStatus: WebDAVSyncStatus.idle,
-                    lastSyncError: null,
-                  ),
-                );
-                await _loadWebDAVConfigs();
-                if (mounted) {
-                  navigator.pop();
-                  // 延迟显示消息，确保对话框完全关闭
-                  Future.delayed(const Duration(milliseconds: 100), () {
-                    if (mounted) {
-                      _showWebDAVMessage('WebDAV配置已删除');
-                    }
-                  });
-                }
-              },
-              child: const Text('删除'),
-            ),
-          FilledButton(
-            onPressed: () async {
-              final navigator = Navigator.of(context);
-              if (nameController.text.isEmpty ||
-                  serverUrlController.text.isEmpty ||
-                  usernameController.text.isEmpty ||
-                  passwordController.text.isEmpty) {
-                // 在对话框内显示错误，而不是使用SnackBar
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('请填写所有必填字段'),
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.errorContainer,
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-                return;
-              }
-
-              final config = WebDAVConfig(
-                id:
-                    _selectedConfig?.id ??
-                    DateTime.now().millisecondsSinceEpoch.toString(),
-                name: nameController.text,
-                serverUrl: serverUrlController.text,
-                username: usernameController.text,
-                remotePath: remotePathController.text,
-                isEnabled: true,
-                autoSync: false,
-                syncIntervalMinutes: 60,
-                lastSyncTime: null,
-                lastSyncStatus: WebDAVSyncStatus.idle,
-                lastSyncError: null,
-              );
-
-              // 保存context引用
-              final scaffoldMessenger = ScaffoldMessenger.of(context);
-              final theme = Theme.of(context);
-
-              try {
-                // 测试连接
-                setState(() {
-                  _isWebDAVLoading = true;
-                  _webdavStatusMessage = '正在测试连接...';
-                });
-
-                final success = await _webdavService.testConnection(
-                  config,
-                  passwordController.text,
-                );
-                if (success) {
-                  await _webdavService.saveConfig(
-                    config,
-                    password: passwordController.text,
-                  );
-                  await _loadWebDAVConfigs();
-                  if (mounted) {
-                    navigator.pop();
-                    // 延迟显示消息，确保对话框完全关闭
-                    Future.delayed(const Duration(milliseconds: 100), () {
-                      if (mounted) {
-                        _showWebDAVMessage('WebDAV配置保存成功');
-                      }
-                    });
-                  }
-                } else {
-                  if (mounted) {
-                    // 在对话框内显示错误
-                    scaffoldMessenger.showSnackBar(
-                      SnackBar(
-                        content: const Text('连接测试失败，请检查配置'),
-                        backgroundColor: theme.colorScheme.errorContainer,
-                        behavior: SnackBarBehavior.floating,
-                        duration: const Duration(seconds: 3),
-                      ),
-                    );
-                  }
-                }
-              } catch (e) {
-                if (mounted) {
-                  // 在对话框内显示错误
-                  scaffoldMessenger.showSnackBar(
-                    SnackBar(
-                      content: Text('保存配置失败: $e'),
-                      backgroundColor: theme.colorScheme.errorContainer,
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 3),
-                    ),
-                  );
-                }
-              } finally {
-                setState(() {
-                  _isWebDAVLoading = false;
-                  _webdavStatusMessage = null;
-                });
-              }
-            },
-            child: const Text('保存'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
+
+  // 上传备份到WebDAV
 
   // 上传备份到WebDAV
   Future<void> _uploadBackupToWebDAV() async {
@@ -560,6 +600,12 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outline,
+                width: 1.0,
+              ),
+            ),
             child: const Text('取消'),
           ),
         ],
