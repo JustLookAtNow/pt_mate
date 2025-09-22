@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
@@ -50,7 +51,9 @@ class AppState extends ChangeNotifier {
       await ApiService.instance.init();
       _isInitialized = true;
       _configVersion++; // 增加配置版本号
-      print('AppState: loadInitial完成，配置版本号: $_configVersion, 强制重新加载: $forceReload');
+      if (kDebugMode) {
+        print('AppState: loadInitial完成，配置版本号: $_configVersion, 强制重新加载: $forceReload');
+      }
       notifyListeners();
       
       // 应用启动时检查自动同步
@@ -102,7 +105,9 @@ class AppState extends ChangeNotifier {
       
       // 检查是否启用了自动同步
       if (config != null && config.autoSync) {
-        print('AppState: 检测到启用自动同步，开始执行自动同步检查');
+        if (kDebugMode) {
+          print('AppState: 检测到启用自动同步，开始执行自动同步检查');
+        }
         
         final backupService = BackupService(StorageService.instance);
         
@@ -112,7 +117,9 @@ class AppState extends ChangeNotifier {
              // 检查是否有远程备份可以下载
              final remoteBackups = await backupService.getWebDAVBackups();
              if (remoteBackups.isNotEmpty) {
-               print('AppState: 发现${remoteBackups.length}个远程备份，准备自动同步最新的');
+               if (kDebugMode) {
+                 print('AppState: 发现${remoteBackups.length}个远程备份，准备自动同步最新的');
+               }
                
                // 获取最新的备份文件路径
                final latestBackup = remoteBackups.first;
@@ -121,23 +128,35 @@ class AppState extends ChangeNotifier {
                // 恢复最新的备份
                final result = await backupService.restoreFromWebDAV(backupPath);
                if (result.success) {
-                 print('AppState: 自动同步完成');
+                 if (kDebugMode) {
+                   print('AppState: 自动同步完成');
+                 }
                } else {
-                 print('AppState: 自动同步失败: ${result.message}');
+                 if (kDebugMode) {
+                   print('AppState: 自动同步失败: ${result.message}');
+                 }
                }
              } else {
-               print('AppState: 未发现远程备份，跳过自动同步');
-             }
-           } catch (e) {
-             print('AppState: 自动同步失败: $e');
+                 if (kDebugMode) {
+                   print('AppState: 未发现远程备份，跳过自动同步');
+                 }
+               }
+             } catch (e) {
+               if (kDebugMode) {
+                 print('AppState: 自动同步失败: $e');
+               }
              // 自动同步失败不影响应用正常启动
            }
          });
       } else {
-        print('AppState: 自动同步未启用或配置不存在');
+        if (kDebugMode) {
+          print('AppState: 自动同步未启用或配置不存在');
+        }
       }
     } catch (e) {
-      print('AppState: 检查自动同步配置失败: $e');
+      if (kDebugMode) {
+        print('AppState: 检查自动同步配置失败: $e');
+      }
       // 配置检查失败不影响应用正常启动
     }
   }
@@ -380,7 +399,9 @@ class _HomePageState extends State<HomePage> {
       if (appState.site != null) {
         _currentSite = appState.site;
         _lastConfigVersion = appState.configVersion;
-        print('HomePage: didChangeDependencies预同步 - 站点: ${_currentSite?.id}, 版本: $_lastConfigVersion');
+        if (kDebugMode) {
+          print('HomePage: didChangeDependencies预同步 - 站点: ${_currentSite?.id}, 版本: $_lastConfigVersion');
+        }
       }
       _didSyncFromAppState = true;
 
@@ -475,7 +496,9 @@ class _HomePageState extends State<HomePage> {
           ? activeSite!.searchCategories
           : SearchCategoryConfig.getDefaultConfigs();
       
-      print('HomePage: _reloadCategories - 重新加载分类，分类数量: ${categories.length}');
+      if (kDebugMode) {
+        print('HomePage: _reloadCategories - 重新加载分类，分类数量: ${categories.length}');
+      }
       
       if (mounted) {
         setState(() {
@@ -909,13 +932,17 @@ class _HomePageState extends State<HomePage> {
           bool needsReload = false;
           String reloadReason = '';
           
-          print('HomePage Consumer: 当前站点=${_currentSite?.id}, AppState站点=${appState.site?.id}, 配置版本=${appState.configVersion}, 上次版本=$_lastConfigVersion');
+          if (kDebugMode) {
+            print('HomePage Consumer: 当前站点=${_currentSite?.id}, AppState站点=${appState.site?.id}, 配置版本=${appState.configVersion}, 上次版本=$_lastConfigVersion');
+          }
           
           if (appState.site != null) {
             final isFirstSync = (_currentSite == null && _lastConfigVersion == -1);
             // 首次同步：仅同步站点与版本，不触发重新加载
             if (isFirstSync) {
-              print('HomePage: 首次同步（不重载） - 同步站点: ${appState.site!.id}, 版本: ${appState.configVersion}');
+              if (kDebugMode) {
+                print('HomePage: 首次同步（不重载） - 同步站点: ${appState.site!.id}, 版本: ${appState.configVersion}');
+              }
               final currentSite = appState.site;
               final currentConfigVersion = appState.configVersion;
               WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -935,18 +962,24 @@ class _HomePageState extends State<HomePage> {
             else if (_currentSite != null && _currentSite!.id != appState.site!.id) {
               needsReload = true;
               reloadReason = '站点变化';
-              print('HomePage: 站点变化检测 - 当前站点: ${_currentSite?.id}, 新站点: ${appState.site!.id}');
+              if (kDebugMode) {
+                print('HomePage: 站点变化检测 - 当前站点: ${_currentSite?.id}, 新站点: ${appState.site!.id}');
+              }
             }
             // 配置版本变化（排除首次同步情形）
             else if (_lastConfigVersion != -1 && _lastConfigVersion != appState.configVersion) {
               needsReload = true;
               reloadReason = '配置更新';
-              print('HomePage: 配置更新检测 - 上次版本: $_lastConfigVersion, 当前版本: ${appState.configVersion}');
+              if (kDebugMode) {
+                print('HomePage: 配置更新检测 - 上次版本: $_lastConfigVersion, 当前版本: ${appState.configVersion}');
+              }
             }
           }
           
           if (needsReload) {
-            print('HomePage: 检测到$reloadReason，重新初始化 - 配置版本: ${appState.configVersion}, 上次版本: $_lastConfigVersion');
+            if (kDebugMode) {
+              print('HomePage: 检测到$reloadReason，重新初始化 - 配置版本: ${appState.configVersion}, 上次版本: $_lastConfigVersion');
+            }
             // 设置标志，防止重复处理
             _isProcessingReload = true;
             // 捕获当前值，避免异步执行时值发生变化
