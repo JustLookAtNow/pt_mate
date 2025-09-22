@@ -47,6 +47,9 @@ class StorageKeys {
   // 图片设置
   static const String autoLoadImages = 'images.autoLoad'; // bool
   
+  // 聚合搜索设置
+  static const String aggregateSearchSettings = 'aggregateSearch.settings';
+  
   // 查询条件配置已移至站点配置中，不再需要全局键
 }
 
@@ -464,5 +467,42 @@ class StorageService {
     
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.webdavPasswordFallback(configId));
+  }
+
+  // 聚合搜索设置相关
+  Future<void> saveAggregateSearchSettings(AggregateSearchSettings settings) async {
+    final prefs = await _prefs;
+    await prefs.setString(StorageKeys.aggregateSearchSettings, jsonEncode(settings.toJson()));
+  }
+
+  Future<AggregateSearchSettings> loadAggregateSearchSettings() async {
+    final prefs = await _prefs;
+    final str = prefs.getString(StorageKeys.aggregateSearchSettings);
+    if (str == null) {
+      // 返回默认设置，包含一个"全部站点"的默认配置
+      final allSites = await loadSiteConfigs();
+      final defaultConfig = AggregateSearchConfig.createDefaultConfig(
+        allSites.map((site) => site.id).toList(),
+      );
+      return AggregateSearchSettings(
+        searchConfigs: [defaultConfig],
+        searchThreads: 3,
+      );
+    }
+    
+    try {
+      final json = jsonDecode(str) as Map<String, dynamic>;
+      return AggregateSearchSettings.fromJson(json);
+    } catch (_) {
+      // 解析失败时返回默认设置
+      final allSites = await loadSiteConfigs();
+      final defaultConfig = AggregateSearchConfig.createDefaultConfig(
+        allSites.map((site) => site.id).toList(),
+      );
+      return AggregateSearchSettings(
+        searchConfigs: [defaultConfig],
+        searchThreads: 3,
+      );
+    }
   }
 }

@@ -7,6 +7,7 @@ import '../services/theme/theme_manager.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/responsive_layout.dart';
 import 'backup_restore_page.dart';
+import 'aggregate_search_settings_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -138,6 +139,29 @@ class _SettingsBody extends StatelessWidget {
         const SizedBox(height: 8),
         Card(
           child: _AutoLoadImagesTile(),
+        ),
+        const SizedBox(height: 16),
+        
+        // 聚合搜索设置
+        Text(
+          '聚合搜索',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.search),
+            title: const Text('聚合搜索设置'),
+            subtitle: const Text('配置搜索策略和线程数'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const AggregateSearchSettingsPage(),
+                ),
+              );
+            },
+          ),
         ),
         const SizedBox(height: 16),
         

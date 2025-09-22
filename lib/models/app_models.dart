@@ -325,6 +325,126 @@ class SiteFeatures {
   String toString() => jsonEncode(toJson());
 }
 
+// 聚合搜索配置
+class AggregateSearchConfig {
+  final String id; // 唯一标识符
+  final String name; // 配置名称
+  final String type; // 配置类型：'all' 表示所有站点，'custom' 表示自定义
+  final List<String> enabledSiteIds; // 启用的站点ID列表（type为'all'时忽略）
+  final bool isActive; // 是否激活
+
+  const AggregateSearchConfig({
+    required this.id,
+    required this.name,
+    this.type = 'custom',
+    this.enabledSiteIds = const [],
+    this.isActive = true,
+  });
+
+  AggregateSearchConfig copyWith({
+    String? id,
+    String? name,
+    String? type,
+    List<String>? enabledSiteIds,
+    bool? isActive,
+  }) => AggregateSearchConfig(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        type: type ?? this.type,
+        enabledSiteIds: enabledSiteIds ?? this.enabledSiteIds,
+        isActive: isActive ?? this.isActive,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'type': type,
+        'enabledSiteIds': enabledSiteIds,
+        'isActive': isActive,
+      };
+
+  factory AggregateSearchConfig.fromJson(Map<String, dynamic> json) => AggregateSearchConfig(
+        id: json['id'] as String? ?? 'legacy-${DateTime.now().millisecondsSinceEpoch}',
+        name: json['name'] as String,
+        type: json['type'] as String? ?? 'custom', // 兼容旧版本
+        enabledSiteIds: (json['enabledSiteIds'] as List<dynamic>?)?.cast<String>() ?? [],
+        isActive: json['isActive'] as bool? ?? true,
+      );
+
+  @override
+  String toString() => jsonEncode(toJson());
+
+  // 创建默认的"所有站点"配置
+  static AggregateSearchConfig createDefaultConfig(List<String> allSiteIds) {
+    return AggregateSearchConfig(
+      id: 'all-sites',
+      name: '所有',
+      type: 'all',
+      enabledSiteIds: [], // all类型不需要具体的站点列表
+      isActive: true,
+    );
+  }
+
+  // 判断是否为"所有站点"类型
+  bool get isAllSitesType => type == 'all';
+
+  // 判断是否可以编辑或删除
+  bool get canEdit => type != 'all';
+
+  // 获取实际启用的站点ID列表
+  List<String> getEnabledSiteIds(List<String> allSiteIds) {
+    if (type == 'all') {
+      return allSiteIds; // 返回所有站点
+    }
+    return enabledSiteIds; // 返回自定义列表
+  }
+}
+
+// 聚合搜索设置
+class AggregateSearchSettings {
+  final List<AggregateSearchConfig> searchConfigs; // 搜索配置列表
+  final int searchThreads; // 搜索线程数
+
+  const AggregateSearchSettings({
+    this.searchConfigs = const [],
+    this.searchThreads = 3,
+  });
+
+  AggregateSearchSettings copyWith({
+    List<AggregateSearchConfig>? searchConfigs,
+    int? searchThreads,
+  }) => AggregateSearchSettings(
+        searchConfigs: searchConfigs ?? this.searchConfigs,
+        searchThreads: searchThreads ?? this.searchThreads,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'searchConfigs': searchConfigs.map((e) => e.toJson()).toList(),
+        'searchThreads': searchThreads,
+      };
+
+  factory AggregateSearchSettings.fromJson(Map<String, dynamic> json) {
+    List<AggregateSearchConfig> configs = [];
+    if (json['searchConfigs'] != null) {
+      try {
+        final list = (json['searchConfigs'] as List).cast<Map<String, dynamic>>();
+        configs = list.map(AggregateSearchConfig.fromJson).toList();
+      } catch (_) {
+        // 解析失败时使用空列表
+        configs = [];
+      }
+    }
+    
+    return AggregateSearchSettings(
+      searchConfigs: configs,
+      searchThreads: json['searchThreads'] as int? ?? 3,
+    );
+  }
+
+  @override
+  String toString() => jsonEncode(toJson());
+}
+
 class SiteConfig {
   final String id; // 唯一标识符
   final String name;

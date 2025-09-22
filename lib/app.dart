@@ -20,6 +20,7 @@ import 'pages/server_settings_page.dart';
 import 'widgets/qb_speed_indicator.dart';
 import 'widgets/responsive_layout.dart';
 import 'widgets/torrent_download_dialog.dart';
+import 'widgets/torrent_list_item.dart';
 
 class AppState extends ChangeNotifier {
   SiteConfig? _site;
@@ -644,39 +645,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Color _discountColor(DiscountType d) {
-    switch (d.colorType) {
-      case DiscountColorType.green:
-        return Colors.green;
-      case DiscountColorType.yellow:
-        return Colors.amber;
-      case DiscountColorType.none:
-        return Colors.grey;
-    }
-  }
 
-  String _discountText(DiscountType d, String? endTime) {
-    final baseText = d.displayText;
-
-    if ((d == DiscountType.free || d == DiscountType.twoXFree) &&
-        endTime != null &&
-        endTime.isNotEmpty) {
-      try {
-        final endDateTime = DateTime.parse(endTime);
-        final now = DateTime.now();
-        final difference = endDateTime.difference(now);
-        final hoursLeft = difference.inHours;
-
-        if (hoursLeft > 0) {
-          return '$baseText ${hoursLeft}h';
-        }
-      } catch (e) {
-        // 解析失败，返回基础文本
-      }
-    }
-
-    return baseText;
-  }
 
   void _onSortSelected(String sortType) {
     if (mounted) {
@@ -1501,158 +1470,17 @@ class _HomePageState extends State<HomePage> {
                             }
                       final t = _items[i];
                       final isSelected = _selectedItems.contains(t.id);
-                      return GestureDetector(
+                      return TorrentListItem(
+                        torrent: t,
+                        isSelected: isSelected,
+                        isSelectionMode: _isSelectionMode,
+                        currentSite: _currentSite,
                         onTap: () => _isSelectionMode
                             ? _onToggleSelection(t)
                             : _onTorrentTap(t),
                         onLongPress: () => _onLongPress(t),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
-                                : null,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 4,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        t.name,
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.titleMedium,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        t.smallDescr,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyMedium
-                                            ?.copyWith(
-                                              color: Theme.of(
-                                                context,
-                                              ).textTheme.bodySmall?.color,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          if (t.discount != DiscountType.normal)
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 6,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: _discountColor(
-                                                  t.discount,
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                _discountText(
-                                                  t.discount,
-                                                  t.discountEndTime,
-                                                ),
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ),
-                                          if (t.discount != DiscountType.normal)
-                                            const SizedBox(width: 6),
-                                          _buildSeedLeechInfo(
-                                            t.seeders,
-                                            t.leechers,
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Text(
-                                            Formatters.dataFromBytes(
-                                              t.sizeBytes,
-                                            ),
-                                          ),
-                                          const Spacer(),
-                                          // 下载状态图标 - 仅在站点支持下载历史功能时显示
-                                          if (_currentSite
-                                                  ?.features
-                                                  .supportHistory ??
-                                              true)
-                                            _buildDownloadStatusIcon(
-                                              t.downloadStatus,
-                                            ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // 收藏按钮 - 仅在站点支持收藏功能时显示
-                                    if (_currentSite
-                                            ?.features
-                                            .supportCollection ??
-                                        true)
-                                      IconButton(
-                                        onPressed: () => _onToggleCollection(t),
-                                        icon: Icon(
-                                          t.collection
-                                              ? Icons.favorite
-                                              : Icons.favorite_border,
-                                          color: t.collection
-                                              ? Colors.red
-                                              : null,
-                                        ),
-                                        tooltip: t.collection ? '取消收藏' : '收藏',
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(
-                                          minWidth: 40,
-                                          minHeight: 40,
-                                        ),
-                                      ),
-                                    // 下载按钮 - 仅在站点支持下载功能时显示
-                                    if (_currentSite
-                                            ?.features
-                                            .supportDownload ??
-                                        true)
-                                      IconButton(
-                                        onPressed: () => _onDownload(t),
-                                        icon: const Icon(
-                                          Icons.download_outlined,
-                                        ),
-                                        tooltip: '下载',
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(
-                                          minWidth: 40,
-                                          minHeight: 40,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        onToggleCollection: () => _onToggleCollection(t),
+                        onDownload: () => _onDownload(t),
                       );
                     },
                   ),
@@ -1960,36 +1788,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Widget _buildSeedLeechInfo(int seeders, int leechers) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.arrow_upward, color: Colors.green, size: 16),
-        Text('$seeders', style: const TextStyle(fontSize: 12)),
-        const SizedBox(width: 4),
-        Icon(Icons.arrow_downward, color: Colors.red, size: 16),
-        Text('$leechers', style: const TextStyle(fontSize: 12)),
-      ],
-    );
-  }
 
-  Widget _buildDownloadStatusIcon(DownloadStatus status) {
-    switch (status) {
-      case DownloadStatus.completed:
-        return const Icon(Icons.download_done, color: Colors.green, size: 20);
-      case DownloadStatus.downloading:
-        return const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-          ),
-        );
-      case DownloadStatus.none:
-        return const SizedBox(width: 20); // 占位，保持布局一致
-    }
-  }
 
   Widget _buildStatChip(BuildContext context, String text, Color color) {
     return Container(

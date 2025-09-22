@@ -3,6 +3,7 @@ import '../pages/downloader_settings_page.dart';
 import '../pages/server_settings_page.dart';
 import '../pages/settings_page.dart';
 import '../pages/about_page.dart';
+import '../pages/aggregate_search_page.dart';
 import '../app.dart';
 
 class AppDrawer extends StatelessWidget {
@@ -75,6 +76,35 @@ class AppDrawer extends StatelessWidget {
                       settings: const RouteSettings(name: '/'),
                     ),
                     (route) => false,
+                  );
+                }
+              }
+            },
+          ),
+          _DrawerItem(
+            icon: Icons.search,
+            title: '聚合搜索',
+            isActive: currentRoute == '/aggregate_search',
+            onTap: () {
+              if (!isFixedSidebar) {
+                Navigator.of(context).pop();
+              }
+              if (currentRoute != '/aggregate_search') {
+                if (isFixedSidebar) {
+                  Navigator.of(context).pushReplacement(
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation1, animation2) => const AggregateSearchPage(),
+                      settings: const RouteSettings(name: '/aggregate_search'),
+                      transitionDuration: Duration.zero,
+                      reverseTransitionDuration: Duration.zero,
+                    ),
+                  );
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const AggregateSearchPage(),
+                      settings: const RouteSettings(name: '/aggregate_search'),
+                    ),
                   );
                 }
               }
