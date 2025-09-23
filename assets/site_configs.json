@@ -245,6 +245,42 @@
         "advancedSearch": true
       },
       "discountMapping": {}
+    },
+    {
+      "id": "lajidui",
+      "name": "垃圾堆",
+      "baseUrl": "https://pt.lajidui.top/",
+      "siteType": "NexusPHP",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": true,
+        "advancedSearch": true
+      },
+      "discountMapping": {}
+    },
+    {
+      "id": "ptfans",
+      "name": "PTFans",
+      "baseUrl": "https://ptfans.cc/",
+      "siteType": "NexusPHP",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": true,
+        "advancedSearch": true
+      },
+      "discountMapping": {}
     }
   ],
   "defaultTemplates": {
