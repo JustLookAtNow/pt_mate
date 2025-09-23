@@ -98,9 +98,35 @@ class ApiService {
       additionalParams: additionalParams,
     );
   }
+
+  /// 使用指定站点搜索种子（专用于聚合搜索，支持真正的并发）
+  Future<TorrentSearchResult> searchTorrentsWithSite({
+    required SiteConfig siteConfig,
+    String? keyword,
+    int pageNumber = 1,
+    int pageSize = 30,
+    int? onlyFav,
+    Map<String, dynamic>? additionalParams,
+  }) async {
+    final adapter = await getAdapter(siteConfig);
+    return adapter.searchTorrents(
+      keyword: keyword,
+      pageNumber: pageNumber,
+      pageSize: pageSize,
+      onlyFav: onlyFav,
+      additionalParams: additionalParams,
+    );
+  }
   
   /// 获取种子详情
-  Future<TorrentDetail> fetchTorrentDetail(String id) async {
+  Future<TorrentDetail> fetchTorrentDetail(String id, {SiteConfig? siteConfig}) async {
+    // 如果提供了siteConfig，使用临时适配器
+    if (siteConfig != null) {
+      final adapter = await getAdapter(siteConfig);
+      return adapter.fetchTorrentDetail(id);
+    }
+    
+    // 否则使用当前活跃适配器
     if (_activeAdapter == null) {
       throw StateError('No active site adapter available');
     }
@@ -108,10 +134,18 @@ class ApiService {
   }
   
   /// 生成下载令牌
-  Future<String> genDlToken({required String id,String? url}) async {
+  Future<String> genDlToken({required String id, String? url, SiteConfig? siteConfig}) async {
     if (url != null && url.isNotEmpty) {
       return url;
     }
+    
+    // 如果提供了siteConfig，使用临时适配器
+    if (siteConfig != null) {
+      final adapter = await getAdapter(siteConfig);
+      return adapter.genDlToken(id: id);
+    }
+    
+    // 否则使用当前活跃适配器
     if (_activeAdapter == null) {
       throw StateError('No active site adapter available');
     }

@@ -174,11 +174,9 @@ class AggregateSearchService {
         return SearchResult.error('站点不支持搜索功能');
       }
 
-      // 设置当前站点
-      await ApiService.instance.setActiveSite(site);
-
-      // 执行搜索，限制结果数量
-      final result = await ApiService.instance.searchTorrents(
+      // 使用专用方法直接搜索指定站点，无需切换全局状态
+      final result = await ApiService.instance.searchTorrentsWithSite(
+        siteConfig: site,
         keyword: keyword.trim().isEmpty ? null : keyword.trim(),
         pageNumber: 1,
         pageSize: maxResults,

@@ -583,10 +583,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         orElse: () => throw Exception('找不到站点配置: ${item.siteId}'),
       );
       
-      // 2. 设置当前站点
-      await ApiService.instance.setActiveSite(siteConfig);
-      
-      // 3. 获取qBittorrent客户端配置
+      // 2. 获取qBittorrent客户端配置
        final qbClients = await storage.loadQbClients();
        
        // 4. 跳转到详情页面
@@ -594,10 +591,11 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
        Navigator.of(context).push(
          MaterialPageRoute(
            builder: (context) => TorrentDetailPage(
-             torrentItem: item.torrent,
-             siteFeatures: siteConfig.features,
-             qbClients: qbClients,
-           ),
+                            torrentItem: item.torrent,
+                            siteFeatures: siteConfig.features,
+                            qbClients: qbClients,
+                            siteConfig: siteConfig, // 传入站点配置
+                          ),
          ),
        );
     } catch (e) {
@@ -628,12 +626,11 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         orElse: () => throw Exception('找不到站点配置: ${item.siteId}'),
       );
       
-      await ApiService.instance.setActiveSite(siteConfig);
-      
       // 2. 获取下载 URL
       final url = await ApiService.instance.genDlToken(
         id: item.torrent.id,
         url: item.torrent.downloadUrl,
+        siteConfig: siteConfig, // 传入站点配置
       );
 
       // 3. 弹出对话框让用户选择下载器设置

@@ -487,12 +487,14 @@ class TorrentDetailPage extends StatefulWidget {
   final TorrentItem torrentItem;
   final SiteFeatures siteFeatures;
   final List<QbClientConfig> qbClients;
+  final SiteConfig? siteConfig; // 可选的站点配置，用于聚合搜索
 
   const TorrentDetailPage({
     super.key,
     required this.torrentItem,
     required this.siteFeatures,
     required this.qbClients,
+    this.siteConfig, // 可选参数
   });
 
   @override
@@ -540,6 +542,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     try {
       final detail = await ApiService.instance.fetchTorrentDetail(
         widget.torrentItem.id,
+        siteConfig: widget.siteConfig, // 传入站点配置
       );
       if (mounted) {
         setState(() {
@@ -563,6 +566,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       final url = await ApiService.instance.genDlToken(
         id: widget.torrentItem.id,
         url: widget.torrentItem.downloadUrl,
+        siteConfig: widget.siteConfig, // 传入站点配置
       );
 
       // 2. 弹出对话框让用户选择下载器设置
