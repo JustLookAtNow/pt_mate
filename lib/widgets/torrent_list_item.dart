@@ -170,7 +170,7 @@ class TorrentListItem extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
               // 操作按钮列
               Column(
                 mainAxisSize: MainAxisSize.min,

@@ -350,7 +350,7 @@
       "discountMapping": {
         "Free": "FREE",
         "Free*2": "2xFREE",
-        "2X 50%": "2xFREE",
+        "2X 50%": "2x50%",
         "10%": "PERCENT_10",
         "20%": "PERCENT_20",
         "30%": "PERCENT_30",
@@ -380,7 +380,7 @@
       "discountMapping": {
         "Free": "FREE",
         "2X Free": "2xFREE",
-        "2X 50%": "2xFREE",
+        "2X 50%": "2x50%",
         "10%": "PERCENT_10",
         "20%": "PERCENT_20",
         "30%": "PERCENT_30",

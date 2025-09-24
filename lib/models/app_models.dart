@@ -126,6 +126,7 @@ enum DiscountType {
   normal('NORMAL'),
   free('FREE'),
   twoXFree('2xFREE'),
+  twoX50Percent('2x50%'),
   percent10('PERCENT_10'),
   percent20('PERCENT_20'),
   percent30('PERCENT_30'),
@@ -150,6 +151,8 @@ enum DiscountType {
         return 'FREE';
       case DiscountType.twoXFree:
         return '2xFREE';
+      case DiscountType.twoX50Percent:
+        return '2x50%';
       case DiscountType.percent10:
         return '10%';
       case DiscountType.percent20:
@@ -179,6 +182,8 @@ enum DiscountType {
       case DiscountType.free:
       case DiscountType.twoXFree:
         return DiscountColorType.green;
+      case DiscountType.twoX50Percent:
+        return DiscountColorType.yellow;
       case DiscountType.percent10:
       case DiscountType.percent20:
       case DiscountType.percent30:
