@@ -321,198 +321,11 @@ class NexusPHPWebAdapter extends SiteAdapter {
         queryParameters: queryParams,
       );
       final soup = BeautifulSoup(response.data);
-
       // 解析种子列表
-      final torrents = <TorrentItem>[];
-      final torrentTable = soup.find('table', class_: 'torrents');
-
-      if (torrentTable != null) {
-        final rows = torrentTable.children.isNotEmpty
-            ? torrentTable.children[0].children
-            : [];
-
-        // 跳过表头行，从第二行开始处理种子数据
-        for (int i = 1; i < rows.length; i++) {
-          final row = rows[i];
-          final tds = row.children;
-
-          if (tds.length <= 6) continue;
-
-          try {
-            final rowTds = tds[1].findAll('td');
-            // 提取种子ID（从详情链接中）
-            var titleTd = rowTds[1];
-            var detailLink = titleTd.find('a[href*="details.php"]');
-            var containsIcon = true;
-            if (detailLink == null) {
-              //有些网站没封面，可以从第一个td试试
-              containsIcon = false;
-              titleTd = rowTds[0];
-              detailLink = titleTd.find('a[href*="details.php"]');
-              if (detailLink == null) continue;
-            }
-
-            final href = detailLink.attributes['href'] ?? '';
-            final idMatch = RegExp(r'id=(\d+)').firstMatch(href);
-            if (idMatch == null) continue;
-
-            final torrentId = idMatch.group(1) ?? '';
-            if (torrentId.isEmpty) continue;
-
-            // 提取主标题（去除换行）
-            final titleElement = titleTd.find('a[href*="details.php"] b');
-            String title = '';
-            if (titleElement != null) {
-              title = titleElement.text
-                  .replaceAll('\n', ' ')
-                  .replaceAll(RegExp(r'\s+'), ' ')
-                  .trim();
-            }
-
-            // 提取描述：从tds[1].findAll('td')[1].innerHtml从后往前匹配，遇到html标签时停止，只要后面的纯文本
-            final fullText = titleTd.innerHtml;
-            String description = fullText
-                .replaceAll(RegExp(r'<[^>]+>.*?</[^>]+>'), '')
-                .replaceAll(RegExp(r'<[^>]+>'), '')
-                .replaceAll(RegExp(r'\s+'), ' ')
-                .trim();
-            // 提取下载记录
-            DownloadStatus status = DownloadStatus.none;
-            final downloadDiv = titleTd.find('div', attrs: {'title': true});
-            if (downloadDiv != null) {
-              final downloadTitle = downloadDiv.getAttrValue('title');
-              RegExp regExp = RegExp(r'(\d+)\%');
-              final match = regExp.firstMatch(downloadTitle!);
-              if (match != null) {
-                final percent = match.group(1);
-                if (percent != null) {
-                  int percentInt = int.parse(percent);
-                  if (percentInt == 100) {
-                    status = DownloadStatus.completed;
-                  } else {
-                    status = DownloadStatus.downloading;
-                  }
-                }
-              }
-            }
-            // 提取大小（第5列，索引4）
-            final sizeText = tds[4].text.replaceAll('\n', ' ').trim();
-
-            // 提取做种数（第6列，索引5）
-            String seedersText = '';
-            final seedersElement = tds[5].find('a');
-            if (seedersElement != null) {
-              seedersText = seedersElement.text.trim();
-            } else {
-              final boldElement = tds[5].find('b');
-              if (boldElement != null) {
-                seedersText = boldElement.text.trim();
-              } else {
-                seedersText = tds[5].text.trim();
-              }
-            }
-
-            // 提取下载数（第7列，索引6）
-            String leechersText = '';
-            final leechersElement = tds[6].find('a');
-            if (leechersElement != null) {
-              leechersText = leechersElement.text.trim();
-            } else {
-              final boldElement = tds[6].find('b');
-              if (boldElement != null) {
-                leechersText = boldElement.text.trim();
-              } else {
-                leechersText = tds[6].text.trim();
-              }
-            }
-
-            // 提取优惠信息
-            String? promoType;
-            String? remainingTime;
-            final promoImg = tds[1].find('img[onmouseover]');
-            if (promoImg != null) {
-              promoType = promoImg.attributes['alt'] ?? '';
-
-              // 提取剩余时间：使用正则表达式匹配"剩余时间：<span title=\"...\">...</span>"
-              final titleCellHtml = tds[1].innerHtml;
-              final timeRegex = RegExp(r'剩余时间：<span[^>]*>([^<]+)</span>');
-              final timeMatch = timeRegex.firstMatch(titleCellHtml);
-              if (timeMatch != null) {
-                remainingTime = timeMatch.group(1)?.trim() ?? '';
-              }
-            }
-
-            // 解析文件大小为字节数，因为有按大小排序，所以要处理单位
-            int sizeInBytes = 0;
-            final sizeMatch = RegExp(r'([\d.]+)\s*(\w+)').firstMatch(sizeText);
-            if (sizeMatch != null) {
-              final sizeValue = double.tryParse(sizeMatch.group(1) ?? '0') ?? 0;
-              final unit = sizeMatch.group(2)?.toUpperCase() ?? 'B';
-
-              switch (unit) {
-                case 'KB':
-                  sizeInBytes = (sizeValue * 1024).round();
-                  break;
-                case 'MB':
-                  sizeInBytes = (sizeValue * 1024 * 1024).round();
-                  break;
-                case 'GB':
-                  sizeInBytes = (sizeValue * 1024 * 1024 * 1024).round();
-                  break;
-                case 'TB':
-                  sizeInBytes = (sizeValue * 1024 * 1024 * 1024 * 1024).round();
-                  break;
-                default:
-                  sizeInBytes = sizeValue.round();
-              }
-            }
-            //收藏信息
-            var starTd = rowTds[2];
-            if (containsIcon) {
-              starTd = rowTds[3];
-            }
-            final starImg = starTd.find('img', class_: 'delbookmark');
-            final collection = starImg == null;
-            torrents.add(
-              TorrentItem(
-                id: torrentId,
-                name: title,
-                smallDescr: description,
-                discount: _parseDiscountType(
-                  promoType?.isNotEmpty == true ? promoType : null,
-                ),
-                discountEndTime: _convertRelativeTimeToAbsolute(remainingTime),
-                downloadUrl: null, // 暂时不提供直接下载链接
-                seeders: int.tryParse(seedersText) ?? 0,
-                leechers: int.tryParse(leechersText) ?? 0,
-                sizeBytes: sizeInBytes,
-                downloadStatus: status,
-                collection: collection,
-                imageList: [], // 暂时不解析图片列表
-              ),
-            );
-          } catch (e) {
-            // 解析单个种子失败时继续处理下一个
-            continue;
-          }
-        }
-      }
+      final torrents = parseTorrentList(soup);
 
       // 解析总页数（从JavaScript变量maxpage中提取）
-      int totalPages = 1;
-      final footerDiv = soup.find('div', id: 'footer');
-      if (footerDiv != null) {
-        final scriptElement = footerDiv.find('script');
-        if (scriptElement != null) {
-          final scriptText = scriptElement.text;
-          final pageMatch = RegExp(
-            r'var\s+maxpage\s*=\s*(\d+);',
-          ).firstMatch(scriptText);
-          if (pageMatch != null) {
-            totalPages = int.tryParse(pageMatch.group(1) ?? '1') ?? 1;
-          }
-        }
-      }
+      int totalPages = parseTotalPages(soup);
 
       return TorrentSearchResult(
         pageNumber: pageNumber,
@@ -524,6 +337,203 @@ class NexusPHPWebAdapter extends SiteAdapter {
     } catch (e) {
       throw Exception('搜索种子失败: $e');
     }
+  }
+
+  int parseTotalPages(BeautifulSoup soup) {
+    int totalPages = 1;
+    final footerDiv = soup.find('div', id: 'footer');
+    if (footerDiv != null) {
+      final scriptElement = footerDiv.find('script');
+      if (scriptElement != null) {
+        final scriptText = scriptElement.text;
+        final pageMatch = RegExp(
+          r'var\s+maxpage\s*=\s*(\d+);',
+        ).firstMatch(scriptText);
+        if (pageMatch != null) {
+          totalPages = int.tryParse(pageMatch.group(1) ?? '1') ?? 1;
+        }
+      }
+    }
+    return totalPages;
+  }
+
+  List<TorrentItem> parseTorrentList(BeautifulSoup soup) {
+    // 解析种子列表
+    final torrents = <TorrentItem>[];
+    final torrentTable = soup.find('table', class_: 'torrents');
+
+    if (torrentTable != null) {
+      final rows = torrentTable.children.isNotEmpty
+          ? torrentTable.children[0].children
+          : [];
+
+      // 跳过表头行，从第二行开始处理种子数据
+      for (int i = 1; i < rows.length; i++) {
+        final row = rows[i];
+        final tds = row.children;
+
+        if (tds.length <= 6) continue;
+        try {
+          final rowTds = tds[1].findAll('td');
+          // 提取种子ID（从详情链接中）
+          var titleTd = rowTds[1];
+          var detailLink = titleTd.find('a[href*="details.php"]');
+          var containsIcon = true;
+          if (detailLink == null) {
+            //有些网站没封面，可以从第一个td试试
+            containsIcon = false;
+            titleTd = rowTds[0];
+            detailLink = titleTd.find('a[href*="details.php"]');
+            if (detailLink == null) continue;
+          }
+
+          final href = detailLink.attributes['href'] ?? '';
+          final idMatch = RegExp(r'id=(\d+)').firstMatch(href);
+          if (idMatch == null) continue;
+
+          final torrentId = idMatch.group(1) ?? '';
+          if (torrentId.isEmpty) continue;
+
+          // 提取主标题（去除换行）
+          final titleElement = titleTd.find('a[href*="details.php"] b');
+          String title = '';
+          if (titleElement != null) {
+            title = titleElement.text
+                .replaceAll('\n', ' ')
+                .replaceAll(RegExp(r'\s+'), ' ')
+                .trim();
+          }
+
+          // 提取描述：只要纯文本，把标题去掉。
+          String description = titleTd.text
+              .replaceAll('\n', ' ')
+              .replaceAll(RegExp(r'\s+'), ' ')
+              .trim()
+              .replaceAll(title, '')
+              .replaceAll(RegExp(r'剩余时间：\d+.*?\d+[分钟|时]'), '');
+          // 提取下载记录
+          DownloadStatus status = DownloadStatus.none;
+          final downloadDiv = titleTd.find('div', attrs: {'title': true});
+          if (downloadDiv != null) {
+            final downloadTitle = downloadDiv.getAttrValue('title');
+            RegExp regExp = RegExp(r'(\d+)\%');
+            final match = regExp.firstMatch(downloadTitle!);
+            if (match != null) {
+              final percent = match.group(1);
+              if (percent != null) {
+                int percentInt = int.parse(percent);
+                if (percentInt == 100) {
+                  status = DownloadStatus.completed;
+                } else {
+                  status = DownloadStatus.downloading;
+                }
+              }
+            }
+          }
+          // 提取大小（第5列，索引4）
+          final sizeText = tds[4].text.replaceAll('\n', ' ').trim();
+
+          // 提取做种数（第6列，索引5）
+          String seedersText = '';
+          final seedersElement = tds[5].find('a');
+          if (seedersElement != null) {
+            seedersText = seedersElement.text.trim();
+          } else {
+            final boldElement = tds[5].find('b');
+            if (boldElement != null) {
+              seedersText = boldElement.text.trim();
+            } else {
+              seedersText = tds[5].text.trim();
+            }
+          }
+
+          // 提取下载数（第7列，索引6）
+          String leechersText = '';
+          final leechersElement = tds[6].find('a');
+          if (leechersElement != null) {
+            leechersText = leechersElement.text.trim();
+          } else {
+            final boldElement = tds[6].find('b');
+            if (boldElement != null) {
+              leechersText = boldElement.text.trim();
+            } else {
+              leechersText = tds[6].text.trim();
+            }
+          }
+
+          // 提取优惠信息
+          String? promoType;
+          String? remainingTime;
+          var promoImg = tds[1].find('img[onmouseover]');
+          promoImg ??= tds[1].find('img', class_: 'pro_free');
+          if (promoImg != null) {
+            promoType = promoImg.attributes['alt'] ?? '';
+
+            // 提取剩余时间：使用正则表达式匹配"剩余时间：<span title=\"...\">...</span>"
+            final titleCellHtml = tds[1].innerHtml;
+            final timeRegex = RegExp(r'剩余时间：<span[^>]*>([^<]+)</span>');
+            final timeMatch = timeRegex.firstMatch(titleCellHtml);
+            if (timeMatch != null) {
+              remainingTime = timeMatch.group(1)?.trim() ?? '';
+            }
+          }
+
+          // 解析文件大小为字节数，因为有按大小排序，所以要处理单位
+          int sizeInBytes = 0;
+          final sizeMatch = RegExp(r'([\d.]+)\s*(\w+)').firstMatch(sizeText);
+          if (sizeMatch != null) {
+            final sizeValue = double.tryParse(sizeMatch.group(1) ?? '0') ?? 0;
+            final unit = sizeMatch.group(2)?.toUpperCase() ?? 'B';
+
+            switch (unit) {
+              case 'KB':
+                sizeInBytes = (sizeValue * 1024).round();
+                break;
+              case 'MB':
+                sizeInBytes = (sizeValue * 1024 * 1024).round();
+                break;
+              case 'GB':
+                sizeInBytes = (sizeValue * 1024 * 1024 * 1024).round();
+                break;
+              case 'TB':
+                sizeInBytes = (sizeValue * 1024 * 1024 * 1024 * 1024).round();
+                break;
+              default:
+                sizeInBytes = sizeValue.round();
+            }
+          }
+          //收藏信息
+          var starTd = rowTds[2];
+          if (containsIcon && rowTds.length > 3) {
+            starTd = rowTds[3];
+          }
+          final starImg = starTd.find('img', class_: 'delbookmark');
+          final collection = starImg == null;
+          torrents.add(
+            TorrentItem(
+              id: torrentId,
+              name: title,
+              smallDescr: description,
+              discount: _parseDiscountType(
+                promoType?.isNotEmpty == true ? promoType : null,
+              ),
+              discountEndTime: _convertRelativeTimeToAbsolute(remainingTime),
+              downloadUrl: null, // 暂时不提供直接下载链接
+              seeders: int.tryParse(seedersText) ?? 0,
+              leechers: int.tryParse(leechersText) ?? 0,
+              sizeBytes: sizeInBytes,
+              downloadStatus: status,
+              collection: collection,
+              imageList: [], // 暂时不解析图片列表
+            ),
+          );
+        } catch (e) {
+          print('解析种子行失败: $e');
+          continue;
+        }
+      }
+    }
+    return torrents;
   }
 
   @override

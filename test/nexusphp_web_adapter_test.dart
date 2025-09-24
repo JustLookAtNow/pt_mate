@@ -5,14 +5,17 @@ import 'package:beautiful_soup_dart/beautiful_soup.dart';
 import 'package:pt_mate/models/app_models.dart';
 import 'dart:io';
 
+import 'package:pt_mate/services/api/nexusphp_web_adapter.dart';
 
 void main() {
   group('NexusPHP Web Adapter Tests', () {
     late List<File> htmlFiles;
     late Map<String, String> htmlContents;
     late Map<String, BeautifulSoup> soups;
+    late NexusPHPWebAdapter adapter;
 
     setUpAll(() async {
+      adapter = NexusPHPWebAdapter();
       // 遍历html文件夹中的所有HTML文件
       final htmlDir = Directory('test/html');
       htmlFiles = htmlDir
@@ -55,161 +58,29 @@ void main() {
       print('\n=== Torrent Data Extraction ===');
 
       for (final fileName in soups.keys) {
-        final soup = soups[fileName]!;
         print('\nProcessing file: $fileName');
         if (!fileName.startsWith('torrents')) {
           continue;
         }
-        int totalPage = 0;
-        final pagination = soup.find('div', id: 'footer')!.find('script')?.text;
-        if (pagination != null) {
-          print('  Found pagination');
-          final pageMatch = RegExp(
-            r'var\s+maxpage\s*=\s*(\d+);',
-          ).firstMatch(pagination);
-          if (pageMatch != null) {
-            totalPage = int.parse(pageMatch.group(1) ?? '0');
-            print('  Found total page: $totalPage');
-          }
-        }
-
-        final table = soup.find('table', class_: 'torrents');
-        if (table != null) {
-          print('  Found torrent table');
-          final rows = table.children[0].children;
-          print('  Found ${rows.length} torrent rows');
-
-          // 跳过表头行，从第二行开始处理种子数据
-          for (int i = 1; i < rows.length; i++) {
-            final row = rows[i];
-            final tds = row.children;
-
-            if (tds.length > 6) {
-            //收藏信息
-            final starTd = tds[1].findAll('td')[3];
-            final starImg = starTd.find('img', class_: 'delbookmark');
-            final collection = starImg == null;
-            print('  Found collection: $collection');
-
-              final titleTd = tds[1].findAll('td')[1];
-
-              // 提取种子ID（从详情链接中）
-              final detailLink = titleTd.find('a[href*="details.php"]');
-              String torrentId = '';
-              if (detailLink != null) {
-                final href = detailLink.attributes['href'] ?? '';
-                final idMatch = RegExp(r'id=(\d+)').firstMatch(href);
-                if (idMatch != null) {
-                  torrentId = idMatch.group(1) ?? '';
-                }
-              }
-
-              // 提取主标题（去除换行）
-              final titleElement = titleTd.find('a[href*="details.php"] b');
-              String title = '';
-              if (titleElement != null) {
-                title = titleElement.text
-                    .replaceAll('\n', ' ')
-                    .replaceAll(RegExp(r'\s+'), ' ')
-                    .trim();
-              }
-
-              // 提取描述：从tds[1].findAll('td')[1].innerHtml中提取纯文本
-              final fullText = titleTd.innerHtml;
-              String description = fullText
-                  .replaceAll(RegExp(r'<[^>]+>.*?</[^>]+>'), '')
-                  .replaceAll(RegExp(r'<[^>]+>'), '')
-                  .replaceAll(RegExp(r'\s+'), ' ')
-                  .trim();
-              // 提取下载记录
-              DownloadStatus status = DownloadStatus.none;
-              final downloadDiv = titleTd.find('div', attrs: {'title': true});
-              if (downloadDiv != null) {
-                final downloadTitle = downloadDiv.getAttrValue('title');
-                RegExp regExp = RegExp(r'(\d+)\%');
-                final match = regExp.firstMatch(downloadTitle!);
-                if (match != null) {
-                  final percent = match.group(1);
-                  if (percent != null) {
-                    int percentInt = int.parse(percent);
-                    if (percentInt == 100) {
-                      status = DownloadStatus.completed;
-                    }else{
-                      status = DownloadStatus.downloading;
-                    }
-                  }
-                }
-              }
-              // 提取大小（第5列，索引4）
-              String size = tds[4].text.replaceAll('\n', ' ').trim();
-
-              // 提取做种数（第6列，索引5）
-              String seeders = '';
-              final seedersElement = tds[5].find('a');
-              if (seedersElement != null) {
-                seeders = seedersElement.text.trim();
-              } else {
-                final boldElement = tds[5].find('b');
-                if (boldElement != null) {
-                  seeders = boldElement.text.trim();
-                } else {
-                  seeders = tds[5].text.trim();
-                }
-              }
-
-              // 提取下载数（第7列，索引6）
-              String leechers = '';
-              final leechersElement = tds[6].find('a');
-              if (leechersElement != null) {
-                leechers = leechersElement.text.trim();
-              } else {
-                final boldElement = tds[6].find('b');
-                if (boldElement != null) {
-                  leechers = boldElement.text.trim();
-                } else {
-                  leechers = tds[6].text.trim();
-                }
-              }
-
-              // 提取优惠信息
-              String promoType = '';
-              String remainingTime = '';
-              final promoImg = tds[1].find('img[onmouseover]');
-              if (promoImg != null) {
-                promoType = promoImg.attributes['alt'] ?? '';
-
-                // 提取剩余时间：使用正则表达式匹配"剩余时间：<span title="...">...</span>"
-                final timeRegex = RegExp(r'剩余时间：<span[^>]*>([^<]+)</span>');
-                final timeMatch = timeRegex.firstMatch(fullText);
-                if (timeMatch != null) {
-                  remainingTime = timeMatch.group(1)?.trim() ?? '';
-                }
-              }
-
-              // 输出提取的信息
-              if (torrentId.isNotEmpty) {
-                print('Torrent ID: $torrentId');
-                print('Title: $title');
-                print('Description: $description');
-                print('Size: $size');
-                print('Seeders: $seeders');
-                print('Leechers: $leechers');
-                if (promoType.isNotEmpty) {
-                  print('Promo: $promoType');
-                  if (remainingTime.isNotEmpty) {
-                    print('Remaining Time: $remainingTime');
-                  }
-                }
-                print('Download Status: $status');
-                print('---');
-
-                //只输出前5个种子以避免输出过长
-                if (i >= 5) break;
-              }
-            }
-          }
-        } else {
-          print('  No torrent table found in this file');
+        final soup = soups[fileName]!;
+        List<TorrentItem> torrents = adapter.parseTorrentList(soup);
+        print('  Found ${torrents.length} torrents');
+        int totalPages = adapter.parseTotalPages(soup);
+        print('  Total pages: $totalPages');
+        for (var torrent in torrents.take(5)) {
+          print('  ID: ${torrent.id}');
+          print('  标题: ${torrent.name}');
+          print('  副标题: ${torrent.smallDescr}');
+          print('  优惠类型: ${torrent.discount}');
+          print('  优惠结束时间: ${torrent.discountEndTime ?? "无"}');
+          print('  下载链接: ${torrent.downloadUrl ?? "无"}');
+          print('  做种数: ${torrent.seeders}');
+          print('  下载数: ${torrent.leechers}');
+          print('  大小(字节): ${torrent.sizeBytes}');
+          print('  图片列表: ${torrent.imageList}');
+          print('  下载状态: ${torrent.downloadStatus}');
+          print('  是否收藏: ${torrent.collection}');
+          print('  ---');
         }
       }
     });
