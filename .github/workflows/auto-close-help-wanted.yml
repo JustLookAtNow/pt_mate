@@ -30,11 +30,28 @@ jobs:
 
             const now = new Date();
             for (const issue of issues) {
-              const created = new Date(issue.created_at);
-              const daysPassed = (now - created) / (1000 * 60 * 60 * 24);
+              let lastActivityTime;
+              
+              // 获取最后一条评论的时间
+              if (issue.comments > 0) {
+                const { data: comments } = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  per_page: 1,
+                  sort: "created",
+                  direction: "desc"
+                });
+                lastActivityTime = new Date(comments[0].created_at);
+              } else {
+                // 如果没有评论，使用 issue 创建时间
+                lastActivityTime = new Date(issue.created_at);
+              }
+              
+              const daysPassed = (now - lastActivityTime) / (1000 * 60 * 60 * 24);
 
-              // 如果超过 7 天 && 没有评论
-              if (daysPassed > 7 && issue.comments === 0) {
+              // 如果最后活动时间超过 7 天
+              if (daysPassed > 7) {
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
