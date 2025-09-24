@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:ui';
+import 'dart:io';
 import 'package:provider/provider.dart';
 import 'package:flutter_bbcode/flutter_bbcode.dart';
 import 'package:bbob_dart/bbob_dart.dart' as bbob;
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/api/api_service.dart';
 import '../services/storage/storage_service.dart';
 import '../services/image_http_client.dart';
@@ -314,23 +317,14 @@ class CustomHideTag extends WrappedStyleTag {
     bbob.Element element,
     List<InlineSpan> spans,
   ) {
-    return [
-      WidgetSpan(
-        child: CustomHideDisplay(
-          content: spans,
-        ),
-      ),
-    ];
+    return [WidgetSpan(child: CustomHideDisplay(content: spans))];
   }
 }
 
 class CustomHideDisplay extends StatefulWidget {
   final List<InlineSpan> content;
 
-  const CustomHideDisplay({
-    super.key,
-    required this.content,
-  });
+  const CustomHideDisplay({super.key, required this.content});
 
   @override
   State<CustomHideDisplay> createState() => _CustomHideDisplayState();
@@ -377,7 +371,9 @@ class _CustomHideDisplayState extends State<CustomHideDisplay> {
                     filter: ImageFilter.blur(sigmaX: 3.0, sigmaY: 3.0),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surface.withValues(alpha: 0.7),
                         borderRadius: BorderRadius.circular(5),
                       ),
                       child: Center(
@@ -388,14 +384,18 @@ class _CustomHideDisplayState extends State<CustomHideDisplay> {
                             Icon(
                               Icons.visibility,
                               size: 16,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.7),
                             ),
                             const SizedBox(width: 4),
                             Text(
                               '点击显示隐藏内容',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.7),
                               ),
                             ),
                           ],
@@ -464,14 +464,22 @@ class CustomSizeTag extends WrappedStyleTag {
       // 值在10以下：按照HTML <font> 标签 size 属性映射，统一缩小到80%
       // Font=1:8px, Font=2:10.4px, Font=3:12.8px, Font=4:14.4px, Font=5:19.2px, Font=6:25.6px, Font=7:38.4px
       switch (numValue.toInt()) {
-        case 1: return 8.0;   // 10.0 * 0.8
-        case 2: return 10.4;  // 13.0 * 0.8
-        case 3: return 12.8;  // 16.0 * 0.8
-        case 4: return 14.4;  // 18.0 * 0.8
-        case 5: return 19.2;  // 24.0 * 0.8
-        case 6: return 25.6;  // 32.0 * 0.8
-        case 7: return 38.4;  // 48.0 * 0.8
-        default: return 12.8; // 默认为 size=3 的大小 (16.0 * 0.8)
+        case 1:
+          return 8.0; // 10.0 * 0.8
+        case 2:
+          return 10.4; // 13.0 * 0.8
+        case 3:
+          return 12.8; // 16.0 * 0.8
+        case 4:
+          return 14.4; // 18.0 * 0.8
+        case 5:
+          return 19.2; // 24.0 * 0.8
+        case 6:
+          return 25.6; // 32.0 * 0.8
+        case 7:
+          return 38.4; // 48.0 * 0.8
+        default:
+          return 12.8; // 默认为 size=3 的大小 (16.0 * 0.8)
       }
     } else if (numValue <= 100) {
       // 值在10-100：作为px绝对值，缩小到80%
@@ -508,10 +516,15 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   bool _showImages = false;
   final List<String> _imageUrls = [];
   late bool _isCollected; // 分离收藏状态为独立变量
-  
+
   // BBCode渲染缓存
   String? _cachedRawContent;
   Widget? _cachedBBCodeWidget;
+
+  // WebView相关状态
+  InAppWebViewController? _webViewController;
+  bool _webViewLoading = false;
+  String? _webViewError;
 
   @override
   void initState() {
@@ -616,9 +629,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               '下载失败：$e',
@@ -650,7 +661,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         id: widget.torrentItem.id,
         make: newCollectionState,
       );
-      
+
       // 请求成功，直接更新传入的torrentItem对象
       widget.torrentItem.collection = newCollectionState;
     } catch (e) {
@@ -659,9 +670,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         setState(() {
           _isCollected = !newCollectionState;
         });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               '收藏操作失败：$e',
@@ -1044,7 +1053,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     // 添加自定义size标签处理逻辑
     stylesheet.tags['size'] = CustomSizeTag();
     stylesheet.tags['SIZE'] = CustomSizeTag();
-    
+
     // 添加自定义hide标签处理逻辑
     stylesheet.tags['hide'] = CustomHideTag();
     stylesheet.tags['HIDE'] = CustomHideTag();
@@ -1569,12 +1578,297 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     return widget;
   }
 
+  // 构建WebView内容
+  Widget buildWebViewContent(String webviewUrl) {
+    // 检查是否为Android平台
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      // 非Android平台显示按钮打开系统浏览器
+      return Center(
+        child: Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(
+                context,
+              ).colorScheme.outline.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.open_in_browser,
+                size: 48,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(height: 16),
+              Text('种子详情页面', style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 8),
+              Text(
+                '在当前平台上，请使用系统浏览器查看详细内容',
+                style: Theme.of(context).textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () async {
+                  try {
+                    final uri = Uri.parse(webviewUrl);
+                    // 在Linux和Windows平台上，canLaunchUrl可能返回false即使系统可以打开URL
+                    // 所以在这些平台上直接尝试启动，其他平台保持原有逻辑
+                    if (defaultTargetPlatform == TargetPlatform.linux || 
+                        defaultTargetPlatform == TargetPlatform.windows) {
+                      final platformName = defaultTargetPlatform == TargetPlatform.linux ? 'Linux' : 'Windows';
+                      debugPrint('$platformName平台：尝试启动URL: $webviewUrl');
+                      debugPrint('使用模式: LaunchMode.externalApplication');
+                      
+                      try {
+                        // 首先尝试使用 url_launcher
+                        await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        );
+                        debugPrint('$platformName平台：url_launcher 启动命令已执行');
+                        
+                        // 对于 Linux，提供 xdg-open 备选方案
+                        if (defaultTargetPlatform == TargetPlatform.linux) {
+                          // 等待一小段时间，然后尝试备选方案
+                          await Future.delayed(const Duration(milliseconds: 500));
+                          
+                          // 如果 url_launcher 没有效果，尝试直接调用 xdg-open
+                          debugPrint('Linux平台：尝试备选方案 - 直接调用 xdg-open');
+                          final result = await Process.run('xdg-open', [webviewUrl]);
+                          debugPrint('Linux平台：xdg-open 退出码: ${result.exitCode}');
+                          if (result.exitCode != 0) {
+                            debugPrint('Linux平台：xdg-open 错误输出: ${result.stderr}');
+                          } else {
+                            debugPrint('Linux平台：xdg-open 执行成功');
+                          }
+                        } else if (defaultTargetPlatform == TargetPlatform.windows) {
+                          // Windows 平台通常 url_launcher 就足够了，但如果需要可以添加 start 命令备选方案
+                          debugPrint('Windows平台：url_launcher 应该已经处理了URL启动');
+                        }
+                      } catch (processError) {
+                        debugPrint('$platformName平台：Process.run 失败: $processError');
+                        // 如果 Process.run 也失败，抛出原始错误
+                        rethrow;
+                      }
+                    } else {
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      } else {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '无法打开链接: $webviewUrl',
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onErrorContainer,
+                                ),
+                              ),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.errorContainer,
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    debugPrint('URL启动失败: $e');
+                    if (mounted) {
+                      String errorMessage = '打开链接失败: $e';
+                      if (defaultTargetPlatform == TargetPlatform.linux) {
+                        errorMessage += '\n\n建议检查：\n1. 默认浏览器设置\n2. Desktop文件是否存在\n3. 运行: xdg-open $webviewUrl';
+                      } else if (defaultTargetPlatform == TargetPlatform.windows) {
+                        errorMessage += '\n\n建议检查：\n1. 默认浏览器设置\n2. 浏览器是否正确安装\n3. 运行: start $webviewUrl';
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(errorMessage),
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.errorContainer,
+                          duration: const Duration(seconds: 8), // 延长显示时间以便阅读
+                        ),
+                      );
+                    }
+                  }
+                },
+                icon: const Icon(Icons.launch),
+                label: const Text('在浏览器中打开'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Android平台显示内嵌WebView
+    return Column(
+      children: [
+        // WebView加载状态指示器
+        if (_webViewLoading)
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 12),
+                Text('正在加载网页...'),
+              ],
+            ),
+          ),
+
+        // WebView错误显示
+        if (_webViewError != null)
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '网页加载失败',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _webViewError!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _webViewError = null;
+                          _webViewLoading = true;
+                        });
+                        _webViewController?.reload();
+                      },
+                      child: Text('重试'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+        // WebView容器
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: Theme.of(
+                  context,
+                ).colorScheme.outline.withValues(alpha: 0.3),
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: InAppWebView(
+                initialUrlRequest: URLRequest(url: WebUri(webviewUrl)),
+                initialSettings: InAppWebViewSettings(
+                  javaScriptEnabled: true,
+                  domStorageEnabled: true,
+                  allowsInlineMediaPlayback: true,
+                  mediaPlaybackRequiresUserGesture: false,
+                  useOnDownloadStart: true,
+                  useShouldOverrideUrlLoading: true,
+                ),
+                onWebViewCreated: (controller) {
+                  _webViewController = controller;
+                },
+                onLoadStart: (controller, url) {
+                  setState(() {
+                    _webViewLoading = true;
+                    _webViewError = null;
+                  });
+                },
+                onLoadStop: (controller, url) {
+                  setState(() {
+                    _webViewLoading = false;
+                  });
+                },
+                onProgressChanged: (controller, progress) {
+                  // 可以在这里显示加载进度
+                },
+                onReceivedError: (controller, request, error) {
+                  debugPrint(
+                    'WebView错误: ${error.description}, URL: ${request.url}, isForMainFrame: ${request.isForMainFrame}',
+                  );
+                  // 只有主页面加载错误才显示错误信息，子资源错误忽略
+                  if (request.isForMainFrame == true) {
+                    setState(() {
+                      _webViewLoading = false;
+                      _webViewError = '加载错误: ${error.description}';
+                    });
+                  } else {
+                    // 子资源加载失败，只打印日志，不影响页面显示
+                    debugPrint('子资源加载失败，忽略: ${request.url}');
+                  }
+                },
+                shouldOverrideUrlLoading: (controller, navigationAction) async {
+                  final url = navigationAction.request.url.toString();
+
+                  // 如果是下载链接，使用系统浏览器打开
+                  if (url.contains('download') || url.contains('.torrent')) {
+                    // 可以在这里处理下载逻辑
+                    return NavigationActionPolicy.CANCEL;
+                  }
+
+                  return NavigationActionPolicy.ALLOW;
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: SelectableText(
-          widget.torrentItem.name.length > 50 
+          widget.torrentItem.name.length > 50
               ? '${widget.torrentItem.name.substring(0, 50)}...'
               : widget.torrentItem.name,
           style: TextStyle(
@@ -1620,6 +1914,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                 ],
               ),
             )
+          : _detail?.webviewUrl != null
+          ? buildWebViewContent(_detail!.webviewUrl!)
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(

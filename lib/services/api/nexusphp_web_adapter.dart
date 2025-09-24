@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../models/app_models.dart';
 import 'site_adapter.dart';
 import '../site_config_service.dart';
@@ -528,7 +530,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
             ),
           );
         } catch (e) {
-          print('解析种子行失败: $e');
+          debugPrint('解析种子行失败: $e');
           continue;
         }
       }
@@ -539,43 +541,36 @@ class NexusPHPWebAdapter extends SiteAdapter {
   @override
   Future<TorrentDetail> fetchTorrentDetail(String id) async {
     // 构建种子详情页面URL
-    final detailUrl = '${_siteConfig.baseUrl}/details.php?id=$id&hit=1';
+    final baseUrl = _siteConfig.baseUrl.endsWith('/') ? _siteConfig.baseUrl.substring(0, _siteConfig.baseUrl.length - 1) : _siteConfig.baseUrl;
+    final detailUrl = '$baseUrl/details.php?id=$id&hit=1';
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      // 设置Cookie到baseUrl域下，HTTPOnly避免带到图片请求
+      final cookieManager = CookieManager.instance();
+      final baseUri = Uri.parse(_siteConfig.baseUrl);
 
-    // 设置Cookie到baseUrl域下，HTTPOnly避免带到图片请求
-    final cookieManager = CookieManager.instance();
-    final baseUri = Uri.parse(_siteConfig.baseUrl);
-
-    if (_siteConfig.cookie != null && _siteConfig.cookie!.isNotEmpty) {
-      // 解析cookie字符串并设置到域下
-      final cookies = _siteConfig.cookie!.split(';');
-      for (final cookieStr in cookies) {
-        final parts = cookieStr.trim().split('=');
-        if (parts.length == 2) {
-          await cookieManager.setCookie(
-            url: WebUri(_siteConfig.baseUrl),
-            name: parts[0].trim(),
-            value: parts[1].trim(),
-            domain: baseUri.host,
-            isHttpOnly: true,
-          );
+      if (_siteConfig.cookie != null && _siteConfig.cookie!.isNotEmpty) {
+        // 解析cookie字符串并设置到域下
+        final cookies = _siteConfig.cookie!.split(';');
+        for (final cookieStr in cookies) {
+          final parts = cookieStr.trim().split('=');
+          if (parts.length == 2) {
+            await cookieManager.setCookie(
+              url: WebUri(_siteConfig.baseUrl),
+              name: parts[0].trim(),
+              value: parts[1].trim(),
+              domain: baseUri.host,
+              isHttpOnly: true,
+            );
+          }
         }
       }
     }
 
-    // 使用应用内webview打开种子详情页面
-    final browser = InAppBrowser();
-    await browser.openUrlRequest(
-      urlRequest: URLRequest(url: WebUri(detailUrl)),
-      settings: InAppBrowserClassSettings(
-        browserSettings: InAppBrowserSettings(
-          hideUrlBar: false,
-          hideToolbarTop: true,
-        ),
-      ),
+    // 返回包含webview URL的TorrentDetail对象，让页面组件来处理嵌入式显示
+    return TorrentDetail(
+      descr: '', // 空描述，因为内容将通过webview显示
+      webviewUrl: detailUrl, // 传递URL给页面组件
     );
-
-    // 由于使用webview打开，返回一个空的TorrentDetail对象
-    return TorrentDetail(descr: '');
   }
 
   @override

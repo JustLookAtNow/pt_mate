@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
 import 'dart:math';
 import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
@@ -531,6 +532,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
   final _baseUrlController = TextEditingController();
   final _apiKeyController = TextEditingController();
   final _passKeyController = TextEditingController();
+  final _cookieController = TextEditingController(); // 手工输入cookie的控制器
 
   SiteType _selectedSiteType = SiteType.mteam;
   int _presetIndex = -1; // -1 表示自定义
@@ -552,9 +554,11 @@ class _SiteEditPageState extends State<SiteEditPage> {
       _baseUrlController.text = widget.site!.baseUrl;
       _apiKeyController.text = widget.site!.apiKey ?? '';
       _passKeyController.text = widget.site!.passKey ?? '';
+      _cookieController.text = widget.site!.cookie ?? '';
       _selectedSiteType = widget.site!.siteType;
       _searchCategories = List.from(widget.site!.searchCategories);
       _siteFeatures = widget.site!.features;
+      _savedCookie = widget.site!.cookie;
     } else {
       // 新建站点时，查询分类配置初始为空
       _searchCategories = [];
@@ -640,6 +644,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
     _baseUrlController.dispose();
     _apiKeyController.dispose();
     _passKeyController.dispose();
+    _cookieController.dispose();
     super.dispose();
   }
 
@@ -1148,7 +1153,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 ),
                 const SizedBox(height: 16),
               ] else ...[
-                // NexusPHPWeb类型显示登录按钮
+                // NexusPHPWeb类型显示登录认证
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -1169,19 +1174,52 @@ class _SiteEditPageState extends State<SiteEditPage> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        const Text(
-                          '此类型站点需要通过网页登录获取认证信息',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: _openWebLogin,
-                            icon: const Icon(Icons.web),
-                            label: const Text('打开登录页面'),
+                        
+                        // 根据平台显示不同的认证方式
+                        if (Platform.isAndroid) ...[
+                          const Text(
+                            '此类型站点需要通过网页登录获取认证信息',
+                            style: TextStyle(color: Colors.grey),
                           ),
-                        ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _openWebLogin,
+                              icon: const Icon(Icons.web),
+                              label: const Text('打开登录页面'),
+                            ),
+                          ),
+                        ] else ...[
+                          const Text(
+                            '请手动输入从浏览器获取的Cookie字符串',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _cookieController,
+                            decoration: const InputDecoration(
+                              labelText: 'Cookie字符串',
+                              hintText: '从浏览器开发者工具中复制完整的Cookie值',
+                              border: OutlineInputBorder(),
+                            ),
+                            maxLines: 3,
+                            onChanged: (value) {
+                              // 当用户输入cookie时，更新保存的cookie
+                              _savedCookie = value.trim();
+                              if (_savedCookie!.isNotEmpty) {
+                                setState(() {
+                                  _cookieStatus = '已输入Cookie，请保存配置后测试连接';
+                                });
+                              } else {
+                                setState(() {
+                                  _cookieStatus = null;
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                        
                         if (_cookieStatus != null) ...[
                           const SizedBox(height: 12),
                           Container(

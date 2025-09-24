@@ -28,8 +28,12 @@ class MemberProfile {
 // 种子详情
 class TorrentDetail {
   final String descr;
+  final String? webviewUrl; // 可选的webview URL，用于嵌入式显示
   
-  TorrentDetail({required this.descr});
+  TorrentDetail({
+    required this.descr,
+    this.webviewUrl,
+  });
 }
 
 // 下载状态枚举
