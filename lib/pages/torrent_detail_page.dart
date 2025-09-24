@@ -526,6 +526,27 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   bool _webViewLoading = false;
   String? _webViewError;
 
+  // 优雅关闭 WebView，避免页面退出或跳转时出现崩溃
+  Future<void> _disposeWebView() async {
+    final controller = _webViewController;
+    if (controller == null) return;
+    try {
+      await controller.stopLoading();
+    } catch (_) {}
+    try {
+      await controller.loadUrl(
+        urlRequest: URLRequest(url: WebUri('about:blank')),
+      );
+    } catch (_) {}
+    _webViewController = null;
+  }
+
+  @override
+  void dispose() {
+    _disposeWebView();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1865,7 +1886,21 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: () async {
+        if (_webViewController != null) {
+          try {
+            final canGoBack = await _webViewController!.canGoBack();
+            if (canGoBack) {
+              await _webViewController!.goBack();
+              return false;
+            }
+          } catch (_) {}
+          await _disposeWebView();
+        }
+        return true;
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: SelectableText(
           widget.torrentItem.name.length > 50
@@ -1986,6 +2021,6 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
           ),
         ],
       ),
-    );
+    ));
   }
 }

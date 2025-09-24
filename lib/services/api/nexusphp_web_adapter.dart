@@ -541,7 +541,9 @@ class NexusPHPWebAdapter extends SiteAdapter {
   @override
   Future<TorrentDetail> fetchTorrentDetail(String id) async {
     // 构建种子详情页面URL
-    final baseUrl = _siteConfig.baseUrl.endsWith('/') ? _siteConfig.baseUrl.substring(0, _siteConfig.baseUrl.length - 1) : _siteConfig.baseUrl;
+    final baseUrl = _siteConfig.baseUrl.endsWith('/')
+        ? _siteConfig.baseUrl.substring(0, _siteConfig.baseUrl.length - 1)
+        : _siteConfig.baseUrl;
     final detailUrl = '$baseUrl/details.php?id=$id&hit=1';
     if (defaultTargetPlatform == TargetPlatform.android) {
       // 设置Cookie到baseUrl域下，HTTPOnly避免带到图片请求
@@ -697,20 +699,42 @@ class NexusPHPWebAdapter extends SiteAdapter {
     final outerElement = soup.find('#outer');
     if (outerElement == null) return categories;
 
+    var currentBatch = <Map<String, String>>[];
+
     final formElement = outerElement.find(
       'form',
       attrs: {'action': 'usercp.php'},
     );
 
     if (formElement == null) return categories;
+
     final table2 = formElement.find('table');
-
-    final infoTables = table2?.findAll('table');
-
-    if (infoTables == null) return categories;
+    List<Bs4Element> infoTables = [];
+    if (table2 == null) {
+      //<form method="post" action="usercp.php"></form>没闭合。
+      for (var element in outerElement.children) {
+        final checkboxes = element.findAll('input[type="checkbox"]');
+        if (checkboxes.isNotEmpty) {
+          for (var checkbox in checkboxes) {
+            final categoryName = checkbox.attributes['name'] ?? '';
+            final categoryId = checkbox.attributes['id'] ?? '';
+            if (categoryName.isNotEmpty &&
+                categoryName.startsWith("cat") &&
+                categoryId.isNotEmpty &&
+                categoryId.startsWith("cat")) {
+              infoTables = element.findAll('table');
+              if (infoTables.isNotEmpty) {
+                break;
+              }
+            }
+          }
+        }
+      }
+    } else {
+      infoTables = table2.findAll('table');
+    }
 
     int batchIndex = 1;
-    var currentBatch = <Map<String, String>>[];
 
     for (final infoTable in infoTables) {
       final rows = infoTable.findAll('tr');
