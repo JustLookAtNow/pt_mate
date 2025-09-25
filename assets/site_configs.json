@@ -281,6 +281,24 @@
         "advancedSearch": true
       },
       "discountMapping": {}
+    },
+    {
+      "id": "xingyunge",
+      "name": "星陨阁",
+      "baseUrl": "https://pt.xingyungept.org/",
+      "siteType": "NexusPHPWeb",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": true,
+        "advancedSearch": true
+      },
+      "discountMapping": {}
     }
   ],
   "defaultTemplates": {
