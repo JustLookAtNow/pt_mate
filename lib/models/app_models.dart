@@ -29,18 +29,15 @@ class MemberProfile {
 class TorrentDetail {
   final String descr;
   final String? webviewUrl; // 可选的webview URL，用于嵌入式显示
-  
-  TorrentDetail({
-    required this.descr,
-    this.webviewUrl,
-  });
+
+  TorrentDetail({required this.descr, this.webviewUrl});
 }
 
 // 下载状态枚举
 enum DownloadStatus {
-  none,        // 未下载
+  none, // 未下载
   downloading, // 下载中
-  completed,   // 已完成
+  completed, // 已完成
 }
 
 // 种子项目
@@ -54,7 +51,9 @@ class TorrentItem {
   final int seeders;
   final int leechers;
   final int sizeBytes;
+  //仅mteam，暂时没啥用
   final List<String> imageList;
+  final String cover;
   final DownloadStatus downloadStatus;
   bool collection; // 是否已收藏（改为可变）
 
@@ -69,6 +68,7 @@ class TorrentItem {
     required this.leechers,
     required this.sizeBytes,
     required this.imageList,
+    required this.cover,
     this.downloadStatus = DownloadStatus.none,
     this.collection = false,
   });
@@ -84,6 +84,7 @@ class TorrentItem {
     int? leechers,
     int? sizeBytes,
     List<String>? imageList,
+    String? cover,
     DownloadStatus? downloadStatus,
     bool? collection,
   }) {
@@ -98,6 +99,7 @@ class TorrentItem {
       leechers: leechers ?? this.leechers,
       sizeBytes: sizeBytes ?? this.sizeBytes,
       imageList: imageList ?? this.imageList,
+      cover: cover ?? this.cover,
       downloadStatus: downloadStatus ?? this.downloadStatus,
       collection: collection ?? this.collection,
     );
@@ -140,8 +142,6 @@ enum DiscountType {
   const DiscountType(this.value);
   final String value;
 
-
-  
   // 获取显示文本
   String get displayText {
     switch (this) {
@@ -173,7 +173,7 @@ enum DiscountType {
         return '90%';
     }
   }
-  
+
   // 获取显示颜色类型
   DiscountColorType get colorType {
     switch (this) {
@@ -199,17 +199,18 @@ enum DiscountType {
 }
 
 // 优惠显示颜色类型
-enum DiscountColorType {
-  none,
-  green,
-  yellow,
-}
+enum DiscountColorType { none, green, yellow }
 
 // 网站类型枚举
 enum SiteType {
   mteam('M-Team', 'M-Team 站点', 'API Key (x-api-key)', '从 控制台-实验室-存储令牌 获取并粘贴此处'),
-  nexusphp('NexusPHP', 'NexusPHP(1.9+ with api)', 'API Key (访问令牌)', '控制面板-设定首页-访问令牌（权限都勾上）'),
-  nexusphpweb('NexusPHPWeb', 'NexusPHP(web)', 'Cookie认证', '通过网页登录获取认证信息'),
+  nexusphp(
+    'NexusPHP',
+    'NexusPHP(1.9+ with api)',
+    'API Key (访问令牌)',
+    '控制面板-设定首页-访问令牌（权限都勾上）',
+  ),
+  nexusphpweb('NexusPHPWeb', 'NexusPHP(web)', 'Cookie认证', '通过网页登录获取认证信息')
   // 未来可以添加其他站点类型
   // gazelle('Gazelle', 'Gazelle 站点'),
   ;
@@ -221,7 +222,7 @@ enum SiteType {
   final String apiKeyHint;
 
   String get passKeyLabel {
-    switch (this) {   
+    switch (this) {
       case SiteType.mteam:
         return 'Pass Key'; // M-Team通常不需要passKey
       case SiteType.nexusphp:
@@ -286,37 +287,47 @@ class SiteFeatures {
     bool? supportCategories,
     bool? supportAdvancedSearch,
   }) => SiteFeatures(
-        supportMemberProfile: supportMemberProfile ?? this.supportMemberProfile,
-        supportTorrentSearch: supportTorrentSearch ?? this.supportTorrentSearch,
-        supportTorrentDetail: supportTorrentDetail ?? this.supportTorrentDetail,
-        supportDownload: supportDownload ?? this.supportDownload,
-        supportCollection: supportCollection ?? this.supportCollection,
-        supportHistory: supportHistory ?? this.supportHistory,
-        supportCategories: supportCategories ?? this.supportCategories,
-        supportAdvancedSearch: supportAdvancedSearch ?? this.supportAdvancedSearch,
-      );
+    supportMemberProfile: supportMemberProfile ?? this.supportMemberProfile,
+    supportTorrentSearch: supportTorrentSearch ?? this.supportTorrentSearch,
+    supportTorrentDetail: supportTorrentDetail ?? this.supportTorrentDetail,
+    supportDownload: supportDownload ?? this.supportDownload,
+    supportCollection: supportCollection ?? this.supportCollection,
+    supportHistory: supportHistory ?? this.supportHistory,
+    supportCategories: supportCategories ?? this.supportCategories,
+    supportAdvancedSearch: supportAdvancedSearch ?? this.supportAdvancedSearch,
+  );
 
   Map<String, dynamic> toJson() => {
-        'supportMemberProfile': supportMemberProfile,
-        'supportTorrentSearch': supportTorrentSearch,
-        'supportTorrentDetail': supportTorrentDetail,
-        'supportDownload': supportDownload,
-        'supportCollection': supportCollection,
-        'supportHistory': supportHistory,
-        'supportCategories': supportCategories,
-        'supportAdvancedSearch': supportAdvancedSearch,
-      };
+    'supportMemberProfile': supportMemberProfile,
+    'supportTorrentSearch': supportTorrentSearch,
+    'supportTorrentDetail': supportTorrentDetail,
+    'supportDownload': supportDownload,
+    'supportCollection': supportCollection,
+    'supportHistory': supportHistory,
+    'supportCategories': supportCategories,
+    'supportAdvancedSearch': supportAdvancedSearch,
+  };
 
   factory SiteFeatures.fromJson(Map<String, dynamic> json) => SiteFeatures(
-        supportMemberProfile: json['userProfile'] ?? json['supportMemberProfile'] as bool? ?? true,
-        supportTorrentSearch: json['torrentSearch'] ?? json['supportTorrentSearch'] as bool? ?? true,
-        supportTorrentDetail: json['torrentDetail'] ?? json['supportTorrentDetail'] as bool? ?? true,
-        supportDownload: json['download'] ?? json['supportDownload'] as bool? ?? true,
-        supportCollection: json['favorites'] ?? json['supportCollection'] as bool? ?? true,
-        supportHistory: json['downloadHistory'] ?? json['supportHistory'] as bool? ?? true,
-        supportCategories: json['categorySearch'] ?? json['supportCategories'] as bool? ?? true,
-        supportAdvancedSearch: json['advancedSearch'] ?? json['supportAdvancedSearch'] as bool? ?? true,
-      );
+    supportMemberProfile:
+        json['userProfile'] ?? json['supportMemberProfile'] as bool? ?? true,
+    supportTorrentSearch:
+        json['torrentSearch'] ?? json['supportTorrentSearch'] as bool? ?? true,
+    supportTorrentDetail:
+        json['torrentDetail'] ?? json['supportTorrentDetail'] as bool? ?? true,
+    supportDownload:
+        json['download'] ?? json['supportDownload'] as bool? ?? true,
+    supportCollection:
+        json['favorites'] ?? json['supportCollection'] as bool? ?? true,
+    supportHistory:
+        json['downloadHistory'] ?? json['supportHistory'] as bool? ?? true,
+    supportCategories:
+        json['categorySearch'] ?? json['supportCategories'] as bool? ?? true,
+    supportAdvancedSearch:
+        json['advancedSearch'] ??
+        json['supportAdvancedSearch'] as bool? ??
+        true,
+  );
 
   // M-Team 站点的默认功能配置
   static const SiteFeatures mteamDefault = SiteFeatures(
@@ -339,28 +350,25 @@ class SiteSearchItem {
   final String id; // 站点ID
   final Map<String, dynamic>? additionalParams; // 额外参数
 
-  const SiteSearchItem({
-    required this.id,
-    this.additionalParams,
-  });
+  const SiteSearchItem({required this.id, this.additionalParams});
 
   SiteSearchItem copyWith({
     String? id,
     Map<String, dynamic>? additionalParams,
   }) => SiteSearchItem(
-        id: id ?? this.id,
-        additionalParams: additionalParams ?? this.additionalParams,
-      );
+    id: id ?? this.id,
+    additionalParams: additionalParams ?? this.additionalParams,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'additionalParams': additionalParams,
-      };
+    'id': id,
+    'additionalParams': additionalParams,
+  };
 
   factory SiteSearchItem.fromJson(Map<String, dynamic> json) => SiteSearchItem(
-        id: json['id'] as String,
-        additionalParams: json['additionalParams'] as Map<String, dynamic>?,
-      );
+    id: json['id'] as String,
+    additionalParams: json['additionalParams'] as Map<String, dynamic>?,
+  );
 
   @override
   String toString() => jsonEncode(toJson());
@@ -399,24 +407,24 @@ class AggregateSearchConfig {
     List<SiteSearchItem>? enabledSites,
     bool? isActive,
   }) => AggregateSearchConfig(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        type: type ?? this.type,
-        enabledSites: enabledSites ?? this.enabledSites,
-        isActive: isActive ?? this.isActive,
-      );
+    id: id ?? this.id,
+    name: name ?? this.name,
+    type: type ?? this.type,
+    enabledSites: enabledSites ?? this.enabledSites,
+    isActive: isActive ?? this.isActive,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'type': type,
-        'enabledSites': enabledSites.map((site) => site.toJson()).toList(),
-        'isActive': isActive,
-      };
+    'id': id,
+    'name': name,
+    'type': type,
+    'enabledSites': enabledSites.map((site) => site.toJson()).toList(),
+    'isActive': isActive,
+  };
 
   factory AggregateSearchConfig.fromJson(Map<String, dynamic> json) {
     List<SiteSearchItem> enabledSites = [];
-    
+
     // 兼容新格式：enabledSites
     if (json['enabledSites'] != null) {
       enabledSites = (json['enabledSites'] as List<dynamic>)
@@ -430,9 +438,11 @@ class AggregateSearchConfig {
           .map((id) => SiteSearchItem(id: id))
           .toList();
     }
-    
+
     return AggregateSearchConfig(
-      id: json['id'] as String? ?? 'legacy-${DateTime.now().millisecondsSinceEpoch}',
+      id:
+          json['id'] as String? ??
+          'legacy-${DateTime.now().millisecondsSinceEpoch}',
       name: json['name'] as String,
       type: json['type'] as String? ?? 'custom', // 兼容旧版本
       enabledSites: enabledSites,
@@ -491,27 +501,28 @@ class AggregateSearchSettings {
     List<AggregateSearchConfig>? searchConfigs,
     int? searchThreads,
   }) => AggregateSearchSettings(
-        searchConfigs: searchConfigs ?? this.searchConfigs,
-        searchThreads: searchThreads ?? this.searchThreads,
-      );
+    searchConfigs: searchConfigs ?? this.searchConfigs,
+    searchThreads: searchThreads ?? this.searchThreads,
+  );
 
   Map<String, dynamic> toJson() => {
-        'searchConfigs': searchConfigs.map((e) => e.toJson()).toList(),
-        'searchThreads': searchThreads,
-      };
+    'searchConfigs': searchConfigs.map((e) => e.toJson()).toList(),
+    'searchThreads': searchThreads,
+  };
 
   factory AggregateSearchSettings.fromJson(Map<String, dynamic> json) {
     List<AggregateSearchConfig> configs = [];
     if (json['searchConfigs'] != null) {
       try {
-        final list = (json['searchConfigs'] as List).cast<Map<String, dynamic>>();
+        final list = (json['searchConfigs'] as List)
+            .cast<Map<String, dynamic>>();
         configs = list.map(AggregateSearchConfig.fromJson).toList();
       } catch (_) {
         // 解析失败时使用空列表
         configs = [];
       }
     }
-    
+
     return AggregateSearchSettings(
       searchConfigs: configs,
       searchThreads: json['searchThreads'] as int? ?? 3,
@@ -562,38 +573,39 @@ class SiteConfig {
     List<SearchCategoryConfig>? searchCategories,
     SiteFeatures? features,
   }) => SiteConfig(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        baseUrl: baseUrl ?? this.baseUrl,
-        apiKey: apiKey ?? this.apiKey,
-        passKey: passKey ?? this.passKey,
-        cookie: cookie ?? this.cookie,
-        userId: userId ?? this.userId,
-        siteType: siteType ?? this.siteType,
-        isActive: isActive ?? this.isActive,
-        searchCategories: searchCategories ?? this.searchCategories,
-        features: features ?? this.features,
-      );
+    id: id ?? this.id,
+    name: name ?? this.name,
+    baseUrl: baseUrl ?? this.baseUrl,
+    apiKey: apiKey ?? this.apiKey,
+    passKey: passKey ?? this.passKey,
+    cookie: cookie ?? this.cookie,
+    userId: userId ?? this.userId,
+    siteType: siteType ?? this.siteType,
+    isActive: isActive ?? this.isActive,
+    searchCategories: searchCategories ?? this.searchCategories,
+    features: features ?? this.features,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'baseUrl': baseUrl,
-        'apiKey': apiKey,
-        'passKey': passKey,
-        'cookie': cookie,
-        'userId': userId,
-        'siteType': siteType.id,
-        'isActive': isActive,
-        'searchCategories': searchCategories.map((e) => e.toJson()).toList(),
-        'features': features.toJson(),
-      };
+    'id': id,
+    'name': name,
+    'baseUrl': baseUrl,
+    'apiKey': apiKey,
+    'passKey': passKey,
+    'cookie': cookie,
+    'userId': userId,
+    'siteType': siteType.id,
+    'isActive': isActive,
+    'searchCategories': searchCategories.map((e) => e.toJson()).toList(),
+    'features': features.toJson(),
+  };
 
   factory SiteConfig.fromJson(Map<String, dynamic> json) {
     List<SearchCategoryConfig> categories = [];
     if (json['searchCategories'] != null) {
       try {
-        final list = (json['searchCategories'] as List).cast<Map<String, dynamic>>();
+        final list = (json['searchCategories'] as List)
+            .cast<Map<String, dynamic>>();
         categories = list.map(SearchCategoryConfig.fromJson).toList();
       } catch (_) {
         // 解析失败时使用默认配置
@@ -603,20 +615,24 @@ class SiteConfig {
       // 如果没有配置，使用默认配置
       categories = SearchCategoryConfig.getDefaultConfigs();
     }
-    
+
     // 解析功能配置
     SiteFeatures features = SiteFeatures.mteamDefault;
     if (json['features'] != null) {
       try {
-        features = SiteFeatures.fromJson(json['features'] as Map<String, dynamic>);
+        features = SiteFeatures.fromJson(
+          json['features'] as Map<String, dynamic>,
+        );
       } catch (_) {
         // 解析失败时使用默认配置
         features = SiteFeatures.mteamDefault;
       }
     }
-    
+
     return SiteConfig(
-      id: json['id'] as String? ?? 'legacy-${DateTime.now().millisecondsSinceEpoch}',
+      id:
+          json['id'] as String? ??
+          'legacy-${DateTime.now().millisecondsSinceEpoch}',
       name: json['name'] as String,
       baseUrl: json['baseUrl'] as String,
       apiKey: json['apiKey'] as String?,
@@ -641,7 +657,8 @@ class SiteConfig {
 class SearchCategoryConfig {
   final String id; // 唯一标识
   final String displayName; // 显示名称
-  final String parameters; // 请求参数，格式如：mode:normal 或 mode:normal,teams:["44","9","43"]
+  final String
+  parameters; // 请求参数，格式如：mode:normal 或 mode:normal,teams:["44","9","43"]
 
   const SearchCategoryConfig({
     required this.id,
@@ -654,18 +671,19 @@ class SearchCategoryConfig {
     String? displayName,
     String? parameters,
   }) => SearchCategoryConfig(
-        id: id ?? this.id,
-        displayName: displayName ?? this.displayName,
-        parameters: parameters ?? this.parameters,
-      );
+    id: id ?? this.id,
+    displayName: displayName ?? this.displayName,
+    parameters: parameters ?? this.parameters,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'displayName': displayName,
-        'parameters': parameters,
-      };
+    'id': id,
+    'displayName': displayName,
+    'parameters': parameters,
+  };
 
-  factory SearchCategoryConfig.fromJson(Map<String, dynamic> json) => SearchCategoryConfig(
+  factory SearchCategoryConfig.fromJson(Map<String, dynamic> json) =>
+      SearchCategoryConfig(
         id: json['id'] as String,
         displayName: json['displayName'] as String,
         parameters: json['parameters'] as String,
@@ -707,7 +725,9 @@ class SearchCategoryConfig {
         if (valueStr.startsWith('[') || valueStr.startsWith('{')) {
           // JSON数组或对象
           result[key] = jsonDecode(valueStr);
-        } else if (valueStr.startsWith('"') && valueStr.endsWith('"') && valueStr.length >= 2) {
+        } else if (valueStr.startsWith('"') &&
+            valueStr.endsWith('"') &&
+            valueStr.length >= 2) {
           // 带引号的字符串，去掉引号
           result[key] = valueStr.substring(1, valueStr.length - 1);
         } else if (valueStr.toLowerCase() == 'true') {
@@ -747,22 +767,22 @@ class SearchCategoryConfig {
 
   // 默认配置
   static List<SearchCategoryConfig> getDefaultConfigs() => [
-        const SearchCategoryConfig(
-          id: 'normal',
-          displayName: '综合',
-          parameters: '{"mode": "normal"}',
-        ),
-        const SearchCategoryConfig(
-          id: 'tvshow',
-          displayName: '电视',
-          parameters: '{"mode": "tvshow"}',
-        ),
-        const SearchCategoryConfig(
-          id: 'movie',
-          displayName: '电影',
-          parameters: '{"mode": "movie"}',
-        ),
-      ];
+    const SearchCategoryConfig(
+      id: 'normal',
+      displayName: '综合',
+      parameters: '{"mode": "normal"}',
+    ),
+    const SearchCategoryConfig(
+      id: 'tvshow',
+      displayName: '电视',
+      parameters: '{"mode": "tvshow"}',
+    ),
+    const SearchCategoryConfig(
+      id: 'movie',
+      displayName: '电影',
+      parameters: '{"mode": "movie"}',
+    ),
+  ];
 }
 
 class QbClientConfig {
@@ -771,7 +791,8 @@ class QbClientConfig {
   final String host; // ip or domain
   final int port;
   final String username;
-  final String? password; // stored securely, may be null when loaded from prefs-only
+  final String?
+  password; // stored securely, may be null when loaded from prefs-only
   final bool useLocalRelay; // 是否启用本地中转，先下载种子文件再提交给qBittorrent
 
   const QbClientConfig({
@@ -793,43 +814,43 @@ class QbClientConfig {
     String? password,
     bool? useLocalRelay,
   }) => QbClientConfig(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        host: host ?? this.host,
-        port: port ?? this.port,
-        username: username ?? this.username,
-        password: password ?? this.password,
-        useLocalRelay: useLocalRelay ?? this.useLocalRelay,
-      );
+    id: id ?? this.id,
+    name: name ?? this.name,
+    host: host ?? this.host,
+    port: port ?? this.port,
+    username: username ?? this.username,
+    password: password ?? this.password,
+    useLocalRelay: useLocalRelay ?? this.useLocalRelay,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'host': host,
-        'port': port,
-        'username': username,
-        'useLocalRelay': useLocalRelay,
-        // password intentionally excluded from plain json by default
-      };
+    'id': id,
+    'name': name,
+    'host': host,
+    'port': port,
+    'username': username,
+    'useLocalRelay': useLocalRelay,
+    // password intentionally excluded from plain json by default
+  };
 
   factory QbClientConfig.fromJson(Map<String, dynamic> json) => QbClientConfig(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        host: json['host'] as String,
-        port: (json['port'] as num).toInt(),
-        username: json['username'] as String,
-        useLocalRelay: (json['useLocalRelay'] as bool?) ?? false,
-      );
+    id: json['id'] as String,
+    name: json['name'] as String,
+    host: json['host'] as String,
+    port: (json['port'] as num).toInt(),
+    username: json['username'] as String,
+    useLocalRelay: (json['useLocalRelay'] as bool?) ?? false,
+  );
 }
 
 // WebDAV同步状态枚举
 enum WebDAVSyncStatus {
-  idle,        // 空闲
-  syncing,     // 同步中
-  uploading,   // 上传中
+  idle, // 空闲
+  syncing, // 同步中
+  uploading, // 上传中
   downloading, // 下载中
-  success,     // 成功
-  error,       // 错误
+  success, // 成功
+  error, // 错误
 }
 
 // WebDAV配置类
@@ -874,88 +895,88 @@ class WebDAVConfig {
     WebDAVSyncStatus? lastSyncStatus,
     String? lastSyncError,
   }) => WebDAVConfig(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        serverUrl: serverUrl ?? this.serverUrl,
-        username: username ?? this.username,
-        remotePath: remotePath ?? this.remotePath,
-        isEnabled: isEnabled ?? this.isEnabled,
-        autoSync: autoSync ?? this.autoSync,
-        syncIntervalMinutes: syncIntervalMinutes ?? this.syncIntervalMinutes,
-        lastSyncTime: lastSyncTime ?? this.lastSyncTime,
-        lastSyncStatus: lastSyncStatus ?? this.lastSyncStatus,
-        lastSyncError: lastSyncError ?? this.lastSyncError,
-      );
+    id: id ?? this.id,
+    name: name ?? this.name,
+    serverUrl: serverUrl ?? this.serverUrl,
+    username: username ?? this.username,
+    remotePath: remotePath ?? this.remotePath,
+    isEnabled: isEnabled ?? this.isEnabled,
+    autoSync: autoSync ?? this.autoSync,
+    syncIntervalMinutes: syncIntervalMinutes ?? this.syncIntervalMinutes,
+    lastSyncTime: lastSyncTime ?? this.lastSyncTime,
+    lastSyncStatus: lastSyncStatus ?? this.lastSyncStatus,
+    lastSyncError: lastSyncError ?? this.lastSyncError,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'serverUrl': serverUrl,
-        'username': username,
-        // 注意：密码通过安全存储单独管理，不包含在JSON中
-        'remotePath': remotePath,
-        'isEnabled': isEnabled,
-        'autoSync': autoSync,
-        'syncIntervalMinutes': syncIntervalMinutes,
-        'lastSyncTime': lastSyncTime?.toIso8601String(),
-        'lastSyncStatus': lastSyncStatus.name,
-        'lastSyncError': lastSyncError,
-      };
+    'id': id,
+    'name': name,
+    'serverUrl': serverUrl,
+    'username': username,
+    // 注意：密码通过安全存储单独管理，不包含在JSON中
+    'remotePath': remotePath,
+    'isEnabled': isEnabled,
+    'autoSync': autoSync,
+    'syncIntervalMinutes': syncIntervalMinutes,
+    'lastSyncTime': lastSyncTime?.toIso8601String(),
+    'lastSyncStatus': lastSyncStatus.name,
+    'lastSyncError': lastSyncError,
+  };
 
   factory WebDAVConfig.fromJson(Map<String, dynamic> json) => WebDAVConfig(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        serverUrl: json['serverUrl'] as String,
-        username: json['username'] as String,
-        // 注意：密码通过安全存储单独管理，不从JSON中读取
-        remotePath: json['remotePath'] as String? ?? '/PTMate/backups/',
-        isEnabled: json['isEnabled'] as bool? ?? false,
-        autoSync: json['autoSync'] as bool? ?? false,
-        syncIntervalMinutes: json['syncIntervalMinutes'] as int? ?? 60,
-        lastSyncTime: json['lastSyncTime'] != null 
-            ? DateTime.parse(json['lastSyncTime'] as String) 
-            : null,
-        lastSyncStatus: WebDAVSyncStatus.values.firstWhere(
-          (status) => status.name == (json['lastSyncStatus'] as String? ?? 'idle'),
-          orElse: () => WebDAVSyncStatus.idle,
-        ),
-        lastSyncError: json['lastSyncError'] as String?,
-      );
+    id: json['id'] as String,
+    name: json['name'] as String,
+    serverUrl: json['serverUrl'] as String,
+    username: json['username'] as String,
+    // 注意：密码通过安全存储单独管理，不从JSON中读取
+    remotePath: json['remotePath'] as String? ?? '/PTMate/backups/',
+    isEnabled: json['isEnabled'] as bool? ?? false,
+    autoSync: json['autoSync'] as bool? ?? false,
+    syncIntervalMinutes: json['syncIntervalMinutes'] as int? ?? 60,
+    lastSyncTime: json['lastSyncTime'] != null
+        ? DateTime.parse(json['lastSyncTime'] as String)
+        : null,
+    lastSyncStatus: WebDAVSyncStatus.values.firstWhere(
+      (status) => status.name == (json['lastSyncStatus'] as String? ?? 'idle'),
+      orElse: () => WebDAVSyncStatus.idle,
+    ),
+    lastSyncError: json['lastSyncError'] as String?,
+  );
 
   @override
   String toString() => jsonEncode(toJson());
 
   // 创建默认配置
   static WebDAVConfig createDefault() => WebDAVConfig(
-        id: 'default-${DateTime.now().millisecondsSinceEpoch}',
-        name: '默认WebDAV配置',
-        serverUrl: '',
-        username: '',
-      );
+    id: 'default-${DateTime.now().millisecondsSinceEpoch}',
+    name: '默认WebDAV配置',
+    serverUrl: '',
+    username: '',
+  );
 
   // 常用WebDAV服务提供商的预设配置
   static List<WebDAVPreset> getPresets() => [
-        WebDAVPreset(
-          name: '坚果云',
-          serverUrl: 'https://dav.jianguoyun.com/dav/',
-          description: '使用坚果云的WebDAV服务，需要在坚果云设置中开启第三方应用管理并创建应用密码',
-        ),
-        WebDAVPreset(
-          name: 'Nextcloud',
-          serverUrl: 'https://your-nextcloud.com/remote.php/dav/files/username/',
-          description: '自建或第三方Nextcloud服务，请替换为您的实际服务器地址',
-        ),
-        WebDAVPreset(
-          name: 'ownCloud',
-          serverUrl: 'https://your-owncloud.com/remote.php/webdav/',
-          description: '自建或第三方ownCloud服务，请替换为您的实际服务器地址',
-        ),
-        WebDAVPreset(
-          name: 'Box',
-          serverUrl: 'https://dav.box.com/dav/',
-          description: 'Box云存储的WebDAV接口',
-        ),
-      ];
+    WebDAVPreset(
+      name: '坚果云',
+      serverUrl: 'https://dav.jianguoyun.com/dav/',
+      description: '使用坚果云的WebDAV服务，需要在坚果云设置中开启第三方应用管理并创建应用密码',
+    ),
+    WebDAVPreset(
+      name: 'Nextcloud',
+      serverUrl: 'https://your-nextcloud.com/remote.php/dav/files/username/',
+      description: '自建或第三方Nextcloud服务，请替换为您的实际服务器地址',
+    ),
+    WebDAVPreset(
+      name: 'ownCloud',
+      serverUrl: 'https://your-owncloud.com/remote.php/webdav/',
+      description: '自建或第三方ownCloud服务，请替换为您的实际服务器地址',
+    ),
+    WebDAVPreset(
+      name: 'Box',
+      serverUrl: 'https://dav.box.com/dav/',
+      description: 'Box云存储的WebDAV接口',
+    ),
+  ];
 }
 
 // WebDAV预设配置
@@ -974,12 +995,12 @@ class WebDAVPreset {
 class Defaults {
   // 预设站点配置现在从JSON文件加载
   // 使用 SiteConfigService.loadPresetSites() 来获取预设站点
-  
+
   /// 获取默认的搜索分类配置
   static List<SearchCategoryConfig> getDefaultSearchCategories() {
     return SearchCategoryConfig.getDefaultConfigs();
   }
-  
+
   /// 获取默认的站点功能配置
   static SiteFeatures getDefaultSiteFeatures() {
     return SiteFeatures.mteamDefault;

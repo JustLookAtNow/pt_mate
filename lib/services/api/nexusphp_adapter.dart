@@ -235,6 +235,7 @@ class NexusPHPAdapter implements SiteAdapter {
       downloadStatus: DownloadStatus.none, // 不支持
       collection: item['has_bookmarked'] as bool? ?? false, 
       imageList: const [], // 暂时没有图片列表
+      cover: item['cover'] as String? ?? '',
     );
   }
 

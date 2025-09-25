@@ -199,6 +199,7 @@ class MTeamAdapter extends SiteAdapter {
             leechers: item.leechers,
             sizeBytes: item.sizeBytes,
             imageList: item.imageList,
+            cover: item.imageList.isNotEmpty ? item.imageList.first : '',
             downloadStatus: status,
             collection: item.collection,
           );
@@ -287,6 +288,7 @@ class MTeamAdapter extends SiteAdapter {
       leechers: parseInt(status['leechers']),
       sizeBytes: parseInt(json['size']),
       imageList: imgs,
+      cover: imgs.isNotEmpty ? imgs.first : '',
       downloadStatus: downloadStatus ?? DownloadStatus.none,
       collection: parseBool(json['collection']),
     );

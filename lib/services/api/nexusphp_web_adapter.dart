@@ -377,6 +377,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
         if (tds.length <= 6) continue;
         try {
           final rowTds = tds[1].findAll('td');
+
+          var cover = "";
           // 提取种子ID（从详情链接中）
           var titleTd = rowTds[1];
           var detailLink = titleTd.find('a[href*="details.php"]');
@@ -387,6 +389,12 @@ class NexusPHPWebAdapter extends SiteAdapter {
             titleTd = rowTds[0];
             detailLink = titleTd.find('a[href*="details.php"]');
             if (detailLink == null) continue;
+          } else {
+            //有封面，提取封面
+            var img = rowTds[0].find('img');
+            if (img != null) {
+              cover = img.getAttrValue('data-src') ?? '';
+            }
           }
 
           final href = detailLink.attributes['href'] ?? '';
@@ -527,6 +535,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
               downloadStatus: status,
               collection: collection,
               imageList: [], // 暂时不解析图片列表
+              cover: cover
             ),
           );
         } catch (e) {

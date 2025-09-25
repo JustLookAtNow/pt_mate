@@ -69,10 +69,110 @@ class TorrentListItem extends StatelessWidget {
         ),
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 封面截图
+              Container(
+                width: 60,
+                height: 84,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: torrent.cover.isNotEmpty
+                      ? Image.network(
+                          torrent.cover,
+                          width: 60,
+                          height: 84,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) {
+                              return child;
+                            }
+                            return Container(
+                              width: 60,
+                              height: 84,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      value: loadingProgress.expectedTotalBytes != null
+                                          ? loadingProgress.cumulativeBytesLoaded /
+                                              loadingProgress.expectedTotalBytes!
+                                          : null,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '加载中',
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.image_outlined,
+                                  size: 24,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '加载失败',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.image_outlined,
+                              size: 24,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '暂无',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,6 +223,8 @@ class TorrentListItem extends StatelessWidget {
                     // 种子描述
                     Text(
                       torrent.smallDescr,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).textTheme.bodySmall?.color,
                         fontSize: 12,
@@ -170,11 +272,13 @@ class TorrentListItem extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 4),
+              // const SizedBox(width: 4),
               // 操作按钮列
               Column(
                 mainAxisSize: MainAxisSize.min,
+                
                 children: [
+                  
                   // 收藏按钮 - 仅在站点支持收藏功能且非聚合搜索模式时显示
                   if (!isAggregateMode &&
                       (currentSite?.features.supportCollection ?? true))
