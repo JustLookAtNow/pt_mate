@@ -387,6 +387,11 @@ class _HomePageState extends State<HomePage> {
   bool _didSyncFromAppState = false; // 首帧前从AppState预同步，避免首次渲染null/-1
   bool _didInitialLoad = false; // 首次进入页面后的初始化是否已完成
   
+  // 用户信息卡片滚动隐藏相关状态
+  bool _userInfoVisible = true; // 用户信息卡片是否可见
+  double _lastScrollOffset = 0.0; // 上次滚动位置
+  static const double _scrollThreshold = 50.0; // 滚动阈值
+  
   @override
   void initState() {
     super.initState();
@@ -583,9 +588,23 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onScroll() {
+    final currentOffset = _scrollCtrl.position.pixels;
+    final delta = currentOffset - _lastScrollOffset;
+    
+    // 检测滚动方向并控制用户信息卡片显示
+    if (delta.abs() > _scrollThreshold) {
+      final shouldShow = delta < 0; // 向上滚动时显示，向下滚动时隐藏
+      if (_userInfoVisible != shouldShow) {
+        setState(() {
+          _userInfoVisible = shouldShow;
+        });
+      }
+      _lastScrollOffset = currentOffset;
+    }
+    
+    // 原有的分页加载逻辑
     if (!_hasMore || _loading) return;
-    if (_scrollCtrl.position.pixels >=
-        _scrollCtrl.position.maxScrollExtent - 200) {
+    if (currentOffset >= _scrollCtrl.position.maxScrollExtent - 200) {
       _loadMore();
     }
   }
@@ -1034,9 +1053,16 @@ class _HomePageState extends State<HomePage> {
               // 顶部用户基础信息 - 仅在站点支持用户资料功能时显示
               if (_profile != null &&
                   (appState.site?.features.supportMemberProfile ?? true))
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                  child: Card(
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  height: _userInfoVisible ? null : 0,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 300),
+                    opacity: _userInfoVisible ? 1.0 : 0.0,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                      child: Card(
                     elevation: 4,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -1146,296 +1172,307 @@ class _HomePageState extends State<HomePage> {
                               ],
                             ],
                           ),
-                        ),
+                  ),
                       ),
                     ),
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    Row(
+                ),
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeInOut,
+                height: _userInfoVisible ? null : 0,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 500),
+                  opacity: _userInfoVisible ? 1.0 : 0.0,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
                       children: [
-                        // 分类按钮 - 仅在站点支持分类搜索功能时显示
-                        if (_currentSite?.features.supportCategories ?? true)
-                          IconButton(
-                            onPressed: () {
-                              _showCategoryFilterDialog();
-                            },
-                            icon: const Icon(Icons.category, size: 20),
-                            style: IconButton.styleFrom(
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.primaryContainer,
-                              foregroundColor: Theme.of(
-                                context,
-                              ).colorScheme.onPrimaryContainer,
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.all(8),
-                            ),
-                            tooltip:
-                                _categories.isNotEmpty &&
-                                    _selectedCategoryIndex >= 0 &&
-                                    _selectedCategoryIndex < _categories.length
-                                ? _categories[_selectedCategoryIndex]
-                                      .displayName
-                                : '分类筛选',
-                          ),
-                        if (_currentSite?.features.supportCategories ?? true)
-                          const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: _keywordCtrl,
-                            textInputAction: TextInputAction.search,
-                            enabled:
-                                _currentSite?.features.supportTorrentSearch ??
-                                true,
-                            decoration: InputDecoration(
-                              hintText:
-                                  (_currentSite
-                                          ?.features
-                                          .supportTorrentSearch ??
-                                      true)
-                                  ? '输入关键词（可选）'
-                                  : '当前站点不支持搜索功能',
-                              border: OutlineInputBorder(
-                                borderRadius: const BorderRadius.all(
-                                  Radius.circular(25),
-                                ),
-                                borderSide: BorderSide(
-                                  color: Theme.of(
+                        Row(
+                          children: [
+                            // 分类按钮 - 仅在站点支持分类搜索功能时显示
+                            if (_currentSite?.features.supportCategories ?? true)
+                              IconButton(
+                                onPressed: () {
+                                  _showCategoryFilterDialog();
+                                },
+                                icon: const Icon(Icons.category, size: 20),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Theme.of(
                                     context,
-                                  ).colorScheme.primary.withValues(alpha: 0.3),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: const BorderRadius.all(
-                                  Radius.circular(25),
-                                ),
-                                borderSide: BorderSide(
-                                  color: Theme.of(
+                                  ).colorScheme.primaryContainer,
+                                  foregroundColor: Theme.of(
                                     context,
-                                  ).colorScheme.primary.withValues(alpha: 0.3),
+                                  ).colorScheme.onPrimaryContainer,
+                                  elevation: 2,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.all(8),
                                 ),
+                                tooltip:
+                                    _categories.isNotEmpty &&
+                                        _selectedCategoryIndex >= 0 &&
+                                        _selectedCategoryIndex < _categories.length
+                                    ? _categories[_selectedCategoryIndex]
+                                          .displayName
+                                    : '分类筛选',
                               ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: const BorderRadius.all(
-                                  Radius.circular(25),
+                            if (_currentSite?.features.supportCategories ?? true)
+                              const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _keywordCtrl,
+                                textInputAction: TextInputAction.search,
+                                enabled:
+                                    _currentSite?.features.supportTorrentSearch ??
+                                    true,
+                                decoration: InputDecoration(
+                                  hintText:
+                                      (_currentSite
+                                              ?.features
+                                              .supportTorrentSearch ??
+                                          true)
+                                      ? '输入关键词（可选）'
+                                      : '当前站点不支持搜索功能',
+                                  border: OutlineInputBorder(
+                                    borderRadius: const BorderRadius.all(
+                                      Radius.circular(25),
+                                    ),
+                                    borderSide: BorderSide(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary.withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: const BorderRadius.all(
+                                      Radius.circular(25),
+                                    ),
+                                    borderSide: BorderSide(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary.withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: const BorderRadius.all(
+                                      Radius.circular(25),
+                                    ),
+                                    borderSide: BorderSide(
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
                                 ),
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
+                                onSubmitted: (_) {
+                                  if (_currentSite?.features.supportTorrentSearch ??
+                                      true) {
+                                    _search(reset: true);
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '当前站点不支持搜索功能',
+                                          style: TextStyle(
+                                            color: Theme.of(context).colorScheme.onErrorContainer,
+                                          ),
+                                        ),
+                                        backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                },
                               ),
                             ),
-                            onSubmitted: (_) {
-                              if (_currentSite?.features.supportTorrentSearch ??
-                                  true) {
-                                _search(reset: true);
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      '当前站点不支持搜索功能',
-                                      style: TextStyle(
-                                        color: Theme.of(context).colorScheme.onErrorContainer,
+                            const SizedBox(width: 8),
+                            if (_currentSite?.features.supportCollection == true)
+                              IconButton(
+                                onPressed: () {
+                                  if (mounted) {
+                                    setState(() {
+                                      _onlyFavorites = !_onlyFavorites;
+                                    });
+                                  }
+                                  if (_currentSite?.features.supportTorrentSearch ??
+                                      true) {
+                                    _search(reset: true);
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '当前站点不支持搜索功能',
+                                          style: TextStyle(
+                                            color: Theme.of(context).colorScheme.onErrorContainer,
+                                          ),
+                                        ),
+                                        backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                                        behavior: SnackBarBehavior.floating,
                                       ),
-                                    ),
-                                    backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        if (_currentSite?.features.supportCollection == true)
-                          IconButton(
-                            onPressed: () {
-                              if (mounted) {
-                                setState(() {
-                                  _onlyFavorites = !_onlyFavorites;
-                                });
-                              }
-                              if (_currentSite?.features.supportTorrentSearch ??
-                                  true) {
-                                _search(reset: true);
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      '当前站点不支持搜索功能',
-                                      style: TextStyle(
-                                        color: Theme.of(context).colorScheme.onErrorContainer,
-                                      ),
-                                    ),
-                                    backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            },
-                            icon: Icon(
-                              _onlyFavorites
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: _onlyFavorites
-                                  ? Theme.of(context).colorScheme.secondary
-                                  : null,
-                            ),
-                            tooltip: _onlyFavorites ? '显示全部' : '仅显示收藏',
-                          ),
-                        const SizedBox(width: 8),
-                        PopupMenuButton<String>(
-                          onSelected: _onSortSelected,
-                          icon: Icon(
-                            _sortBy == 'none' ? Icons.sort : Icons.sort,
-                            color: _sortBy == 'none'
-                                ? null
-                                : Theme.of(context).colorScheme.secondary,
-                          ),
-                          tooltip: '排序',
-                          itemBuilder: (context) => [
-                            PopupMenuItem(
-                              value: 'none',
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: _sortBy == 'none'
-                                      ? Theme.of(context).colorScheme.primary
-                                            .withValues(alpha: 0.1)
+                                    );
+                                  }
+                                },
+                                icon: Icon(
+                                  _onlyFavorites
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  color: _onlyFavorites
+                                      ? Theme.of(context).colorScheme.secondary
                                       : null,
-                                  borderRadius: BorderRadius.circular(4),
                                 ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.clear,
+                                tooltip: _onlyFavorites ? '显示全部' : '仅显示收藏',
+                              ),
+                            const SizedBox(width: 8),
+                            PopupMenuButton<String>(
+                              onSelected: _onSortSelected,
+                              icon: Icon(
+                                _sortBy == 'none' ? Icons.sort : Icons.sort,
+                                color: _sortBy == 'none'
+                                    ? null
+                                    : Theme.of(context).colorScheme.secondary,
+                              ),
+                              tooltip: '排序',
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: 'none',
+                                  child: Container(
+                                    decoration: BoxDecoration(
                                       color: _sortBy == 'none'
-                                          ? Theme.of(
-                                              context,
-                                            ).colorScheme.secondary
+                                          ? Theme.of(context).colorScheme.primary
+                                                .withValues(alpha: 0.1)
                                           : null,
+                                      borderRadius: BorderRadius.circular(4),
                                     ),
-                                    const SizedBox(width: 8),
-                                    const Text('默认排序'),
-                                  ],
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.clear,
+                                          color: _sortBy == 'none'
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.secondary
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text('默认排序'),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'size',
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: _sortBy == 'size'
-                                      ? Theme.of(context).colorScheme.primary
-                                            .withValues(alpha: 0.1)
-                                      : null,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      _sortBy == 'size' && _sortAscending
-                                          ? Icons.arrow_upward
-                                          : Icons.arrow_downward,
+                                PopupMenuItem(
+                                  value: 'size',
+                                  child: Container(
+                                    decoration: BoxDecoration(
                                       color: _sortBy == 'size'
-                                          ? Theme.of(
-                                              context,
-                                            ).colorScheme.secondary
+                                          ? Theme.of(context).colorScheme.primary
+                                                .withValues(alpha: 0.1)
                                           : null,
+                                      borderRadius: BorderRadius.circular(4),
                                     ),
-                                    const SizedBox(width: 8),
-                                    const Text('按大小排序'),
-                                  ],
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          _sortBy == 'size' && _sortAscending
+                                              ? Icons.arrow_upward
+                                              : Icons.arrow_downward,
+                                          color: _sortBy == 'size'
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.secondary
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text('按大小排序'),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'upload',
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: _sortBy == 'upload'
-                                      ? Theme.of(context).colorScheme.primary
-                                            .withValues(alpha: 0.1)
-                                      : null,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      _sortBy == 'upload' && _sortAscending
-                                          ? Icons.arrow_upward
-                                          : Icons.arrow_downward,
+                                PopupMenuItem(
+                                  value: 'upload',
+                                  child: Container(
+                                    decoration: BoxDecoration(
                                       color: _sortBy == 'upload'
-                                          ? Theme.of(
-                                              context,
-                                            ).colorScheme.secondary
+                                          ? Theme.of(context).colorScheme.primary
+                                                .withValues(alpha: 0.1)
                                           : null,
+                                      borderRadius: BorderRadius.circular(4),
                                     ),
-                                    const SizedBox(width: 8),
-                                    const Text('按上传量排序'),
-                                  ],
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          _sortBy == 'upload' && _sortAscending
+                                              ? Icons.arrow_upward
+                                              : Icons.arrow_downward,
+                                          color: _sortBy == 'upload'
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.secondary
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text('按上传量排序'),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'download',
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: _sortBy == 'download'
-                                      ? Theme.of(context).colorScheme.primary
-                                            .withValues(alpha: 0.1)
-                                      : null,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      _sortBy == 'download' && _sortAscending
-                                          ? Icons.arrow_upward
-                                          : Icons.arrow_downward,
+                                PopupMenuItem(
+                                  value: 'download',
+                                  child: Container(
+                                    decoration: BoxDecoration(
                                       color: _sortBy == 'download'
-                                          ? Theme.of(
-                                              context,
-                                            ).colorScheme.secondary
+                                          ? Theme.of(context).colorScheme.primary
+                                                .withValues(alpha: 0.1)
                                           : null,
+                                      borderRadius: BorderRadius.circular(4),
                                     ),
-                                    const SizedBox(width: 8),
-                                    const Text('按下载量排序'),
-                                  ],
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          _sortBy == 'download' && _sortAscending
+                                              ? Icons.arrow_upward
+                                              : Icons.arrow_downward,
+                                          color: _sortBy == 'download'
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.secondary
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text('按下载量排序'),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
                           ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
               if (_loading) const LinearProgressIndicator(),
