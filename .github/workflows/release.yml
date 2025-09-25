@@ -290,20 +290,17 @@ jobs:
         # Extract release notes from commit message
         COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
         
-        # Create Telegram message
-        MESSAGE="$(cat <<'EOF'
-🎉 **PT Mate ${{ steps.version.outputs.tag }} 发布了！**
-
-${COMMIT_MESSAGE}
-
-📥 **下载链接：**
-[GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }})
-
-
-
-#PTMate #更新 #Release
-EOF
-)"
+        # Create Telegram message using printf for better control
+        MESSAGE=$(printf '%s\n' \
+          "🎉 **PT Mate ${{ steps.version.outputs.tag }} 发布了！**" \
+          "" \
+          "${COMMIT_MESSAGE}" \
+          "" \
+          "📥 **下载链接：**" \
+          "[GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }})" \
+          "" \
+          "#PTMate #更新 #Release")
+        
         echo "$MESSAGE"
 
         # Send message to Telegram
