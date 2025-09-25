@@ -291,23 +291,20 @@ jobs:
         COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
         
         # Create Telegram message
-        MESSAGE="🎉 **PT Mate ${{ steps.version.outputs.tag }} 发布了！**
+        MESSAGE="$(cat <<'EOF'
+🎉 **PT Mate ${{ steps.version.outputs.tag }} 发布了！**
 
-$COMMIT_MESSAGE
+${COMMIT_MESSAGE}
 
 📥 **下载链接：**
 [GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }})
 
-📱 **Android APK**
-• All-in-one APK (推荐)
-• ARM64 APK (64位设备)  
-• ARMv7 APK (32位设备)
 
-💻 **桌面版**
-• Windows x64 安装包
-• Linux x64 AppImage
 
-#PTMate #更新 #Release"
+#PTMate #更新 #Release
+EOF
+)"
+        echo "$MESSAGE"
 
         # Send message to Telegram
         RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
