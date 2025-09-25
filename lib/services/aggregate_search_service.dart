@@ -74,14 +74,26 @@ class AggregateSearchService {
     // 获取要搜索的站点列表
     final allSites = await StorageService.instance.loadSiteConfigs();
     final activeSites = allSites.where((site) => site.isActive).toList();
+    final allSiteIds = activeSites.map((site) => site.id).toList();
     
-    List<SiteConfig> targetSites;
-    if (config.type == 'all') {
-      targetSites = activeSites;
-    } else {
-      targetSites = activeSites
-          .where((site) => config.enabledSiteIds.contains(site.id))
-          .toList();
+    // 获取启用的站点对象列表
+    final enabledSiteItems = config.getEnabledSites(allSiteIds);
+    
+    // 根据站点对象列表获取实际的站点配置
+    List<SiteConfig> targetSites = [];
+    Map<String, Map<String, dynamic>?> siteAdditionalParams = {};
+    
+    for (final siteItem in enabledSiteItems) {
+      try {
+        final siteConfig = activeSites.firstWhere(
+          (site) => site.id == siteItem.id,
+        );
+        targetSites.add(siteConfig);
+        siteAdditionalParams[siteItem.id] = siteItem.additionalParams;
+      } catch (e) {
+        // 站点不存在或未激活，跳过
+        continue;
+      }
     }
 
     if (targetSites.isEmpty) {
@@ -114,6 +126,7 @@ class AggregateSearchService {
         site: site,
         keyword: keyword,
         maxResults: maxResultsPerSite,
+        additionalParams: siteAdditionalParams[site.id],
       ));
 
       final batchResults = await Future.wait(futures);
@@ -167,6 +180,7 @@ class AggregateSearchService {
     required SiteConfig site,
     required String keyword,
     required int maxResults,
+    Map<String, dynamic>? additionalParams,
   }) async {
     try {
       // 检查站点是否支持搜索
@@ -175,11 +189,13 @@ class AggregateSearchService {
       }
 
       // 使用专用方法直接搜索指定站点，无需切换全局状态
+      // TODO: 这里需要在ApiService中添加对additionalParams的支持
       final result = await ApiService.instance.searchTorrentsWithSite(
         siteConfig: site,
         keyword: keyword.trim().isEmpty ? null : keyword.trim(),
         pageNumber: 1,
         pageSize: maxResults,
+        // additionalParams: additionalParams, // 待ApiService支持后启用
       );
 
       return SearchResult.success(result.items);

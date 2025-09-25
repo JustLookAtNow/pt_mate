@@ -135,6 +135,10 @@ class BackupService {
     data['qbCategoriesCache'] = qbCategoriesCache;
     data['qbTagsCache'] = qbTagsCache;
     
+    // 收集聚合搜索设置
+    final aggregateSearchSettings = await _storageService.loadAggregateSearchSettings();
+    data['aggregateSearchSettings'] = aggregateSearchSettings.toJson();
+    
     return BackupData(
       version: BackupVersion.current,
       timestamp: DateTime.now(),
@@ -323,6 +327,19 @@ class BackupService {
         for (final entry in tagsCache.entries) {
           final tags = (entry.value as List).cast<String>();
           await _storageService.saveQbTags(entry.key, tags);
+        }
+      }
+      
+      // 恢复聚合搜索设置
+      if (migratedData['aggregateSearchSettings'] != null) {
+        try {
+          final aggregateSearchSettings = AggregateSearchSettings.fromJson(
+            migratedData['aggregateSearchSettings'] as Map<String, dynamic>
+          );
+          await _storageService.saveAggregateSearchSettings(aggregateSearchSettings);
+        } catch (e) {
+          // 如果恢复聚合搜索设置失败，记录错误但不影响整体恢复过程
+          // 这样可以确保其他数据的恢复不受影响
         }
       }
       

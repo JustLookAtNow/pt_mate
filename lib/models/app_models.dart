@@ -334,19 +334,61 @@ class SiteFeatures {
   String toString() => jsonEncode(toJson());
 }
 
+// 站点搜索项目
+class SiteSearchItem {
+  final String id; // 站点ID
+  final Map<String, dynamic>? additionalParams; // 额外参数
+
+  const SiteSearchItem({
+    required this.id,
+    this.additionalParams,
+  });
+
+  SiteSearchItem copyWith({
+    String? id,
+    Map<String, dynamic>? additionalParams,
+  }) => SiteSearchItem(
+        id: id ?? this.id,
+        additionalParams: additionalParams ?? this.additionalParams,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'additionalParams': additionalParams,
+      };
+
+  factory SiteSearchItem.fromJson(Map<String, dynamic> json) => SiteSearchItem(
+        id: json['id'] as String,
+        additionalParams: json['additionalParams'] as Map<String, dynamic>?,
+      );
+
+  @override
+  String toString() => jsonEncode(toJson());
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SiteSearchItem &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+}
+
 // 聚合搜索配置
 class AggregateSearchConfig {
   final String id; // 唯一标识符
   final String name; // 配置名称
   final String type; // 配置类型：'all' 表示所有站点，'custom' 表示自定义
-  final List<String> enabledSiteIds; // 启用的站点ID列表（type为'all'时忽略）
+  final List<SiteSearchItem> enabledSites; // 启用的站点列表（type为'all'时忽略）
   final bool isActive; // 是否激活
 
   const AggregateSearchConfig({
     required this.id,
     required this.name,
     this.type = 'custom',
-    this.enabledSiteIds = const [],
+    this.enabledSites = const [],
     this.isActive = true,
   });
 
@@ -354,13 +396,13 @@ class AggregateSearchConfig {
     String? id,
     String? name,
     String? type,
-    List<String>? enabledSiteIds,
+    List<SiteSearchItem>? enabledSites,
     bool? isActive,
   }) => AggregateSearchConfig(
         id: id ?? this.id,
         name: name ?? this.name,
         type: type ?? this.type,
-        enabledSiteIds: enabledSiteIds ?? this.enabledSiteIds,
+        enabledSites: enabledSites ?? this.enabledSites,
         isActive: isActive ?? this.isActive,
       );
 
@@ -368,17 +410,35 @@ class AggregateSearchConfig {
         'id': id,
         'name': name,
         'type': type,
-        'enabledSiteIds': enabledSiteIds,
+        'enabledSites': enabledSites.map((site) => site.toJson()).toList(),
         'isActive': isActive,
       };
 
-  factory AggregateSearchConfig.fromJson(Map<String, dynamic> json) => AggregateSearchConfig(
-        id: json['id'] as String? ?? 'legacy-${DateTime.now().millisecondsSinceEpoch}',
-        name: json['name'] as String,
-        type: json['type'] as String? ?? 'custom', // 兼容旧版本
-        enabledSiteIds: (json['enabledSiteIds'] as List<dynamic>?)?.cast<String>() ?? [],
-        isActive: json['isActive'] as bool? ?? true,
-      );
+  factory AggregateSearchConfig.fromJson(Map<String, dynamic> json) {
+    List<SiteSearchItem> enabledSites = [];
+    
+    // 兼容新格式：enabledSites
+    if (json['enabledSites'] != null) {
+      enabledSites = (json['enabledSites'] as List<dynamic>)
+          .map((item) => SiteSearchItem.fromJson(item as Map<String, dynamic>))
+          .toList();
+    }
+    // 兼容旧格式：enabledSiteIds TODO：删掉
+    else if (json['enabledSiteIds'] != null) {
+      enabledSites = (json['enabledSiteIds'] as List<dynamic>)
+          .cast<String>()
+          .map((id) => SiteSearchItem(id: id))
+          .toList();
+    }
+    
+    return AggregateSearchConfig(
+      id: json['id'] as String? ?? 'legacy-${DateTime.now().millisecondsSinceEpoch}',
+      name: json['name'] as String,
+      type: json['type'] as String? ?? 'custom', // 兼容旧版本
+      enabledSites: enabledSites,
+      isActive: json['isActive'] as bool? ?? true,
+    );
+  }
 
   @override
   String toString() => jsonEncode(toJson());
@@ -389,7 +449,7 @@ class AggregateSearchConfig {
       id: 'all-sites',
       name: '所有',
       type: 'all',
-      enabledSiteIds: [], // all类型不需要具体的站点列表
+      enabledSites: [], // all类型不需要具体的站点列表
       isActive: true,
     );
   }
@@ -405,7 +465,15 @@ class AggregateSearchConfig {
     if (type == 'all') {
       return allSiteIds; // 返回所有站点
     }
-    return enabledSiteIds; // 返回自定义列表
+    return enabledSites.map((site) => site.id).toList(); // 返回自定义列表的ID
+  }
+
+  // 获取启用的站点对象列表
+  List<SiteSearchItem> getEnabledSites(List<String> allSiteIds) {
+    if (type == 'all') {
+      return allSiteIds.map((id) => SiteSearchItem(id: id)).toList(); // 返回所有站点
+    }
+    return enabledSites; // 返回自定义列表
   }
 }
 

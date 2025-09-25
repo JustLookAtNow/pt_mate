@@ -1886,19 +1886,25 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, dynamic result) async {
+        if (didPop) return;
+        
         if (_webViewController != null) {
           try {
             final canGoBack = await _webViewController!.canGoBack();
             if (canGoBack) {
               await _webViewController!.goBack();
-              return false;
+              return;
             }
           } catch (_) {}
           await _disposeWebView();
         }
-        return true;
+        
+        if (context.mounted) {
+          Navigator.of(context).pop();
+        }
       },
       child: Scaffold(
       appBar: AppBar(

@@ -264,7 +264,7 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
                       ),
                       subtitle: Text(config.isAllSitesType 
                           ? '包含所有已配置的站点' 
-                          : '${config.enabledSiteIds.length} 个站点'),
+                          : '${config.enabledSites.length} 个站点'),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -375,7 +375,7 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
 
   void _showConfigDialog(AggregateSearchConfig? existingConfig) {
     final nameController = TextEditingController(text: existingConfig?.name ?? '');
-    final selectedSiteIds = Set<String>.from(existingConfig?.enabledSiteIds ?? []);
+    final selectedSiteIds = Set<String>.from(existingConfig?.enabledSites.map((site) => site.id) ?? []);
 
     showDialog(
       context: context,
@@ -486,7 +486,7 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
     final config = AggregateSearchConfig(
       id: existingConfig?.id ?? 'config-${DateTime.now().millisecondsSinceEpoch}',
       name: name,
-      enabledSiteIds: siteIds,
+      enabledSites: siteIds.map((id) => SiteSearchItem(id: id)).toList(),
       isActive: existingConfig?.isActive ?? true,
     );
 
