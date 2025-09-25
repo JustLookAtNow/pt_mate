@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
@@ -21,6 +22,10 @@ class AggregateSearchPage extends StatefulWidget {
 
 class _AggregateSearchPageState extends State<AggregateSearchPage> {
   final TextEditingController _searchController = TextEditingController();
+  
+  // 选择模式相关状态
+  bool _isSelectionMode = false;
+  final Set<String> _selectedItems = <String>{};
   
   @override
   void initState() {
@@ -421,18 +426,56 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                     margin: const EdgeInsets.only(bottom: 8),
                                     child: TorrentListItem(
                                       torrent: item.torrent,
-                                      isSelected: false,
-                                      isSelectionMode: false,
+                                      isSelected: _selectedItems.contains(item.torrent.id),
+                                      isSelectionMode: _isSelectionMode,
                                       isAggregateMode: true,
                                       siteName: item.siteName,
-                                      onTap: () => _onTorrentTap(item),
+                                      onTap: _isSelectionMode
+                                          ? () => _onToggleSelection(item)
+                                          : () => _onTorrentTap(item),
+                                      onLongPress: () => _onLongPress(item),
                                       onDownload: () => _showDownloadDialog(item),
-                                      onToggleCollection: null,
+                                      onToggleCollection: () => _onToggleCollection(item),
                                     ),
                                   );
                                 },
                               ),
                       ),
+
+                      // 选择模式下的操作栏
+                      if (_isSelectionMode) ...[
+                        const SizedBox(height: 8),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Row(
+                              children: [
+                                Text(
+                                  '已选择 ${_selectedItems.length} 项',
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                                const Spacer(),
+                                TextButton(
+                                  onPressed: _onCancelSelection,
+                                  style: TextButton.styleFrom(
+                                    side: BorderSide(
+                                      color: Theme.of(context).colorScheme.outline,
+                                      width: 1.0,
+                                    ),
+                                  ),
+                                  child: const Text('取消'),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton.icon(
+                                  onPressed: _selectedItems.isEmpty ? null : _onBatchDownload,
+                                  icon: const Icon(Icons.download),
+                                  label: const Text('批量下载'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -715,6 +758,238 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           SnackBar(
             content: Text(
               '下载失败: $e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  // 长按触发选中模式
+  void _onLongPress(AggregateSearchResultItem item) {
+    if (!_isSelectionMode && mounted) {
+      // 使用 Flutter 内置的触觉反馈，提供原生的震动体验
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _isSelectionMode = true;
+        _selectedItems.add(item.torrent.id);
+      });
+    }
+  }
+
+  // 切换选中状态
+  void _onToggleSelection(AggregateSearchResultItem item) {
+    if (mounted) {
+      setState(() {
+        if (_selectedItems.contains(item.torrent.id)) {
+          _selectedItems.remove(item.torrent.id);
+          if (_selectedItems.isEmpty) {
+            _isSelectionMode = false;
+          }
+        } else {
+          _selectedItems.add(item.torrent.id);
+        }
+      });
+    }
+  }
+
+  // 批量下载
+  Future<void> _onBatchDownload() async {
+    if (_selectedItems.isEmpty) return;
+
+    final provider = Provider.of<AggregateSearchProvider>(context, listen: false);
+    final selectedItems = provider.searchResults
+        .where((item) => _selectedItems.contains(item.torrent.id))
+        .toList();
+
+    // 显示批量下载设置对话框
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) =>
+          TorrentDownloadDialog(itemCount: selectedItems.length),
+    );
+
+    if (result == null) return; // 用户取消了
+
+    _onCancelSelection(); // 取消选择模式
+
+    // 显示开始下载的提示
+    if (mounted) {
+      final clientConfig = result['clientConfig'] as QbClientConfig;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '开始批量下载${selectedItems.length}个项目到${clientConfig.name}...',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
+            ),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
+    // 异步处理下载
+    _performBatchDownload(
+      selectedItems,
+      result['clientConfig'] as QbClientConfig,
+      result['password'] as String,
+      result['category'] as String?,
+      result['tags'] as List<String>? ?? [],
+      result['savePath'] as String?,
+      result['autoTMM'] as bool?,
+    );
+  }
+
+  Future<void> _performBatchDownload(
+    List<AggregateSearchResultItem> items,
+    QbClientConfig clientConfig,
+    String password,
+    String? category,
+    List<String> tags,
+    String? savePath,
+    bool? autoTMM,
+  ) async {
+    int successCount = 0;
+    int failureCount = 0;
+
+    for (final item in items) {
+      try {
+        // 1. 获取种子所属站点的配置
+        final storage = Provider.of<StorageService>(context, listen: false);
+        final allSites = await storage.loadSiteConfigs();
+        final siteConfig = allSites.firstWhere(
+          (site) => site.id == item.siteId,
+          orElse: () => throw Exception('找不到站点配置: ${item.siteId}'),
+        );
+
+        // 2. 获取下载 URL
+        final url = await ApiService.instance.genDlToken(
+          id: item.torrent.id,
+          url: item.torrent.downloadUrl,
+          siteConfig: siteConfig,
+        );
+
+        // 3. 发送到 qBittorrent
+        await QbService.instance.addTorrentByUrl(
+          config: clientConfig,
+          password: password,
+          url: url,
+          category: category,
+          tags: tags.isEmpty ? null : tags,
+          savePath: savePath,
+          autoTMM: autoTMM,
+        );
+
+        successCount++;
+
+        // 添加延迟避免请求过快
+        await Future.delayed(const Duration(milliseconds: 500));
+      } catch (e) {
+        failureCount++;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '下载失败: ${item.torrent.name}, 错误: $e',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
+              ),
+              backgroundColor: Theme.of(context).colorScheme.errorContainer,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    }
+
+    // 显示最终结果
+    if (mounted) {
+      final message = failureCount == 0
+          ? '批量下载完成，成功$successCount个项目'
+          : '批量下载完成，成功$successCount个，失败$failureCount个';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            style: TextStyle(
+              color: failureCount == 0
+                  ? Theme.of(context).colorScheme.onPrimaryContainer
+                  : Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
+          backgroundColor: failureCount == 0
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Theme.of(context).colorScheme.errorContainer,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  // 取消选中模式
+  void _onCancelSelection() {
+    if (mounted) {
+      setState(() {
+        _isSelectionMode = false;
+        _selectedItems.clear();
+      });
+    }
+  }
+
+  // 收藏/取消收藏功能
+  Future<void> _onToggleCollection(AggregateSearchResultItem item) async {
+    final newCollectionState = !item.torrent.collection;
+
+    // 立即更新UI状态
+    if (mounted) {
+      setState(() {
+        item.torrent.collection = newCollectionState;
+      });
+    }
+
+    // 异步后台请求
+    try {
+      // 调用收藏API
+      await ApiService.instance.toggleCollection(
+        id: item.torrent.id,
+        make: newCollectionState,
+      );
+
+      // 显示成功提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              newCollectionState ? '已收藏' : '已取消收藏',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      // 请求失败，恢复原状态
+      if (mounted) {
+        setState(() {
+          item.torrent.collection = !newCollectionState;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '收藏操作失败：$e',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onErrorContainer,
               ),

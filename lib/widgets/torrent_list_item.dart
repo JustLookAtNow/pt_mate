@@ -57,22 +57,23 @@ class TorrentListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: Container(
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-              : null,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+    // 检测是否为移动设备（屏幕宽度小于600px）
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    
+    // 构建主要内容
+    Widget mainContent = Container(
+      decoration: BoxDecoration(
+        color: isSelected
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+            : null,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
               // 封面截图
               Container(
                 width: 60,
@@ -196,7 +197,6 @@ class TorrentListItem extends StatelessWidget {
                                     fontSize: 14,
                                   ),
                             ),
-
                             TextSpan(
                               text: ' ${torrent.name}',
                               style: TextStyle(
@@ -207,16 +207,46 @@ class TorrentListItem extends StatelessWidget {
                                 fontSize: 14,
                               ),
                             ),
+                            // 移动设备上显示收藏状态小红心
+                            if (isMobile && torrent.collection)
+                              WidgetSpan(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 4),
+                                  child: Icon(
+                                    Icons.favorite,
+                                    color: Colors.red,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       )
                     else
-                      Text(
-                        torrent.name,
-                        style: TextStyle(
-                          color: Theme.of(context).textTheme.titleMedium?.color,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: torrent.name,
+                              style: TextStyle(
+                                color: Theme.of(context).textTheme.titleMedium?.color,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            // 移动设备上显示收藏状态小红心
+                            if (isMobile && torrent.collection)
+                              WidgetSpan(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 4),
+                                  child: Icon(
+                                    Icons.favorite,
+                                    color: Colors.red,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     const SizedBox(height: 4),
@@ -272,50 +302,152 @@ class TorrentListItem extends StatelessWidget {
                   ],
                 ),
               ),
-              // const SizedBox(width: 4),
-              // 操作按钮列
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                
-                children: [
-                  
-                  // 收藏按钮 - 仅在站点支持收藏功能且非聚合搜索模式时显示
-                  if (!isAggregateMode &&
-                      (currentSite?.features.supportCollection ?? true))
-                    IconButton(
-                      onPressed: onToggleCollection,
-                      icon: Icon(
-                        torrent.collection
-                            ? Icons.favorite
-                            : Icons.favorite_border,
-                        color: torrent.collection ? Colors.red : null,
+              // 桌面端显示操作按钮
+              if (!isMobile) ...[
+                const SizedBox(width: 4),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 收藏按钮 - 仅在站点支持收藏功能时显示
+                    if (currentSite?.features.supportCollection ?? true)
+                      IconButton(
+                        onPressed: onToggleCollection,
+                        icon: Icon(
+                          torrent.collection
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: torrent.collection ? Colors.red : null,
+                        ),
+                        tooltip: torrent.collection ? '取消收藏' : '收藏',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 40,
+                          minHeight: 40,
+                        ),
                       ),
-                      tooltip: torrent.collection ? '取消收藏' : '收藏',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 40,
-                        minHeight: 40,
+                    // 下载按钮 - 仅在站点支持下载功能时显示
+                    if (currentSite?.features.supportDownload ?? true)
+                      IconButton(
+                        onPressed: onDownload,
+                        icon: const Icon(Icons.download_outlined),
+                        tooltip: '下载',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 40,
+                          minHeight: 40,
+                        ),
                       ),
-                    ),
-                  // 下载按钮 - 仅在站点支持下载功能时显示
-                  if (currentSite?.features.supportDownload ?? true)
-                    IconButton(
-                      onPressed: onDownload,
-                      icon: const Icon(Icons.download_outlined),
-                      tooltip: '下载',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 40,
-                        minHeight: 40,
-                      ),
-                    ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
-      ),
-    );
+      );
+
+    // 移动设备使用自定义左滑功能
+    if (isMobile) {
+      return _SwipeableItem(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        actions: _buildSwipeActions(context),
+        child: mainContent,
+      );
+    } else {
+      // 桌面端直接返回带手势检测的内容
+      return GestureDetector(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: mainContent,
+      );
+    }
+  }
+
+  // 构建左滑动作按钮
+  List<Widget> _buildSwipeActions(BuildContext context) {
+    List<Widget> actions = [];
+    
+    // 添加收藏按钮（如果支持）
+    if (currentSite?.features.supportCollection ?? true) {
+      actions.add(
+        Container(
+          width: 60,
+          margin: const EdgeInsets.only(left: 4),
+          child: Material(
+            color: torrent.collection 
+                ? (Theme.of(context).brightness == Brightness.dark 
+                    ? Colors.red.shade800 
+                    : Colors.red)
+                : (Theme.of(context).brightness == Brightness.dark 
+                    ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.7)
+                    : Theme.of(context).colorScheme.secondary),
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: onToggleCollection,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    torrent.collection ? Icons.favorite : Icons.favorite_border,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    torrent.collection ? '取消' : '收藏',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    
+    // 添加下载按钮（如果支持）
+    if (currentSite?.features.supportDownload ?? true) {
+      actions.add(
+        Container(
+          width: 60,
+          margin: const EdgeInsets.only(left: 4),
+          child: Material(
+            color: Theme.of(context).brightness == Brightness.dark 
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)
+                : Theme.of(context).colorScheme.primary,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: onDownload,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.download_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '下载',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    
+    return actions;
   }
 
   /// 获取优惠类型对应的颜色
@@ -385,5 +517,173 @@ class TorrentListItem extends StatelessWidget {
       case DownloadStatus.none:
         return const SizedBox(width: 20); // 占位，保持布局一致
     }
+  }
+}
+
+// 自定义左滑组件，支持固定显示按钮
+class _SwipeableItem extends StatefulWidget {
+  final Widget child;
+  final List<Widget> actions;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+
+  const _SwipeableItem({
+    required this.child,
+    required this.actions,
+    this.onTap,
+    this.onLongPress,
+  });
+
+  @override
+  State<_SwipeableItem> createState() => _SwipeableItemState();
+}
+
+class _SwipeableItemState extends State<_SwipeableItem>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  double _dragExtent = 0;
+  bool _isOpen = false;
+  
+  // 计算动作按钮的总宽度
+  double get _actionsWidth {
+    if (widget.actions.isEmpty) return 0;
+    return widget.actions.length * 64.0; // 每个按钮60px + 4px间距
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+    _animation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleDragStart(DragStartDetails details) {
+    _controller.stop();
+  }
+
+  void _handleDragUpdate(DragUpdateDetails details) {
+    if (widget.actions.isEmpty) return;
+    
+    final delta = details.primaryDelta ?? 0;
+    final newDragExtent = _dragExtent + delta;
+    
+    // 限制拖拽范围：向左滑动为负值，最大滑动距离为按钮宽度
+    setState(() {
+      _dragExtent = newDragExtent.clamp(-_actionsWidth, 0);
+    });
+  }
+
+  void _handleDragEnd(DragEndDetails details) {
+    if (widget.actions.isEmpty) return;
+    
+    final velocity = details.primaryVelocity ?? 0;
+    final threshold = _actionsWidth * 0.3;
+    
+    // 判断是否应该打开或关闭
+    bool shouldOpen = false;
+    
+    if (velocity < -300) {
+      // 快速向左滑动，打开
+      shouldOpen = true;
+    } else if (velocity > 300) {
+      // 快速向右滑动，关闭
+      shouldOpen = false;
+    } else {
+      // 根据滑动距离判断
+      shouldOpen = _dragExtent.abs() > threshold;
+    }
+    
+    _animateToPosition(shouldOpen);
+  }
+
+  void _animateToPosition(bool open) {
+    _isOpen = open;
+    final targetExtent = open ? -_actionsWidth : 0.0;
+    
+    _controller.reset();
+    _animation = Tween<double>(
+      begin: _dragExtent,
+      end: targetExtent,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    ));
+    
+    _controller.forward().then((_) {
+      setState(() {
+        _dragExtent = targetExtent;
+      });
+    });
+    
+    _animation.addListener(() {
+      setState(() {
+        _dragExtent = _animation.value;
+      });
+    });
+  }
+
+  void _close() {
+    if (_isOpen) {
+      _animateToPosition(false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        if (_isOpen) {
+          _close();
+        } else {
+          widget.onTap?.call();
+        }
+      },
+      onLongPress: _isOpen ? null : widget.onLongPress,
+      onHorizontalDragStart: _handleDragStart,
+      onHorizontalDragUpdate: _handleDragUpdate,
+      onHorizontalDragEnd: _handleDragEnd,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: ClipRect(
+          child: Stack(
+            children: [
+              // 背景动作按钮
+              if (widget.actions.isNotEmpty)
+                Positioned(
+                  right: -_actionsWidth + _dragExtent.abs(),
+                  top: 0,
+                  bottom: 0,
+                  width: _actionsWidth,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: widget.actions,
+                  ),
+                ),
+              // 主要内容
+              Transform.translate(
+                offset: Offset(_dragExtent, 0),
+                child: widget.child,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
