@@ -281,3 +281,62 @@ jobs:
           windows-artifact/pt_mate-${{ steps.version.outputs.version }}-windows-x64.exe
           linux-artifact/pt_mate-${{ steps.version.outputs.version }}-linux-x64.AppImage
         fail_on_unmatched_files: true
+        
+    - name: Send Telegram notification
+      env:
+        TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+        TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+      run: |
+        # Extract release notes from commit message
+        COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
+        
+        # Create Telegram message
+        MESSAGE="🎉 **PT Mate ${{ steps.version.outputs.tag }} 发布了！**
+
+$COMMIT_MESSAGE
+
+📥 **下载链接：**
+[GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }})
+
+📱 **Android APK**
+• All-in-one APK (推荐)
+• ARM64 APK (64位设备)  
+• ARMv7 APK (32位设备)
+
+💻 **桌面版**
+• Windows x64 安装包
+• Linux x64 AppImage
+
+#PTMate #更新 #Release"
+
+        # Send message to Telegram
+        RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"chat_id\": \"${TG_CHAT_ID}\",
+            \"text\": \"${MESSAGE}\",
+            \"parse_mode\": \"Markdown\",
+            \"disable_web_page_preview\": false
+          }")
+        
+        # Extract message_id from response
+        MESSAGE_ID=$(echo $RESPONSE | jq -r '.result.message_id')
+        
+        if [ "$MESSAGE_ID" != "null" ] && [ "$MESSAGE_ID" != "" ]; then
+          echo "Message sent successfully with ID: $MESSAGE_ID"
+          
+          # Pin the message
+          curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/pinChatMessage" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"chat_id\": \"${TG_CHAT_ID}\",
+              \"message_id\": ${MESSAGE_ID},
+              \"disable_notification\": false
+            }"
+          
+          echo "Message pinned successfully"
+        else
+          echo "Failed to send message"
+          echo "Response: $RESPONSE"
+          exit 1
+        fi
