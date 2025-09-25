@@ -62,7 +62,7 @@ class AggregateSearchService {
     required String keyword,
     required String configId,
     required Function(AggregateSearchProgress) onProgress,
-    int maxResultsPerSite = 10,
+    int maxResultsPerSite = 20,
   }) async {
     // 加载搜索配置
     final settings = await StorageService.instance.loadAggregateSearchSettings();
@@ -111,68 +111,92 @@ class AggregateSearchService {
       completedSites: 0,
     ));
 
-    // 并发搜索，但限制并发数量
+    // 使用异步处理，让每个站点独立返回结果
     final maxConcurrency = settings.searchThreads;
     final results = <AggregateSearchResultItem>[];
     final errors = <String, String>{};
     int completedSites = 0;
+    int activeTasks = 0;
 
-    // 分批处理站点
-    for (int i = 0; i < targetSites.length; i += maxConcurrency) {
-      final batch = targetSites.skip(i).take(maxConcurrency).toList();
+    // 创建一个 Completer 来控制整个搜索流程的完成
+    final completer = Completer<AggregateSearchResult>();
+    
+    // 处理单个站点搜索完成的回调
+    void handleSiteComplete(SiteConfig site, SearchResult<List<TorrentItem>> result) {
+      completedSites++;
+      activeTasks--;
       
-      // 并发搜索当前批次的站点
-      final futures = batch.map((site) => _searchSingleSite(
-        site: site,
-        keyword: keyword,
-        maxResults: maxResultsPerSite,
-        additionalParams: siteAdditionalParams[site.id],
+      if (result.isSuccess) {
+        final siteResults = result.data!.map((torrent) => 
+          AggregateSearchResultItem(
+            torrent: torrent,
+            siteName: site.name,
+            siteId: site.id,
+          ),
+        ).toList();
+        results.addAll(siteResults);
+      } else {
+        errors[site.id] = result.error ?? '搜索失败';
+      }
+
+      // 更新进度
+      onProgress(AggregateSearchProgress(
+        totalSites: targetSites.length,
+        completedSites: completedSites,
+        currentSite: site.name,
       ));
 
-      final batchResults = await Future.wait(futures);
-      
-      // 处理批次结果
-      for (int j = 0; j < batchResults.length; j++) {
-        final site = batch[j];
-        final result = batchResults[j];
-        
-        completedSites++;
-        
-        if (result.isSuccess) {
-          final siteResults = result.data!.map((torrent) => 
-            AggregateSearchResultItem(
-              torrent: torrent,
-              siteName: site.name,
-              siteId: site.id,
-            ),
-          ).toList();
-          results.addAll(siteResults);
-        } else {
-          errors[site.id] = result.error ?? '搜索失败';
-        }
-
-        // 更新进度
+      // 检查是否所有站点都已完成
+      if (completedSites >= targetSites.length) {
+        // 搜索完成
         onProgress(AggregateSearchProgress(
           totalSites: targetSites.length,
           completedSites: completedSites,
-          currentSite: site.name,
+          isCompleted: true,
+        ));
+
+        completer.complete(AggregateSearchResult(
+          items: results,
+          errors: errors,
+          totalSites: targetSites.length,
+          successSites: targetSites.length - errors.length,
         ));
       }
     }
 
-    // 搜索完成
-    onProgress(AggregateSearchProgress(
-      totalSites: targetSites.length,
-      completedSites: completedSites,
-      isCompleted: true,
-    ));
+    // 启动搜索任务，控制并发数量
+    int siteIndex = 0;
+    
+    void startNextSite() {
+      while (activeTasks < maxConcurrency && siteIndex < targetSites.length) {
+        final site = targetSites[siteIndex];
+        final additionalParams = siteAdditionalParams[site.id];
+        siteIndex++;
+        activeTasks++;
 
-    return AggregateSearchResult(
-      items: results,
-      errors: errors,
-      totalSites: targetSites.length,
-      successSites: targetSites.length - errors.length,
-    );
+        // 异步启动单个站点搜索，不等待结果
+        _searchSingleSite(
+          site: site,
+          keyword: keyword,
+          maxResults: maxResultsPerSite,
+          additionalParams: additionalParams,
+        ).then((result) {
+          handleSiteComplete(site, result);
+          // 当前任务完成后，尝试启动下一个任务
+          startNextSite();
+        }).catchError((error) {
+          // 处理异常情况
+          handleSiteComplete(site, SearchResult.error(error.toString()));
+          // 当前任务完成后，尝试启动下一个任务
+          startNextSite();
+        });
+      }
+    }
+
+    // 开始启动搜索任务
+    startNextSite();
+
+    return completer.future;
   }
 
   /// 搜索单个站点
@@ -189,13 +213,12 @@ class AggregateSearchService {
       }
 
       // 使用专用方法直接搜索指定站点，无需切换全局状态
-      // TODO: 这里需要在ApiService中添加对additionalParams的支持
       final result = await ApiService.instance.searchTorrentsWithSite(
         siteConfig: site,
         keyword: keyword.trim().isEmpty ? null : keyword.trim(),
         pageNumber: 1,
         pageSize: maxResults,
-        // additionalParams: additionalParams, // 待ApiService支持后启用
+        additionalParams: additionalParams, 
       );
 
       return SearchResult.success(result.items);

@@ -83,7 +83,13 @@ class NexusPHPWebAdapter extends SiteAdapter {
     // 加载优惠类型映射配置
     await _loadDiscountMapping();
 
-    _dio = Dio();
+    _dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 10),
+        sendTimeout: const Duration(seconds: 30),
+      ),
+    );
     _dio.options.baseUrl = _siteConfig.baseUrl;
     _dio.options.headers['User-Agent'] =
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
