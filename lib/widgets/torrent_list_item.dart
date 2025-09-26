@@ -75,103 +75,126 @@ class TorrentListItem extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-              // 封面截图
-              Container(
-                width: 60,
-                height: 84,
-                margin: const EdgeInsets.only(right: 12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-                    width: 1,
+            // 封面截图和创建时间
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 封面截图
+                Container(
+                  width: 60,
+                  height: 84,
+                  margin: const EdgeInsets.only(right: 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
                   ),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: torrent.cover.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: torrent.cover,
-                          width: 60,
-                          height: 84,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) {
-                              return child;
-                            }
-                            return Container(
-                              width: 60,
-                              height: 84,
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Column(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: torrent.cover.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: torrent.cover,
+                            width: 60,
+                            height: 84,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) {
+                                return child;
+                              }
+                              return Container(
+                                width: 60,
+                                height: 84,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '加载中',
+                                      style: TextStyle(
+                                        fontSize: 8,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              debugPrint('图片加载失败: $error');
+                              return Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Theme.of(context).colorScheme.primary,
-                                    ),
+                                  Icon(
+                                    Icons.image_outlined,
+                                    size: 24,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '加载中',
+                                    '加载失败',
                                     style: TextStyle(
-                                      fontSize: 8,
+                                      fontSize: 10,
                                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ],
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            debugPrint('图片加载失败: $error');
-                            return Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.image_outlined,
-                                  size: 24,
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '加载失败',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.image_outlined,
-                              size: 24,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '暂无',
-                              style: TextStyle(
-                                fontSize: 10,
+                              );
+                            },
+                          )
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.image_outlined,
+                                size: 24,
                                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '暂无',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
                 ),
-              ),
+                // 创建时间
+                const SizedBox(height: 4),
+                Container(
+                  width: 60,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: Text(
+                    Formatters.formatTorrentCreatedDate(torrent.createdDate),
+                    style: TextStyle(
+                      fontSize: 9,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+              
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

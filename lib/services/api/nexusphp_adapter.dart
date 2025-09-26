@@ -236,6 +236,7 @@ class NexusPHPAdapter implements SiteAdapter {
       collection: item['has_bookmarked'] as bool? ?? false, 
       imageList: const [], // 暂时没有图片列表
       cover: item['cover'] as String? ?? '',
+      createdDate: item['added'] != null ? item['added'] + ':00' : '',
     );
   }
 

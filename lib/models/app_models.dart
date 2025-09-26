@@ -56,6 +56,7 @@ class TorrentItem {
   final String cover;
   final DownloadStatus downloadStatus;
   bool collection; // 是否已收藏（改为可变）
+  final String createdDate; // 种子创建时间
 
   TorrentItem({
     required this.id,
@@ -67,6 +68,7 @@ class TorrentItem {
     required this.seeders,
     required this.leechers,
     required this.sizeBytes,
+    required this.createdDate,
     required this.imageList,
     required this.cover,
     this.downloadStatus = DownloadStatus.none,
@@ -87,6 +89,7 @@ class TorrentItem {
     String? cover,
     DownloadStatus? downloadStatus,
     bool? collection,
+    String? createdDate,
   }) {
     return TorrentItem(
       id: id ?? this.id,
@@ -102,6 +105,7 @@ class TorrentItem {
       cover: cover ?? this.cover,
       downloadStatus: downloadStatus ?? this.downloadStatus,
       collection: collection ?? this.collection,
+      createdDate: createdDate ?? this.createdDate,
     );
   }
 }

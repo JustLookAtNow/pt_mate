@@ -202,6 +202,7 @@ class MTeamAdapter extends SiteAdapter {
             cover: item.imageList.isNotEmpty ? item.imageList.first : '',
             downloadStatus: status,
             collection: item.collection,
+            createdDate: item.createdDate,
           );
         }).toList();
         
@@ -291,6 +292,7 @@ class MTeamAdapter extends SiteAdapter {
       cover: imgs.isNotEmpty ? imgs.first : '',
       downloadStatus: downloadStatus ?? DownloadStatus.none,
       collection: parseBool(json['collection']),
+      createdDate: json['createdDate'] ?? '',
     );
   }
   

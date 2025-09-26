@@ -26,4 +26,58 @@ class Formatters {
 
   static String shareRate(num rate) => _num2.format(rate);
   static String bonus(num bonus) => _num2.format(bonus);
+
+  // 新增：格式化种子创建时间为距离现在过了多久
+  static String formatTorrentCreatedDate(String createdDate) {
+    try {
+      final date = DateTime.parse(createdDate);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+      
+      // 计算各个时间单位
+      final years = difference.inDays ~/ 365;
+      final months = (difference.inDays % 365) ~/ 30;
+      final days = difference.inDays % 30;
+      final hours = difference.inHours % 24;
+      final minutes = difference.inMinutes % 60;
+      
+      // 按优先级返回两段显示
+      if (years > 0) {
+        if (months > 0) {
+          return '$years 年 $months 月';
+        }
+        return '$years 年';
+      }
+      
+      if (months > 0) {
+        if (days > 0) {
+          return '$months 月 $days 天';
+        }
+        return '$months 月';
+      }
+      
+      if (days > 0) {
+        if (hours > 0) {
+          return '$days 天 $hours 时';
+        }
+        return '$days 天';
+      }
+      
+      if (hours > 0) {
+        if (minutes > 0) {
+          return '$hours 时 $minutes 分';
+        }
+        return '$hours 时';
+      }
+      
+      // 最小单位为分钟
+      if (minutes > 0) {
+        return '$minutes 分';
+      }
+      
+      return '1 分'; // 不足1分钟显示为1分
+    } catch (e) {
+      return "- -"; // 解析失败时返回原始字符串
+    }
+  }
 }

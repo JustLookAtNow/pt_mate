@@ -446,6 +446,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
               }
             }
           }
+          // 提取创建时间（第4列，索引3）
+          final createDate = tds[3].find('span[title]').attributes['title'] ?? '';
           // 提取大小（第5列，索引4）
           final sizeText = tds[4].text.replaceAll('\n', ' ').trim();
 
@@ -541,7 +543,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
               downloadStatus: status,
               collection: collection,
               imageList: [], // 暂时不解析图片列表
-              cover: cover
+              cover: cover,
+              createdDate: createDate,
             ),
           );
         } catch (e) {
