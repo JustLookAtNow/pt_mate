@@ -87,7 +87,7 @@ class ImageHttpClient {
       options: Options(
         responseType: ResponseType.bytes,
         headers: {
-          if (referer != null) 'Referer': referer,
+          'Referer': referer,
         },
       ),
     );
