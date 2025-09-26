@@ -289,7 +289,7 @@ jobs:
       run: |
         # Function to escape MarkdownV2 special characters
         escape_tg() {
-          echo "$1" | sed -E 's/([_*\[\]()~`>#+\-=|{}.!])/\\\1/g'
+          echo "$1" | sed -E 's/([_*\[\]()~`>#+=|{}.!-])/\\\1/g'
         }
     
         # Extract and escape commit message
