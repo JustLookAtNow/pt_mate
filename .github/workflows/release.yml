@@ -287,38 +287,49 @@ jobs:
         TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
         TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
       run: |
-        # Extract release notes from commit message
-        COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
-        
-        # Create Telegram message using printf for better control
+        # Function to escape MarkdownV2 special characters
+        escape_tg() {
+          echo "$1" | sed -E 's/([_*\[\]()~`>#+\-=|{}.!])/\\\1/g'
+        }
+    
+        # Extract and escape commit message
+        RAW_COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
+        COMMIT_MESSAGE=$(escape_tg "$RAW_COMMIT_MESSAGE")
+    
+        # Create Telegram message
         MESSAGE=$(printf '%s\n' \
-          "🎉 **PT Mate ${{ steps.version.outputs.tag }} 发布了！**" \
+          "*🎉 PT Mate ${{ steps.version.outputs.tag }} 发布了！*" \
           "" \
           "${COMMIT_MESSAGE}" \
           "" \
-          "📥 **下载链接：**" \
+          "📥 *下载链接：*" \
           "[GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }})" \
           "" \
-          "#PTMate #更新 #Release")
-        
+          "\\#PTMate \\#更新 \\#Release")
+    
+        echo "Final message to send:"
         echo "$MESSAGE"
-
+    
         # Send message to Telegram
         RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
           -H "Content-Type: application/json" \
           -d "{
             \"chat_id\": \"${TG_CHAT_ID}\",
             \"text\": \"${MESSAGE}\",
-            \"parse_mode\": \"Markdown\",
+            \"parse_mode\": \"MarkdownV2\",
             \"disable_web_page_preview\": false
           }")
-        
+    
         # Extract message_id from response
-        MESSAGE_ID=$(echo $RESPONSE | jq -r '.result.message_id')
-        
+        MESSAGE_ID=$(echo "$RESPONSE" | jq -r '.result.message_id')
+    
         if [ "$MESSAGE_ID" != "null" ] && [ "$MESSAGE_ID" != "" ]; then
           echo "Message sent successfully with ID: $MESSAGE_ID"
-          
+          curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/unpinAllChatMessages" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"chat_id\": \"${TG_CHAT_ID}\"
+            }"
           # Pin the message
           curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/pinChatMessage" \
             -H "Content-Type: application/json" \
