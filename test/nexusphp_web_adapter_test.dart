@@ -80,6 +80,10 @@ void main() {
           print('  图片列表: ${torrent.imageList}');
           print('  下载状态: ${torrent.downloadStatus}');
           print('  是否收藏: ${torrent.collection}');
+          print('  发布时间: ${torrent.createdDate}');
+          print('  封面: ${torrent.cover}');
+          print('  豆瓣评分: ${torrent.doubanRating}');
+          print('  IMDB评分: ${torrent.imdbRating}');
           print('  ---');
         }
       }

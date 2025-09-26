@@ -203,6 +203,8 @@ class MTeamAdapter extends SiteAdapter {
             downloadStatus: status,
             collection: item.collection,
             createdDate: item.createdDate,
+            doubanRating: item.doubanRating,
+            imdbRating: item.imdbRating,
           );
         }).toList();
         
@@ -293,6 +295,8 @@ class MTeamAdapter extends SiteAdapter {
       downloadStatus: downloadStatus ?? DownloadStatus.none,
       collection: parseBool(json['collection']),
       createdDate: json['createdDate'] ?? '',
+      doubanRating: (json['doubanRating'] ?? 'N/A').toString(),
+      imdbRating: (json['imdbRating'] ?? 'N/A').toString(),
     );
   }
   

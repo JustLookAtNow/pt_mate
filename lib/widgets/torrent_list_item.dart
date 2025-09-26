@@ -192,6 +192,59 @@ class TorrentListItem extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                // 评分模块
+                const SizedBox(height: 4),
+                Container(
+                  width: 60,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: Column(
+                    children: [
+                      // 豆瓣评分
+                      if (torrent.doubanRating != null && torrent.doubanRating != 'N/A')
+                        Container(
+                          width: 60,
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          margin: const EdgeInsets.only(bottom: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF007711),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '豆 ${torrent.doubanRating}',
+                            style: const TextStyle(
+                              fontSize: 8,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      // IMDB评分
+                      if (torrent.imdbRating != null && torrent.imdbRating != 'N/A')
+                        Container(
+                          width: 60,
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5C518),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'IMDB ${torrent.imdbRating}',
+                            style: const TextStyle(
+                              fontSize: 8,
+                              color: Colors.black,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ],
             ),
               

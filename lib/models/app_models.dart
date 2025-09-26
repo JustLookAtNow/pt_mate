@@ -57,6 +57,8 @@ class TorrentItem {
   final DownloadStatus downloadStatus;
   bool collection; // 是否已收藏（改为可变）
   final String createdDate; // 种子创建时间
+  final String? doubanRating; // 豆瓣评分
+  final String? imdbRating; // IMDB评分
 
   TorrentItem({
     required this.id,
@@ -73,6 +75,8 @@ class TorrentItem {
     required this.cover,
     this.downloadStatus = DownloadStatus.none,
     this.collection = false,
+    this.doubanRating = 'N/A',
+    this.imdbRating = 'N/A',
   });
 
   TorrentItem copyWith({

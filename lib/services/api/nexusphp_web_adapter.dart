@@ -371,47 +371,102 @@ class NexusPHPWebAdapter extends SiteAdapter {
     final torrentTable = soup.find('table', class_: 'torrents');
 
     if (torrentTable != null) {
-      final rows = torrentTable.children.isNotEmpty
+      final List<Bs4Element> rows = torrentTable.children.isNotEmpty
           ? torrentTable.children[0].children
-          : [];
+          : <Bs4Element>[];
 
       // 跳过表头行，从第二行开始处理种子数据
       for (int i = 1; i < rows.length; i++) {
-        final row = rows[i];
-        final tds = row.children;
+        final Bs4Element row = rows[i];
+        final List<Bs4Element> tds = row.children;
 
         if (tds.length <= 6) continue;
         try {
-          final rowTds = tds[1].findAll('td');
-
+          final Bs4Element? torrentNameTable = tds[1].find(
+            'table',
+            class_: 'torrentname',
+          );
+          final List<Bs4Element> torrentNameTds =
+              torrentNameTable?.children[0].children[0].children ??
+              <Bs4Element>[];
           var cover = "";
-          // 提取种子ID（从详情链接中）
-          var titleTd = rowTds[1];
-          var detailLink = titleTd.find('a[href*="details.php"]');
-          var containsIcon = true;
-          if (detailLink == null) {
-            //有些网站没封面，可以从第一个td试试
-            containsIcon = false;
-            titleTd = rowTds[0];
-            detailLink = titleTd.find('a[href*="details.php"]');
-            if (detailLink == null) continue;
+          var doubanRating = 'N/A';
+          var imdbRating = 'N/A';
+          Bs4Element? coverTd;
+          Bs4Element? titleTd;
+          Bs4Element? scoreTd;
+          Bs4Element? starTd;
+          if (torrentNameTds.length > 3) {
+            //有封面，有评分的
+            coverTd = torrentNameTds[0];
+            titleTd = torrentNameTds[1];
+            scoreTd = torrentNameTds[2];
+            starTd = torrentNameTds[3];
+          } else if ((torrentNameTable?.find(
+                    'img',
+                    attrs: {'title': 'douban'},
+                  ) !=
+                  null) ||
+              (torrentNameTable?.find('img', attrs: {'title': 'imdb'}) !=
+                  null)) {
+            //有评分，没封面的
+            titleTd = torrentNameTds[0];
+            scoreTd = torrentNameTds[1];
+            starTd = torrentNameTds[2];
           } else {
-            //有封面，提取封面
-            var img = rowTds[0].find('img');
+            //有封面，没评分的
+            coverTd = torrentNameTds[0];
+            titleTd = torrentNameTds[1];
+            starTd = torrentNameTds[2];
+          }
+          //提取封面 
+          if(coverTd != null){
+            final Bs4Element? img = coverTd.find('img');
             if (img != null) {
               cover = img.getAttrValue('data-src') ?? '';
             }
           }
+          // 提取评分
+          if(scoreTd != null){
+            final Bs4Element? doubanRatingImg = scoreTd.find(
+              'img',
+              attrs: {'title': 'douban'},
+            );
+            final Bs4Element? imdbRatingImg = scoreTd.find(
+              'img',
+              attrs: {'title': 'imdb'},
+            );
+            if (doubanRatingImg != null) {
+              doubanRating = doubanRatingImg.nextSibling?.text ?? 'N/A';
+            }
+            if (imdbRatingImg != null) {
+              imdbRating = imdbRatingImg.nextSibling?.text ?? 'N/A';
+            }
+          }
 
-          final href = detailLink.attributes['href'] ?? '';
-          final idMatch = RegExp(r'id=(\d+)').firstMatch(href);
+
+          // 提取收藏
+          final Bs4Element? starImg = starTd.find(
+            'img',
+            class_: 'delbookmark',
+          );
+          final collection = starImg == null;
+          // 提取种子ID（从详情链接中）
+          final Bs4Element? detailLink = titleTd.find(
+            'a[href*="details.php"]',
+          );
+
+          final String href = detailLink?.attributes['href'] ?? '';
+          final RegExpMatch? idMatch = RegExp(r'id=(\d+)').firstMatch(href);
           if (idMatch == null) continue;
 
-          final torrentId = idMatch.group(1) ?? '';
+          final String torrentId = idMatch.group(1) ?? '';
           if (torrentId.isEmpty) continue;
 
           // 提取主标题（去除换行）
-          final titleElement = titleTd.find('a[href*="details.php"] b');
+          final Bs4Element? titleElement = titleTd.find(
+            'a[href*="details.php"] b',
+          );
           String title = '';
           if (titleElement != null) {
             title = titleElement.text
@@ -421,43 +476,50 @@ class NexusPHPWebAdapter extends SiteAdapter {
           }
 
           // 提取描述：只要纯文本，把标题去掉。
-          String description = titleTd.text
-              .replaceAll('\n', ' ')
-              .replaceAll(RegExp(r'\s+'), ' ')
-              .trim()
-              .replaceAll(title, '')
-              .replaceAll(RegExp(r'剩余时间：\d+.*?\d+[分钟|时]'), '');
+          String description =
+              titleTd.text
+                  .replaceAll('\n', ' ')
+                  .replaceAll(RegExp(r'\s+'), ' ')
+                  .trim()
+                  .replaceAll(title, '')
+                  .replaceAll(RegExp(r'剩余时间：\d+.*?\d+[分钟|时]'), '') ;
           // 提取下载记录
           DownloadStatus status = DownloadStatus.none;
-          final downloadDiv = titleTd.find('div', attrs: {'title': true});
+          final Bs4Element? downloadDiv = titleTd.find(
+            'div',
+            attrs: {'title': true},
+          );
           if (downloadDiv != null) {
-            final downloadTitle = downloadDiv.getAttrValue('title');
-            RegExp regExp = RegExp(r'(\d+)\%');
-            final match = regExp.firstMatch(downloadTitle!);
-            if (match != null) {
-              final percent = match.group(1);
-              if (percent != null) {
-                int percentInt = int.parse(percent);
-                if (percentInt == 100) {
-                  status = DownloadStatus.completed;
-                } else {
-                  status = DownloadStatus.downloading;
+            final String? downloadTitle = downloadDiv.getAttrValue('title');
+            if (downloadTitle != null) {
+              final RegExp regExp = RegExp(r'(\d+)\%');
+              final RegExpMatch? match = regExp.firstMatch(downloadTitle);
+              if (match != null) {
+                final String? percent = match.group(1);
+                if (percent != null) {
+                  final int percentInt = int.parse(percent);
+                  if (percentInt == 100) {
+                    status = DownloadStatus.completed;
+                  } else {
+                    status = DownloadStatus.downloading;
+                  }
                 }
               }
             }
           }
           // 提取创建时间（第4列，索引3）
-          final createDate = tds[3].find('span[title]').attributes['title'] ?? '';
+          final String createDate =
+              tds[3].find('span[title]')?.attributes['title'] ?? '';
           // 提取大小（第5列，索引4）
-          final sizeText = tds[4].text.replaceAll('\n', ' ').trim();
+          final String sizeText = tds[4].text.replaceAll('\n', ' ').trim();
 
           // 提取做种数（第6列，索引5）
           String seedersText = '';
-          final seedersElement = tds[5].find('a');
+          final Bs4Element? seedersElement = tds[5].find('a');
           if (seedersElement != null) {
             seedersText = seedersElement.text.trim();
           } else {
-            final boldElement = tds[5].find('b');
+            final Bs4Element? boldElement = tds[5].find('b');
             if (boldElement != null) {
               seedersText = boldElement.text.trim();
             } else {
@@ -467,11 +529,11 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
           // 提取下载数（第7列，索引6）
           String leechersText = '';
-          final leechersElement = tds[6].find('a');
+          final Bs4Element? leechersElement = tds[6].find('a');
           if (leechersElement != null) {
             leechersText = leechersElement.text.trim();
           } else {
-            final boldElement = tds[6].find('b');
+            final Bs4Element? boldElement = tds[6].find('b');
             if (boldElement != null) {
               leechersText = boldElement.text.trim();
             } else {
@@ -482,7 +544,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
           // 提取优惠信息
           String? promoType;
           String? remainingTime;
-          var promoImg = tds[1].find('img[onmouseover]');
+          Bs4Element? promoImg = tds[1].find('img[onmouseover]');
           promoImg ??= tds[1].find('img', class_: 'pro_free');
           if (promoImg != null) {
             promoType = promoImg.attributes['alt'] ?? '';
@@ -520,13 +582,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
                 sizeInBytes = sizeValue.round();
             }
           }
-          //收藏信息
-          var starTd = rowTds[2];
-          if (containsIcon && rowTds.length > 3) {
-            starTd = rowTds[3];
-          }
-          final starImg = starTd.find('img', class_: 'delbookmark');
-          final collection = starImg == null;
+
           torrents.add(
             TorrentItem(
               id: torrentId,
@@ -545,6 +601,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
               imageList: [], // 暂时不解析图片列表
               cover: cover,
               createdDate: createDate,
+              doubanRating: doubanRating,
+              imdbRating: imdbRating,
             ),
           );
         } catch (e) {
