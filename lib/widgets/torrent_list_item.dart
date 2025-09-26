@@ -558,17 +558,27 @@ class _SwipeableItemState extends State<_SwipeableItem>
     );
     _animation = Tween<double>(
       begin: 0,
-      end: 1,
+      end: 0,
     ).animate(CurvedAnimation(
       parent: _controller,
       curve: Curves.easeOut,
     ));
+    
+    // 添加动画监听器，只添加一次
+    _animation.addListener(_updateDragExtent);
   }
 
   @override
   void dispose() {
+    _animation.removeListener(_updateDragExtent);
     _controller.dispose();
     super.dispose();
+  }
+
+  void _updateDragExtent() {
+    setState(() {
+      _dragExtent = _animation.value;
+    });
   }
 
   void _handleDragStart(DragStartDetails details) {
@@ -614,7 +624,15 @@ class _SwipeableItemState extends State<_SwipeableItem>
     _isOpen = open;
     final targetExtent = open ? -_actionsWidth : 0.0;
     
-    _controller.reset();
+    // 如果目标位置和当前位置相同，不需要动画
+    if ((_dragExtent - targetExtent).abs() < 0.1) {
+      setState(() {
+        _dragExtent = targetExtent;
+      });
+      return;
+    }
+    
+    // 重新创建动画，避免状态冲突
     _animation = Tween<double>(
       begin: _dragExtent,
       end: targetExtent,
@@ -623,17 +641,9 @@ class _SwipeableItemState extends State<_SwipeableItem>
       curve: Curves.easeOut,
     ));
     
-    _controller.forward().then((_) {
-      setState(() {
-        _dragExtent = targetExtent;
-      });
-    });
-    
-    _animation.addListener(() {
-      setState(() {
-        _dragExtent = _animation.value;
-      });
-    });
+    // 重置并启动动画
+    _controller.reset();
+    _controller.forward();
   }
 
   void _close() {
