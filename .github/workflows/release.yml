@@ -287,25 +287,48 @@ jobs:
         TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
         TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
       run: |
-        # Function to escape MarkdownV2 special characters
+        # Function to escape MarkdownV2 special characters (preserve formatting chars)
         escape_tg() {
-          echo "$1" | sed -E 's/([_*\[\]()~`>#+=|{}.!-])/\\\1/g'
+          echo "$1" | \
+            sed 's/_/\\\\_/g' | \
+            sed 's/\[/\\\\[/g' | \
+            sed 's/\]/\\\\]/g' | \
+            sed 's/(/\\\\(/g' | \
+            sed 's/)/\\\\)/g' | \
+            sed 's/~/\\\\~/g' | \
+            sed 's/`/\\\\`/g' | \
+            sed 's/>/\\\\>/g' | \
+            sed 's/+/\\\\+/g' | \
+            sed 's/=/\\\\=/g' | \
+            sed 's/|/\\\\|/g' | \
+            sed 's/{/\\\\{/g' | \
+            sed 's/}/\\\\}/g' | \
+            sed 's/\./\\\\./g' | \
+            sed 's/!/\\\\!/g' | \
+            sed 's/\//\\\\\//g'
         }
     
-        # Extract and escape commit message
+        # Extract and process commit message
         RAW_COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
-        COMMIT_MESSAGE=$(escape_tg "$RAW_COMMIT_MESSAGE")
+        
+        # Process the commit message: convert ## titles to *title* and - to •
+        PROCESSED_MESSAGE=$(echo "$RAW_COMMIT_MESSAGE" | \
+          sed 's/^[[:space:]]*## \(.*\)/*\1*/' | \
+          sed 's/^- /• /')
+        
+        # Escape the processed message
+        COMMIT_MESSAGE=$(escape_tg "$PROCESSED_MESSAGE")
     
         # Create Telegram message
+        VERSION="${{ steps.version.outputs.tag }}"
+        RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}"
+        
         MESSAGE=$(printf '%s\n' \
-          "*🎉 PT Mate ${{ steps.version.outputs.tag }} 发布了！*" \
+          "*🎉 PT Mate $(escape_tg "$VERSION") 发布了！*" \
           "" \
-          "${COMMIT_MESSAGE}" \
+          "$COMMIT_MESSAGE" \
           "" \
-          "📥 *下载链接：*" \
-          "[GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }})" \
-          "" \
-          "\\#PTMate \\#更新 \\#Release")
+          "📱 [GitHub Release]($(escape_tg "$RELEASE_URL"))")
     
         echo "Final message to send:"
         echo "$MESSAGE"
@@ -313,12 +336,15 @@ jobs:
         # Send message to Telegram
         RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
           -H "Content-Type: application/json" \
-          -d "{
-            \"chat_id\": \"${TG_CHAT_ID}\",
-            \"text\": \"${MESSAGE}\",
-            \"parse_mode\": \"MarkdownV2\",
-            \"disable_web_page_preview\": false
-          }")
+          -d "$(jq -n \
+            --arg chat_id "${TG_CHAT_ID}" \
+            --arg text "${MESSAGE}" \
+            '{
+              chat_id: $chat_id,
+              text: $text,
+              parse_mode: "MarkdownV2",
+              disable_web_page_preview: false
+            }')")
     
         # Extract message_id from response
         MESSAGE_ID=$(echo "$RESPONSE" | jq -r '.result.message_id')
