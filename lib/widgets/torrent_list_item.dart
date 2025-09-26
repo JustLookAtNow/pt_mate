@@ -65,13 +65,19 @@ class TorrentListItem extends StatelessWidget {
     Widget mainContent = Container(
       decoration: BoxDecoration(
         color: isSelected
-            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
+            : Theme.of(context).colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: isSelected 
+            ? Border.all(
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
+                width: 1,
+              )
             : null,
-        borderRadius: BorderRadius.circular(8),
       ),
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+        padding: const EdgeInsets.all(4),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -252,6 +258,39 @@ class TorrentListItem extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // 标签行
+                    Builder(
+                      builder: (context) {
+                        final tags = TagType.matchTags('${torrent.name} ${torrent.smallDescr}');
+                        if (tags.isEmpty) return const SizedBox.shrink();
+                        
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Wrap(
+                            spacing: 4,
+                            runSpacing: 2,
+                            children: tags.map((tag) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: tag.color,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text(
+                                tag.content,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            )).toList(),
+                          ),
+                        );
+                      },
+                    ),
                     // 种子名称（聚合搜索模式下包含站点名称）
                     if (isAggregateMode && siteName != null)
                       RichText(

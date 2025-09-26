@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 
 // 用户资料信息
 class MemberProfile {
@@ -208,6 +209,36 @@ enum DiscountType {
 
 // 优惠显示颜色类型
 enum DiscountColorType { none, green, yellow }
+
+// 标签类型枚举
+enum TagType {
+  chinese('中字', Colors.green, r'中字|中文|简体'),
+  chineseTraditional('繁体', Colors.green, r'繁体'),
+  mandarin('国语', Colors.blue, r'国语|国配|普通话|中配'),
+  fourK('4K', Colors.orange, r'4K|2160p'),
+  resolution1080('1080p', Colors.blue, r'1080p'),
+  hdr('HDR', Colors.purple, r'HDR|HDR10|Dolby Vision|DV'),
+  h265('H265', Colors.blueGrey, r'H\.?265|HEVC|x265'),
+  webDl('WEB-DL', Colors.brown, r'WEB-DL|WEBDL|WEB\.DL'),
+  dovi('DOVI', Colors.pink, r'DOVI|Dolby Vision|DV');
+
+  const TagType(this.content, this.color, this.regex);
+  final String content;
+  final Color color;
+  final String regex;
+
+  // 从字符串中匹配所有标签
+  static List<TagType> matchTags(String text) {
+    List<TagType> matchedTags = [];
+    for (TagType tag in TagType.values) {
+      RegExp regExp = RegExp(tag.regex, caseSensitive: false);
+      if (regExp.hasMatch(text)) {
+        matchedTags.add(tag);
+      }
+    }
+    return matchedTags;
+  }
+}
 
 // 网站类型枚举
 enum SiteType {
