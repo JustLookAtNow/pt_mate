@@ -1051,8 +1051,7 @@ class _HomePageState extends State<HomePage> {
           body: Column(
             children: [
               // 顶部用户基础信息 - 仅在站点支持用户资料功能时显示
-              if (_profile != null &&
-                  (appState.site?.features.supportMemberProfile ?? true))
+              if (appState.site?.features.supportMemberProfile ?? true)
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   curve: Curves.easeInOut,
@@ -1060,125 +1059,127 @@ class _HomePageState extends State<HomePage> {
                   child: AnimatedOpacity(
                     duration: const Duration(milliseconds: 300),
                     opacity: _userInfoVisible ? 1.0 : 0.0,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                      child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          _userInfoExpanded = !_userInfoExpanded;
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.primaryContainer.withValues(alpha: 0.1),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.1),
-                                    child: Text(
-                                      _profile!.username.isNotEmpty
-                                          ? _profile!.username[0].toUpperCase()
-                                          : 'U',
-                                      style: TextStyle(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.primary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      _profile!.username,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleSmall
-                                          ?.copyWith(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                  ),
-                                  Icon(
-                                    _userInfoExpanded
-                                        ? Icons.expand_less
-                                        : Icons.expand_more,
+                    child: _profile != null
+                        ? Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                            child: Card(
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _userInfoExpanded = !_userInfoExpanded;
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
                                     color: Theme.of(
                                       context,
-                                    ).colorScheme.primary,
-                                    size: 20,
+                                    ).colorScheme.primaryContainer.withValues(alpha: 0.1),
                                   ),
-                                ],
-                              ),
-                              if (_userInfoExpanded) ...[
-                                const SizedBox(height: 12),
-                                Wrap(
-                                  spacing: 12,
-                                  runSpacing: 4,
-                                  children: [
-                                    _buildStatChip(
-                                      context,
-                                      '↑ ${_profile!.uploadedBytesString}',
-                                      Colors.green,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
                                     ),
-                                    _buildStatChip(
-                                      context,
-                                      '↓ ${_profile!.downloadedBytesString}',
-                                      Colors.blue,
+                                    child: Column(
+                                      children: [
+                                        Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 16,
+                                              backgroundColor: Theme.of(context)
+                                                  .colorScheme
+                                                  .primary
+                                                  .withValues(alpha: 0.1),
+                                              child: Text(
+                                                _profile!.username.isNotEmpty
+                                                    ? _profile!.username[0].toUpperCase()
+                                                    : 'U',
+                                                style: TextStyle(
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Text(
+                                                _profile!.username,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .titleSmall
+                                                    ?.copyWith(
+                                                      color: Theme.of(
+                                                        context,
+                                                      ).colorScheme.primary,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                              ),
+                                            ),
+                                            Icon(
+                                              _userInfoExpanded
+                                                  ? Icons.expand_less
+                                                  : Icons.expand_more,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
+                                              size: 20,
+                                            ),
+                                          ],
+                                        ),
+                                        if (_userInfoExpanded) ...[
+                                          const SizedBox(height: 12),
+                                          Wrap(
+                                            spacing: 12,
+                                            runSpacing: 4,
+                                            children: [
+                                              _buildStatChip(
+                                                context,
+                                                '↑ ${_profile!.uploadedBytesString}',
+                                                Colors.green,
+                                              ),
+                                              _buildStatChip(
+                                                context,
+                                                '↓ ${_profile!.downloadedBytesString}',
+                                                Colors.blue,
+                                              ),
+                                              _buildStatChip(
+                                                context,
+                                                '比率 ${Formatters.shareRate(_profile!.shareRate)}',
+                                                Colors.orange,
+                                              ),
+                                              _buildStatChip(
+                                                context,
+                                                '魔力 ${Formatters.bonus(_profile!.bonus)}',
+                                                Colors.purple,
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ],
                                     ),
-                                    _buildStatChip(
-                                      context,
-                                      '比率 ${Formatters.shareRate(_profile!.shareRate)}',
-                                      Colors.orange,
-                                    ),
-                                    _buildStatChip(
-                                      context,
-                                      '魔力 ${Formatters.bonus(_profile!.bonus)}',
-                                      Colors.purple,
-                                    ),
-                                  ],
+                                  ),
                                 ),
-                              ],
-                            ],
-                          ),
-                  ),
-                      ),
-                    ),
+                              ),
+                            ),
+                          )
+                        : const _UserInfoSkeleton(), // 显示骨架屏
                   ),
                 ),
-                ),
-              ),
               AnimatedContainer(
                 duration: const Duration(milliseconds: 500),
                 curve: Curves.easeInOut,
@@ -1919,6 +1920,117 @@ class _HomePageState extends State<HomePage> {
           fontWeight: FontWeight.w500,
         ),
       ),
+    );
+  }
+}
+
+/// 用户信息骨架屏组件
+class _UserInfoSkeleton extends StatefulWidget {
+  const _UserInfoSkeleton();
+
+  @override
+  State<_UserInfoSkeleton> createState() => _UserInfoSkeletonState();
+}
+
+class _UserInfoSkeletonState extends State<_UserInfoSkeleton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _animation = Tween<double>(
+      begin: 0.3,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+    _animationController.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          child: Card(
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.1),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    // 头像骨架
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.1 * _animation.value),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // 用户名骨架
+                    Expanded(
+                      child: Container(
+                        height: 16,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.1 * _animation.value),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // 展开图标骨架
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(4),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.1 * _animation.value),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
