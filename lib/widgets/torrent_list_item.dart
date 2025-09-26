@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
 import '../utils/format.dart';
+import 'cached_network_image.dart';
 
 /// 种子列表项组件
 ///
@@ -90,8 +91,8 @@ class TorrentListItem extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: torrent.cover.isNotEmpty
-                      ? Image.network(
-                          torrent.cover,
+                      ? CachedNetworkImage(
+                          imageUrl: torrent.cover,
                           width: 60,
                           height: 84,
                           fit: BoxFit.cover,
@@ -114,10 +115,6 @@ class TorrentListItem extends StatelessWidget {
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      value: loadingProgress.expectedTotalBytes != null
-                                          ? loadingProgress.cumulativeBytesLoaded /
-                                              loadingProgress.expectedTotalBytes!
-                                          : null,
                                       color: Theme.of(context).colorScheme.primary,
                                     ),
                                   ),
@@ -134,6 +131,7 @@ class TorrentListItem extends StatelessWidget {
                             );
                           },
                           errorBuilder: (context, error, stackTrace) {
+                            debugPrint('图片加载失败: $error');
                             return Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
