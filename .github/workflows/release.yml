@@ -290,22 +290,23 @@ jobs:
         # Function to escape MarkdownV2 special characters (preserve formatting chars)
         escape_tg() {
           echo "$1" | \
-            sed 's/_/\\\\_/g' | \
-            sed 's/\[/\\\\[/g' | \
-            sed 's/\]/\\\\]/g' | \
-            sed 's/(/\\\\(/g' | \
-            sed 's/)/\\\\)/g' | \
-            sed 's/~/\\\\~/g' | \
-            sed 's/`/\\\\`/g' | \
-            sed 's/>/\\\\>/g' | \
-            sed 's/+/\\\\+/g' | \
-            sed 's/=/\\\\=/g' | \
-            sed 's/|/\\\\|/g' | \
-            sed 's/{/\\\\{/g' | \
-            sed 's/}/\\\\}/g' | \
-            sed 's/\./\\\\./g' | \
-            sed 's/!/\\\\!/g' | \
-            sed 's/\//\\\\\//g'
+            sed 's/_/\\_/g' | \
+            sed 's/\[/\\[/g' | \
+            sed 's/\]/\\]/g' | \
+            sed 's/(/\\(/g' | \
+            sed 's/)/\\)/g' | \
+            sed 's/~/\\~/g' | \
+            sed 's/`/\\`/g' | \
+            sed 's/>/\\>/g' | \
+            sed 's/+/\\+/g' | \
+            sed 's/=/\\=/g' | \
+            sed 's/|/\\|/g' | \
+            sed 's/{/\\{/g' | \
+            sed 's/}/\\}/g' | \
+            sed 's/\./\\./g' | \
+            sed 's/!/\\!/g' | \
+            sed 's/-/\\-/g' | \
+            sed 's/\//\\\//g'
         }
     
         # Extract and process commit message
@@ -333,18 +334,22 @@ jobs:
         echo "Final message to send:"
         echo "$MESSAGE"
     
-        # Send message to Telegram
-        RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+        # Send message to Telegram using jq to properly escape JSON
+        JSON_PAYLOAD=$(printf '%s\n' "$MESSAGE" | jq -Rs \
+          --arg chat_id "${TG_CHAT_ID}" \
+          '{
+            chat_id: $chat_id,
+            text: .,
+            parse_mode: "MarkdownV2",
+            disable_web_page_preview: false
+          }')
+        
+        echo "JSON payload:"
+        echo "$JSON_PAYLOAD"
+        
+        RESPONSE=$(echo "$JSON_PAYLOAD" | curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
           -H "Content-Type: application/json" \
-          -d "$(jq -n \
-            --arg chat_id "${TG_CHAT_ID}" \
-            --arg text "${MESSAGE}" \
-            '{
-              chat_id: $chat_id,
-              text: $text,
-              parse_mode: "MarkdownV2",
-              disable_web_page_preview: false
-            }')")
+          -d @-)
     
         # Extract message_id from response
         MESSAGE_ID=$(echo "$RESPONSE" | jq -r '.result.message_id')
