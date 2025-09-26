@@ -5,8 +5,8 @@ class ImageHttpClient {
   static final ImageHttpClient instance = ImageHttpClient._();
 
   // 缓存配置
-  static const int _maxCacheSize = 100; // 最大缓存图片数量
-  static const int _maxCacheSizeBytes = 100 * 1024 * 1024; // 最大缓存大小 50MB
+  static const int _maxCacheSize = 500; // 最大缓存图片数量
+  static const int _maxCacheSizeBytes = 100 * 1024 * 1024; // 最大缓存大小 100MB
 
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
@@ -76,6 +76,10 @@ class ImageHttpClient {
       referer = 'https://www.douban.com/';
     } else if (url.contains('m-team.cc')) {
       referer = 'https://kp.m-team.cc/';
+    } else {
+      // 从URL中提取主域名作为referer
+      final uri = Uri.parse(url);
+      referer = '${uri.scheme}://${uri.host}/';
     }
 
     return await _dio.get<List<int>>(
