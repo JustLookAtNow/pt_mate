@@ -58,24 +58,24 @@ class Formatters {
       
       if (days > 0) {
         if (hours > 0) {
-          return '$days 天 $hours 时';
+          return '$days 天 $hours 小时';
         }
         return '$days 天';
       }
       
       if (hours > 0) {
         if (minutes > 0) {
-          return '$hours 时 $minutes 分';
+          return '$hours 小时 $minutes 分钟';
         }
-        return '$hours 时';
+        return '$hours 小时';
       }
       
       // 最小单位为分钟
       if (minutes > 0) {
-        return '$minutes 分';
+        return '$minutes 分钟';
       }
       
-      return '1 分'; // 不足1分钟显示为1分
+      return '刚刚'; // 不足1分钟显示为刚刚
     } catch (e) {
       return "- -"; // 解析失败时返回原始字符串
     }

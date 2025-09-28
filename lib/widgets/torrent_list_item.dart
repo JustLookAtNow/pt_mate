@@ -66,7 +66,7 @@ class TorrentListItem extends StatelessWidget {
       decoration: BoxDecoration(
         color: isSelected
             ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
-            : Theme.of(context).colorScheme.surfaceContainerLowest,
+            : Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: isSelected 
             ? Border.all(
@@ -75,7 +75,7 @@ class TorrentListItem extends StatelessWidget {
               )
             : null,
       ),
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
       child: Padding(
         padding: const EdgeInsets.all(4),
         child: Row(
@@ -87,9 +87,9 @@ class TorrentListItem extends StatelessWidget {
               children: [
                 // 封面截图
                 Container(
-                  width: 60,
-                  height: 84,
-                  margin: const EdgeInsets.only(right: 12),
+                  width: 70,
+                  height: 100,
+                  margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(6),
@@ -103,16 +103,16 @@ class TorrentListItem extends StatelessWidget {
                     child: torrent.cover.isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: torrent.cover,
-                            width: 60,
-                            height: 84,
+                            width: 70,
+                            height: 100,
                             fit: BoxFit.cover,
                             loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) {
                                 return child;
                               }
                               return Container(
-                                width: 60,
-                                height: 84,
+                                width: 70,
+                                height: 100,
                                 decoration: BoxDecoration(
                                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                   borderRadius: BorderRadius.circular(6),
@@ -182,33 +182,17 @@ class TorrentListItem extends StatelessWidget {
                           ),
                   ),
                 ),
-                // 创建时间
-                const SizedBox(height: 4),
-                Container(
-                  width: 60,
-                  margin: const EdgeInsets.only(right: 12),
-                  child: Text(
-                    Formatters.formatTorrentCreatedDate(torrent.createdDate),
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
                 // 评分模块
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Container(
-                  width: 60,
-                  margin: const EdgeInsets.only(right: 12),
+                  width: 70,
+                  margin: const EdgeInsets.only(right: 8),
                   child: Column(
                     children: [
                       // 豆瓣评分
                       if (torrent.doubanRating != null && torrent.doubanRating != 'N/A')
                         Container(
-                          width: 60,
+                          width: 70,
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                           margin: const EdgeInsets.only(bottom: 2),
                           decoration: BoxDecoration(
@@ -230,7 +214,7 @@ class TorrentListItem extends StatelessWidget {
                       // IMDB评分
                       if (torrent.imdbRating != null && torrent.imdbRating != 'N/A')
                         Container(
-                          width: 60,
+                          width: 70,
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF5C518),
@@ -373,6 +357,16 @@ class TorrentListItem extends StatelessWidget {
                         fontSize: 12,
                       ),
                     ),
+                    Text(
+                    '发布于 ${Formatters.formatTorrentCreatedDate(torrent.createdDate)} 前',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                     const SizedBox(height: 4),
                     // 底部信息行（优惠标签、做种/下载数、大小、下载状态）
                     Row(
