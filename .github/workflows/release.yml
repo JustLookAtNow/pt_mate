@@ -247,6 +247,17 @@ jobs:
           echo "is_prerelease=false" >> $GITHUB_OUTPUT
         fi
         
+    - name: Get latest commit message
+      id: commit_message
+      run: |
+        # Get the latest commit message (full message including body)
+        COMMIT_MESSAGE=$(git log -1 --pretty=format:"%B")
+        
+        # Save to output using multiline format
+        echo "message<<EOF" >> $GITHUB_OUTPUT
+        echo "$COMMIT_MESSAGE" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       
@@ -259,7 +270,7 @@ jobs:
         name: Release ${{ steps.version.outputs.tag }}
         body: |
           ## Changes in this release
-          ${{ github.event.head_commit.message }}
+          ${{ steps.commit_message.outputs.message }}
           
           ## 📱 Android APK Downloads
           
@@ -310,7 +321,7 @@ jobs:
         }
     
         # Extract and process commit message
-        RAW_COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
+        RAW_COMMIT_MESSAGE="${{ steps.commit_message.outputs.message }}"
         
         # Process the commit message: convert ## titles to *title* and - to •
         PROCESSED_MESSAGE=$(echo "$RAW_COMMIT_MESSAGE" | \
