@@ -216,11 +216,101 @@ jobs:
         path: windows/Output/pt_mate-${{ steps.version.outputs.version }}-windows-x64.exe
         retention-days: 1
 
-
+  build-ios:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && 'master' || github.ref }}
+        
+    - name: Extract version from tag
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          TAG="${{ github.event.inputs.tag }}"
+        else
+          TAG=${GITHUB_REF#refs/tags/}
+        fi
+        VERSION=${TAG#v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+        
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.35.2'
+        channel: 'stable'
+        
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Build iOS xcarchive
+      run: |
+        flutter build ios --release --no-codesign
+        
+    - name: Create xcarchive
+      run: |
+        cd ios
+        xcodebuild -workspace Runner.xcworkspace \
+          -scheme Runner \
+          -configuration Release \
+          -destination generic/platform=iOS \
+          -archivePath build/Runner.xcarchive \
+          archive \
+          CODE_SIGNING_ALLOWED=NO
+          
+    - name: Export unsigned IPA
+      run: |
+        cd ios
+        # Create export options plist for unsigned build
+        cat > ExportOptions.plist << EOF
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>method</key>
+            <string>development</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <false/>
+        </dict>
+        </plist>
+        EOF
+        
+        # Export IPA
+        xcodebuild -exportArchive \
+          -archivePath build/Runner.xcarchive \
+          -exportPath build/ipa \
+          -exportOptionsPlist ExportOptions.plist \
+          -allowProvisioningUpdates
+          
+        # Rename IPA file
+        mv build/ipa/Runner.ipa build/ipa/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa
+        
+    - name: Create xcarchive zip
+      run: |
+        cd ios/build
+        zip -r pt_mate-${{ steps.version.outputs.version }}.xcarchive.zip Runner.xcarchive
+        
+    - name: Upload iOS artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-artifacts
+        path: |
+          ios/build/ipa/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa
+          ios/build/pt_mate-${{ steps.version.outputs.version }}.xcarchive.zip
+        retention-days: 1
 
   create-release:
     runs-on: ubuntu-latest
-    needs: [build-android-linux, build-windows]
+    needs: [build-android-linux, build-windows, build-ios]
     
     steps:
     - name: Checkout code
@@ -283,6 +373,11 @@ jobs:
           - **Windows x64**: Windows installer for 64-bit systems
           - **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)
           
+          ## 🍎 iOS Downloads
+          
+          - **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.
+          - **Xcode Archive**: For developers to re-sign and distribute
+          
         draft: false
         prerelease: ${{ steps.version.outputs.is_prerelease }}
         files: |
@@ -291,6 +386,8 @@ jobs:
           android-artifacts/pt_mate-${{ steps.version.outputs.version }}-armeabi-v7a.apk
           windows-artifact/pt_mate-${{ steps.version.outputs.version }}-windows-x64.exe
           linux-artifact/pt_mate-${{ steps.version.outputs.version }}-linux-x64.AppImage
+          ios-artifacts/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa
+          ios-artifacts/pt_mate-${{ steps.version.outputs.version }}.xcarchive.zip
         fail_on_unmatched_files: true
         
     - name: Send Telegram notification
