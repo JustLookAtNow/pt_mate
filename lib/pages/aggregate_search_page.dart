@@ -102,15 +102,6 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
               fontWeight: FontWeight.w500,
             ),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.settings),
-                onPressed: () async {
-                  await Navigator.pushNamed(context, '/aggregate_search_settings');
-                  // 从设置页面返回后刷新配置
-                  _loadSearchConfigs();
-                },
-                tooltip: '聚合搜索设置',
-              ),
               const QbSpeedIndicator(),
             ],
           ),

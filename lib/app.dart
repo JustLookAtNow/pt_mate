@@ -1020,15 +1020,24 @@ class _HomePageState extends State<HomePage> {
           currentRoute: '/',
           onSettingsChanged: _reloadCategories,
           appBar: AppBar(
-            title: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(text: appState.site?.name ?? 'PT Mate'),
-                  TextSpan(
-                    text: ' - PT Mate',
-                    style: const TextStyle(fontSize: 14),
+            title: GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ServerSettingsPage(),
                   ),
-                ],
+                );
+              },
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: appState.site?.name ?? 'PT Mate'),
+                    TextSpan(
+                      text: ' - PT Mate',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ],
+                ),
               ),
             ),
             actions: const [QbSpeedIndicator()],

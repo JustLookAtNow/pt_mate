@@ -218,9 +218,10 @@ enum TagType {
   fourK('4K', Colors.orange, r'4K|2160p'),
   resolution1080('1080p', Colors.blue, r'1080p'),
   hdr('HDR', Colors.purple, r'HDR|HDR10|Dolby Vision|DV'),
-  h265('H265', Colors.blueGrey, r'H\.?265|HEVC|x265'),
-  webDl('WEB-DL', Colors.brown, r'WEB-DL|WEBDL|WEB\.DL'),
-  dovi('DOVI', Colors.pink, r'DOVI|Dolby Vision|DV');
+  h265('H265', Color.fromARGB(255, 51, 162, 217), r'H\.?265|HEVC|x265'),
+  webDl('WEB-DL', Color.fromARGB(255, 162, 41, 178), r'WEB-DL|WEBDL|WEB\.DL'),
+  dovi('DOVI', Colors.pink, r'DOVI|Dolby Vision|DV'),
+  blueRay('Blu-ray', Colors.red, r'blu-ray|bluray');
 
   const TagType(this.content, this.color, this.regex);
   final String content;

@@ -81,6 +81,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             behavior: SnackBarBehavior.fixed,
           ),
         );
+        
+        // 切换站点成功后跳转回首页
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       if (mounted) {
