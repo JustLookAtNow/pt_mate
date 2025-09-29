@@ -329,9 +329,9 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                             spacing: 1,
                             children: [
                               IconButton(
-                                tooltip: '测试连接',
-                                onPressed: () => _test(c),
-                                icon: const Icon(Icons.wifi_tethering),
+                                tooltip: '设置',
+                                onPressed: () => _addOrEdit(existing: c),
+                                icon: const Icon(Icons.settings),
                               ),
                               IconButton(
                                 tooltip: '删除',
@@ -434,6 +434,7 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
   final _portCtrl = TextEditingController(text: '8080');
   final _userCtrl = TextEditingController();
   final _pwdCtrl = TextEditingController();
+  final _scrollController = ScrollController(); // 添加滚动控制器
   bool _testing = false;
   String? _testMsg;
   bool? _testOk;
@@ -484,22 +485,56 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
       username: user,
       useLocalRelay: _useLocalRelay, // 包含本地中转选项
     );
-    // 可选先测连
-    Navigator.of(context).pop(_QbEditorResult(cfg, pwd.isEmpty ? null : pwd));
+    
+    // 如果密码为空且是编辑现有配置，则尝试从已保存的配置中读取密码
+    if (pwd.isEmpty && widget.existing != null) {
+      // 获取保存的密码
+      final savedPassword = await StorageService.instance.loadQbPassword(id);
+      
+      // 检查组件是否仍然挂载
+      if (!mounted) return;
+      
+      // 返回结果，使用保存的密码或null
+      Navigator.of(context).pop(_QbEditorResult(cfg, savedPassword));
+    } else {
+      // 无需异步操作，直接返回结果
+      Navigator.of(context).pop(_QbEditorResult(cfg, pwd.isEmpty ? null : pwd));
+    }
   }
 
   Future<void> _testConnection() async {
+    // 保存当前上下文状态，避免异步操作后直接使用 context
     final name = _nameCtrl.text.trim();
     final host = _hostCtrl.text.trim();
     final port = int.tryParse(_portCtrl.text.trim());
     final user = _userCtrl.text.trim();
     final pwd = _pwdCtrl.text.trim();
+    
+    // 如果密码为空且是编辑现有配置，则尝试从已保存的配置中读取密码
+    String? password = pwd;
+    if (pwd.isEmpty && widget.existing != null) {
+      final id = widget.existing!.id;
+      try {
+        password = await StorageService.instance.loadQbPassword(id);
+        // 检查组件是否仍然挂载
+        if (!mounted) return;
+      } catch (e) {
+        // 处理密码加载失败的情况
+        if (!mounted) return;
+        setState(() {
+          _testOk = false;
+          _testMsg = '加载保存的密码失败';
+        });
+        return;
+      }
+    }
 
     if (name.isEmpty ||
         host.isEmpty ||
         port == null ||
         user.isEmpty ||
-        pwd.isEmpty) {
+        (password?.isEmpty ?? true)) {
+      if (!mounted) return;
       setState(() {
         _testOk = false;
         _testMsg = '请完整填写名称、主机、端口、用户名和密码后再测试';
@@ -521,7 +556,7 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
         useLocalRelay: _useLocalRelay, // 包含本地中转选项
       );
 
-      await QbService.instance.testConnection(config: cfg, password: pwd);
+      await QbService.instance.testConnection(config: cfg, password: password!);
       if (!mounted) return;
       setState(() {
         _testOk = true;
@@ -571,6 +606,7 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
             // 内容区域
             Flexible(
               child: SingleChildScrollView(
+                controller: _scrollController, // 使用滚动控制器
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -655,7 +691,19 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
                       ),
                     ),
                     if (_testMsg != null) ...[
-                      const SizedBox(height: 16),
+                      Builder(builder: (context) {
+                        // 当测试消息显示时，滚动到底部
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (_scrollController.hasClients) {
+                            _scrollController.animateTo(
+                              _scrollController.position.maxScrollExtent,
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOut,
+                            );
+                          }
+                        });
+                        return const SizedBox(height: 16);
+                      }),
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
