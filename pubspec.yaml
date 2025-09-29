@@ -74,6 +74,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4  # 添加这一行
+  flutter_native_splash: ^2.4.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -140,3 +141,13 @@ flutter_launcher_icons:
   macos:
     generate: true
     image_path: "mt.png"
+
+flutter_native_splash:
+  color: "#ffffff"
+  image: mt.png
+  android: true
+  ios: true
+  web: true
+  android_12:
+    image: mt.png
+    color: "#ffffff"

@@ -248,12 +248,17 @@ jobs:
       
     - name: Build unsigned IPA
       run: |
-        # Build IPA directly
-        flutter build ipa --release --no-codesign
+        # Build iOS app bundle
+        flutter build ios --release --no-codesign
         
-        # Create build directory and copy IPA
+        # Create build directory
         mkdir -p ios/build
-        cp build/ios/ipa/Runner.ipa ios/build/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa
+        
+        # Create IPA manually from app bundle
+        mkdir -p Payload
+        cp -r build/ios/iphoneos/Runner.app Payload/
+        zip -r ios/build/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa Payload/
+        rm -rf Payload
         
     - name: Create xcarchive
       run: |
