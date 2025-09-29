@@ -246,9 +246,14 @@ jobs:
     - name: Get dependencies
       run: flutter pub get
       
-    - name: Build iOS xcarchive
+    - name: Build unsigned IPA
       run: |
-        flutter build ios --release --no-codesign
+        # Build IPA directly
+        flutter build ipa --release --no-codesign
+        
+        # Create build directory and copy IPA
+        mkdir -p ios/build
+        cp build/ios/ipa/Runner.ipa ios/build/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa
         
     - name: Create xcarchive
       run: |
@@ -260,39 +265,6 @@ jobs:
           -archivePath build/Runner.xcarchive \
           archive \
           CODE_SIGNING_ALLOWED=NO
-          
-    - name: Export unsigned IPA
-      run: |
-        cd ios
-        # Create export options plist for unsigned build
-        cat > ExportOptions.plist << EOF
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>method</key>
-            <string>development</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>stripSwiftSymbols</key>
-            <true/>
-            <key>uploadBitcode</key>
-            <false/>
-            <key>uploadSymbols</key>
-            <false/>
-        </dict>
-        </plist>
-        EOF
-        
-        # Export IPA
-        xcodebuild -exportArchive \
-          -archivePath build/Runner.xcarchive \
-          -exportPath build/ipa \
-          -exportOptionsPlist ExportOptions.plist \
-          -allowProvisioningUpdates
-          
-        # Rename IPA file
-        mv build/ipa/Runner.ipa build/ipa/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa
         
     - name: Create xcarchive zip
       run: |
@@ -304,7 +276,7 @@ jobs:
       with:
         name: ios-artifacts
         path: |
-          ios/build/ipa/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa
+          ios/build/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa
           ios/build/pt_mate-${{ steps.version.outputs.version }}.xcarchive.zip
         retention-days: 1
 
