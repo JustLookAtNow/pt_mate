@@ -23,6 +23,102 @@ class QbServerState {
   });
 }
 
+class QbTorrentState {
+  static const String error = 'error';
+  static const String missingFiles = 'missingFiles';
+  static const String uploading = 'uploading';
+  static const String pausedUP = 'pausedUP';
+  static const String queuedUP = 'queuedUP';
+  static const String stalledUP = 'stalledUP';
+  static const String checkingUP = 'checkingUP';
+  static const String forcedUP = 'forcedUP';
+  static const String allocating = 'allocating';
+  static const String downloading = 'downloading';
+  static const String metaDL = 'metaDL';
+  static const String pausedDL = 'pausedDL';
+  static const String queuedDL = 'queuedDL';
+  static const String stalledDL = 'stalledDL';
+  static const String checkingDL = 'checkingDL';
+  static const String forcedDL = 'forcedDL';
+  static const String stoppedDL = 'stoppedDL';
+  static const String checkingResumeData = 'checkingResumeData';
+  static const String moving = 'moving';
+  static const String unknown = 'unknown';
+  
+  static bool isDownloading(String state) {
+    return state == downloading || state == forcedDL || 
+           state == metaDL || state == stalledDL;
+  }
+  
+  static bool isPaused(String state) {
+    return state == pausedDL || state == pausedUP;
+  }
+}
+
+class QbTorrent {
+  final String hash;
+  final String name;
+  final String state;
+  final int size;
+  final double progress;
+  final int dlspeed;
+  final int upspeed;
+  final int eta;
+  final String category;
+  final List<String> tags;
+  final int completionOn;
+  final String contentPath;
+  final int addedOn;
+  final int amountLeft;
+  final double ratio;
+  final int timeActive;
+  
+  const QbTorrent({
+    required this.hash,
+    required this.name,
+    required this.state,
+    required this.size,
+    required this.progress,
+    required this.dlspeed,
+    required this.upspeed,
+    required this.eta,
+    required this.category,
+    required this.tags,
+    required this.completionOn,
+    required this.contentPath,
+    required this.addedOn,
+    required this.amountLeft,
+    required this.ratio,
+    required this.timeActive,
+  });
+  
+  factory QbTorrent.fromJson(Map<String, dynamic> json) {
+    return QbTorrent(
+      hash: json['hash'] ?? '',
+      name: json['name'] ?? '',
+      state: json['state'] ?? QbTorrentState.unknown,
+      size: json['size'] is int ? json['size'] : int.tryParse('${json['size'] ?? 0}') ?? 0,
+      progress: json['progress'] is double ? json['progress'] : double.tryParse('${json['progress'] ?? 0}') ?? 0,
+      dlspeed: json['dlspeed'] is int ? json['dlspeed'] : int.tryParse('${json['dlspeed'] ?? 0}') ?? 0,
+      upspeed: json['upspeed'] is int ? json['upspeed'] : int.tryParse('${json['upspeed'] ?? 0}') ?? 0,
+      eta: json['eta'] is int ? json['eta'] : int.tryParse('${json['eta'] ?? 0}') ?? 0,
+      category: json['category'] ?? '',
+      tags: json['tags'] is String 
+          ? (json['tags'] as String).split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList() 
+          : <String>[],
+      completionOn: json['completion_on'] is int ? json['completion_on'] : int.tryParse('${json['completion_on'] ?? 0}') ?? 0,
+      contentPath: json['content_path'] ?? '',
+      addedOn: json['added_on'] is int ? json['added_on'] : int.tryParse('${json['added_on'] ?? 0}') ?? 0,
+      amountLeft: json['amount_left'] is int ? json['amount_left'] : int.tryParse('${json['amount_left'] ?? 0}') ?? 0,
+      ratio: json['ratio'] is double ? json['ratio'] : double.tryParse('${json['ratio'] ?? 0}') ?? 0,
+      timeActive: json['time_active'] is int ? json['time_active'] : int.tryParse('${json['time_active'] ?? 0}') ?? 0,
+    );
+  }
+  
+  bool get isDownloading => QbTorrentState.isDownloading(state);
+  bool get isPaused => QbTorrentState.isPaused(state);
+}
+
 class QbService {
   QbService._();
   static final QbService instance = QbService._();
@@ -330,6 +426,59 @@ class QbService {
     
     return <String>[];
   }
+  
+  /// 获取下载任务列表
+  Future<List<QbTorrent>> fetchTorrents({
+    required QbClientConfig config,
+    required String password,
+    String? filter,
+    String? category,
+    String? tag,
+    String? sort,
+    bool? reverse,
+    int? limit,
+    int? offset,
+  }) async {
+    final base = _buildBase(config);
+    final dio = _createDio(base);
+    
+    final queryParams = <String, dynamic>{
+      if (filter != null) 'filter': filter,
+      if (category != null) 'category': category,
+      if (tag != null) 'tag': tag,
+      if (sort != null) 'sort': sort,
+      if (reverse != null) 'reverse': reverse.toString(),
+      if (limit != null) 'limit': limit.toString(),
+      if (offset != null) 'offset': offset.toString(),
+    };
+    
+    final res = await _executeAuthenticatedRequest<List<dynamic>>(
+      config,
+      password,
+      (cookie) => dio.get(
+        '/api/v2/torrents/info',
+        queryParameters: queryParams,
+        options: Options(headers: cookie.isNotEmpty ? {'Cookie': cookie} : null),
+      ),
+    );
+    
+    if ((res.statusCode ?? 0) != 200) {
+      throw Exception('获取下载任务列表失败（HTTP ${res.statusCode}）');
+    }
+    
+    final data = res.data;
+    if (data is List) {
+      return data
+          .map((item) => item is Map 
+              ? QbTorrent.fromJson((item).cast<String, dynamic>()) 
+              : null)
+          .where((item) => item != null)
+          .cast<QbTorrent>()
+          .toList();
+    }
+    
+    return <QbTorrent>[];
+  }
 
   // 新增：通过 URL 添加任务到 qBittorrent
   Future<void> addTorrentByUrl({
@@ -471,5 +620,138 @@ class QbService {
     } catch (e) {
       throw Exception('下载种子文件失败：$e');
     }
+  }
+  
+  /// 暂停下载任务
+  Future<void> pauseTorrents({
+    required QbClientConfig config,
+    required String password,
+    required List<String> hashes,
+  }) async {
+    if (hashes.isEmpty) return;
+    
+    final base = _buildBase(config);
+    final dio = _createDio(base);
+    
+    final form = FormData.fromMap({
+      'hashes': hashes.join('|'),
+    });
+    
+    final res = await _executeAuthenticatedRequest(
+      config,
+      password,
+      (cookie) => dio.post(
+        '/api/v2/torrents/stop',
+        data: form,
+        options: Options(headers: cookie.isNotEmpty ? {'Cookie': cookie} : null),
+      ),
+    );
+    
+    if ((res.statusCode ?? 0) != 200) {
+      throw Exception('暂停任务失败（HTTP ${res.statusCode}）');
+    }
+  }
+  
+  /// 恢复下载任务
+  Future<void> resumeTorrents({
+    required QbClientConfig config,
+    required String password,
+    required List<String> hashes,
+  }) async {
+    if (hashes.isEmpty) return;
+    
+    final base = _buildBase(config);
+    final dio = _createDio(base);
+    
+    final form = FormData.fromMap({
+      'hashes': hashes.join('|'),
+    });
+    
+    final res = await _executeAuthenticatedRequest(
+      config,
+      password,
+      (cookie) => dio.post(
+        '/api/v2/torrents/start',
+        data: form,
+        options: Options(headers: cookie.isNotEmpty ? {'Cookie': cookie} : null),
+      ),
+    );
+    
+    if ((res.statusCode ?? 0) != 200) {
+      throw Exception('恢复任务失败（HTTP ${res.statusCode}）');
+    }
+  }
+  
+  /// 删除下载任务
+  Future<void> deleteTorrents({
+    required QbClientConfig config,
+    required String password,
+    required List<String> hashes,
+    bool deleteFiles = false,
+  }) async {
+    if (hashes.isEmpty) return;
+    
+    final base = _buildBase(config);
+    final dio = _createDio(base);
+    
+    final form = FormData.fromMap({
+      'hashes': hashes.join('|'),
+      'deleteFiles': deleteFiles.toString(),
+    });
+    
+    final res = await _executeAuthenticatedRequest(
+      config,
+      password,
+      (cookie) => dio.post(
+        '/api/v2/torrents/delete',
+        data: form,
+        options: Options(headers: cookie.isNotEmpty ? {'Cookie': cookie} : null),
+      ),
+    );
+    
+    if ((res.statusCode ?? 0) != 200) {
+      throw Exception('删除任务失败（HTTP ${res.statusCode}）');
+    }
+  }
+
+  /// 暂停单个任务的便捷方法
+  Future<void> pauseTorrent({
+    required QbClientConfig config,
+    required String password,
+    required String hash,
+  }) async {
+    await pauseTorrents(
+      config: config,
+      password: password,
+      hashes: [hash],
+    );
+  }
+
+  /// 恢复单个任务的便捷方法
+  Future<void> resumeTorrent({
+    required QbClientConfig config,
+    required String password,
+    required String hash,
+  }) async {
+    await resumeTorrents(
+      config: config,
+      password: password,
+      hashes: [hash],
+    );
+  }
+
+  /// 删除单个任务的便捷方法
+  Future<void> deleteTorrent({
+    required QbClientConfig config,
+    required String password,
+    required String hash,
+    bool deleteFiles = false,
+  }) async {
+    await deleteTorrents(
+      config: config,
+      password: password,
+      hashes: [hash],
+      deleteFiles: deleteFiles,
+    );
   }
 }

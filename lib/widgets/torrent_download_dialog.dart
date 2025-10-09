@@ -260,10 +260,10 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
           selectedItemBuilder: (context) {
             return _clients.map((client) {
               final screenWidth = MediaQuery.of(context).size.width;
-              // 响应式宽度：手机上限制最大宽度，大屏上允许更宽
+              // 响应式宽度：手机上限制最大宽度，大屏上基于对话框容器宽度计算
               final maxWidth = screenWidth > 600 
-                  ? screenWidth * 0.6  // 大屏上使用60%宽度
-                  : 240.0;  // 小屏上限制200px
+                  ? 400.0 * 0.6  // 大屏上使用对话框容器宽度的60%
+                  : 240.0;  // 小屏上限制240px
               
               return SizedBox(
                 width: maxWidth,

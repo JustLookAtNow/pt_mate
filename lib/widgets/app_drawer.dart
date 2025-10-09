@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../pages/downloader_settings_page.dart';
+import '../pages/aggregate_search_page.dart';
+import '../pages/download_tasks_page.dart';
 import '../pages/server_settings_page.dart';
 import '../pages/settings_page.dart';
 import '../pages/about_page.dart';
-import '../pages/aggregate_search_page.dart';
 import '../app.dart';
 
 class AppDrawer extends StatelessWidget {
@@ -112,18 +112,18 @@ class AppDrawer extends StatelessWidget {
           ),
           _DrawerItem(
             icon: Icons.download_outlined,
-            title: '下载器设置',
-            isActive: currentRoute == '/downloader_settings',
+            title: '下载管理',
+            isActive: currentRoute == '/download_tasks',
             onTap: () {
               if (!isFixedSidebar) {
                 Navigator.of(context).pop();
               }
-              if (currentRoute != '/downloader_settings') {
+              if (currentRoute != '/download_tasks') {
                 if (isFixedSidebar) {
                   Navigator.of(context).pushReplacement(
                     PageRouteBuilder(
-                      pageBuilder: (context, animation1, animation2) => const DownloaderSettingsPage(),
-                      settings: const RouteSettings(name: '/downloader_settings'),
+                      pageBuilder: (context, animation1, animation2) => const DownloadTasksPage(),
+                      settings: const RouteSettings(name: '/download_tasks'),
                       transitionDuration: Duration.zero,
                       reverseTransitionDuration: Duration.zero,
                     ),
@@ -131,8 +131,8 @@ class AppDrawer extends StatelessWidget {
                 } else {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const DownloaderSettingsPage(),
-                      settings: const RouteSettings(name: '/downloader_settings'),
+                      builder: (_) => const DownloadTasksPage(),
+                      settings: const RouteSettings(name: '/download_tasks'),
                     ),
                   );
                 }

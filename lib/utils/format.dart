@@ -1,5 +1,51 @@
 import 'package:intl/intl.dart';
 
+/// 格式化工具类，用于格式化文件大小、速度和时间
+class FormatUtil {
+  /// 格式化文件大小
+  static String formatFileSize(int bytes) {
+    if (bytes < 1024) {
+      return '$bytes B';
+    } else if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    } else if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    } else {
+      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    }
+  }
+
+  /// 格式化速度
+  static String formatSpeed(int bytesPerSecond) {
+    if (bytesPerSecond < 1024) {
+      return '$bytesPerSecond B/s';
+    } else if (bytesPerSecond < 1024 * 1024) {
+      return '${(bytesPerSecond / 1024).toStringAsFixed(1)} KB/s';
+    } else if (bytesPerSecond < 1024 * 1024 * 1024) {
+      return '${(bytesPerSecond / (1024 * 1024)).toStringAsFixed(1)} MB/s';
+    } else {
+      return '${(bytesPerSecond / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB/s';
+    }
+  }
+
+  /// 格式化剩余时间
+  static String formatEta(int seconds) {
+    if (seconds < 0) {
+      return '未知';
+    }
+    
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    final remainingSeconds = seconds % 60;
+    
+    if (hours > 0) {
+      return '$hours:${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+    } else {
+      return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+    }
+  }
+}
+
 class Formatters {
   static final NumberFormat _num2 = NumberFormat('#,##0.00');
 

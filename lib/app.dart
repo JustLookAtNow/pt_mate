@@ -796,7 +796,12 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('已成功发送"${item.name}"到 ${clientConfig.name}'),
+            content: Text(
+              '已成功发送"${item.name}"到 ${clientConfig.name}',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
             backgroundColor: Theme.of(context).colorScheme.primaryContainer,
             behavior: SnackBarBehavior.floating,
           ),

@@ -8,6 +8,7 @@ import '../widgets/qb_speed_indicator.dart';
 import '../widgets/responsive_layout.dart';
 import 'backup_restore_page.dart';
 import 'aggregate_search_settings_page.dart';
+import 'downloader_settings_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -127,6 +128,29 @@ class _SettingsBody extends StatelessWidget {
                 },
               ),
             ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // 下载器设置
+        Text(
+          '下载器设置',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.download_outlined),
+            title: const Text('下载器配置'),
+            subtitle: const Text('管理 qBittorrent 下载器'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const DownloaderSettingsPage(),
+                ),
+              );
+            },
           ),
         ),
         const SizedBox(height: 16),

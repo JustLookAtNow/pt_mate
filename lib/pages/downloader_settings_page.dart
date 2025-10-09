@@ -267,6 +267,11 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       currentRoute: '/downloader_settings',
       appBar: AppBar(
         title: const Text('下载器设置'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             tooltip: '测试默认下载器',
