@@ -236,6 +236,14 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
         config: _qbConfig!,
         password: _qbPassword!,
         hash: hash,
+        onConfigUpdated: (updatedConfig) {
+          // 更新本地配置
+          setState(() {
+            _qbConfig = updatedConfig;
+          });
+          // 同时保存到存储中
+          _saveUpdatedConfig(updatedConfig);
+        },
       );
       
       if (!mounted) return;
@@ -273,6 +281,14 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
         config: _qbConfig!,
         password: _qbPassword!,
         hash: hash,
+        onConfigUpdated: (updatedConfig) {
+          // 更新本地配置
+          setState(() {
+            _qbConfig = updatedConfig;
+          });
+          // 同时保存到存储中
+          _saveUpdatedConfig(updatedConfig);
+        },
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -297,6 +313,22 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
           backgroundColor: Theme.of(context).colorScheme.errorContainer,
         ),
       );
+    }
+  }
+
+  // 保存更新后的配置到存储
+  Future<void> _saveUpdatedConfig(QbClientConfig updatedConfig) async {
+    try {
+      final clients = await StorageService.instance.loadQbClients();
+      final updatedClients = clients.map((c) => 
+        c.id == updatedConfig.id ? updatedConfig : c
+      ).toList();
+      
+      final defaultId = await StorageService.instance.loadDefaultQbId();
+      await StorageService.instance.saveQbClients(updatedClients, defaultId: defaultId);
+    } catch (e) {
+      // 保存失败不影响主要功能，只记录错误
+      debugPrint('保存配置失败: $e');
     }
   }
   

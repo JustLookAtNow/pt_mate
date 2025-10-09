@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
 import '../services/qbittorrent/qb_client.dart';
 import '../utils/format.dart';
@@ -44,13 +45,36 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
         });
         return;
       }
+      
       final clients = await StorageService.instance.loadQbClients();
-      final c = clients.firstWhere(
-        (e) => e.id == defId,
-        orElse: () =>
-            clients.isNotEmpty ? clients.first : throw Exception('未找到默认下载器'),
-      );
-      final pwd = await StorageService.instance.loadQbPassword(c.id);
+      if (clients.isEmpty) {
+        setState(() {
+          _err = '没有配置任何下载器';
+          _info = null;
+          _serverState = null;
+        });
+        return;
+      }
+      
+      // 查找默认客户端
+      QbClientConfig? defaultClient;
+      for (final client in clients) {
+        if (client.id == defId) {
+          defaultClient = client;
+          break;
+        }
+      }
+      
+      if (defaultClient == null) {
+        setState(() {
+          _err = '未找到默认下载器 ID: $defId，请重新设置默认下载器';
+          _info = null;
+          _serverState = null;
+        });
+        return;
+      }
+      
+      final pwd = await StorageService.instance.loadQbPassword(defaultClient.id);
       if ((pwd ?? '').isEmpty) {
         setState(() {
           _err = '未保存密码';
@@ -62,8 +86,8 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
       
       // 同时获取传输信息和服务器状态
       final futures = await Future.wait([
-        QbService.instance.fetchTransferInfo(config: c, password: pwd!),
-        QbService.instance.fetchServerState(config: c, password: pwd),
+        QbService.instance.fetchTransferInfo(config: defaultClient, password: pwd!),
+        QbService.instance.fetchServerState(config: defaultClient, password: pwd),
       ]);
       
       if (!mounted) return;
@@ -75,7 +99,7 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _err = '获取失败';
+        _err = '获取失败: ${e.toString()}';
         _info = null;
         _serverState = null;
       });

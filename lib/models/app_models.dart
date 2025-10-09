@@ -834,6 +834,7 @@ class QbClientConfig {
   final String?
   password; // stored securely, may be null when loaded from prefs-only
   final bool useLocalRelay; // 是否启用本地中转，先下载种子文件再提交给qBittorrent
+  final String? version; // qBittorrent版本号，用于API兼容性
 
   const QbClientConfig({
     required this.id,
@@ -843,6 +844,7 @@ class QbClientConfig {
     required this.username,
     this.password,
     this.useLocalRelay = false, // 默认禁用
+    this.version, // 版本号可为空，首次使用时自动获取
   });
 
   QbClientConfig copyWith({
@@ -853,6 +855,7 @@ class QbClientConfig {
     String? username,
     String? password,
     bool? useLocalRelay,
+    String? version,
   }) => QbClientConfig(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -861,6 +864,7 @@ class QbClientConfig {
     username: username ?? this.username,
     password: password ?? this.password,
     useLocalRelay: useLocalRelay ?? this.useLocalRelay,
+    version: version ?? this.version,
   );
 
   Map<String, dynamic> toJson() => {
@@ -870,6 +874,7 @@ class QbClientConfig {
     'port': port,
     'username': username,
     'useLocalRelay': useLocalRelay,
+    if (version != null) 'version': version,
     // password intentionally excluded from plain json by default
   };
 
@@ -880,6 +885,7 @@ class QbClientConfig {
     port: (json['port'] as num).toInt(),
     username: json['username'] as String,
     useLocalRelay: (json['useLocalRelay'] as bool?) ?? false,
+    version: json['version'] as String?, // 兼容老数据，可为空
   );
 }
 

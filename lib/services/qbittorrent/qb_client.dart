@@ -427,6 +427,64 @@ class QbService {
     return <String>[];
   }
   
+  /// 获取 qBittorrent 版本信息
+  Future<String> fetchVersion({
+    required QbClientConfig config,
+    required String password,
+  }) async {
+    final base = _buildBase(config);
+    final dio = _createDio(base);
+    
+    final res = await _executeAuthenticatedRequest(
+      config,
+      password,
+      (cookie) => dio.get(
+        '/api/v2/app/version',
+        options: Options(headers: cookie.isNotEmpty ? {'Cookie': cookie} : null),
+      ),
+    );
+    
+    if ((res.statusCode ?? 0) != 200) {
+      throw Exception('获取版本信息失败（HTTP ${res.statusCode}）');
+    }
+    
+    final version = res.data?.toString().trim() ?? '';
+    if (version.isEmpty) {
+      throw Exception('版本信息为空');
+    }
+    
+    return version;
+  }
+  
+  /// 确保配置中有版本信息，如果没有则自动获取
+  /// 返回更新后的配置（如果版本信息被更新）
+  Future<QbClientConfig> ensureVersionInfo({
+    required QbClientConfig config,
+    required String password,
+    Function(QbClientConfig)? onVersionUpdated,
+  }) async {
+    // 如果配置中已有版本信息，直接返回
+    if (config.version != null && config.version!.isNotEmpty) {
+      return config;
+    }
+    
+    try {
+      // 获取版本信息
+      final version = await fetchVersion(config: config, password: password);
+      
+      // 创建包含版本信息的新配置
+      final updatedConfig = config.copyWith(version: version);
+      
+      // 如果提供了回调，通知调用者配置已更新
+      onVersionUpdated?.call(updatedConfig);
+      
+      return updatedConfig;
+    } catch (e) {
+      // 如果获取版本失败，返回原配置（使用默认的 API 路径）
+      return config;
+    }
+  }
+  
   /// 获取下载任务列表
   Future<List<QbTorrent>> fetchTorrents({
     required QbClientConfig config,
@@ -622,26 +680,77 @@ class QbService {
     }
   }
   
+  /// 根据版本获取暂停任务的 API 路径
+  String _getPauseApiPath(String? version) {
+    if (version == null) return '/api/v2/torrents/pause'; // 默认使用 4.x 的路径
+    
+    // 移除版本号前的 'v' 前缀（如果存在）
+    String cleanVersion = version.toLowerCase().startsWith('v') 
+        ? version.substring(1) 
+        : version;
+    
+    // 解析版本号，判断是 4.x 还是 5.x
+    final versionParts = cleanVersion.split('.');
+    if (versionParts.isNotEmpty) {
+      final majorVersion = int.tryParse(versionParts[0]);
+      if (majorVersion != null && majorVersion >= 5) {
+        return '/api/v2/torrents/stop'; // 5.x 使用 stop
+      }
+    }
+    return '/api/v2/torrents/pause'; // 4.x 使用 pause
+  }
+  
+  /// 根据版本获取恢复任务的 API 路径
+  String _getResumeApiPath(String? version) {
+    if (version == null) return '/api/v2/torrents/resume'; // 默认使用 4.x 的路径
+    
+    // 移除版本号前的 'v' 前缀（如果存在）
+    String cleanVersion = version.toLowerCase().startsWith('v') 
+        ? version.substring(1) 
+        : version;
+    
+    // 解析版本号，判断是 4.x 还是 5.x
+    final versionParts = cleanVersion.split('.');
+    if (versionParts.isNotEmpty) {
+      final majorVersion = int.tryParse(versionParts[0]);
+      if (majorVersion != null && majorVersion >= 5) {
+        return '/api/v2/torrents/start'; // 5.x 使用 start
+      }
+    }
+    return '/api/v2/torrents/resume'; // 4.x 使用 resume
+  }
+  
   /// 暂停下载任务
   Future<void> pauseTorrents({
     required QbClientConfig config,
     required String password,
     required List<String> hashes,
+    Function(QbClientConfig)? onVersionUpdated,
   }) async {
     if (hashes.isEmpty) return;
     
-    final base = _buildBase(config);
+    // 确保有版本信息
+    final configWithVersion = await ensureVersionInfo(
+      config: config,
+      password: password,
+      onVersionUpdated: onVersionUpdated,
+    );
+    
+    final base = _buildBase(configWithVersion);
     final dio = _createDio(base);
     
     final form = FormData.fromMap({
       'hashes': hashes.join('|'),
     });
     
+    // 根据配置中的版本选择 API 路径
+    final apiPath = _getPauseApiPath(configWithVersion.version);
+    
     final res = await _executeAuthenticatedRequest(
-      config,
+      configWithVersion,
       password,
       (cookie) => dio.post(
-        '/api/v2/torrents/stop',
+        apiPath,
         data: form,
         options: Options(headers: cookie.isNotEmpty ? {'Cookie': cookie} : null),
       ),
@@ -657,21 +766,32 @@ class QbService {
     required QbClientConfig config,
     required String password,
     required List<String> hashes,
+    Function(QbClientConfig)? onVersionUpdated,
   }) async {
     if (hashes.isEmpty) return;
     
-    final base = _buildBase(config);
+    // 确保有版本信息
+    final configWithVersion = await ensureVersionInfo(
+      config: config,
+      password: password,
+      onVersionUpdated: onVersionUpdated,
+    );
+    
+    final base = _buildBase(configWithVersion);
     final dio = _createDio(base);
     
     final form = FormData.fromMap({
       'hashes': hashes.join('|'),
     });
     
+    // 根据配置中的版本选择 API 路径
+    final apiPath = _getResumeApiPath(configWithVersion.version);
+    
     final res = await _executeAuthenticatedRequest(
-      config,
+      configWithVersion,
       password,
       (cookie) => dio.post(
-        '/api/v2/torrents/start',
+        apiPath,
         data: form,
         options: Options(headers: cookie.isNotEmpty ? {'Cookie': cookie} : null),
       ),
@@ -719,11 +839,16 @@ class QbService {
     required QbClientConfig config,
     required String password,
     required String hash,
+    Function(QbClientConfig)? onConfigUpdated,
   }) async {
     await pauseTorrents(
       config: config,
       password: password,
       hashes: [hash],
+      onVersionUpdated: (updatedConfig) async {
+        // 通知调用方配置已更新
+        onConfigUpdated?.call(updatedConfig);
+      },
     );
   }
 
@@ -732,11 +857,16 @@ class QbService {
     required QbClientConfig config,
     required String password,
     required String hash,
+    Function(QbClientConfig)? onConfigUpdated,
   }) async {
     await resumeTorrents(
       config: config,
       password: password,
       hashes: [hash],
+      onVersionUpdated: (updatedConfig) async {
+        // 通知调用方配置已更新
+        onConfigUpdated?.call(updatedConfig);
+      },
     );
   }
 
