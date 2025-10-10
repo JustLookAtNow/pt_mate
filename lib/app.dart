@@ -15,7 +15,9 @@ import 'services/webdav_service.dart';
 import 'providers/aggregate_search_provider.dart';
 
 import 'utils/format.dart';
-import 'services/qbittorrent/qb_client.dart';
+import 'services/downloader/downloader_config.dart';
+import 'services/downloader/downloader_service.dart';
+import 'services/downloader/downloader_models.dart';
 
 import 'pages/server_settings_page.dart';
 import 'widgets/qb_speed_indicator.dart';
@@ -49,6 +51,9 @@ class AppState extends ChangeNotifier {
     _initCompleter = Completer<void>();
 
     try {
+      // 应用启动时首先检查并执行数据迁移
+      await StorageService.instance.checkAndMigrate();
+      
       _site = await StorageService.instance.getActiveSiteConfig();
       await ApiService.instance.init();
       _isInitialized = true;
@@ -117,7 +122,7 @@ class AppState extends ChangeNotifier {
          Future.microtask(() async {
            try {
              // 检查是否有远程备份可以下载
-             final remoteBackups = await backupService.getWebDAVBackups();
+             final remoteBackups = await backupService.listWebDAVBackups();
              if (remoteBackups.isNotEmpty) {
                if (kDebugMode) {
                  print('AppState: 发现${remoteBackups.length}个远程备份，准备自动同步最新的');
@@ -127,15 +132,18 @@ class AppState extends ChangeNotifier {
                final latestBackup = remoteBackups.first;
                final backupPath = latestBackup['path'] as String;
                
-               // 恢复最新的备份
-               final result = await backupService.restoreFromWebDAV(backupPath);
-               if (result.success) {
-                 if (kDebugMode) {
-                   print('AppState: 自动同步完成');
-                 }
-               } else {
-                 if (kDebugMode) {
-                   print('AppState: 自动同步失败: ${result.message}');
+               // 下载并恢复最新的备份
+               final backupData = await backupService.downloadWebDAVBackup(backupPath);
+               if (backupData != null) {
+                 final result = await backupService.restoreBackup(backupData);
+                 if (result.success) {
+                   if (kDebugMode) {
+                     print('AppState: 自动同步完成');
+                   }
+                 } else {
+                   if (kDebugMode) {
+                     print('AppState: 自动同步失败: ${result.message}');
+                   }
                  }
                }
              } else {
@@ -346,8 +354,8 @@ class _HomePageState extends State<HomePage> {
 
   // 用户信息与搜索结果分页状态
   MemberProfile? _profile;
-  // QB客户端配置
-  List<QbClientConfig> _qbClients = [];
+  // 下载器配置
+  List<DownloaderConfig> _downloaderConfigs = [];
   // 用户信息展开状态
   bool _userInfoExpanded = false;
   final List<TorrentItem> _items = [];
@@ -472,9 +480,10 @@ class _HomePageState extends State<HomePage> {
         });
       }
 
-      // 加载QB客户端配置
-      final qbClients = await StorageService.instance.loadQbClients();
-      if (mounted) setState(() => _qbClients = qbClients);
+      // 加载下载器配置
+      final downloaderConfigsData = await StorageService.instance.loadDownloaderConfigs();
+      final downloaderConfigs = downloaderConfigsData.map((data) => DownloaderConfig.fromJson(data)).toList();
+      if (mounted) setState(() => _downloaderConfigs = downloaderConfigs);
 
       // 拉取用户基础信息
       final prof = await ApiService.instance.fetchMemberProfile();
@@ -745,7 +754,7 @@ class _HomePageState extends State<HomePage> {
         builder: (context) => TorrentDetailPage(
           torrentItem: item,
           siteFeatures: _currentSite?.features ?? SiteFeatures.mteamDefault,
-          qbClients: _qbClients,
+          qbClients: _downloaderConfigs.whereType<QbittorrentConfig>().toList(),
         ),
       ),
     );
@@ -775,22 +784,24 @@ class _HomePageState extends State<HomePage> {
       if (result == null) return; // 用户取消了
 
       // 3. 从对话框结果中获取设置
-      final clientConfig = result['clientConfig'] as QbClientConfig;
+      final clientConfig = result['clientConfig'] as DownloaderConfig;
       final password = result['password'] as String;
       final category = result['category'] as String?;
       final tags = result['tags'] as List<String>?;
       final savePath = result['savePath'] as String?;
       final autoTMM = result['autoTMM'] as bool?;
 
-      // 4. 发送到 qBittorrent
-      await QbService.instance.addTorrentByUrl(
+      // 4. 发送到下载器
+      await DownloaderService.instance.addTask(
         config: clientConfig,
         password: password,
-        url: url,
-        category: category,
-        tags: tags,
-        savePath: savePath,
-        autoTMM: autoTMM,
+        params: AddTaskParams(
+          url: url,
+          category: category,
+          tags: tags,
+          savePath: savePath,
+          autoTMM: autoTMM,
+        ),
       );
 
       if (mounted) {
@@ -1801,7 +1812,7 @@ class _HomePageState extends State<HomePage> {
 
     // 显示开始下载的提示
     if (mounted) {
-      final clientConfig = result['clientConfig'] as QbClientConfig;
+      final clientConfig = result['clientConfig'] as DownloaderConfig;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -1819,7 +1830,7 @@ class _HomePageState extends State<HomePage> {
     // 异步处理下载
     _performBatchDownload(
       selectedItems,
-      result['clientConfig'] as QbClientConfig,
+      result['clientConfig'] as DownloaderConfig,
       result['password'] as String,
       result['category'] as String?,
       result['tags'] as List<String>? ?? [],
@@ -1830,7 +1841,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _performBatchDownload(
     List<TorrentItem> items,
-    QbClientConfig clientConfig,
+    DownloaderConfig clientConfig,
     String password,
     String? category,
     List<String> tags,
@@ -1855,15 +1866,17 @@ class _HomePageState extends State<HomePage> {
           url: item.downloadUrl,
         );
 
-        // 发送到 qBittorrent
-        await QbService.instance.addTorrentByUrl(
+        // 发送到下载器
+        await DownloaderService.instance.addTask(
           config: clientConfig,
           password: password,
-          url: url,
-          category: category,
-          tags: tags.isEmpty ? null : tags,
-          savePath: savePath,
-          autoTMM: autoTMM,
+          params: AddTaskParams(
+            url: url,
+            category: category,
+            tags: tags.isEmpty ? null : tags,
+            savePath: savePath,
+            autoTMM: autoTMM,
+          ),
         );
 
         successCount++;

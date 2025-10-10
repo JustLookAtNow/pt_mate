@@ -531,7 +531,7 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
     });
 
     try {
-      final backupFiles = await _backupService.getWebDAVBackups();
+      final backupFiles = await _backupService.listWebDAVBackups();
       if (backupFiles.isEmpty) {
         _showWebDAVMessage('WebDAV上没有找到备份文件', isError: true);
         return;
@@ -545,8 +545,14 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
         _webdavStatusMessage = '正在从WebDAV下载并恢复备份...';
       });
 
-      // 使用集成的下载和恢复方法
-      final result = await _backupService.restoreFromWebDAV(selectedFile);
+      // 下载并恢复备份
+      final backupData = await _backupService.downloadWebDAVBackup(selectedFile);
+      if (backupData == null) {
+        _showWebDAVMessage('下载备份文件失败', isError: true);
+        return;
+      }
+      
+      final result = await _backupService.restoreBackup(backupData);
 
       if (result.success) {
         if (mounted) {

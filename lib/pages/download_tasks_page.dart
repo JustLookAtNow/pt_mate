@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import '../models/app_models.dart';
-import '../services/qbittorrent/qb_client.dart';
 import '../services/storage/storage_service.dart';
+import '../services/downloader/downloader_config.dart';
+import '../services/downloader/downloader_factory.dart';
+import '../services/downloader/downloader_models.dart';
 import '../utils/format.dart';
 
 import '../widgets/responsive_layout.dart';
@@ -22,9 +23,9 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
   // 状态变量
   bool _isLoading = true;
  String? _errorMessage;
-  List<QbTorrent> _tasks = [];
-  QbClientConfig? _qbConfig;
-  String? _qbPassword;
+  List<DownloadTask> _tasks = [];
+  DownloaderConfig? _downloaderConfig;
+  String? _password;
   
 
 
@@ -44,53 +45,54 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
   // 启动自动刷新
   void _startAutoRefresh() {
     _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (_qbConfig != null && _qbPassword != null && mounted) {
+      if (_downloaderConfig != null && _password != null && mounted) {
         _loadTasks(silent: true); // 使用静默模式
       }
     });
   }
 
-  // 加载qBittorrent配置
+  // 加载下载器配置
   Future<void> _loadQbConfig() async {
     try {
-      final defId = await StorageService.instance.loadDefaultQbId();
+      final defId = await StorageService.instance.loadDefaultDownloaderId();
       if (defId == null) {
         setState(() {
           _isLoading = false;
-          _qbConfig = null;
-          _qbPassword = null;
-          _errorMessage = '未配置qBittorrent';
+          _downloaderConfig = null;
+          _password = null;
+          _errorMessage = '未配置下载器';
         });
         return;
       }
       
-      final clients = await StorageService.instance.loadQbClients();
-      final config = clients.firstWhere(
-        (e) => e.id == defId,
-        orElse: () => clients.isNotEmpty ? clients.first : throw Exception('未找到默认下载器'),
+      final configs = await StorageService.instance.loadDownloaderConfigs();
+      final configMap = configs.firstWhere(
+        (e) => e['id'] == defId,
+        orElse: () => configs.isNotEmpty ? configs.first : throw Exception('未找到默认下载器'),
       );
       
-      final password = await StorageService.instance.loadQbPassword(config.id);
+      final config = DownloaderConfig.fromJson(configMap);
+      final password = await StorageService.instance.loadDownloaderPassword(config.id);
       if ((password ?? '').isEmpty) {
         setState(() {
           _isLoading = false;
-          _qbConfig = config;
-          _qbPassword = null;
+          _downloaderConfig = config;
+          _password = null;
           _errorMessage = '未保存密码';
         });
         return;
       }
       
       setState(() {
-        _qbConfig = config;
-        _qbPassword = password;
+        _downloaderConfig = config;
+        _password = password;
       });
       await _loadTasks();
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _qbConfig = null;
-        _qbPassword = null;
+        _downloaderConfig = null;
+        _password = null;
         _errorMessage = '加载配置失败: $e';
       });
     }
@@ -98,7 +100,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
 
   // 加载下载任务
   Future<void> _loadTasks({bool silent = false}) async {
-    if (_qbConfig == null || _qbPassword == null) return;
+    if (_downloaderConfig == null || _password == null) return;
     
     if (!silent) {
       setState(() {
@@ -108,11 +110,11 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
     }
 
     try {
-      final tasks = await QbService.instance.fetchTorrents(
-        config: _qbConfig!,
-        password: _qbPassword!,
-        filter: 'all',
+      final client = DownloaderFactory.createClient(
+        config: _downloaderConfig!,
+        password: _password!,
       );
+      final tasks = await client.getTasks();
       
       setState(() {
         _tasks = tasks;
@@ -161,10 +163,10 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
-                    color: _qbConfig == null 
+                    color: _downloaderConfig == null 
                         ? Theme.of(context).colorScheme.primaryContainer
                         : Theme.of(context).colorScheme.errorContainer,
-                    child: _qbConfig == null
+                    child: _downloaderConfig == null
                         ? Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -229,22 +231,14 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
 
   // 暂停任务
   Future<void> _pauseTask(String hash) async {
-    if (_qbConfig == null || _qbPassword == null) return;
+    if (_downloaderConfig == null || _password == null) return;
     
     try {
-      await QbService.instance.pauseTorrent(
-        config: _qbConfig!,
-        password: _qbPassword!,
-        hash: hash,
-        onConfigUpdated: (updatedConfig) {
-          // 更新本地配置
-          setState(() {
-            _qbConfig = updatedConfig;
-          });
-          // 同时保存到存储中
-          _saveUpdatedConfig(updatedConfig);
-        },
+      final client = DownloaderFactory.createClient(
+        config: _downloaderConfig!,
+        password: _password!,
       );
+      await client.pauseTask(hash);
       
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -274,22 +268,14 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
   
   // 恢复任务
   Future<void> _resumeTask(String hash) async {
-    if (_qbConfig == null || _qbPassword == null) return;
+    if (_downloaderConfig == null || _password == null) return;
     
     try {
-      await QbService.instance.resumeTorrent(
-        config: _qbConfig!,
-        password: _qbPassword!,
-        hash: hash,
-        onConfigUpdated: (updatedConfig) {
-          // 更新本地配置
-          setState(() {
-            _qbConfig = updatedConfig;
-          });
-          // 同时保存到存储中
-          _saveUpdatedConfig(updatedConfig);
-        },
+      final client = DownloaderFactory.createClient(
+        config: _downloaderConfig!,
+        password: _password!,
       );
+      await client.resumeTask(hash);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -316,33 +302,18 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
     }
   }
 
-  // 保存更新后的配置到存储
-  Future<void> _saveUpdatedConfig(QbClientConfig updatedConfig) async {
-    try {
-      final clients = await StorageService.instance.loadQbClients();
-      final updatedClients = clients.map((c) => 
-        c.id == updatedConfig.id ? updatedConfig : c
-      ).toList();
-      
-      final defaultId = await StorageService.instance.loadDefaultQbId();
-      await StorageService.instance.saveQbClients(updatedClients, defaultId: defaultId);
-    } catch (e) {
-      // 保存失败不影响主要功能，只记录错误
-      debugPrint('保存配置失败: $e');
-    }
-  }
+
   
   // 删除任务
   Future<void> _deleteTask(String hash, bool deleteFiles) async {
-    if (_qbConfig == null || _qbPassword == null) return;
+    if (_downloaderConfig == null || _password == null) return;
     
     try {
-      await QbService.instance.deleteTorrent(
-        config: _qbConfig!,
-        password: _qbPassword!,
-        hash: hash,
-        deleteFiles: deleteFiles,
+      final client = DownloaderFactory.createClient(
+        config: _downloaderConfig!,
+        password: _password!,
       );
+      await client.deleteTask(hash, deleteFiles: deleteFiles);
       
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -373,9 +344,10 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
   Widget _buildAllTasksList() {
     // 过滤只显示这三种状态的任务
     final filteredTasks = _tasks.where((task) => 
-      task.state == QbTorrentState.downloading || 
-      task.state == QbTorrentState.pausedDL || 
-      task.state == QbTorrentState.stoppedDL
+      task.state == DownloadTaskState.downloading || 
+      task.state == DownloadTaskState.pausedDL ||
+      task.state == DownloadTaskState.stalledDL ||
+      task.state == DownloadTaskState.stoppedDL 
     ).toList();
     
     if (filteredTasks.isEmpty) {
@@ -397,23 +369,23 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
     );
   }
 
-  Widget _buildTaskCard(QbTorrent task) {
+  Widget _buildTaskCard(DownloadTask task) {
     final bool isDownloading = 
-      task.state == QbTorrentState.downloading || 
-      task.state == QbTorrentState.stalledDL ||
-      task.state == QbTorrentState.metaDL ||
-      task.state == QbTorrentState.forcedDL ||
-      task.state == QbTorrentState.queuedDL ||
-      task.state == QbTorrentState.checkingDL ||
-      task.state == QbTorrentState.allocating ||
-      task.state == QbTorrentState.checkingResumeData;
+      task.state == DownloadTaskState.downloading || 
+      task.state == DownloadTaskState.stalledDL ||
+      task.state == DownloadTaskState.metaDL ||
+      task.state == DownloadTaskState.forcedDL ||
+      task.state == DownloadTaskState.queuedDL ||
+      task.state == DownloadTaskState.checkingDL ||
+      task.state == DownloadTaskState.allocating ||
+      task.state == DownloadTaskState.checkingResumeData;
     final bool isPaused = 
-      task.state == QbTorrentState.pausedDL || 
-      task.state == QbTorrentState.pausedUP ||
-      task.state == QbTorrentState.queuedUP ||
-      task.state == QbTorrentState.error ||
-      task.state == QbTorrentState.stoppedDL ||
-      task.state == QbTorrentState.missingFiles;
+      task.state == DownloadTaskState.pausedDL || 
+      task.state == DownloadTaskState.pausedUP ||
+      task.state == DownloadTaskState.queuedUP ||
+      task.state == DownloadTaskState.error ||
+      task.state == DownloadTaskState.stoppedDL ||
+      task.state == DownloadTaskState.missingFiles;
     
     return Card(
       margin: const EdgeInsets.only(bottom: 8),

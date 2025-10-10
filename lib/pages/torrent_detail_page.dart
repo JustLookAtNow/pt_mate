@@ -11,7 +11,9 @@ import '../services/api/api_service.dart';
 import '../services/storage/storage_service.dart';
 import '../services/image_http_client.dart';
 import '../models/app_models.dart';
-import '../services/qbittorrent/qb_client.dart';
+import '../services/downloader/downloader_config.dart';
+import '../services/downloader/downloader_service.dart';
+import '../services/downloader/downloader_models.dart';
 import '../widgets/torrent_download_dialog.dart';
 
 // 自定义Quote标签处理器
@@ -494,7 +496,7 @@ class CustomSizeTag extends WrappedStyleTag {
 class TorrentDetailPage extends StatefulWidget {
   final TorrentItem torrentItem;
   final SiteFeatures siteFeatures;
-  final List<QbClientConfig> qbClients;
+  final List<QbittorrentConfig> qbClients;
   final SiteConfig? siteConfig; // 可选的站点配置，用于聚合搜索
 
   const TorrentDetailPage({
@@ -616,22 +618,24 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       if (result == null) return; // 用户取消了
 
       // 3. 从对话框结果中获取设置
-      final clientConfig = result['clientConfig'] as QbClientConfig;
+      final clientConfig = result['clientConfig'] as DownloaderConfig;
       final password = result['password'] as String;
       final category = result['category'] as String?;
       final tags = result['tags'] as List<String>?;
       final savePath = result['savePath'] as String?;
       final autoTMM = result['autoTMM'] as bool?;
 
-      // 4. 发送到 qBittorrent
-      await QbService.instance.addTorrentByUrl(
+      // 4. 发送到下载器
+      await DownloaderService.instance.addTask(
         config: clientConfig,
         password: password,
-        url: url,
-        category: category,
-        tags: tags,
-        savePath: savePath,
-        autoTMM: autoTMM,
+        params: AddTaskParams(
+          url: url,
+          category: category,
+          tags: tags,
+          savePath: savePath,
+          autoTMM: autoTMM,
+        ),
       );
 
       if (mounted) {

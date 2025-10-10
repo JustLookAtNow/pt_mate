@@ -1,11 +1,15 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/app_models.dart';
 
 class StorageKeys {
+  // 应用版本管理
+  static const String appVersion = 'app.version'; // 存储应用数据版本
+  
   // 多站点配置
   static const String siteConfigs = 'app.sites'; // 存储所有站点配置
   static const String activeSiteId = 'app.activeSiteId'; // 当前活跃站点ID
@@ -13,13 +17,21 @@ class StorageKeys {
   // 兼容性：旧的单站点配置（用于迁移）
   static const String siteConfig = 'app.site';
   
-  static const String qbClients = 'qb.clients';
-  static const String qbDefaultId = 'qb.defaultId';
-  static String qbPasswordKey(String id) => 'qb.password.$id';
-  static String qbPasswordFallbackKey(String id) => 'qb.password.fallback.$id';
-  // 新增：分类与标签缓存 key
-  static String qbCategoriesKey(String id) => 'qb.categories.$id';
-  static String qbTagsKey(String id) => 'qb.tags.$id';
+  // 兼容性：旧的qBittorrent配置（用于迁移）
+  static const String legacyQbClientConfigs = 'qb.clients';
+  static const String legacyDefaultQbId = 'qb.defaultId';
+  static String legacyQbPasswordKey(String id) => 'qb.password.$id';
+  static String legacyQbPasswordFallbackKey(String id) => 'qb.password.fallback.$id';
+  static String legacyQbCategoriesKey(String id) => 'qb.categories.$id';
+  static String legacyQbTagsKey(String id) => 'qb.tags.$id';
+  
+  // 新的下载器配置
+  static const String downloaderConfigs = 'downloader.configs';
+  static const String defaultDownloaderId = 'downloader.defaultId';
+  static String downloaderPasswordKey(String id) => 'downloader.password.$id';
+  static String downloaderPasswordFallbackKey(String id) => 'downloader.password.fallback.$id';
+  static String downloaderCategoriesKey(String id) => 'downloader.categories.$id';
+  static String downloaderTagsKey(String id) => 'downloader.tags.$id';
   
   // 默认下载设置
   static const String defaultDownloadCategory = 'download.defaultCategory';
@@ -60,6 +72,140 @@ class StorageService {
   final FlutterSecureStorage _secure = const FlutterSecureStorage();
 
   Future<SharedPreferences> get _prefs async => SharedPreferences.getInstance();
+
+  // 版本管理
+  static const String currentVersion = '1.1.0';
+  
+  /// 检查并执行数据迁移
+  Future<void> checkAndMigrate() async {
+    final prefs = await _prefs;
+    final storedVersion = prefs.getString(StorageKeys.appVersion);
+    
+    if (storedVersion == null) {
+      // 首次安装或从1.0.0升级（1.0.0版本没有版本标记）
+      await _migrateFrom100To110();
+      await prefs.setString(StorageKeys.appVersion, currentVersion);
+    } else if (storedVersion != currentVersion) {
+      // 处理其他版本迁移
+      if (storedVersion == '1.0.0') {
+        await _migrateFrom100To110();
+      }
+      await prefs.setString(StorageKeys.appVersion, currentVersion);
+    }
+  }
+  
+  /// 从1.0.0迁移到1.1.0
+  Future<void> _migrateFrom100To110() async {
+    final prefs = await _prefs;
+    
+    // 迁移qBittorrent配置到下载器配置
+    final qbConfigsStr = prefs.getString(StorageKeys.legacyQbClientConfigs);
+    if (qbConfigsStr != null) {
+      try {
+        final qbConfigs = (jsonDecode(qbConfigsStr) as List).cast<Map<String, dynamic>>();
+        final downloaderConfigs = <Map<String, dynamic>>[];
+        
+        for (final qbConfig in qbConfigs) {
+          // 转换为新的下载器配置格式
+          final downloaderConfig = {
+            'id': qbConfig['id'] ?? '',
+            'name': qbConfig['name'] ?? '',
+            'type': 'qbittorrent',
+            'config': {
+              'host': qbConfig['host'] ?? '',
+              'port': qbConfig['port'] ?? 8080,
+              'username': qbConfig['username'] ?? '',
+              'useLocalRelay': qbConfig['useLocalRelay'] ?? false,
+              'version': qbConfig['version'] ?? '',
+            },
+          };
+          downloaderConfigs.add(downloaderConfig);
+          
+          // 迁移密码
+          final clientId = qbConfig['id'] as String?;
+          if (clientId != null && clientId.isNotEmpty) {
+            await _migratePassword(clientId);
+            await _migrateCategories(clientId);
+            await _migrateTags(clientId);
+          }
+        }
+        
+        // 保存新的下载器配置
+        await prefs.setString(StorageKeys.downloaderConfigs, jsonEncode(downloaderConfigs));
+        
+        // 迁移默认下载器ID
+        final defaultQbId = prefs.getString(StorageKeys.legacyDefaultQbId);
+        if (defaultQbId != null) {
+          await prefs.setString(StorageKeys.defaultDownloaderId, defaultQbId);
+        }
+        
+        // 清理旧配置
+        await prefs.remove(StorageKeys.legacyQbClientConfigs);
+        await prefs.remove(StorageKeys.legacyDefaultQbId);
+        
+      } catch (e) {
+         // 迁移失败时记录错误，但不阻塞应用启动
+         if (kDebugMode) {
+           print('数据迁移失败: $e');
+         }
+       }
+    }
+  }
+  
+  /// 迁移密码
+  Future<void> _migratePassword(String clientId) async {
+    try {
+      // 尝试从安全存储读取旧密码
+      final oldPassword = await _secure.read(key: StorageKeys.legacyQbPasswordKey(clientId));
+      if (oldPassword != null && oldPassword.isNotEmpty) {
+        await _secure.write(key: StorageKeys.downloaderPasswordKey(clientId), value: oldPassword);
+        await _secure.delete(key: StorageKeys.legacyQbPasswordKey(clientId));
+        return;
+      }
+    } catch (_) {
+      // 安全存储读取失败，尝试从降级存储读取
+    }
+    
+    try {
+      // 尝试从降级存储读取旧密码
+      final prefs = await _prefs;
+      final oldPassword = prefs.getString(StorageKeys.legacyQbPasswordFallbackKey(clientId));
+      if (oldPassword != null && oldPassword.isNotEmpty) {
+        await saveDownloaderPassword(clientId, oldPassword);
+        await prefs.remove(StorageKeys.legacyQbPasswordFallbackKey(clientId));
+      }
+    } catch (_) {
+      // 降级存储读取失败，忽略
+    }
+  }
+  
+  /// 迁移分类缓存
+  Future<void> _migrateCategories(String clientId) async {
+    try {
+      final prefs = await _prefs;
+      final oldCategories = prefs.getString(StorageKeys.legacyQbCategoriesKey(clientId));
+      if (oldCategories != null) {
+        await prefs.setString(StorageKeys.downloaderCategoriesKey(clientId), oldCategories);
+        await prefs.remove(StorageKeys.legacyQbCategoriesKey(clientId));
+      }
+    } catch (_) {
+      // 迁移失败，忽略
+    }
+  }
+  
+  /// 迁移标签缓存
+  Future<void> _migrateTags(String clientId) async {
+    try {
+      final prefs = await _prefs;
+      final oldTags = prefs.getString(StorageKeys.legacyQbTagsKey(clientId));
+      if (oldTags != null) {
+        await prefs.setString(StorageKeys.downloaderTagsKey(clientId), oldTags);
+        await prefs.remove(StorageKeys.legacyQbTagsKey(clientId));
+      }
+    } catch (_) {
+      // 迁移失败，忽略
+    }
+  }
 
   // Site config
   Future<void> saveSite(SiteConfig config) async {
@@ -255,87 +401,6 @@ class StorageService {
     await prefs.remove(StorageKeys.siteApiKeyFallback(siteId));
   }
 
-  // qBittorrent clients
-  Future<void> saveQbClients(List<QbClientConfig> clients, {String? defaultId}) async {
-    final prefs = await _prefs;
-    await prefs.setString(StorageKeys.qbClients, jsonEncode(clients.map((e) => e.toJson()).toList()));
-    if (defaultId != null) {
-      await prefs.setString(StorageKeys.qbDefaultId, defaultId);
-    } else {
-      // 允许将默认下载器清空
-      await prefs.remove(StorageKeys.qbDefaultId);
-    }
-    // passwords should be saved separately when creating/editing single client
-  }
-
-  Future<List<QbClientConfig>> loadQbClients() async {
-    final prefs = await _prefs;
-    final str = prefs.getString(StorageKeys.qbClients);
-    if (str == null) return [];
-    final list = (jsonDecode(str) as List).cast<Map<String, dynamic>>();
-    return list.map(QbClientConfig.fromJson).toList();
-  }
-
-  Future<void> saveQbPassword(String id, String password) async {
-    try {
-      await _secure.write(key: StorageKeys.qbPasswordKey(id), value: password);
-      // 清理可能存在的降级存储
-      final prefs = await _prefs;
-      await prefs.remove(StorageKeys.qbPasswordFallbackKey(id));
-    } catch (_) {
-      // 在 Linux 桌面端等环境，可能出现 keyring 未解锁；降级写入本地存储，避免功能中断
-      final prefs = await _prefs;
-      await prefs.setString(StorageKeys.qbPasswordFallbackKey(id), password);
-    }
-  }
-
-  Future<String?> loadQbPassword(String id) async {
-    try {
-      final v = await _secure.read(key: StorageKeys.qbPasswordKey(id));
-      if (v != null && v.isNotEmpty) return v;
-    } catch (_) {
-      // ignore and try fallback
-    }
-    final prefs = await _prefs;
-    return prefs.getString(StorageKeys.qbPasswordFallbackKey(id));
-  }
-
-  Future<void> deleteQbPassword(String id) async {
-    try {
-      await _secure.delete(key: StorageKeys.qbPasswordKey(id));
-    } catch (_) {
-      // ignore
-    }
-    final prefs = await _prefs;
-    await prefs.remove(StorageKeys.qbPasswordFallbackKey(id));
-  }
-
-  // 新增：分类与标签的本地缓存
-  Future<void> saveQbCategories(String id, List<String> categories) async {
-    final prefs = await _prefs;
-    await prefs.setStringList(StorageKeys.qbCategoriesKey(id), categories);
-  }
-
-  Future<List<String>> loadQbCategories(String id) async {
-    final prefs = await _prefs;
-    return prefs.getStringList(StorageKeys.qbCategoriesKey(id)) ?? <String>[];
-  }
-
-  Future<void> saveQbTags(String id, List<String> tags) async {
-    final prefs = await _prefs;
-    await prefs.setStringList(StorageKeys.qbTagsKey(id), tags);
-  }
-
-  Future<List<String>> loadQbTags(String id) async {
-    final prefs = await _prefs;
-    return prefs.getStringList(StorageKeys.qbTagsKey(id)) ?? <String>[];
-  }
-
-  Future<String?> loadDefaultQbId() async {
-    final prefs = await _prefs;
-    return prefs.getString(StorageKeys.qbDefaultId);
-  }
-
   // 主题相关：保存与读取
   Future<void> saveThemeMode(String mode) async {
     final prefs = await _prefs;
@@ -504,5 +569,106 @@ class StorageService {
         searchThreads: 3,
       );
     }
+  }
+
+  // 新的下载器配置管理方法
+  Future<void> saveDownloaderConfigs(List<dynamic> configs, {String? defaultId}) async {
+    final prefs = await _prefs;
+    final jsonList = configs.map((config) {
+      if (config is Map<String, dynamic>) {
+        return config;
+      } else {
+        // 假设是 DownloaderConfig 对象
+        return (config as dynamic).toJson();
+      }
+    }).toList();
+    
+    await prefs.setString(StorageKeys.downloaderConfigs, jsonEncode(jsonList));
+    
+    if (defaultId != null) {
+      await prefs.setString(StorageKeys.defaultDownloaderId, defaultId);
+    } else {
+      await prefs.remove(StorageKeys.defaultDownloaderId);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> loadDownloaderConfigs() async {
+    final prefs = await _prefs;
+    final str = prefs.getString(StorageKeys.downloaderConfigs);
+    if (str == null) return [];
+    
+    try {
+      final list = (jsonDecode(str) as List).cast<Map<String, dynamic>>();
+      return list;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<String?> loadDefaultDownloaderId() async {
+    final prefs = await _prefs;
+    return prefs.getString(StorageKeys.defaultDownloaderId);
+  }
+
+  Future<void> saveDownloaderPassword(String id, String password) async {
+    try {
+      await _secure.write(key: StorageKeys.downloaderPasswordKey(id), value: password);
+      // 清理可能存在的降级存储
+      final prefs = await _prefs;
+      await prefs.remove(StorageKeys.downloaderPasswordFallbackKey(id));
+    } catch (_) {
+      // 在 Linux 桌面端等环境，可能出现 keyring 未解锁；降级写入本地存储，避免功能中断
+      final prefs = await _prefs;
+      await prefs.setString(StorageKeys.downloaderPasswordFallbackKey(id), password);
+    }
+  }
+
+  Future<String?> loadDownloaderPassword(String id) async {
+    try {
+      final password = await _secure.read(key: StorageKeys.downloaderPasswordKey(id));
+      if (password != null && password.isNotEmpty) return password;
+    } catch (_) {
+      // 读取失败时，从降级存储取值
+    }
+    
+    // 若安全存储读取到的值为空或为 null，则继续尝试降级存储
+    final prefs = await _prefs;
+    final fallback = prefs.getString(StorageKeys.downloaderPasswordFallbackKey(id));
+    if (fallback != null && fallback.isNotEmpty) {
+      return fallback;
+    }
+    
+    return null;
+  }
+
+  Future<void> deleteDownloaderPassword(String id) async {
+    try {
+      await _secure.delete(key: StorageKeys.downloaderPasswordKey(id));
+    } catch (_) {
+      // ignore
+    }
+    final prefs = await _prefs;
+    await prefs.remove(StorageKeys.downloaderPasswordFallbackKey(id));
+  }
+
+  // 下载器分类与标签的本地缓存
+  Future<void> saveDownloaderCategories(String id, List<String> categories) async {
+    final prefs = await _prefs;
+    await prefs.setStringList(StorageKeys.downloaderCategoriesKey(id), categories);
+  }
+
+  Future<List<String>> loadDownloaderCategories(String id) async {
+    final prefs = await _prefs;
+    return prefs.getStringList(StorageKeys.downloaderCategoriesKey(id)) ?? <String>[];
+  }
+
+  Future<void> saveDownloaderTags(String id, List<String> tags) async {
+    final prefs = await _prefs;
+    await prefs.setStringList(StorageKeys.downloaderTagsKey(id), tags);
+  }
+
+  Future<List<String>> loadDownloaderTags(String id) async {
+    final prefs = await _prefs;
+    return prefs.getStringList(StorageKeys.downloaderTagsKey(id)) ?? <String>[];
   }
 }

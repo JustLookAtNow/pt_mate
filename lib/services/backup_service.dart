@@ -1,33 +1,38 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+
 import '../models/app_models.dart';
-import 'storage/storage_service.dart';
 import '../utils/backup_migrators.dart';
+import 'storage/storage_service.dart';
 import 'webdav_service.dart';
 
-// 备份数据版本
+// 备份版本管理
 class BackupVersion {
-  static const String current = '1.0.0';
+  static const String current = '1.1.0';
   
-  // 版本比较
+  static bool isCompatible(String version) {
+    // 支持的版本列表
+    const supportedVersions = ['1.0.0', '1.1.0'];
+    return supportedVersions.contains(version);
+  }
+  
   static int compare(String version1, String version2) {
     final v1Parts = version1.split('.').map(int.parse).toList();
     final v2Parts = version2.split('.').map(int.parse).toList();
     
     for (int i = 0; i < 3; i++) {
-      final v1 = i < v1Parts.length ? v1Parts[i] : 0;
-      final v2 = i < v2Parts.length ? v2Parts[i] : 0;
-      if (v1 != v2) return v1.compareTo(v2);
+      final v1Part = i < v1Parts.length ? v1Parts[i] : 0;
+      final v2Part = i < v2Parts.length ? v2Parts[i] : 0;
+      
+      if (v1Part < v2Part) return -1;
+      if (v1Part > v2Part) return 1;
     }
+    
     return 0;
-  }
-  
-  // 检查版本兼容性
-  static bool isCompatible(String backupVersion) {
-    return compare(backupVersion, current) <= 0;
   }
 }
 
@@ -38,7 +43,7 @@ class BackupData {
   final String appVersion;
   final Map<String, dynamic> data;
   
-  const BackupData({
+  BackupData({
     required this.version,
     required this.timestamp,
     required this.appVersion,
@@ -94,23 +99,26 @@ class BackupService {
     final activeSiteId = await _storageService.getActiveSiteId();
     data['activeSiteId'] = activeSiteId;
     
-    // 收集QB客户端配置
-    final qbConfigs = await _storageService.loadQbClients();
-    data['qbClientConfigs'] = qbConfigs.map((config) => config.toJson()).toList();
-    
+    // 收集下载器配置
+    final downloaderConfigs = await _storageService.loadDownloaderConfigs();
+    data['downloaderConfigs'] = downloaderConfigs;
+
     // 收集默认下载器ID
-    final defaultQbId = await _storageService.loadDefaultQbId();
-    data['defaultQbId'] = defaultQbId;
-    
-    // 收集QB客户端密码
-    final qbPasswords = <String, String>{};
-    for (final qbConfig in qbConfigs) {
-      final password = await _storageService.loadQbPassword(qbConfig.id);
-      if (password != null && password.isNotEmpty) {
-        qbPasswords[qbConfig.id] = password;
+    final defaultDownloaderId = await _storageService.loadDefaultDownloaderId();
+    data['defaultDownloaderId'] = defaultDownloaderId;
+
+    // 收集下载器密码
+    final downloaderPasswords = <String, String>{};
+    for (final config in downloaderConfigs) {
+      final configId = config['id'] as String?;
+      if (configId != null) {
+        final password = await _storageService.loadDownloaderPassword(configId);
+        if (password != null && password.isNotEmpty) {
+          downloaderPasswords[configId] = password;
+        }
       }
     }
-    data['qbPasswords'] = qbPasswords;
+    data['downloaderPasswords'] = downloaderPasswords;
     
     // 收集用户偏好设置
     data['userPreferences'] = {
@@ -125,15 +133,20 @@ class BackupService {
       },
     };
     
-    // 收集QB客户端的分类和标签缓存
-    final qbCategoriesCache = <String, List<String>>{};
-    final qbTagsCache = <String, List<String>>{};
-    for (final qbConfig in qbConfigs) {
-      qbCategoriesCache[qbConfig.id] = await _storageService.loadQbCategories(qbConfig.id);
-      qbTagsCache[qbConfig.id] = await _storageService.loadQbTags(qbConfig.id);
+    // 收集下载器的分类和标签缓存
+    final downloaderCategoriesCache = <String, List<String>>{};
+    final downloaderTagsCache = <String, List<String>>{};
+    for (final config in downloaderConfigs) {
+      final configId = config['id'] as String?;
+      if (configId != null) {
+        downloaderCategoriesCache[configId] = await _storageService
+            .loadDownloaderCategories(configId);
+        downloaderTagsCache[configId] = await _storageService
+            .loadDownloaderTags(configId);
+      }
     }
-    data['qbCategoriesCache'] = qbCategoriesCache;
-    data['qbTagsCache'] = qbTagsCache;
+    data['downloaderCategoriesCache'] = downloaderCategoriesCache;
+    data['downloaderTagsCache'] = downloaderTagsCache;
     
     // 收集聚合搜索设置
     final aggregateSearchSettings = await _storageService.loadAggregateSearchSettings();
@@ -252,28 +265,26 @@ class BackupService {
         await _storageService.setActiveSiteId(migratedData['activeSiteId'] as String?);
       }
       
-      // 恢复QB客户端配置
-      if (migratedData['qbClientConfigs'] != null) {
-        final qbConfigs = (migratedData['qbClientConfigs'] as List)
-            .map((json) => QbClientConfig.fromJson(json as Map<String, dynamic>))
-            .toList();
+      // 恢复下载器配置
+      if (migratedData['downloaderConfigs'] != null) {
+        final downloaderConfigs = migratedData['downloaderConfigs'] as List<Map<String, dynamic>>;
         
         // 恢复默认下载器ID
-        String? defaultQbId;
-        if (migratedData['defaultQbId'] != null) {
-          defaultQbId = migratedData['defaultQbId'] as String?;
+        String? defaultDownloaderId;
+        if (migratedData['defaultDownloaderId'] != null) {
+          defaultDownloaderId = migratedData['defaultDownloaderId'] as String?;
         }
         
-        await _storageService.saveQbClients(qbConfigs, defaultId: defaultQbId);
+        await _storageService.saveDownloaderConfigs(downloaderConfigs, defaultId: defaultDownloaderId);
       }
       
-      // 恢复QB客户端密码
-      if (migratedData['qbPasswords'] != null) {
-        final qbPasswords = migratedData['qbPasswords'] as Map<String, dynamic>;
-        for (final entry in qbPasswords.entries) {
+      // 恢复下载器密码
+      if (migratedData['downloaderPasswords'] != null) {
+        final downloaderPasswords = migratedData['downloaderPasswords'] as Map<String, dynamic>;
+        for (final entry in downloaderPasswords.entries) {
           final clientId = entry.key;
           final password = entry.value as String;
-          await _storageService.saveQbPassword(clientId, password);
+          await _storageService.saveDownloaderPassword(clientId, password);
         }
       }
       
@@ -314,19 +325,19 @@ class BackupService {
         }
       }
       
-      // 恢复QB客户端的分类和标签缓存
-      if (migratedData['qbCategoriesCache'] != null) {
-        final categoriesCache = migratedData['qbCategoriesCache'] as Map<String, dynamic>;
+      // 恢复下载器的分类和标签缓存
+      if (migratedData['downloaderCategoriesCache'] != null) {
+        final categoriesCache = migratedData['downloaderCategoriesCache'] as Map<String, dynamic>;
         for (final entry in categoriesCache.entries) {
           final categories = (entry.value as List).cast<String>();
-          await _storageService.saveQbCategories(entry.key, categories);
+          await _storageService.saveDownloaderCategories(entry.key, categories);
         }
       }
-      if (migratedData['qbTagsCache'] != null) {
-        final tagsCache = migratedData['qbTagsCache'] as Map<String, dynamic>;
+      if (migratedData['downloaderTagsCache'] != null) {
+        final tagsCache = migratedData['downloaderTagsCache'] as Map<String, dynamic>;
         for (final entry in tagsCache.entries) {
           final tags = (entry.value as List).cast<String>();
-          await _storageService.saveQbTags(entry.key, tags);
+          await _storageService.saveDownloaderTags(entry.key, tags);
         }
       }
       
@@ -375,44 +386,33 @@ class BackupService {
         } catch (e) {
           // WebDAV上传失败，在Linux平台上直接抛出异常，避免文件选择器问题
           if (defaultTargetPlatform == TargetPlatform.linux) {
-            throw BackupException('WebDAV上传失败: $e');
-          } else {
-            // 其他平台回退到本地备份
-            final localPath = await exportBackup();
-            return localPath;
+            throw BackupException('WebDAV备份失败: $e');
           }
+          // 在移动平台上，WebDAV失败时回退到本地导出
+          return await exportBackup();
         }
       } else {
-        // 没有WebDAV配置，创建本地备份文件
-        final localPath = await exportBackup();
-        return localPath;
+        // 没有配置WebDAV或未启用，直接导出到本地
+        return await exportBackup();
       }
     } catch (e) {
-      throw BackupException('导出备份失败: $e');
+      throw BackupException('备份失败: $e');
     }
   }
 
-  /// 从WebDAV下载并恢复备份
-  Future<BackupRestoreResult> restoreFromWebDAV(String backupFileName) async {
+  /// 从WebDAV导入最新备份
+  Future<BackupData?> importBackupFromWebDAV() async {
     try {
       final webdavConfig = await _webdavService.loadConfig();
       if (webdavConfig == null || !webdavConfig.isEnabled) {
-        return const BackupRestoreResult(
-          success: false,
-          message: 'WebDAV未配置或未启用',
-        );
+        throw BackupException('WebDAV未配置或未启用');
       }
 
-      // 从WebDAV下载备份内容
-      final backupContent = await _webdavService.downloadBackup(backupFileName);
+      final backupContent = await _webdavService.downloadLatestBackup();
       if (backupContent == null) {
-        return const BackupRestoreResult(
-          success: false,
-          message: '从WebDAV下载备份失败',
-        );
+        return null; // 没有找到备份文件
       }
 
-      // 解析备份内容
       var json = jsonDecode(backupContent) as Map<String, dynamic>;
       
       // 检查是否需要数据迁移
@@ -421,106 +421,75 @@ class BackupService {
         json = BackupMigrationManager.migrate(json, BackupVersion.current);
       }
       
-      final backup = BackupData.fromJson(json);
-      
-      // 恢复备份
-      await restoreBackup(backup);
-      
-      return const BackupRestoreResult(
-        success: true,
-        message: '从WebDAV恢复备份成功',
-      );
+      return BackupData.fromJson(json);
     } catch (e) {
-      return BackupRestoreResult(
-        success: false,
-        message: '从WebDAV恢复备份失败: $e',
-      );
+      throw BackupException('从WebDAV导入备份失败: $e');
     }
   }
 
-  /// 获取WebDAV上的备份文件列表
-  Future<List<Map<String, dynamic>>> getWebDAVBackups() async {
+  /// 列出WebDAV中的所有备份文件
+  Future<List<Map<String, dynamic>>> listWebDAVBackups() async {
     try {
       final webdavConfig = await _webdavService.loadConfig();
       if (webdavConfig == null || !webdavConfig.isEnabled) {
-        return [];
+        throw BackupException('WebDAV未配置或未启用');
       }
 
       return await _webdavService.getRemoteBackups();
     } catch (e) {
-      return [];
+      throw BackupException('获取WebDAV备份列表失败: $e');
     }
   }
 
-  /// 检查是否应该执行自动WebDAV同步
-  Future<bool> shouldAutoSync() async {
+  /// 从WebDAV下载指定的备份文件
+  Future<BackupData?> downloadWebDAVBackup(String fileName) async {
     try {
       final webdavConfig = await _webdavService.loadConfig();
-      if (webdavConfig == null || !webdavConfig.isEnabled || !webdavConfig.autoSync) {
-        return false;
+      if (webdavConfig == null || !webdavConfig.isEnabled) {
+        throw BackupException('WebDAV未配置或未启用');
       }
 
-      // 检查上次同步时间
-      if (webdavConfig.lastSyncTime == null) {
-        return true; // 从未同步过
+      final backupContent = await _webdavService.downloadBackup(fileName);
+      if (backupContent == null) {
+        return null;
       }
 
-      final now = DateTime.now();
-      final lastSync = webdavConfig.lastSyncTime!;
-      final intervalMinutes = webdavConfig.syncIntervalMinutes;
+      var json = jsonDecode(backupContent) as Map<String, dynamic>;
       
-      return now.difference(lastSync).inMinutes >= intervalMinutes;
+      // 检查是否需要数据迁移
+      final backupVersion = json['version'] as String? ?? '1.0.0';
+      if (backupVersion != BackupVersion.current) {
+        json = BackupMigrationManager.migrate(json, BackupVersion.current);
+      }
+      
+      return BackupData.fromJson(json);
     } catch (e) {
-      return false;
+      throw BackupException('从WebDAV下载备份失败: $e');
     }
   }
 
-  /// 执行自动WebDAV同步
-  Future<void> performAutoSync() async {
+  /// 删除WebDAV中的指定备份文件
+  Future<void> deleteWebDAVBackup(String fileName) async {
     try {
-      if (!await shouldAutoSync()) return;
-
       final webdavConfig = await _webdavService.loadConfig();
-      if (webdavConfig == null || !webdavConfig.isEnabled) return;
-
-      // 上传到WebDAV
-      final success = await _webdavService.performAutoSync();
-      
-      // 更新同步状态
-      final updatedConfig = webdavConfig.copyWith(
-        lastSyncTime: DateTime.now(),
-        lastSyncStatus: success ? WebDAVSyncStatus.success : WebDAVSyncStatus.error,
-        lastSyncError: success ? null : '自动同步失败',
-      );
-      
-      await _webdavService.saveConfig(updatedConfig);
-    } catch (e) {
-      // 更新错误状态
-      final webdavConfig = await _webdavService.loadConfig();
-      if (webdavConfig != null) {
-        final updatedConfig = webdavConfig.copyWith(
-          lastSyncTime: DateTime.now(),
-          lastSyncStatus: WebDAVSyncStatus.error,
-          lastSyncError: '自动同步失败: $e',
-        );
-        await _webdavService.saveConfig(updatedConfig);
+      if (webdavConfig == null || !webdavConfig.isEnabled) {
+        throw BackupException('WebDAV未配置或未启用');
       }
+
+      await _webdavService.deleteRemoteBackup(fileName);
+    } catch (e) {
+      throw BackupException('删除WebDAV备份失败: $e');
     }
   }
-  
 }
 
-// 备份导入结果
-class BackupImportResult {
-  final bool success;
+// 备份异常
+class BackupException implements Exception {
   final String message;
-  final BackupData? backupData;
+  BackupException(this.message);
   
-  const BackupImportResult({
-    required this.success,
-    required this.message,
-    this.backupData,
-  });
+  @override
+  String toString() => 'BackupException: $message';
 }
 
 // 备份恢复结果
@@ -528,17 +497,8 @@ class BackupRestoreResult {
   final bool success;
   final String message;
   
-  const BackupRestoreResult({
+  BackupRestoreResult({
     required this.success,
     required this.message,
   });
-}
-
-// 备份异常
-class BackupException implements Exception {
-  final String message;
-  const BackupException(this.message);
-  
-  @override
-  String toString() => 'BackupException: $message';
 }

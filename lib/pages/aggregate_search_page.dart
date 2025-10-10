@@ -5,7 +5,9 @@ import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
 import '../services/api/api_service.dart';
 import '../services/aggregate_search_service.dart';
-import '../services/qbittorrent/qb_client.dart';
+import '../services/downloader/downloader_config.dart';
+import '../services/downloader/downloader_factory.dart';
+import '../services/downloader/downloader_models.dart';
 import '../providers/aggregate_search_provider.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/qb_speed_indicator.dart';
@@ -617,8 +619,15 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         orElse: () => throw Exception('找不到站点配置: ${item.siteId}'),
       );
       
-      // 2. 获取qBittorrent客户端配置
-       final qbClients = await storage.loadQbClients();
+      // 2. 获取下载器客户端配置
+        final downloaderConfigs = await storage.loadDownloaderConfigs();
+        final qbClients = downloaderConfigs.map((configMap) {
+          final config = DownloaderConfig.fromJson(configMap);
+          if (config is QbittorrentConfig) {
+            return config;
+          }
+          throw Exception('不支持的下载器类型: ${config.type}');
+        }).toList();
        
        // 4. 跳转到详情页面
        if (!mounted) return;
@@ -680,7 +689,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       if (result == null) return; // 用户取消了
 
       // 4. 从对话框结果中获取设置
-      final clientConfig = result['clientConfig'] as QbClientConfig;
+      final clientConfig = result['clientConfig'] as DownloaderConfig;
       final password = result['password'] as String;
       final category = result['category'] as String?;
       final tags = result['tags'] as List<String>?;
@@ -709,7 +718,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
   Future<void> _onTorrentDownload(
     AggregateSearchResultItem item,
-    QbClientConfig clientConfig,
+    DownloaderConfig clientConfig,
     String password,
     String url,
     String? category,
@@ -718,16 +727,20 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     bool? autoTMM,
   ) async {
     try {
-      // 发送到 qBittorrent
-      await QbService.instance.addTorrentByUrl(
+      // 直接使用下载器配置
+      final client = DownloaderFactory.createClient(
         config: clientConfig,
         password: password,
-        url: url,
-        category: category,
-        tags: tags,
-        savePath: savePath,
-        autoTMM: autoTMM,
       );
+      
+      // 发送到下载器
+       await client.addTask(AddTaskParams(
+         url: url,
+         category: category,
+         tags: tags,
+         savePath: savePath,
+         autoTMM: autoTMM,
+       ));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -829,7 +842,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     // 异步处理下载
     _performBatchDownload(
       selectedItems,
-      result['clientConfig'] as QbClientConfig,
+      result['clientConfig'] as DownloaderConfig,
       result['password'] as String,
       result['category'] as String?,
       result['tags'] as List<String>? ?? [],
@@ -840,7 +853,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
   Future<void> _performBatchDownload(
     List<AggregateSearchResultItem> items,
-    QbClientConfig clientConfig,
+    DownloaderConfig clientConfig,
     String password,
     String? category,
     List<String> tags,
@@ -867,16 +880,18 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           siteConfig: siteConfig,
         );
 
-        // 3. 发送到 qBittorrent
-        await QbService.instance.addTorrentByUrl(
+        // 3. 发送到下载器
+        final client = DownloaderFactory.createClient(
           config: clientConfig,
           password: password,
+        );
+        await client.addTask(AddTaskParams(
           url: url,
           category: category,
           tags: tags.isEmpty ? null : tags,
           savePath: savePath,
           autoTMM: autoTMM,
-        );
+        ));
 
         successCount++;
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
-import '../services/qbittorrent/qb_client.dart';
+import '../services/downloader/downloader_config.dart';
+import '../services/downloader/downloader_factory.dart';
 import '../pages/downloader_settings_page.dart';
 
 class TorrentDownloadDialog extends StatefulWidget {
@@ -21,8 +21,8 @@ class TorrentDownloadDialog extends StatefulWidget {
 }
 
 class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
-  List<QbClientConfig> _clients = [];
-  QbClientConfig? _selectedClient;
+  List<DownloaderConfig> _clients = [];
+  DownloaderConfig? _selectedClient;
   String? _selectedCategory;
   final List<String> _selectedTags = [];
   final _savePathCtrl = TextEditingController();
@@ -46,8 +46,10 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
 
   Future<void> _loadClients() async {
     try {
-      final clients = await StorageService.instance.loadQbClients();
-      final defaultId = await StorageService.instance.loadDefaultQbId();
+      final clientsData = await StorageService.instance.loadDownloaderConfigs();
+      final defaultId = await StorageService.instance.loadDefaultDownloaderId();
+      
+      final clients = clientsData.map((data) => DownloaderConfig.fromJson(data)).toList();
 
       if (mounted) {
         setState(() {
@@ -75,10 +77,10 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
     setState(() => _loading = true);
     try {
       // 优先读取缓存
-      final cachedCategories = await StorageService.instance.loadQbCategories(
+      final cachedCategories = await StorageService.instance.loadDownloaderCategories(
         _selectedClient!.id,
       );
-      final cachedTags = await StorageService.instance.loadQbTags(
+      final cachedTags = await StorageService.instance.loadDownloaderTags(
         _selectedClient!.id,
       );
 
@@ -104,7 +106,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
     if (_selectedClient == null) return;
 
     try {
-      String? password = await StorageService.instance.loadQbPassword(
+      String? password = await StorageService.instance.loadDownloaderPassword(
         _selectedClient!.id,
       );
 
@@ -113,21 +115,20 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
         if (password == null) return;
       }
 
-      final categories = await QbService.instance.fetchCategories(
+      final client = DownloaderFactory.createClient(
         config: _selectedClient!,
         password: password,
       );
-      final tags = await QbService.instance.fetchTags(
-        config: _selectedClient!,
-        password: password,
-      );
+      
+      final categories = await client.getCategories();
+      final tags = await client.getTags();
 
       // 保存到缓存
-      await StorageService.instance.saveQbCategories(
+      await StorageService.instance.saveDownloaderCategories(
         _selectedClient!.id,
         categories,
       );
-      await StorageService.instance.saveQbTags(_selectedClient!.id, tags);
+      await StorageService.instance.saveDownloaderTags(_selectedClient!.id, tags);
 
       if (mounted) {
         setState(() {
@@ -151,7 +152,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
       return;
     }
 
-    String? password = await StorageService.instance.loadQbPassword(
+    String? password = await StorageService.instance.loadDownloaderPassword(
       _selectedClient!.id,
     );
     if (password == null || password.isEmpty) {
@@ -251,7 +252,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
         // 下载器选择
         Text('下载器', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        DropdownButtonFormField<QbClientConfig>(
+        DropdownButtonFormField<DownloaderConfig>(
           initialValue: _selectedClient,
           decoration: const InputDecoration(
             border: OutlineInputBorder(),
@@ -268,7 +269,9 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
               return SizedBox(
                 width: maxWidth,
                 child: Text(
-                  '${client.name} (${client.host}:${client.port})',
+                  client is QbittorrentConfig 
+                    ? '${client.name} (${client.host}:${client.port})'
+                    : client.name,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
@@ -289,7 +292,9 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                   return SizedBox(
                     width: maxWidth,
                     child: Text(
-                      '${client.name} (${client.host}:${client.port})',
+                      client is QbittorrentConfig 
+                        ? '${client.name} (${client.host}:${client.port})'
+                        : client.name,
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                     ),
