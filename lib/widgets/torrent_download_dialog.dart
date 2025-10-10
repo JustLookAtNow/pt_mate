@@ -115,7 +115,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
         if (password == null) return;
       }
 
-      final client = DownloaderFactory.createClient(
+      final client = DownloaderFactory.getClient(
         config: _selectedClient!,
         password: password,
       );

@@ -724,7 +724,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   ) async {
     try {
       // 直接使用下载器配置
-      final client = DownloaderFactory.createClient(
+      final client = DownloaderFactory.getClient(
         config: clientConfig,
         password: password,
       );
@@ -877,7 +877,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         );
 
         // 3. 发送到下载器
-        final client = DownloaderFactory.createClient(
+        final client = DownloaderFactory.getClient(
           config: clientConfig,
           password: password,
         );

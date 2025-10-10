@@ -29,9 +29,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
   DownloaderConfig? _downloaderConfig;
   String? _password;
   
-  // Client 实例管理
-  dynamic _client;
-  String? _currentConfigId;
+
   
 
 
@@ -123,22 +121,19 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
       return null;
     }
     
-    // 如果配置ID发生变化，需要重新创建client
-    if (_client == null || _currentConfigId != _downloaderConfig!.id) {
-      _client = DownloaderFactory.createClient(
-        config: _downloaderConfig!,
-        password: _password!,
-      );
-      _currentConfigId = _downloaderConfig!.id;
-    }
-    
-    return _client;
+    // 使用 DownloaderFactory 的缓存机制
+    return DownloaderFactory.getClient(
+      config: _downloaderConfig!,
+      password: _password!,
+    );
   }
 
-  // 重置 client（当配置更改时）
+  // 重置 client（当配置更改时）/// 重置客户端
   void _resetClient() {
-    _client = null;
-    _currentConfigId = null;
+    // 清除 DownloaderFactory 中的缓存
+    if (_downloaderConfig != null) {
+      DownloaderFactory.clearConfigCache(_downloaderConfig!.id);
+    }
   }
 
   // 加载下载任务

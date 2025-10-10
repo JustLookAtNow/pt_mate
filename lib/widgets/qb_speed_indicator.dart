@@ -86,7 +86,7 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
       }
       
       // 使用新的下载器客户端API
-      final client = DownloaderFactory.createClient(
+      final client = DownloaderFactory.getClient(
         config: defaultClient,
         password: pwd!,
       );

@@ -78,12 +78,14 @@ class QbittorrentConfig extends DownloaderConfig {
       'id': id,
       'name': name,
       'type': type.value,
-      'host': host,
-      'port': port,
-      'username': username,
-      'password': password,
-      'useLocalRelay': useLocalRelay,
-      if (version != null) 'version': version,
+      'config': {
+        'host': host,
+        'port': port,
+        'username': username,
+        'password': password,
+        'useLocalRelay': useLocalRelay,
+        if (version != null) 'version': version,
+      },
     };
   }
   
