@@ -7,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../models/app_models.dart';
 import '../utils/backup_migrators.dart';
+import 'downloader/downloader_config.dart';
 import 'storage/storage_service.dart';
 import 'webdav_service.dart';
 
@@ -43,7 +44,7 @@ class BackupData {
   final String appVersion;
   final Map<String, dynamic> data;
   
-  BackupData({
+  const BackupData({
     required this.version,
     required this.timestamp,
     required this.appVersion,
@@ -267,7 +268,8 @@ class BackupService {
       
       // 恢复下载器配置
       if (migratedData['downloaderConfigs'] != null) {
-        final downloaderConfigs = migratedData['downloaderConfigs'] as List<Map<String, dynamic>>;
+        final downloaderConfigMaps = migratedData['downloaderConfigs'] as List<Map<String, dynamic>>;
+        final downloaderConfigs = downloaderConfigMaps.map((configMap) => DownloaderConfig.fromJson(configMap)).toList();
         
         // 恢复默认下载器ID
         String? defaultDownloaderId;

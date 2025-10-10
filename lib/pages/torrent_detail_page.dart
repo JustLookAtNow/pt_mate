@@ -496,7 +496,7 @@ class CustomSizeTag extends WrappedStyleTag {
 class TorrentDetailPage extends StatefulWidget {
   final TorrentItem torrentItem;
   final SiteFeatures siteFeatures;
-  final List<QbittorrentConfig> qbClients;
+  final List<DownloaderConfig> qbClients;
   final SiteConfig? siteConfig; // 可选的站点配置，用于聚合搜索
 
   const TorrentDetailPage({

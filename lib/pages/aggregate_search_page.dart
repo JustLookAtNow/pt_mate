@@ -622,11 +622,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       // 2. 获取下载器客户端配置
         final downloaderConfigs = await storage.loadDownloaderConfigs();
         final qbClients = downloaderConfigs.map((configMap) {
-          final config = DownloaderConfig.fromJson(configMap);
-          if (config is QbittorrentConfig) {
-            return config;
-          }
-          throw Exception('不支持的下载器类型: ${config.type}');
+          return DownloaderConfig.fromJson(configMap);
         }).toList();
        
        // 4. 跳转到详情页面

@@ -266,14 +266,15 @@ class DownloaderService {
   Future<void> _saveUpdatedConfig(DownloaderConfig updatedConfig) async {
     try {
       // 加载当前所有配置
-      final allConfigs = await StorageService.instance.loadDownloaderConfigs();
+      final allConfigMaps = await StorageService.instance.loadDownloaderConfigs();
+      final allConfigs = allConfigMaps.map((configMap) => DownloaderConfig.fromJson(configMap)).toList();
       final defaultId = await StorageService.instance.loadDefaultDownloaderId();
       
       // 查找并更新对应的配置
       bool configUpdated = false;
       for (int i = 0; i < allConfigs.length; i++) {
-        if (allConfigs[i]['id'] == updatedConfig.id) {
-          allConfigs[i] = updatedConfig.toJson();
+        if (allConfigs[i].id == updatedConfig.id) {
+          allConfigs[i] = updatedConfig;
           configUpdated = true;
           break;
         }

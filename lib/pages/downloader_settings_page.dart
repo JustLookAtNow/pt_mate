@@ -16,7 +16,7 @@ class DownloaderSettingsPage extends StatefulWidget {
 }
 
 class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
-  List<Map<String, dynamic>> _downloaderConfigs = [];
+  List<DownloaderConfig> _downloaderConfigs = [];
   String? _defaultId;
   bool _loading = true;
   String? _error;
@@ -47,7 +47,8 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       _error = null;
     });
     try {
-      final configs = await StorageService.instance.loadDownloaderConfigs();
+      final configMaps = await StorageService.instance.loadDownloaderConfigs();
+      final configs = configMaps.map((configMap) => DownloaderConfig.fromJson(configMap)).toList();
       final defaultId = await StorageService.instance.loadDefaultDownloaderId();
       if (!mounted) return;
       setState(() {
@@ -64,7 +65,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
     }
   }
 
-  Future<void> _addOrEdit({Map<String, dynamic>? existing}) async {
+  Future<void> _addOrEdit({DownloaderConfig? existing}) async {
     final result = await showDialog<_DownloaderEditorResult>(
       context: context,
       builder: (_) => _DownloaderEditorDialog(existing: existing),
@@ -74,8 +75,8 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       final updated = [..._downloaderConfigs];
       final idx = existing == null
           ? -1
-          : updated.indexWhere((c) => c['id'] == existing['id']);
-      final cfg = result.config;
+          : updated.indexWhere((c) => c.id == existing.id);
+      final cfg = DownloaderConfig.fromJson(result.config);
       if (idx >= 0) {
         updated[idx] = cfg;
       } else {
@@ -84,12 +85,12 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       await StorageService.instance.saveDownloaderConfigs(updated, defaultId: _defaultId);
       if (_defaultId == null && updated.isNotEmpty) {
         setState(() {
-          _defaultId = cfg['id'];
+          _defaultId = cfg.id;
         });
       }
       if (result.password != null) {
         await StorageService.instance.saveDownloaderPassword(
-          cfg['id'],
+          cfg.id,
           result.password!,
         );
       }
@@ -111,12 +112,12 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
     }
   }
 
-  Future<void> _delete(Map<String, dynamic> config) async {
+  Future<void> _delete(DownloaderConfig config) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('确认删除'),
-        content: Text('确定要删除下载器"${config['name']}"吗？'),
+        content: Text('确定要删除下载器"${config.name}"吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -137,12 +138,12 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
     );
     if (confirm != true) return;
     try {
-      final list = _downloaderConfigs.where((e) => e['id'] != config['id']).toList();
+      final list = _downloaderConfigs.where((e) => e.id != config.id).toList();
       await StorageService.instance.saveDownloaderConfigs(
         list,
-        defaultId: _defaultId == config['id'] ? null : _defaultId,
+        defaultId: _defaultId == config.id ? null : _defaultId,
       );
-      await StorageService.instance.deleteDownloaderPassword(config['id']);
+      await StorageService.instance.deleteDownloaderPassword(config.id);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -161,14 +162,14 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
     }
   }
 
-  Future<void> _setDefault(Map<String, dynamic> config) async {
+  Future<void> _setDefault(DownloaderConfig config) async {
     try {
       await StorageService.instance.saveDownloaderConfigs(
         _downloaderConfigs,
-        defaultId: config['id'],
+        defaultId: config.id,
       );
       setState(() {
-        _defaultId = config['id'];
+        _defaultId = config.id;
       });
     } catch (e) {
       if (!mounted) return;
@@ -203,13 +204,13 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       ));
       return;
     }
-    final config = _downloaderConfigs.firstWhere((c) => c['id'] == _defaultId);
+    final config = _downloaderConfigs.firstWhere((c) => c.id == _defaultId);
     await _test(config);
   }
 
-  Future<void> _test(Map<String, dynamic> config) async {
+  Future<void> _test(DownloaderConfig config) async {
     try {
-      final pwd = await StorageService.instance.loadDownloaderPassword(config['id']);
+      final pwd = await StorageService.instance.loadDownloaderPassword(config.id);
       if ((pwd ?? '').isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(
@@ -228,9 +229,8 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       }
       
       // 使用新的下载器服务进行测试
-      final downloaderConfig = DownloaderConfig.fromJson(config);
       await DownloaderService.instance.testConnection(
-        config: downloaderConfig,
+        config: config,
         password: pwd!,
       );
       
@@ -339,7 +339,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                     onChanged: (String? value) {
                       if (value != null) {
                         final config = _downloaderConfigs.firstWhere(
-                          (c) => c['id'] == value,
+                          (c) => c.id == value,
                         );
                         _setDefault(config);
                       }
@@ -348,20 +348,20 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                       itemCount: _downloaderConfigs.length,
                       itemBuilder: (_, i) {
                         final c = _downloaderConfigs[i];
-                        final config = c['config'] as Map<String, dynamic>? ?? {};
-                        final typeStr = c['type'] as String? ?? 'qbittorrent';
-                        final subtitle =
-                            '${config['host'] ?? ''}:${config['port'] ?? ''}  ·  ${config['username'] ?? ''}';
+                        String subtitle = c.type.displayName;
+                        if (c is QbittorrentConfig) {
+                          subtitle = '${c.host}:${c.port}  ·  ${c.username}';
+                        }
                         return ListTile(
                           leading: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Radio<String>(value: c['id']),
+                              Radio<String>(value: c.id),
                               const SizedBox(width: 8),
-                              _getDownloaderIcon(typeStr),
+                              _getDownloaderIcon(c.type.value),
                             ],
                           ),
-                          title: Text(c['name']),
+                          title: Text(c.name),
                           subtitle: Text(subtitle),
                           onTap: () => _addOrEdit(existing: c),
                           trailing: Wrap(
@@ -460,7 +460,7 @@ class _DownloaderEditorResult {
 }
 
 class _DownloaderEditorDialog extends StatefulWidget {
-  final Map<String, dynamic>? existing;
+  final DownloaderConfig? existing;
   const _DownloaderEditorDialog({this.existing});
 
   @override
@@ -485,19 +485,14 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
     super.initState();
     final e = widget.existing;
     if (e != null) {
-      final config = e['config'] as Map<String, dynamic>? ?? {};
-      _nameCtrl.text = e['name'] ?? '';
-      _hostCtrl.text = config['host'] ?? '';
-      _portCtrl.text = (config['port'] ?? 8080).toString();
-      _userCtrl.text = config['username'] ?? '';
-      _useLocalRelay = config['useLocalRelay'] ?? false; // 初始化本地中转状态
+      _nameCtrl.text = e.name;
+      _selectedType = e.type;
       
-      // 初始化下载器类型
-      final typeStr = e['type'] as String? ?? 'qbittorrent';
-      try {
-        _selectedType = DownloaderType.fromString(typeStr);
-      } catch (_) {
-        _selectedType = DownloaderType.qbittorrent;
+      if (e is QbittorrentConfig) {
+        _hostCtrl.text = e.host;
+        _portCtrl.text = e.port.toString();
+        _userCtrl.text = e.username;
+        _useLocalRelay = e.useLocalRelay;
       }
     }
   }
@@ -525,7 +520,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
       return;
     }
     final id =
-        widget.existing?['id'] ?? DateTime.now().millisecondsSinceEpoch.toString();
+        widget.existing?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
     final cfg = {
       'id': id,
       'name': name,
@@ -565,7 +560,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
     // 如果密码为空且是编辑现有配置，则尝试从已保存的配置中读取密码
     String? password = pwd;
     if (pwd.isEmpty && widget.existing != null) {
-      final id = widget.existing!['id'];
+      final id = widget.existing!.id;
       try {
         password = await StorageService.instance.loadDownloaderPassword(id);
         // 检查组件是否仍然挂载
@@ -600,7 +595,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
     });
     try {
       final cfg = {
-        'id': widget.existing?['id'] ?? 'temp',
+        'id': widget.existing?.id ?? 'temp',
         'name': name,
         'type': _selectedType.value,
         'config': {

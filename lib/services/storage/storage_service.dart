@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/app_models.dart';
+import '../downloader/downloader_config.dart';
 
 class StorageKeys {
   // 应用版本管理
@@ -572,16 +573,9 @@ class StorageService {
   }
 
   // 新的下载器配置管理方法
-  Future<void> saveDownloaderConfigs(List<dynamic> configs, {String? defaultId}) async {
+  Future<void> saveDownloaderConfigs(List<DownloaderConfig> configs, {String? defaultId}) async {
     final prefs = await _prefs;
-    final jsonList = configs.map((config) {
-      if (config is Map<String, dynamic>) {
-        return config;
-      } else {
-        // 假设是 DownloaderConfig 对象
-        return (config as dynamic).toJson();
-      }
-    }).toList();
+    final jsonList = configs.map((config) => config.toJson()).toList();
     
     await prefs.setString(StorageKeys.downloaderConfigs, jsonEncode(jsonList));
     

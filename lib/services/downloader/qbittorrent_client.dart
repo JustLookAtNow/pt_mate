@@ -1,6 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'downloader_client.dart';
 import 'downloader_config.dart';
 import 'downloader_models.dart';
@@ -11,7 +10,7 @@ class QbittorrentClient implements DownloaderClient {
   final String password;
   
   // HTTP客户端和会话管理
-  late final http.Client _httpClient;
+  late final Dio _dio;
   String? _sessionId;
   
   // 缓存的版本信息，避免重复调用 API
@@ -25,7 +24,13 @@ class QbittorrentClient implements DownloaderClient {
     required this.password,
     Function(QbittorrentConfig)? onConfigUpdated,
   }) : _onConfigUpdated = onConfigUpdated {
-    _httpClient = http.Client();
+    _dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 30),
+      headers: {
+        'User-Agent': 'M-Team Flutter App',
+      },
+    ));
   }
   
   /// 获取基础URL
@@ -51,14 +56,14 @@ class QbittorrentClient implements DownloaderClient {
   }
   
   /// 执行HTTP请求
-  Future<http.Response> _request(
+  Future<Response> _request(
     String method,
     String endpoint, {
     Map<String, String>? headers,
     Map<String, dynamic>? body,
     bool requireAuth = true,
   }) async {
-    final url = Uri.parse('$_baseUrl$_apiPrefix$endpoint');
+    final url = '$_baseUrl$_apiPrefix$endpoint';
     
     // 如果需要认证且没有会话，先登录
     if (requireAuth && _sessionId == null) {
@@ -66,7 +71,6 @@ class QbittorrentClient implements DownloaderClient {
     }
     
     final requestHeaders = <String, String>{
-      'User-Agent': 'M-Team Flutter App',
       ...?headers,
     };
     
@@ -75,72 +79,92 @@ class QbittorrentClient implements DownloaderClient {
       requestHeaders['Cookie'] = 'SID=$_sessionId';
     }
     
-    http.Response response;
-    
-    switch (method.toUpperCase()) {
-      case 'GET':
-        final uri = body != null 
-          ? url.replace(queryParameters: body.map((k, v) => MapEntry(k, v.toString())))
-          : url;
-        response = await _httpClient.get(uri, headers: requestHeaders);
-        break;
-      case 'POST':
-        if (body != null) {
-          // 对于表单数据，使用application/x-www-form-urlencoded
-          requestHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
-          final formData = body.entries
-            .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value.toString())}')
-            .join('&');
-          response = await _httpClient.post(url, headers: requestHeaders, body: formData);
-        } else {
-          response = await _httpClient.post(url, headers: requestHeaders);
-        }
-        break;
-      default:
-        throw UnsupportedError('HTTP method $method not supported');
-    }
-    
-    // 检查响应状态
-    if (response.statusCode == 403) {
-      // 会话可能已过期，清除会话并重试一次
-      if (_sessionId != null) {
-        _sessionId = null;
-        return _request(method, endpoint, headers: headers, body: body, requireAuth: requireAuth);
+    try {
+      Response response;
+      
+      switch (method.toUpperCase()) {
+        case 'GET':
+          response = await _dio.get(
+            url,
+            queryParameters: body,
+            options: Options(headers: requestHeaders),
+          );
+          break;
+        case 'POST':
+          if (body != null) {
+            // 对于表单数据，使用application/x-www-form-urlencoded
+            response = await _dio.post(
+              url,
+              data: body.entries
+                .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value.toString())}')
+                .join('&'),
+              options: Options(
+                headers: {
+                  ...requestHeaders,
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                },
+              ),
+            );
+          } else {
+            response = await _dio.post(
+              url,
+              options: Options(headers: requestHeaders),
+            );
+          }
+          break;
+        default:
+          throw UnsupportedError('HTTP method $method not supported');
       }
-      throw Exception('Authentication failed');
+      
+      return response;
+    } on DioException catch (e) {
+      // 检查响应状态
+      if (e.response?.statusCode == 403) {
+        // 会话可能已过期，清除会话并重试一次
+        if (_sessionId != null) {
+          _sessionId = null;
+          return _request(method, endpoint, headers: headers, body: body, requireAuth: requireAuth);
+        }
+        throw Exception('Authentication failed');
+      }
+      
+      if (e.response?.statusCode != null && e.response!.statusCode! >= 400) {
+        throw HttpException('HTTP ${e.response!.statusCode}: ${e.response!.data}');
+      }
+      
+      throw Exception('Request failed: ${e.message}');
     }
-    
-    if (response.statusCode >= 400) {
-      throw HttpException('HTTP ${response.statusCode}: ${response.body}');
-    }
-    
-    return response;
   }
   
   /// 登录获取会话
   Future<void> _login() async {
-    final response = await _httpClient.post(
-      Uri.parse('$_baseUrl$_apiPrefix/auth/login'),
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'M-Team Flutter App',
-      },
-      body: 'username=${Uri.encodeComponent(config.username)}&password=${Uri.encodeComponent(password)}',
-    );
-    
-    if (response.statusCode == 200 && response.body == 'Ok.') {
-      // 从响应头中提取会话ID
-      final cookies = response.headers['set-cookie'];
-      if (cookies != null) {
-        final sidMatch = RegExp(r'SID=([^;]+)').firstMatch(cookies);
-        if (sidMatch != null) {
-          _sessionId = sidMatch.group(1);
-          return;
+    try {
+      final response = await _dio.post(
+        '$_baseUrl$_apiPrefix/auth/login',
+        data: 'username=${Uri.encodeComponent(config.username)}&password=${Uri.encodeComponent(password)}',
+        options: Options(
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        ),
+      );
+      
+      if (response.statusCode == 200 && response.data == 'Ok.') {
+        // 从响应头中提取会话ID
+        final cookies = response.headers['set-cookie'];
+        if (cookies != null && cookies.isNotEmpty) {
+          final sidMatch = RegExp(r'SID=([^;]+)').firstMatch(cookies.first);
+          if (sidMatch != null) {
+            _sessionId = sidMatch.group(1);
+            return;
+          }
         }
+        throw Exception('Failed to extract session ID from login response');
+      } else {
+        throw Exception('Login failed: ${response.data}');
       }
-      throw Exception('Failed to extract session ID from login response');
-    } else {
-      throw Exception('Login failed: ${response.body}');
+    } on DioException catch (e) {
+      throw Exception('Login failed: ${e.message}');
     }
   }
   
@@ -158,7 +182,7 @@ class QbittorrentClient implements DownloaderClient {
   @override
   Future<TransferInfo> getTransferInfo() async {
     final response = await _request('GET', '/transfer/info');
-    final data = json.decode(response.body) as Map<String, dynamic>;
+    final data = response.data as Map<String, dynamic>;
     
     return TransferInfo(
       upSpeed: data['up_info_speed'] ?? 0,
@@ -171,7 +195,7 @@ class QbittorrentClient implements DownloaderClient {
   @override
   Future<ServerState> getServerState() async {
     final response = await _request('GET', '/sync/maindata');
-    final data = json.decode(response.body) as Map<String, dynamic>;
+    final data = response.data as Map<String, dynamic>;
     
     // 从 server_state 字段中获取服务器状态信息
     final serverState = data['server_state'] as Map<String, dynamic>? ?? {};
@@ -199,7 +223,7 @@ class QbittorrentClient implements DownloaderClient {
     }
     
     final response = await _request('GET', '/torrents/info', body: queryParams);
-    final List<dynamic> data = json.decode(response.body);
+    final List<dynamic> data = response.data as List<dynamic>;
     
     return data.map((torrent) => _convertToDownloadTask(torrent)).toList();
   }
@@ -309,14 +333,14 @@ class QbittorrentClient implements DownloaderClient {
   @override
   Future<List<String>> getCategories() async {
     final response = await _request('GET', '/torrents/categories');
-    final Map<String, dynamic> data = json.decode(response.body);
+    final Map<String, dynamic> data = response.data as Map<String, dynamic>;
     return data.keys.toList();
   }
   
   @override
   Future<List<String>> getTags() async {
     final response = await _request('GET', '/torrents/tags');
-    final List<dynamic> data = json.decode(response.body);
+    final List<dynamic> data = response.data as List<dynamic>;
     return data.cast<String>();
   }
   
@@ -328,7 +352,7 @@ class QbittorrentClient implements DownloaderClient {
     }
     
     final response = await _request('GET', '/app/version');
-    final version = response.body.replaceAll('"', ''); // 移除可能的引号
+    final version = response.data.replaceAll('"', ''); // 移除可能的引号
     
     // 缓存版本信息
     _cachedVersion = version;
@@ -463,6 +487,6 @@ class QbittorrentClient implements DownloaderClient {
   
   /// 释放资源
   void dispose() {
-    _httpClient.close();
+    _dio.close();
   }
 }

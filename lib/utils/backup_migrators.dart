@@ -89,43 +89,11 @@ class BackupMigratorV100To110 implements BackupMigrator {
   }
 }
 
-/// 1.1.0 迁移到 1.2.0 - 清理旧qBittorrent数据
-class BackupMigratorV110To120 implements BackupMigrator {
-  @override
-  String get fromVersion => '1.1.0';
-  
-  @override
-  String get toVersion => '1.2.0';
-  
-  @override
-  Map<String, dynamic> migrate(Map<String, dynamic> backupData) {
-    final migratedData = Map<String, dynamic>.from(backupData);
-    
-    // 更新版本号
-    migratedData['version'] = toVersion;
-    
-    // 清理所有旧的qBittorrent相关数据
-    final oldKeys = [
-      'qbClientConfigs',
-      'defaultQbId', 
-      'qbPasswords',
-      'qbCategoriesCache',
-      'qbTagsCache'
-    ];
-    
-    for (final key in oldKeys) {
-      migratedData.remove(key);
-    }
-    
-    return migratedData;
-  }
-}
 
 /// 备份迁移管理器
 class BackupMigrationManager {
   static final List<BackupMigrator> _migrators = [
     BackupMigratorV100To110(),
-    BackupMigratorV110To120()
   ];
   
   /// 注册迁移器
