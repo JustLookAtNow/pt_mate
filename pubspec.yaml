@@ -39,7 +39,6 @@ dependencies:
   cupertino_icons: ^1.0.8
   provider: ^6.1.2
   dio: ^5.7.0
-  http: ^1.2.2
   shared_preferences: ^2.3.2
   path_provider: ^2.1.4
   permission_handler: ^12.0.1
