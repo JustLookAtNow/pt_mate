@@ -3,6 +3,7 @@ import 'dart:async';
 import '../services/storage/storage_service.dart';
 import '../services/downloader/downloader_config.dart';
 import '../services/downloader/downloader_factory.dart';
+import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
 import '../utils/format.dart';
 
@@ -19,6 +20,7 @@ class DownloadTasksPage extends StatefulWidget {
 
 class _DownloadTasksPageState extends State<DownloadTasksPage> {
   Timer? _refreshTimer;
+  StreamSubscription<String>? _configChangeSubscription;
   
   // 状态变量
   bool _isLoading = true;
@@ -27,6 +29,10 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
   DownloaderConfig? _downloaderConfig;
   String? _password;
   
+  // Client 实例管理
+  dynamic _client;
+  String? _currentConfigId;
+  
 
 
   @override
@@ -34,11 +40,20 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
     super.initState();
     _loadQbConfig();
     _startAutoRefresh();
+    
+    // 监听配置变更
+    _configChangeSubscription = DownloaderService.instance.configChangeStream.listen((configId) {
+      // 当配置发生变更时，重置 client 并重新加载配置
+      _resetClient();
+      _loadQbConfig();
+    });
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _configChangeSubscription?.cancel();
+    _resetClient(); // 清理 client 实例
     super.dispose();
   }
 
@@ -87,6 +102,10 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
         _downloaderConfig = config;
         _password = password;
       });
+      
+      // 配置更改时重置 client
+      _resetClient();
+      
       await _loadTasks();
     } catch (e) {
       setState(() {
@@ -96,6 +115,30 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
         _errorMessage = '加载配置失败: $e';
       });
     }
+  }
+
+  // 获取或创建 client 实例
+  dynamic _getClient() {
+    if (_downloaderConfig == null || _password == null) {
+      return null;
+    }
+    
+    // 如果配置ID发生变化，需要重新创建client
+    if (_client == null || _currentConfigId != _downloaderConfig!.id) {
+      _client = DownloaderFactory.createClient(
+        config: _downloaderConfig!,
+        password: _password!,
+      );
+      _currentConfigId = _downloaderConfig!.id;
+    }
+    
+    return _client;
+  }
+
+  // 重置 client（当配置更改时）
+  void _resetClient() {
+    _client = null;
+    _currentConfigId = null;
   }
 
   // 加载下载任务
@@ -110,10 +153,9 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
     }
 
     try {
-      final client = DownloaderFactory.createClient(
-        config: _downloaderConfig!,
-        password: _password!,
-      );
+      final client = _getClient();
+      if (client == null) return;
+      
       final tasks = await client.getTasks();
       
       setState(() {
@@ -234,10 +276,9 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
     if (_downloaderConfig == null || _password == null) return;
     
     try {
-      final client = DownloaderService.instance.getClient(
-        config: _downloaderConfig!,
-        password: _password!,
-      );
+      final client = _getClient();
+      if (client == null) return;
+      
       await client.pauseTask(hash);
       
       if (!mounted) return;
@@ -271,10 +312,9 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
     if (_downloaderConfig == null || _password == null) return;
     
     try {
-      final client = DownloaderFactory.createClient(
-        config: _downloaderConfig!,
-        password: _password!,
-      );
+      final client = _getClient();
+      if (client == null) return;
+      
       await client.resumeTask(hash);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -309,10 +349,9 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
     if (_downloaderConfig == null || _password == null) return;
     
     try {
-      final client = DownloaderFactory.createClient(
-        config: _downloaderConfig!,
-        password: _password!,
-      );
+      final client = _getClient();
+      if (client == null) return;
+      
       await client.deleteTask(hash, deleteFiles: deleteFiles);
       
       if (!mounted) return;

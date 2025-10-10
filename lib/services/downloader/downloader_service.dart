@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'downloader_client.dart';
@@ -19,6 +20,12 @@ class DownloaderService {
   /// 缓存的密码
   final Map<String, String> _passwordCache = {};
   
+  /// 配置变更通知流
+  final StreamController<String> _configChangeController = StreamController<String>.broadcast();
+  
+  /// 配置变更通知流
+  Stream<String> get configChangeStream => _configChangeController.stream;
+  
   /// 清除所有缓存
   void clearCache() {
     _clientCache.clear();
@@ -29,6 +36,16 @@ class DownloaderService {
   void clearConfigCache(String configId) {
     _clientCache.remove(configId);
     _passwordCache.remove(configId);
+  }
+  
+  /// 通知配置变更
+  void notifyConfigChanged([String? configId]) {
+    if (configId != null) {
+      clearConfigCache(configId);
+    } else {
+      clearCache();
+    }
+    _configChangeController.add(configId ?? 'all');
   }
   
   /// 获取下载器客户端

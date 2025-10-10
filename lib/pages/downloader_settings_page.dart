@@ -94,6 +94,10 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
           result.password!,
         );
       }
+      
+      // 通知配置变更
+      DownloaderService.instance.notifyConfigChanged(cfg.id);
+      
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -144,6 +148,10 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
         defaultId: _defaultId == config.id ? null : _defaultId,
       );
       await StorageService.instance.deleteDownloaderPassword(config.id);
+      
+      // 通知配置变更
+      DownloaderService.instance.notifyConfigChanged(config.id);
+      
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -168,6 +176,10 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
         _downloaderConfigs,
         defaultId: config.id,
       );
+      
+      // 通知配置变更
+      DownloaderService.instance.notifyConfigChanged(config.id);
+      
       setState(() {
         _defaultId = config.id;
       });
