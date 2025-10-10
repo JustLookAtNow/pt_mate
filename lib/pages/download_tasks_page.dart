@@ -234,7 +234,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
     if (_downloaderConfig == null || _password == null) return;
     
     try {
-      final client = DownloaderFactory.createClient(
+      final client = DownloaderService.instance.getClient(
         config: _downloaderConfig!,
         password: _password!,
       );
