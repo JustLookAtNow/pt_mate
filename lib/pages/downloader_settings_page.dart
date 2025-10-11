@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+
 import '../services/storage/storage_service.dart';
 import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_config.dart';
 import '../services/downloader/downloader_models.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/responsive_layout.dart';
+import '../utils/downloader_utils.dart';
 
 class DownloaderSettingsPage extends StatefulWidget {
   const DownloaderSettingsPage({super.key});
@@ -21,26 +22,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
   bool _loading = true;
   String? _error;
 
-  Widget _getDownloaderIcon(String type) {
-    switch (type.toLowerCase()) {
-      case 'qbittorrent':
-        return SvgPicture.asset(
-          'assets/logo/qBittorrent.svg',
-          width: 24,
-          height: 24,
-          fit: BoxFit.contain,
-        );
-      case 'transmission':
-        return SvgPicture.asset(
-          'assets/logo/Transmission.svg',
-          width: 24,
-          height: 24,
-          fit: BoxFit.contain,
-        );
-      default:
-        return const Icon(Icons.download, size: 24);
-    }
-  }
+
 
   @override
   void initState() {
@@ -379,7 +361,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                             children: [
                               Radio<String>(value: c.id),
                               const SizedBox(width: 8),
-                              _getDownloaderIcon(c.type.value),
+                              DownloaderUtils.getDownloaderIcon(c.type),
                             ],
                           ),
                           title: Text(c.name),
@@ -538,26 +520,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
     super.dispose();
   }
 
-  Widget _getDownloaderIcon(String type) {
-    switch (type.toLowerCase()) {
-      case 'qbittorrent':
-        return SvgPicture.asset(
-          'assets/logo/qBittorrent.svg',
-          width: 24,
-          height: 24,
-          fit: BoxFit.contain,
-        );
-      case 'transmission':
-        return SvgPicture.asset(
-          'assets/logo/Transmission.svg',
-          width: 24,
-          height: 24,
-          fit: BoxFit.contain,
-        );
-      default:
-        return const Icon(Icons.download, size: 24);
-    }
-  }
+
 
   Future<void> _onSubmit() async {
     final name = _nameCtrl.text.trim();
@@ -737,7 +700,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
                           value: type,
                           child: Row(
                             children: [
-                              _getDownloaderIcon(type.value),
+                              DownloaderUtils.getDownloaderIcon(type),
                               const SizedBox(width: 12),
                               Text(type.displayName),
                             ],
