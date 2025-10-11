@@ -20,6 +20,8 @@ abstract class DownloaderConfig {
     switch (type) {
       case DownloaderType.qbittorrent:
         return QbittorrentConfig.fromJson(json);
+      case DownloaderType.transmission:
+        return TransmissionConfig.fromJson(json);
     }
   }
   
@@ -116,6 +118,112 @@ class QbittorrentConfig extends DownloaderConfig {
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is QbittorrentConfig &&
+        other.id == id &&
+        other.name == name &&
+        other.host == host &&
+        other.port == port &&
+        other.username == username &&
+        other.password == password &&
+        other.useLocalRelay == useLocalRelay &&
+        other.version == version;
+  }
+  
+  @override
+  int get hashCode {
+    return Object.hash(
+      id,
+      name,
+      host,
+      port,
+      username,
+      password,
+      useLocalRelay,
+      version,
+    );
+  }
+}
+
+/// Transmission下载器配置
+class TransmissionConfig extends DownloaderConfig {
+  final String host;
+  final int port;
+  final String username;
+  final String password;
+  final bool useLocalRelay;
+  final String? version;
+  
+  const TransmissionConfig({
+    required super.id,
+    required super.name,
+    required this.host,
+    required this.port,
+    required this.username,
+    required this.password,
+    this.useLocalRelay = false,
+    this.version,
+  }) : super(type: DownloaderType.transmission);
+  
+  /// 从JSON创建配置
+  factory TransmissionConfig.fromJson(Map<String, dynamic> json) {
+    // 支持嵌套的config结构和扁平结构（向后兼容）
+    final config = json['config'] as Map<String, dynamic>? ?? json;
+    
+    return TransmissionConfig(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      host: config['host'] ?? '',
+      port: config['port'] ?? 9091,
+      username: config['username'] ?? '',
+      password: config['password'] ?? '',
+      useLocalRelay: config['useLocalRelay'] ?? false,
+      version: config['version'],
+    );
+  }
+  
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'type': type.value,
+      'config': {
+        'host': host,
+        'port': port,
+        'username': username,
+        'password': password,
+        'useLocalRelay': useLocalRelay,
+        if (version != null) 'version': version,
+      },
+    };
+  }
+  
+  @override
+  TransmissionConfig copyWith({
+    String? id,
+    String? name,
+    String? host,
+    int? port,
+    String? username,
+    String? password,
+    bool? useLocalRelay,
+    String? version,
+  }) {
+    return TransmissionConfig(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      host: host ?? this.host,
+      port: port ?? this.port,
+      username: username ?? this.username,
+      password: password ?? this.password,
+      useLocalRelay: useLocalRelay ?? this.useLocalRelay,
+      version: version ?? this.version,
+    );
+  }
+  
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is TransmissionConfig &&
         other.id == id &&
         other.name == name &&
         other.host == host &&

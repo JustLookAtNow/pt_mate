@@ -142,7 +142,7 @@ class _SettingsBody extends StatelessWidget {
           child: ListTile(
             leading: const Icon(Icons.download_outlined),
             title: const Text('下载器配置'),
-            subtitle: const Text('管理 qBittorrent 下载器'),
+            subtitle: const Text('管理跟配置所有下载器'),
             trailing: const Icon(Icons.arrow_forward_ios),
             onTap: () {
               Navigator.of(context).push(

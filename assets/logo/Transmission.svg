@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+<svg width="800px" height="800px" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1">
+	<g transform="scale(0.521)">
+	  <defs>
+	    <linearGradient id="grad1" x1="30%" y1="0%" x2="100%" y2="0%">
+	      <stop offset="0%" style="stop-color:rgb(250,250,250);stop-opacity:1" />
+	      <stop offset="100%" style="stop-color:rgb(100,100,100);stop-opacity:1" />
+	    </linearGradient>  
+	    <linearGradient id="grad2" x1="30%" y1="0%" x2="100%" y2="0%">  
+	      <stop offset="0%" style="stop-color:rgb(255,150,150);stop-opacity:1" />
+	      <stop offset="100%" style="stop-color:rgb(255,40,40);stop-opacity:1" />
+	    </linearGradient>
+	  </defs>
+	  <path style="fill:#919191;stroke:#ddd;stroke-width:2;" d="m 32,160 a 12 12 0 0 1 -10,-14 l 36,-48 a 12 12 0 0 1 6,-6 l 64,0  a 12 12 0 0 1 6,6 l 36,48 a 12 12 0 0 1 -10,14 z"/>
+	  <path style="fill:url(#grad1);" d="m 26,142 36,-48 68,0 36,48 z"/>
+	  <circle style="fill:#E91E63;" cx="158" cy="155" r="3"/>
+	  <path style="fill:#aaa;"  d="m 90,102 -6,32 -6,0 18,6 18,-6 -6,0 -6,-32 z"/>
+	  <path style="stroke:#ff0000;stroke-width:2;fill:url(#grad2);"  d="m 58,54 a 8,8 0 0 0 0,16 l 76,0  a 8,8 0 0 0 0,-16 z"/>
+	  <path style="stroke:#444;stroke-width:2;fill:url(#grad1);"  d="m 88,126 16,0 0,-72 -16,0 z"/>
+	</g>
+</svg>

@@ -28,7 +28,7 @@ class QbittorrentClient implements DownloaderClient {
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 30),
       headers: {
-        'User-Agent': 'M-Team Flutter App',
+        'User-Agent': 'PT Mate',
       },
     ));
   }

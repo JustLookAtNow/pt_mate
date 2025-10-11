@@ -5,7 +5,8 @@ library;
 
 /// 下载器类型枚举
 enum DownloaderType {
-  qbittorrent('qbittorrent', 'qBittorrent');
+  qbittorrent('qbittorrent', 'qBittorrent'),
+  transmission('transmission', 'Transmission');
 
   const DownloaderType(this.value, this.displayName);
   
