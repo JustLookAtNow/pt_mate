@@ -2,6 +2,7 @@ import 'downloader_client.dart';
 import 'downloader_config.dart';
 import 'downloader_models.dart';
 import 'qbittorrent_client.dart';
+import 'transmission_client.dart';
 
 /// 下载器工厂
 /// 
@@ -75,6 +76,18 @@ class DownloaderFactory {
           );
         } else {
           throw ArgumentError('Invalid config type for qBittorrent: ${config.runtimeType}');
+        }
+      case DownloaderType.transmission:
+        if (config is TransmissionConfig) {
+          return TransmissionClient(
+            config: config,
+            password: password,
+            onConfigUpdated: onConfigUpdated != null 
+              ? (updatedConfig) => onConfigUpdated(updatedConfig)
+              : null,
+          );
+        } else {
+          throw ArgumentError('Invalid config type for Transmission: ${config.runtimeType}');
         }
     }
   }

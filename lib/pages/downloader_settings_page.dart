@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+
 import '../services/storage/storage_service.dart';
 import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_config.dart';
 import '../services/downloader/downloader_models.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/responsive_layout.dart';
+import '../utils/downloader_utils.dart';
 
 class DownloaderSettingsPage extends StatefulWidget {
   const DownloaderSettingsPage({super.key});
@@ -21,19 +22,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
   bool _loading = true;
   String? _error;
 
-  Widget _getDownloaderIcon(String type) {
-    switch (type.toLowerCase()) {
-      case 'qbittorrent':
-        return SvgPicture.asset(
-          'assets/logo/qBittorrent_Logo.svg',
-          width: 24,
-          height: 24,
-          fit: BoxFit.contain,
-        );
-      default:
-        return const Icon(Icons.download, size: 24);
-    }
-  }
+
 
   @override
   void initState() {
@@ -363,6 +352,8 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                         String subtitle = c.type.displayName;
                         if (c is QbittorrentConfig) {
                           subtitle = '${c.host}:${c.port}  ·  ${c.username}';
+                        } else if (c is TransmissionConfig) {
+                          subtitle = '${c.host}:${c.port}  ·  ${c.username}';
                         }
                         return ListTile(
                           leading: Row(
@@ -370,7 +361,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                             children: [
                               Radio<String>(value: c.id),
                               const SizedBox(width: 8),
-                              _getDownloaderIcon(c.type.value),
+                              DownloaderUtils.getDownloaderIcon(c.type),
                             ],
                           ),
                           title: Text(c.name),
@@ -505,6 +496,16 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
         _portCtrl.text = e.port.toString();
         _userCtrl.text = e.username;
         _useLocalRelay = e.useLocalRelay;
+      } else if (e is TransmissionConfig) {
+        _hostCtrl.text = e.host;
+        _portCtrl.text = e.port.toString();
+        _userCtrl.text = e.username;
+        _useLocalRelay = e.useLocalRelay;
+      }
+    } else {
+      // 新建配置时，如果是 Transmission 类型，默认开启本地中转
+      if (_selectedType == DownloaderType.transmission) {
+        _useLocalRelay = true;
       }
     }
   }
@@ -518,6 +519,8 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
     _pwdCtrl.dispose();
     super.dispose();
   }
+
+
 
   Future<void> _onSubmit() async {
     final name = _nameCtrl.text.trim();
@@ -695,13 +698,23 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
                       items: DownloaderType.values.map((type) {
                         return DropdownMenuItem<DownloaderType>(
                           value: type,
-                          child: Text(type.displayName),
+                          child: Row(
+                            children: [
+                              DownloaderUtils.getDownloaderIcon(type),
+                              const SizedBox(width: 12),
+                              Text(type.displayName),
+                            ],
+                          ),
                         );
                       }).toList(),
                       onChanged: (DownloaderType? newType) {
                         if (newType != null) {
                           setState(() {
                             _selectedType = newType;
+                            // 当选择 Transmission 时，自动开启本地中转
+                            if (newType == DownloaderType.transmission) {
+                              _useLocalRelay = true;
+                            }
                           });
                         }
                       },
@@ -760,7 +773,9 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '启用后先下载种子文件到本地，再提交给 qBittorrent',
+                                  _selectedType == DownloaderType.transmission
+                                      ? 'Transmission 必须启用本地中转（种子文件需要先下载到本地）'
+                                      : '启用后先下载种子文件到本地，再提交给下载器',
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(color: Colors.grey.shade600),
                                 ),
@@ -769,11 +784,13 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
                           ),
                           Switch(
                             value: _useLocalRelay,
-                            onChanged: (value) {
-                              setState(() {
-                                _useLocalRelay = value;
-                              });
-                            },
+                            onChanged: _selectedType == DownloaderType.transmission
+                                ? null // Transmission 类型时禁用开关
+                                : (value) {
+                                    setState(() {
+                                      _useLocalRelay = value;
+                                    });
+                                  },
                           ),
                         ],
                       ),
