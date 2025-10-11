@@ -60,7 +60,7 @@ class TorrentListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     // 检测是否为移动设备（屏幕宽度小于600px）
     final isMobile = MediaQuery.of(context).size.width < 600;
-    
+
     // 构建主要内容
     Widget mainContent = Container(
       decoration: BoxDecoration(
@@ -68,14 +68,16 @@ class TorrentListItem extends StatelessWidget {
             ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
             : Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: isSelected 
+        border: isSelected
             ? Border.all(
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.6),
                 width: 1,
               )
             : null,
       ),
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Padding(
         padding: const EdgeInsets.all(4),
         child: Row(
@@ -91,10 +93,14 @@ class TorrentListItem extends StatelessWidget {
                   height: 100,
                   margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                      color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.outline.withValues(alpha: 0.3),
                       width: 1,
                     ),
                   ),
@@ -114,7 +120,9 @@ class TorrentListItem extends StatelessWidget {
                                 width: 70,
                                 height: 100,
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest,
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Column(
@@ -125,7 +133,9 @@ class TorrentListItem extends StatelessWidget {
                                       height: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Theme.of(context).colorScheme.primary,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
                                       ),
                                     ),
                                     const SizedBox(height: 4),
@@ -133,7 +143,9 @@ class TorrentListItem extends StatelessWidget {
                                       '加载中',
                                       style: TextStyle(
                                         fontSize: 8,
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
@@ -148,14 +160,18 @@ class TorrentListItem extends StatelessWidget {
                                   Icon(
                                     Icons.image_outlined,
                                     size: 24,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     '加载失败',
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ],
@@ -168,14 +184,18 @@ class TorrentListItem extends StatelessWidget {
                               Icon(
                                 Icons.image_outlined,
                                 size: 24,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 '暂无',
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ],
@@ -190,10 +210,14 @@ class TorrentListItem extends StatelessWidget {
                   child: Column(
                     children: [
                       // 豆瓣评分
-                      if (torrent.doubanRating != null && torrent.doubanRating != 'N/A')
+                      if (torrent.doubanRating != null &&
+                          torrent.doubanRating != 'N/A')
                         Container(
                           width: 70,
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
                           margin: const EdgeInsets.only(bottom: 2),
                           decoration: BoxDecoration(
                             color: const Color(0xFF007711),
@@ -212,10 +236,14 @@ class TorrentListItem extends StatelessWidget {
                           ),
                         ),
                       // IMDB评分
-                      if (torrent.imdbRating != null && torrent.imdbRating != 'N/A')
+                      if (torrent.imdbRating != null &&
+                          torrent.imdbRating != 'N/A')
                         Container(
                           width: 70,
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF5C518),
                             borderRadius: BorderRadius.circular(4),
@@ -237,127 +265,135 @@ class TorrentListItem extends StatelessWidget {
                 ),
               ],
             ),
-              
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 标签行
-                    Builder(
-                      builder: (context) {
-                        final tags = TagType.matchTags('${torrent.name} ${torrent.smallDescr}');
-                        if (tags.isEmpty) return const SizedBox.shrink();
-                        
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Wrap(
-                            spacing: 4,
-                            runSpacing: 2,
-                            children: tags.map((tag) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: tag.color,
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                              child: Text(
-                                tag.content,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 标签行
+                  Builder(
+                    builder: (context) {
+                      final tags = TagType.matchTags(
+                        '${torrent.name} ${torrent.smallDescr}',
+                      );
+                      if (tags.isEmpty) return const SizedBox.shrink();
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Wrap(
+                          spacing: 4,
+                          runSpacing: 2,
+                          children: tags
+                              .map(
+                                (tag) => Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: tag.color,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                  child: Text(
+                                    tag.content,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            )).toList(),
+                              )
+                              .toList(),
+                        ),
+                      );
+                    },
+                  ),
+                  // 种子名称（聚合搜索模式下包含站点名称）
+                  if (isAggregateMode && siteName != null)
+                    RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: ' $siteName ',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimary,
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
                           ),
-                        );
-                      },
-                    ),
-                    // 种子名称（聚合搜索模式下包含站点名称）
-                    if (isAggregateMode && siteName != null)
-                      RichText(
-                        text: TextSpan(
-                          children: [
-                            TextSpan(
-                              text: ' $siteName ',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onPrimary,
-                                    backgroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                  ),
+                          TextSpan(
+                            text: ' ${torrent.name}',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).textTheme.titleMedium?.color,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
                             ),
-                            TextSpan(
-                              text: ' ${torrent.name}',
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).textTheme.titleMedium?.color,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                            // 移动设备上显示收藏状态小红心
-                            if (isMobile && torrent.collection)
-                              WidgetSpan(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(left: 4),
-                                  child: Icon(
-                                    Icons.favorite,
-                                    color: Colors.red,
-                                    size: 16,
-                                  ),
+                          ),
+                          // 移动设备上显示收藏状态小红心
+                          if (isMobile && torrent.collection)
+                            WidgetSpan(
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 4),
+                                child: Icon(
+                                  Icons.favorite,
+                                  color: Colors.red,
+                                  size: 16,
                                 ),
                               ),
-                          ],
-                        ),
-                      )
-                    else
-                      RichText(
-                        text: TextSpan(
-                          children: [
-                            TextSpan(
-                              text: torrent.name,
-                              style: TextStyle(
-                                color: Theme.of(context).textTheme.titleMedium?.color,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
                             ),
-                            // 移动设备上显示收藏状态小红心
-                            if (isMobile && torrent.collection)
-                              WidgetSpan(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(left: 4),
-                                  child: Icon(
-                                    Icons.favorite,
-                                    color: Colors.red,
-                                    size: 16,
-                                  ),
+                        ],
+                      ),
+                    )
+                  else
+                    RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: torrent.name,
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).textTheme.titleMedium?.color,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          // 移动设备上显示收藏状态小红心
+                          if (isMobile && torrent.collection)
+                            WidgetSpan(
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 4),
+                                child: Icon(
+                                  Icons.favorite,
+                                  color: Colors.red,
+                                  size: 16,
                                 ),
                               ),
-                          ],
-                        ),
-                      ),
-                    const SizedBox(height: 4),
-                    // 种子描述
-                    Text(
-                      torrent.smallDescr,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).textTheme.bodySmall?.color,
-                        fontSize: 12,
+                            ),
+                        ],
                       ),
                     ),
-                    Text(
+                  const SizedBox(height: 4),
+                  // 种子描述
+                  Text(
+                    torrent.smallDescr,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).textTheme.bodySmall?.color,
+                      fontSize: 12,
+                    ),
+                  ),
+                  Text(
                     '发布于 ${Formatters.formatTorrentCreatedDate(torrent.createdDate)} 前',
                     style: TextStyle(
                       fontSize: 10,
@@ -367,90 +403,90 @@ class TorrentListItem extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                    const SizedBox(height: 4),
-                    // 底部信息行（优惠标签、做种/下载数、大小、下载状态）
-                    Row(
-                      children: [
-                        // 优惠标签
-                        if (torrent.discount != DiscountType.normal)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
+                  const SizedBox(height: 4),
+                  // 底部信息行（优惠标签、做种/下载数、大小、下载状态）
+                  Row(
+                    children: [
+                      // 优惠标签
+                      if (torrent.discount != DiscountType.normal)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _discountColor(torrent.discount),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            _discountText(
+                              torrent.discount,
+                              torrent.discountEndTime,
                             ),
-                            decoration: BoxDecoration(
-                              color: _discountColor(torrent.discount),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              _discountText(
-                                torrent.discount,
-                                torrent.discountEndTime,
-                              ),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
                             ),
                           ),
-                        if (torrent.discount != DiscountType.normal)
-                          const SizedBox(width: 6),
-                        // 做种/下载数信息
-                        _buildSeedLeechInfo(torrent.seeders, torrent.leechers),
-                        const SizedBox(width: 10),
-                        // 文件大小
-                        Text(Formatters.dataFromBytes(torrent.sizeBytes)),
-                        const Spacer(),
-                        // 下载状态图标 - 仅在站点支持下载历史功能时显示
-                        if (currentSite?.features.supportHistory ?? true)
-                          _buildDownloadStatusIcon(torrent.downloadStatus),
-                      ],
-                    ),
-                  ],
-                ),
+                        ),
+                      if (torrent.discount != DiscountType.normal)
+                        const SizedBox(width: 6),
+                      // 做种/下载数信息
+                      _buildSeedLeechInfo(torrent.seeders, torrent.leechers),
+                      const SizedBox(width: 10),
+                      // 文件大小
+                      Text(Formatters.dataFromBytes(torrent.sizeBytes)),
+                      const Spacer(),
+                      // 下载状态图标 - 仅在站点支持下载历史功能时显示
+                      if (currentSite?.features.supportHistory ?? true)
+                        _buildDownloadStatusIcon(torrent.downloadStatus),
+                    ],
+                  ),
+                ],
               ),
-              // 桌面端显示操作按钮
-              if (!isMobile) ...[
-                const SizedBox(width: 4),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 收藏按钮 - 仅在站点支持收藏功能时显示
-                    if (currentSite?.features.supportCollection ?? true)
-                      IconButton(
-                        onPressed: onToggleCollection,
-                        icon: Icon(
-                          torrent.collection
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                          color: torrent.collection ? Colors.red : null,
-                        ),
-                        tooltip: torrent.collection ? '取消收藏' : '收藏',
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 40,
-                          minHeight: 40,
-                        ),
+            ),
+            // 桌面端显示操作按钮
+            if (!isMobile) ...[
+              const SizedBox(width: 4),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 收藏按钮 - 仅在站点支持收藏功能时显示
+                  if (currentSite?.features.supportCollection ?? true)
+                    IconButton(
+                      onPressed: onToggleCollection,
+                      icon: Icon(
+                        torrent.collection
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        color: torrent.collection ? Colors.red : null,
                       ),
-                    // 下载按钮 - 仅在站点支持下载功能时显示
-                    if (currentSite?.features.supportDownload ?? true)
-                      IconButton(
-                        onPressed: onDownload,
-                        icon: const Icon(Icons.download_outlined),
-                        tooltip: '下载',
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 40,
-                          minHeight: 40,
-                        ),
+                      tooltip: torrent.collection ? '取消收藏' : '收藏',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 40,
                       ),
-                  ],
-                ),
-              ],
+                    ),
+                  // 下载按钮 - 仅在站点支持下载功能时显示
+                  if (currentSite?.features.supportDownload ?? true)
+                    IconButton(
+                      onPressed: onDownload,
+                      icon: const Icon(Icons.download_outlined),
+                      tooltip: '下载',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 40,
+                      ),
+                    ),
+                ],
+              ),
             ],
-          ),
+          ],
         ),
-      );
+      ),
+    );
 
     // 移动设备使用自定义左滑功能
     if (isMobile) {
@@ -473,7 +509,7 @@ class TorrentListItem extends StatelessWidget {
   // 构建左滑动作按钮
   List<Widget> _buildSwipeActions(BuildContext context) {
     List<Widget> actions = [];
-    
+
     // 添加收藏按钮（如果支持）
     if (currentSite?.features.supportCollection ?? true) {
       actions.add(
@@ -481,13 +517,15 @@ class TorrentListItem extends StatelessWidget {
           width: 60,
           margin: const EdgeInsets.only(left: 4),
           child: Material(
-            color: torrent.collection 
-                ? (Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.red.shade800 
-                    : Colors.red)
-                : (Theme.of(context).brightness == Brightness.dark 
-                    ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.7)
-                    : Theme.of(context).colorScheme.secondary),
+            color: torrent.collection
+                ? (Theme.of(context).brightness == Brightness.dark
+                      ? Colors.red.shade800
+                      : Colors.red)
+                : (Theme.of(context).brightness == Brightness.dark
+                      ? Theme.of(
+                          context,
+                        ).colorScheme.secondary.withValues(alpha: 0.7)
+                      : Theme.of(context).colorScheme.secondary),
             borderRadius: BorderRadius.circular(8),
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
@@ -503,10 +541,7 @@ class TorrentListItem extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     torrent.collection ? '取消' : '收藏',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 10),
                   ),
                 ],
               ),
@@ -515,7 +550,7 @@ class TorrentListItem extends StatelessWidget {
         ),
       );
     }
-    
+
     // 添加下载按钮（如果支持）
     if (currentSite?.features.supportDownload ?? true) {
       actions.add(
@@ -523,7 +558,7 @@ class TorrentListItem extends StatelessWidget {
           width: 60,
           margin: const EdgeInsets.only(left: 4),
           child: Material(
-            color: Theme.of(context).brightness == Brightness.dark 
+            color: Theme.of(context).brightness == Brightness.dark
                 ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)
                 : Theme.of(context).colorScheme.primary,
             borderRadius: BorderRadius.circular(8),
@@ -533,18 +568,11 @@ class TorrentListItem extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.download_outlined,
-                    color: Colors.white,
-                    size: 20,
-                  ),
+                  Icon(Icons.download_outlined, color: Colors.white, size: 20),
                   const SizedBox(height: 2),
                   Text(
                     '下载',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 10),
                   ),
                 ],
               ),
@@ -553,7 +581,7 @@ class TorrentListItem extends StatelessWidget {
         ),
       );
     }
-    
+
     return actions;
   }
 
@@ -651,7 +679,7 @@ class _SwipeableItemState extends State<_SwipeableItem>
   late Animation<double> _animation;
   double _dragExtent = 0;
   bool _isOpen = false;
-  
+
   // 计算动作按钮的总宽度
   double get _actionsWidth {
     if (widget.actions.isEmpty) return 0;
@@ -668,11 +696,8 @@ class _SwipeableItemState extends State<_SwipeableItem>
     _animation = Tween<double>(
       begin: 0,
       end: 0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
-    
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+
     // 添加动画监听器，只添加一次
     _animation.addListener(_updateDragExtent);
   }
@@ -696,10 +721,10 @@ class _SwipeableItemState extends State<_SwipeableItem>
 
   void _handleDragUpdate(DragUpdateDetails details) {
     if (widget.actions.isEmpty) return;
-    
+
     final delta = details.primaryDelta ?? 0;
     final newDragExtent = _dragExtent + delta;
-    
+
     // 限制拖拽范围：向左滑动为负值，最大滑动距离为按钮宽度
     setState(() {
       _dragExtent = newDragExtent.clamp(-_actionsWidth, 0);
@@ -708,13 +733,13 @@ class _SwipeableItemState extends State<_SwipeableItem>
 
   void _handleDragEnd(DragEndDetails details) {
     if (widget.actions.isEmpty) return;
-    
+
     final velocity = details.primaryVelocity ?? 0;
     final threshold = _actionsWidth * 0.3;
-    
+
     // 判断是否应该打开或关闭
     bool shouldOpen = false;
-    
+
     if (velocity < -300) {
       // 快速向左滑动，打开
       shouldOpen = true;
@@ -725,14 +750,14 @@ class _SwipeableItemState extends State<_SwipeableItem>
       // 根据滑动距离判断
       shouldOpen = _dragExtent.abs() > threshold;
     }
-    
+
     _animateToPosition(shouldOpen);
   }
 
   void _animateToPosition(bool open) {
     _isOpen = open;
     final targetExtent = open ? -_actionsWidth : 0.0;
-    
+
     // 如果目标位置和当前位置相同，不需要动画
     if ((_dragExtent - targetExtent).abs() < 0.1) {
       setState(() {
@@ -740,16 +765,13 @@ class _SwipeableItemState extends State<_SwipeableItem>
       });
       return;
     }
-    
+
     // 重新创建动画，避免状态冲突
     _animation = Tween<double>(
       begin: _dragExtent,
       end: targetExtent,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
-    
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+
     // 重置并启动动画
     _controller.reset();
     _controller.forward();
@@ -776,7 +798,7 @@ class _SwipeableItemState extends State<_SwipeableItem>
       onHorizontalDragUpdate: _handleDragUpdate,
       onHorizontalDragEnd: _handleDragEnd,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
         child: ClipRect(
           child: Stack(
             children: [

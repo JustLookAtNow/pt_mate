@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
-import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
-import '../services/qbittorrent/qb_client.dart';
+import '../services/downloader/downloader_config.dart';
+import '../services/downloader/downloader_service.dart';
+import '../services/downloader/downloader_models.dart';
 import '../utils/format.dart';
 import '../pages/downloader_settings_page.dart';
 
@@ -17,8 +18,8 @@ class QbSpeedIndicator extends StatefulWidget {
 
 class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
   Timer? _timer;
-  QbTransferInfo? _info;
-  QbServerState? _serverState;
+  TransferInfo? _info;
+  ServerState? _serverState;
   String? _err;
 
   @override
@@ -36,7 +37,7 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
 
   Future<void> _fetch() async {
     try {
-      final defId = await StorageService.instance.loadDefaultQbId();
+      final defId = await StorageService.instance.loadDefaultDownloaderId();
       if (defId == null) {
         setState(() {
           _err = '未设置默认下载器';
@@ -46,8 +47,8 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
         return;
       }
       
-      final clients = await StorageService.instance.loadQbClients();
-      if (clients.isEmpty) {
+      final configs = await StorageService.instance.loadDownloaderConfigs();
+      if (configs.isEmpty) {
         setState(() {
           _err = '没有配置任何下载器';
           _info = null;
@@ -57,10 +58,10 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
       }
       
       // 查找默认客户端
-      QbClientConfig? defaultClient;
-      for (final client in clients) {
-        if (client.id == defId) {
-          defaultClient = client;
+      DownloaderConfig? defaultClient;
+      for (final configMap in configs) {
+        if (configMap['id'] == defId) {
+          defaultClient = DownloaderConfig.fromJson(configMap);
           break;
         }
       }
@@ -74,7 +75,7 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
         return;
       }
       
-      final pwd = await StorageService.instance.loadQbPassword(defaultClient.id);
+      final pwd = await StorageService.instance.loadDownloaderPassword(defaultClient.id);
       if ((pwd ?? '').isEmpty) {
         setState(() {
           _err = '未保存密码';
@@ -84,16 +85,23 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
         return;
       }
       
+      // 使用统一的下载器服务API
       // 同时获取传输信息和服务器状态
       final futures = await Future.wait([
-        QbService.instance.fetchTransferInfo(config: defaultClient, password: pwd!),
-        QbService.instance.fetchServerState(config: defaultClient, password: pwd),
+        DownloaderService.instance.getTransferInfo(
+          config: defaultClient,
+          password: pwd ?? '',
+        ),
+        DownloaderService.instance.getServerState(
+          config: defaultClient,
+          password: pwd ?? '',
+        ),
       ]);
       
       if (!mounted) return;
       setState(() {
-        _info = futures[0] as QbTransferInfo;
-        _serverState = futures[1] as QbServerState;
+        _info = futures[0] as TransferInfo;
+        _serverState = futures[1] as ServerState;
         _err = null;
       });
     } catch (e) {

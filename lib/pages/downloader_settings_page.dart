@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../services/storage/storage_service.dart';
-import '../services/qbittorrent/qb_client.dart';
-import '../models/app_models.dart';
+import '../services/downloader/downloader_service.dart';
+import '../services/downloader/downloader_config.dart';
+import '../services/downloader/downloader_models.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/responsive_layout.dart';
 
@@ -14,10 +16,24 @@ class DownloaderSettingsPage extends StatefulWidget {
 }
 
 class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
-  List<QbClientConfig> _clients = [];
+  List<DownloaderConfig> _downloaderConfigs = [];
   String? _defaultId;
   bool _loading = true;
   String? _error;
+
+  Widget _getDownloaderIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'qbittorrent':
+        return SvgPicture.asset(
+          'assets/logo/qBittorrent_Logo.svg',
+          width: 24,
+          height: 24,
+          fit: BoxFit.contain,
+        );
+      default:
+        return const Icon(Icons.download, size: 24);
+    }
+  }
 
   @override
   void initState() {
@@ -31,11 +47,12 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       _error = null;
     });
     try {
-      final clients = await StorageService.instance.loadQbClients();
-      final defaultId = await StorageService.instance.loadDefaultQbId();
+      final configMaps = await StorageService.instance.loadDownloaderConfigs();
+      final configs = configMaps.map((configMap) => DownloaderConfig.fromJson(configMap)).toList();
+      final defaultId = await StorageService.instance.loadDefaultDownloaderId();
       if (!mounted) return;
       setState(() {
-        _clients = clients;
+        _downloaderConfigs = configs;
         _defaultId = defaultId;
         _loading = false;
       });
@@ -48,33 +65,39 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
     }
   }
 
-  Future<void> _addOrEdit({QbClientConfig? existing}) async {
-    final result = await showDialog<_QbEditorResult>(
+  Future<void> _addOrEdit({DownloaderConfig? existing}) async {
+    final result = await showDialog<_DownloaderEditorResult>(
       context: context,
-      builder: (_) => _QbClientEditorDialog(existing: existing),
+      builder: (_) => _DownloaderEditorDialog(existing: existing),
     );
     if (result == null) return;
     try {
-      final updated = [..._clients];
+      final updated = [..._downloaderConfigs];
       final idx = existing == null
           ? -1
           : updated.indexWhere((c) => c.id == existing.id);
-      final cfg = result.config;
+      final cfg = DownloaderConfig.fromJson(result.config);
       if (idx >= 0) {
         updated[idx] = cfg;
       } else {
         updated.add(cfg);
       }
-      await StorageService.instance.saveQbClients(
-        updated,
-        defaultId: _defaultId,
-      );
+      await StorageService.instance.saveDownloaderConfigs(updated, defaultId: _defaultId);
+      if (_defaultId == null && updated.isNotEmpty) {
+        setState(() {
+          _defaultId = cfg.id;
+        });
+      }
       if (result.password != null) {
-        await StorageService.instance.saveQbPassword(
-          result.config.id,
+        await StorageService.instance.saveDownloaderPassword(
+          cfg.id,
           result.password!,
         );
       }
+      
+      // 通知配置变更
+      DownloaderService.instance.notifyConfigChanged(cfg.id);
+      
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -93,7 +116,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
     }
   }
 
-  Future<void> _delete(QbClientConfig config) async {
+  Future<void> _delete(DownloaderConfig config) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -119,12 +142,16 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
     );
     if (confirm != true) return;
     try {
-      final list = _clients.where((e) => e.id != config.id).toList();
-      await StorageService.instance.saveQbClients(
+      final list = _downloaderConfigs.where((e) => e.id != config.id).toList();
+      await StorageService.instance.saveDownloaderConfigs(
         list,
         defaultId: _defaultId == config.id ? null : _defaultId,
       );
-      await StorageService.instance.deleteQbPassword(config.id);
+      await StorageService.instance.deleteDownloaderPassword(config.id);
+      
+      // 通知配置变更
+      DownloaderService.instance.notifyConfigChanged(config.id);
+      
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -143,12 +170,16 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
     }
   }
 
-  Future<void> _setDefault(QbClientConfig config) async {
+  Future<void> _setDefault(DownloaderConfig config) async {
     try {
-      await StorageService.instance.saveQbClients(
-        _clients,
+      await StorageService.instance.saveDownloaderConfigs(
+        _downloaderConfigs,
         defaultId: config.id,
       );
+      
+      // 通知配置变更
+      DownloaderService.instance.notifyConfigChanged(config.id);
+      
       setState(() {
         _defaultId = config.id;
       });
@@ -185,13 +216,13 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       ));
       return;
     }
-    final client = _clients.firstWhere((c) => c.id == _defaultId);
-    await _test(client);
+    final config = _downloaderConfigs.firstWhere((c) => c.id == _defaultId);
+    await _test(config);
   }
 
-  Future<void> _test(QbClientConfig c) async {
+  Future<void> _test(DownloaderConfig config) async {
     try {
-      final pwd = await StorageService.instance.loadQbPassword(c.id);
+      final pwd = await StorageService.instance.loadDownloaderPassword(config.id);
       if ((pwd ?? '').isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(
@@ -208,7 +239,13 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
         ));
         return;
       }
-      await QbService.instance.testConnection(config: c, password: pwd!);
+      
+      // 使用新的下载器服务进行测试
+      await DownloaderService.instance.testConnection(
+        config: config,
+        password: pwd!,
+      );
+      
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -313,20 +350,29 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                     groupValue: _defaultId,
                     onChanged: (String? value) {
                       if (value != null) {
-                        final client = _clients.firstWhere(
+                        final config = _downloaderConfigs.firstWhere(
                           (c) => c.id == value,
                         );
-                        _setDefault(client);
+                        _setDefault(config);
                       }
                     },
                     child: ListView.builder(
-                      itemCount: _clients.length,
+                      itemCount: _downloaderConfigs.length,
                       itemBuilder: (_, i) {
-                        final c = _clients[i];
-                        final subtitle =
-                            '${c.host}:${c.port}  ·  ${c.username}';
+                        final c = _downloaderConfigs[i];
+                        String subtitle = c.type.displayName;
+                        if (c is QbittorrentConfig) {
+                          subtitle = '${c.host}:${c.port}  ·  ${c.username}';
+                        }
                         return ListTile(
-                          leading: Radio<String>(value: c.id),
+                          leading: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Radio<String>(value: c.id),
+                              const SizedBox(width: 8),
+                              _getDownloaderIcon(c.type.value),
+                            ],
+                          ),
                           title: Text(c.name),
                           subtitle: Text(subtitle),
                           onTap: () => _addOrEdit(existing: c),
@@ -419,21 +465,21 @@ class _PasswordPromptDialogState extends State<PasswordPromptDialog> {
   }
 }
 
-class _QbEditorResult {
-  final QbClientConfig config;
+class _DownloaderEditorResult {
+  final Map<String, dynamic> config;
   final String? password;
-  _QbEditorResult(this.config, this.password);
+  _DownloaderEditorResult(this.config, this.password);
 }
 
-class _QbClientEditorDialog extends StatefulWidget {
-  final QbClientConfig? existing;
-  const _QbClientEditorDialog({this.existing});
+class _DownloaderEditorDialog extends StatefulWidget {
+  final DownloaderConfig? existing;
+  const _DownloaderEditorDialog({this.existing});
 
   @override
-  State<_QbClientEditorDialog> createState() => _QbClientEditorDialogState();
+  State<_DownloaderEditorDialog> createState() => _DownloaderEditorDialogState();
 }
 
-class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
+class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
   final _nameCtrl = TextEditingController();
   final _hostCtrl = TextEditingController();
   final _portCtrl = TextEditingController(text: '8080');
@@ -444,6 +490,7 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
   String? _testMsg;
   bool? _testOk;
   bool _useLocalRelay = false; // 本地中转选项状态
+  DownloaderType _selectedType = DownloaderType.qbittorrent; // 选择的下载器类型
 
   @override
   void initState() {
@@ -451,10 +498,14 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
     final e = widget.existing;
     if (e != null) {
       _nameCtrl.text = e.name;
-      _hostCtrl.text = e.host;
-      _portCtrl.text = e.port.toString();
-      _userCtrl.text = e.username;
-      _useLocalRelay = e.useLocalRelay; // 初始化本地中转状态
+      _selectedType = e.type;
+      
+      if (e is QbittorrentConfig) {
+        _hostCtrl.text = e.host;
+        _portCtrl.text = e.port.toString();
+        _userCtrl.text = e.username;
+        _useLocalRelay = e.useLocalRelay;
+      }
     }
   }
 
@@ -482,28 +533,31 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
     }
     final id =
         widget.existing?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
-    final cfg = QbClientConfig(
-      id: id,
-      name: name,
-      host: host,
-      port: port,
-      username: user,
-      useLocalRelay: _useLocalRelay, // 包含本地中转选项
-    );
+    final cfg = {
+      'id': id,
+      'name': name,
+      'type': _selectedType.value, // 使用选择的类型
+      'config': {
+        'host': host,
+        'port': port,
+        'username': user,
+        'useLocalRelay': _useLocalRelay, // 包含本地中转选项
+      },
+    };
     
     // 如果密码为空且是编辑现有配置，则尝试从已保存的配置中读取密码
     if (pwd.isEmpty && widget.existing != null) {
       // 获取保存的密码
-      final savedPassword = await StorageService.instance.loadQbPassword(id);
+      final savedPassword = await StorageService.instance.loadDownloaderPassword(id);
       
       // 检查组件是否仍然挂载
       if (!mounted) return;
       
       // 返回结果，使用保存的密码或null
-      Navigator.of(context).pop(_QbEditorResult(cfg, savedPassword));
+      Navigator.of(context).pop(_DownloaderEditorResult(cfg, savedPassword));
     } else {
       // 无需异步操作，直接返回结果
-      Navigator.of(context).pop(_QbEditorResult(cfg, pwd.isEmpty ? null : pwd));
+      Navigator.of(context).pop(_DownloaderEditorResult(cfg, pwd.isEmpty ? null : pwd));
     }
   }
 
@@ -520,7 +574,7 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
     if (pwd.isEmpty && widget.existing != null) {
       final id = widget.existing!.id;
       try {
-        password = await StorageService.instance.loadQbPassword(id);
+        password = await StorageService.instance.loadDownloaderPassword(id);
         // 检查组件是否仍然挂载
         if (!mounted) return;
       } catch (e) {
@@ -552,16 +606,23 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
       _testMsg = null;
     });
     try {
-      final cfg = QbClientConfig(
-        id: widget.existing?.id ?? 'temp',
-        name: name,
-        host: host,
-        port: port,
-        username: user,
-        useLocalRelay: _useLocalRelay, // 包含本地中转选项
-      );
+      final cfg = {
+        'id': widget.existing?.id ?? 'temp',
+        'name': name,
+        'type': _selectedType.value,
+        'config': {
+          'host': host,
+          'port': port,
+          'username': user,
+          'useLocalRelay': _useLocalRelay, // 包含本地中转选项
+        },
+      };
 
-      await QbService.instance.testConnection(config: cfg, password: password!);
+      final downloaderConfig = DownloaderConfig.fromJson(cfg);
+      await DownloaderService.instance.testConnection(
+        config: downloaderConfig,
+        password: password!,
+      );
       if (!mounted) return;
       setState(() {
         _testOk = true;
@@ -622,6 +683,28 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
                         labelText: '名称',
                         border: OutlineInputBorder(),
                       ),
+                    ),
+                    const SizedBox(height: 16),
+                    // 下载器类型选择
+                    DropdownButtonFormField<DownloaderType>(
+                      initialValue: _selectedType,
+                      decoration: const InputDecoration(
+                        labelText: '下载器类型',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: DownloaderType.values.map((type) {
+                        return DropdownMenuItem<DownloaderType>(
+                          value: type,
+                          child: Text(type.displayName),
+                        );
+                      }).toList(),
+                      onChanged: (DownloaderType? newType) {
+                        if (newType != null) {
+                          setState(() {
+                            _selectedType = newType;
+                          });
+                        }
+                      },
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -821,7 +904,7 @@ class _QbClientEditorDialogState extends State<_QbClientEditorDialog> {
 }
 
 class _QbCategoriesTagsDialog extends StatefulWidget {
-  final QbClientConfig config;
+  final DownloaderConfig config;
   final String password;
   const _QbCategoriesTagsDialog({required this.config, required this.password});
 
@@ -844,10 +927,10 @@ class _QbCategoriesTagsDialogState extends State<_QbCategoriesTagsDialog> {
 
   Future<void> _loadCacheThenRefresh() async {
     // 先读取本地缓存，提升首屏体验
-    final cachedCats = await StorageService.instance.loadQbCategories(
+    final cachedCats = await StorageService.instance.loadDownloaderCategories(
       widget.config.id,
     );
-    final cachedTags = await StorageService.instance.loadQbTags(
+    final cachedTags = await StorageService.instance.loadDownloaderTags(
       widget.config.id,
     );
     if (mounted) {
@@ -866,11 +949,11 @@ class _QbCategoriesTagsDialogState extends State<_QbCategoriesTagsDialog> {
       _error = null;
     });
     try {
-      final cats = await QbService.instance.fetchCategories(
+      final cats = await DownloaderService.instance.getCategories(
         config: widget.config,
         password: widget.password,
       );
-      final tags = await QbService.instance.fetchTags(
+      final tags = await DownloaderService.instance.getTags(
         config: widget.config,
         password: widget.password,
       );
@@ -881,8 +964,8 @@ class _QbCategoriesTagsDialogState extends State<_QbCategoriesTagsDialog> {
         _error = null;
       });
       // 成功后写入本地缓存
-      await StorageService.instance.saveQbCategories(widget.config.id, cats);
-      await StorageService.instance.saveQbTags(widget.config.id, tags);
+      await StorageService.instance.saveDownloaderCategories(widget.config.id, cats);
+      await StorageService.instance.saveDownloaderTags(widget.config.id, tags);
     } catch (e) {
       if (!mounted) return;
       setState(() {

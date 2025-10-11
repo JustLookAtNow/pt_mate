@@ -825,6 +825,8 @@ class SearchCategoryConfig {
   ];
 }
 
+/// @deprecated 此类仅用于数据迁移，不应在新代码中使用
+/// 请使用 DownloaderConfig 和 QbittorrentConfig 替代
 class QbClientConfig {
   final String id; // uuid or custom id
   final String name;
