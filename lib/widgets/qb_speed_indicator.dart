@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../services/storage/storage_service.dart';
 import '../services/downloader/downloader_config.dart';
-import '../services/downloader/downloader_factory.dart';
+import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
 import '../utils/format.dart';
 import '../pages/downloader_settings_page.dart';
@@ -85,16 +85,17 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
         return;
       }
       
-      // 使用新的下载器客户端API
-      final client = DownloaderFactory.getClient(
-        config: defaultClient,
-        password: pwd!,
-      );
-      
+      // 使用统一的下载器服务API
       // 同时获取传输信息和服务器状态
       final futures = await Future.wait([
-        client.getTransferInfo(),
-        client.getServerState(),
+        DownloaderService.instance.getTransferInfo(
+          config: defaultClient,
+          password: pwd ?? '',
+        ),
+        DownloaderService.instance.getServerState(
+          config: defaultClient,
+          password: pwd ?? '',
+        ),
       ]);
       
       if (!mounted) return;

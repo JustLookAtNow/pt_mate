@@ -77,7 +77,7 @@ class TorrentListItem extends StatelessWidget {
               )
             : null,
       ),
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Padding(
         padding: const EdgeInsets.all(4),
         child: Row(
@@ -798,7 +798,7 @@ class _SwipeableItemState extends State<_SwipeableItem>
       onHorizontalDragUpdate: _handleDragUpdate,
       onHorizontalDragEnd: _handleDragEnd,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
         child: ClipRect(
           child: Stack(
             children: [

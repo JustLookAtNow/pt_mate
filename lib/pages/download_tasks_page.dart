@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../services/storage/storage_service.dart';
 import '../services/downloader/downloader_config.dart';
-import '../services/downloader/downloader_factory.dart';
 import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
 import '../utils/format.dart';
@@ -36,14 +35,14 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
   @override
   void initState() {
     super.initState();
-    _loadQbConfig();
+    _loadDownloaderConfig();
     _startAutoRefresh();
     
     // 监听配置变更
     _configChangeSubscription = DownloaderService.instance.configChangeStream.listen((configId) {
       // 当配置发生变更时，重置 client 并重新加载配置
       _resetClient();
-      _loadQbConfig();
+      _loadDownloaderConfig();
     });
   }
 
@@ -65,7 +64,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
   }
 
   // 加载下载器配置
-  Future<void> _loadQbConfig() async {
+  Future<void> _loadDownloaderConfig() async {
     try {
       final defId = await StorageService.instance.loadDefaultDownloaderId();
       if (defId == null) {
@@ -121,18 +120,18 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
       return null;
     }
     
-    // 使用 DownloaderFactory 的缓存机制
-    return DownloaderFactory.getClient(
+    // 使用 DownloaderService 的缓存机制（包含配置更新回调）
+    return DownloaderService.instance.getClient(
       config: _downloaderConfig!,
       password: _password!,
     );
   }
 
-  // 重置 client（当配置更改时）/// 重置客户端
+  /// 重置客户端
   void _resetClient() {
-    // 清除 DownloaderFactory 中的缓存
+    // 清除 DownloaderService 中的缓存
     if (_downloaderConfig != null) {
-      DownloaderFactory.clearConfigCache(_downloaderConfig!.id);
+      DownloaderService.instance.clearConfigCache(_downloaderConfig!.id);
     }
   }
 
@@ -208,7 +207,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                '未配置qBittorrent',
+                                '未配置下载器',
                                 style: TextStyle(
                                   color: Theme.of(context).colorScheme.onPrimaryContainer,
                                   fontSize: 14,

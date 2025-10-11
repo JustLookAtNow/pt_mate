@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/storage/storage_service.dart';
 import '../services/downloader/downloader_config.dart';
-import '../services/downloader/downloader_factory.dart';
+import '../services/downloader/downloader_service.dart';
 import '../pages/downloader_settings_page.dart';
 
 class TorrentDownloadDialog extends StatefulWidget {
@@ -115,13 +115,15 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
         if (password == null) return;
       }
 
-      final client = DownloaderFactory.getClient(
+      // 使用统一的下载器服务
+      final categories = await DownloaderService.instance.getCategories(
         config: _selectedClient!,
         password: password,
       );
-      
-      final categories = await client.getCategories();
-      final tags = await client.getTags();
+      final tags = await DownloaderService.instance.getTags(
+        config: _selectedClient!,
+        password: password,
+      );
 
       // 保存到缓存
       await StorageService.instance.saveDownloaderCategories(

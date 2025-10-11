@@ -6,7 +6,7 @@ import '../services/storage/storage_service.dart';
 import '../services/api/api_service.dart';
 import '../services/aggregate_search_service.dart';
 import '../services/downloader/downloader_config.dart';
-import '../services/downloader/downloader_factory.dart';
+import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
 import '../providers/aggregate_search_provider.dart';
 import '../widgets/responsive_layout.dart';
@@ -723,20 +723,18 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     bool? autoTMM,
   ) async {
     try {
-      // 直接使用下载器配置
-      final client = DownloaderFactory.getClient(
+      // 使用统一的下载器服务
+      await DownloaderService.instance.addTask(
         config: clientConfig,
         password: password,
+        params: AddTaskParams(
+          url: url,
+          category: category,
+          tags: tags,
+          savePath: savePath,
+          autoTMM: autoTMM,
+        ),
       );
-      
-      // 发送到下载器
-       await client.addTask(AddTaskParams(
-         url: url,
-         category: category,
-         tags: tags,
-         savePath: savePath,
-         autoTMM: autoTMM,
-       ));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -877,17 +875,17 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         );
 
         // 3. 发送到下载器
-        final client = DownloaderFactory.getClient(
+        await DownloaderService.instance.addTask(
           config: clientConfig,
           password: password,
+          params: AddTaskParams(
+            url: url,
+            category: category,
+            tags: tags.isEmpty ? null : tags,
+            savePath: savePath,
+            autoTMM: autoTMM,
+          ),
         );
-        await client.addTask(AddTaskParams(
-          url: url,
-          category: category,
-          tags: tags.isEmpty ? null : tags,
-          savePath: savePath,
-          autoTMM: autoTMM,
-        ));
 
         successCount++;
 

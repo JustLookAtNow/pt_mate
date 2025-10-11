@@ -45,7 +45,36 @@ class DownloaderService {
     required DownloaderConfig config,
     required String password,
   }) {
-    return DownloaderFactory.getClient(config: config, password: password);
+    return DownloaderFactory.getClient(
+      config: config, 
+      password: password,
+      onConfigUpdated: (updatedConfig) async {
+        // 当配置更新时（比如获取到版本信息），持久化到存储中
+        try {
+          final storageService = StorageService.instance;
+          final configs = await storageService.loadDownloaderConfigs();
+          final currentDefaultId = await storageService.loadDefaultDownloaderId();
+          
+          // 找到对应的配置并更新
+          final configIndex = configs.indexWhere((c) => c['id'] == updatedConfig.id);
+          if (configIndex != -1) {
+            configs[configIndex] = updatedConfig.toJson();
+            await storageService.saveDownloaderConfigs(
+              configs.map((c) => DownloaderConfig.fromJson(c)).toList(),
+              defaultId: currentDefaultId, // 保留当前的默认下载器ID
+            );
+            
+            if (kDebugMode) {
+              print('配置已更新并持久化: ${updatedConfig.id}, 版本: ${updatedConfig is QbittorrentConfig ? updatedConfig.version : 'N/A'}');
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('保存配置更新失败: $e');
+          }
+        }
+      },
+    );
   }
   
   /// 测试连接
