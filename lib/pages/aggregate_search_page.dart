@@ -24,11 +24,11 @@ class AggregateSearchPage extends StatefulWidget {
 
 class _AggregateSearchPageState extends State<AggregateSearchPage> {
   final TextEditingController _searchController = TextEditingController();
-  
+
   // 选择模式相关状态
   bool _isSelectionMode = false;
   final Set<String> _selectedItems = <String>{};
-  
+
   @override
   void initState() {
     super.initState();
@@ -42,25 +42,26 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   }
 
   Future<void> _loadSearchConfigs() async {
-    final provider = Provider.of<AggregateSearchProvider>(context, listen: false);
-    
+    final provider = Provider.of<AggregateSearchProvider>(
+      context,
+      listen: false,
+    );
+
     try {
       final storage = Provider.of<StorageService>(context, listen: false);
       final settings = await storage.loadAggregateSearchSettings();
 
       if (mounted) {
-        provider.setSearchConfigs(settings.searchConfigs
-            .where((config) => config.isActive)
-            .toList());
+        provider.setSearchConfigs(
+          settings.searchConfigs.where((config) => config.isActive).toList(),
+        );
         provider.setLoading(false);
         provider.initializeDefaultStrategy();
       }
     } catch (e) {
       if (mounted) {
         provider.setLoading(false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               '加载搜索配置失败: $e',
@@ -83,7 +84,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         if (_searchController.text != provider.searchKeyword) {
           _searchController.text = provider.searchKeyword;
         }
-        
+
         return ResponsiveLayout(
           currentRoute: '/aggregate_search',
           appBar: AppBar(
@@ -103,9 +104,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
               fontSize: 20,
               fontWeight: FontWeight.w500,
             ),
-            actions: [
-              const QbSpeedIndicator(),
-            ],
+            actions: [const QbSpeedIndicator()],
           ),
           body: provider.loading
               ? const Center(child: CircularProgressIndicator())
@@ -142,11 +141,15 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: DropdownButton<String>(
-                                        value: provider.selectedStrategy.isEmpty ? null : provider.selectedStrategy,
+                                        value: provider.selectedStrategy.isEmpty
+                                            ? null
+                                            : provider.selectedStrategy,
                                         hint: const Text('选择搜索策略'),
                                         isExpanded: true,
                                         underline: const SizedBox(),
-                                        items: provider.searchConfigs.map((config) {
+                                        items: provider.searchConfigs.map((
+                                          config,
+                                        ) {
                                           return DropdownMenuItem<String>(
                                             value: config.id,
                                             child: Row(
@@ -156,15 +159,16 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                                       ? Icons.public
                                                       : Icons.group,
                                                   size: 16,
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .primary,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
                                                 ),
                                                 const SizedBox(width: 8),
                                                 Expanded(
                                                   child: Text(
                                                     config.name,
-                                                    overflow: TextOverflow.ellipsis,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
                                                 ),
                                               ],
@@ -188,15 +192,20 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       decoration: InputDecoration(
                                         hintText: '输入搜索关键词',
                                         border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(4),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                         ),
-                                        contentPadding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 8,
-                                        ),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 8,
+                                            ),
                                         suffixIcon: IconButton(
                                           icon: const Icon(Icons.search),
-                                          onPressed: () => _performSearch(_searchController.text),
+                                          onPressed: () => _performSearch(
+                                            _searchController.text,
+                                          ),
                                         ),
                                       ),
                                       onSubmitted: _performSearch,
@@ -211,7 +220,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                     icon: Icon(
                                       Icons.sort,
                                       color: provider.sortBy != 'none'
-                                          ? Theme.of(context).colorScheme.primary
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.primary
                                           : null,
                                     ),
                                     tooltip: '排序方式',
@@ -226,11 +237,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           decoration: BoxDecoration(
                                             color: provider.sortBy == 'none'
                                                 ? Theme.of(context)
-                                                    .colorScheme
-                                                    .primaryContainer
-                                                    .withValues(alpha: 0.3)
+                                                      .colorScheme
+                                                      .primaryContainer
+                                                      .withValues(alpha: 0.3)
                                                 : null,
-                                            borderRadius: BorderRadius.circular(4),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
                                           ),
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 8,
@@ -259,11 +272,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           decoration: BoxDecoration(
                                             color: provider.sortBy == 'size'
                                                 ? Theme.of(context)
-                                                    .colorScheme
-                                                    .primaryContainer
-                                                    .withValues(alpha: 0.3)
+                                                      .colorScheme
+                                                      .primaryContainer
+                                                      .withValues(alpha: 0.3)
                                                 : null,
-                                            borderRadius: BorderRadius.circular(4),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
                                           ),
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 8,
@@ -294,11 +309,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           decoration: BoxDecoration(
                                             color: provider.sortBy == 'seeders'
                                                 ? Theme.of(context)
-                                                    .colorScheme
-                                                    .primaryContainer
-                                                    .withValues(alpha: 0.3)
+                                                      .colorScheme
+                                                      .primaryContainer
+                                                      .withValues(alpha: 0.3)
                                                 : null,
-                                            borderRadius: BorderRadius.circular(4),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
                                           ),
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 8,
@@ -310,7 +327,8 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                                 provider.sortAscending
                                                     ? Icons.arrow_upward
                                                     : Icons.arrow_downward,
-                                                color: provider.sortBy == 'seeders'
+                                                color:
+                                                    provider.sortBy == 'seeders'
                                                     ? Theme.of(
                                                         context,
                                                       ).colorScheme.secondary
@@ -331,11 +349,17 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                         provider.sortAscending
                                             ? Icons.keyboard_arrow_up
                                             : Icons.keyboard_arrow_down,
-                                        color: Theme.of(context).colorScheme.primary,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
                                       ),
-                                      tooltip: provider.sortAscending ? '升序' : '降序',
+                                      tooltip: provider.sortAscending
+                                          ? '升序'
+                                          : '降序',
                                       onPressed: () {
-                                        provider.setSortAscending(!provider.sortAscending);
+                                        provider.setSortAscending(
+                                          !provider.sortAscending,
+                                        );
                                         _resortCurrentResults();
                                       },
                                     ),
@@ -361,25 +385,34 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                     const SizedBox(
                                       width: 16,
                                       height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     ),
                                     const SizedBox(width: 12),
                                     Text(
                                       '正在搜索...',
-                                      style: Theme.of(context).textTheme.titleSmall,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleSmall,
                                     ),
                                   ],
                                 ),
                                 if (provider.searchProgress != null) ...[
                                   const SizedBox(height: 8),
                                   LinearProgressIndicator(
-                                    value: provider.searchProgress!.completedSites /
+                                    value:
+                                        provider
+                                            .searchProgress!
+                                            .completedSites /
                                         provider.searchProgress!.totalSites,
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     '${provider.searchProgress!.completedSites}/${provider.searchProgress!.totalSites} 个站点',
-                                    style: Theme.of(context).textTheme.bodySmall,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
                                   ),
                                 ],
                               ],
@@ -391,7 +424,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
                       // 搜索结果
                       Expanded(
-                        child: provider.searchResults.isEmpty && !provider.searching
+                        child:
+                            provider.searchResults.isEmpty &&
+                                !provider.searching
                             ? Center(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -399,13 +434,20 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                     Icon(
                                       Icons.search,
                                       size: 64,
-                                      color: Theme.of(context).colorScheme.outline,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.outline,
                                     ),
                                     const SizedBox(height: 16),
                                     Text(
                                       '输入关键词开始搜索',
-                                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                            color: Theme.of(context).colorScheme.outline,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.outline,
                                           ),
                                     ),
                                   ],
@@ -419,7 +461,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                     margin: const EdgeInsets.only(bottom: 8),
                                     child: TorrentListItem(
                                       torrent: item.torrent,
-                                      isSelected: _selectedItems.contains(item.torrent.id),
+                                      isSelected: _selectedItems.contains(
+                                        item.torrent.id,
+                                      ),
                                       isSelectionMode: _isSelectionMode,
                                       isAggregateMode: true,
                                       siteName: item.siteName,
@@ -427,8 +471,10 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           ? () => _onToggleSelection(item)
                                           : () => _onTorrentTap(item),
                                       onLongPress: () => _onLongPress(item),
-                                      onDownload: () => _showDownloadDialog(item),
-                                      onToggleCollection: () => _onToggleCollection(item),
+                                      onDownload: () =>
+                                          _showDownloadDialog(item),
+                                      onToggleCollection: () =>
+                                          _onToggleCollection(item),
                                     ),
                                   );
                                 },
@@ -452,7 +498,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                   onPressed: _onCancelSelection,
                                   style: TextButton.styleFrom(
                                     side: BorderSide(
-                                      color: Theme.of(context).colorScheme.outline,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.outline,
                                       width: 1.0,
                                     ),
                                   ),
@@ -460,7 +508,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                 ),
                                 const SizedBox(width: 8),
                                 ElevatedButton.icon(
-                                  onPressed: _selectedItems.isEmpty ? null : _onBatchDownload,
+                                  onPressed: _selectedItems.isEmpty
+                                      ? null
+                                      : _onBatchDownload,
                                   icon: const Icon(Icons.download),
                                   label: const Text('批量下载'),
                                 ),
@@ -478,13 +528,17 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   }
 
   /// 应用排序到搜索结果
-  List<AggregateSearchResultItem> _applySorting(List<AggregateSearchResultItem> items, String sortBy, bool sortAscending) {
+  List<AggregateSearchResultItem> _applySorting(
+    List<AggregateSearchResultItem> items,
+    String sortBy,
+    bool sortAscending,
+  ) {
     if (sortBy == 'none' || items.isEmpty) {
       return List.from(items);
     }
 
     final sortedItems = List<AggregateSearchResultItem>.from(items);
-    
+
     switch (sortBy) {
       case 'size':
         // 按文件大小排序
@@ -501,24 +555,29 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         });
         break;
     }
-    
+
     return sortedItems;
   }
 
   /// 重新排序当前搜索结果
   void _resortCurrentResults() {
-    final provider = Provider.of<AggregateSearchProvider>(context, listen: false);
+    final provider = Provider.of<AggregateSearchProvider>(
+      context,
+      listen: false,
+    );
     if (provider.searchResults.isNotEmpty) {
-      final sortedResults = _applySorting(provider.searchResults, provider.sortBy, provider.sortAscending);
+      final sortedResults = _applySorting(
+        provider.searchResults,
+        provider.sortBy,
+        provider.sortAscending,
+      );
       provider.setSearchResults(sortedResults);
     }
   }
 
   void _performSearch(String query) async {
     if (query.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             '请输入搜索关键词',
@@ -532,12 +591,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       return;
     }
 
-    final provider = Provider.of<AggregateSearchProvider>(context, listen: false);
-    
+    final provider = Provider.of<AggregateSearchProvider>(
+      context,
+      listen: false,
+    );
+
     if (provider.selectedStrategy.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             '请选择搜索策略',
@@ -557,26 +617,32 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     provider.setSearchProgress(null);
 
     try {
-      final result = await AggregateSearchService.instance.performAggregateSearch(
-        keyword: query.trim(),
-        configId: provider.selectedStrategy,
-        maxResultsPerSite: 10,
-        onProgress: (progress) {
-          if (mounted) {
-            provider.setSearchProgress(progress);
-          }
-        },
-      );
+      final result = await AggregateSearchService.instance
+          .performAggregateSearch(
+            keyword: query.trim(),
+            configId: provider.selectedStrategy,
+            maxResultsPerSite: 10,
+            onProgress: (progress) {
+              if (mounted) {
+                provider.setSearchProgress(progress);
+              }
+            },
+          );
 
       if (mounted) {
-        final sortedResults = _applySorting(result.items, provider.sortBy, provider.sortAscending);
+        final sortedResults = _applySorting(
+          result.items,
+          provider.sortBy,
+          provider.sortAscending,
+        );
         provider.setSearchResults(sortedResults);
         provider.setSearchErrors(result.errors);
         provider.setSearching(false);
         provider.setSearchProgress(null);
 
         // 显示搜索结果摘要
-        final message = '搜索完成：共找到 ${result.items.length} 条结果，'
+        final message =
+            '搜索完成：共找到 ${result.items.length} 条结果，'
             '成功搜索 ${result.successSites}/${result.totalSites} 个站点';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -618,25 +684,25 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         (site) => site.id == item.siteId,
         orElse: () => throw Exception('找不到站点配置: ${item.siteId}'),
       );
-      
+
       // 2. 获取下载器客户端配置
-        final downloaderConfigs = await storage.loadDownloaderConfigs();
-        final qbClients = downloaderConfigs.map((configMap) {
-          return DownloaderConfig.fromJson(configMap);
-        }).toList();
-       
-       // 4. 跳转到详情页面
-       if (!mounted) return;
-       Navigator.of(context).push(
-         MaterialPageRoute(
-           builder: (context) => TorrentDetailPage(
-                            torrentItem: item.torrent,
-                            siteFeatures: siteConfig.features,
-                            qbClients: qbClients,
-                            siteConfig: siteConfig, // 传入站点配置
-                          ),
-         ),
-       );
+      final downloaderConfigsData = await storage.loadDownloaderConfigs();
+      final downloaderConfigs = downloaderConfigsData.map((configMap) {
+        return DownloaderConfig.fromJson(configMap);
+      }).toList();
+
+      // 4. 跳转到详情页面
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => TorrentDetailPage(
+            torrentItem: item.torrent,
+            siteFeatures: siteConfig.features,
+            downloaderConfigs: downloaderConfigs,
+            siteConfig: siteConfig, // 传入站点配置
+          ),
+        ),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -664,7 +730,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         (site) => site.id == item.siteId,
         orElse: () => throw Exception('找不到站点配置: ${item.siteId}'),
       );
-      
+
       // 2. 获取下载 URL
       final url = await ApiService.instance.genDlToken(
         id: item.torrent.id,
@@ -693,7 +759,16 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       final autoTMM = result['autoTMM'] as bool?;
 
       // 5. 发送到 qBittorrent
-      await _onTorrentDownload(item, clientConfig, password, url, category, tags, savePath, autoTMM);
+      await _onTorrentDownload(
+        item,
+        clientConfig,
+        password,
+        url,
+        category,
+        tags,
+        savePath,
+        autoTMM,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -800,7 +875,10 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   Future<void> _onBatchDownload() async {
     if (_selectedItems.isEmpty) return;
 
-    final provider = Provider.of<AggregateSearchProvider>(context, listen: false);
+    final provider = Provider.of<AggregateSearchProvider>(
+      context,
+      listen: false,
+    );
     final selectedItems = provider.searchResults
         .where((item) => _selectedItems.contains(item.torrent.id))
         .toList();

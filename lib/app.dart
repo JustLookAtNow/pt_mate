@@ -754,7 +754,7 @@ class _HomePageState extends State<HomePage> {
         builder: (context) => TorrentDetailPage(
           torrentItem: item,
           siteFeatures: _currentSite?.features ?? SiteFeatures.mteamDefault,
-          qbClients: _downloaderConfigs,
+          downloaderConfigs: _downloaderConfigs,
         ),
       ),
     );
