@@ -34,7 +34,32 @@ class QbittorrentClient implements DownloaderClient {
   }
   
   /// 获取基础URL
-  String get _baseUrl => 'http://${config.host}:${config.port}';
+  String get _baseUrl => _buildBase(config);
+  
+  /// 构建基础URL，处理各种格式的主机地址
+  String _buildBase(QbittorrentConfig c) { 
+    var h = c.host.trim(); 
+    if (h.endsWith('/')) h = h.substring(0, h.length - 1); 
+    
+    // 判断端口是否有效，如果没填或者为0，使用协议默认端口
+    final port = (c.port <= 0) ? null : c.port;
+    
+    final hasScheme = h.startsWith('http://') || h.startsWith('https://'); 
+    if (!hasScheme) { 
+      // 使用http协议，如果没有指定端口则使用默认的80
+      return port == null ? 'http://$h' : 'http://$h:$port'; 
+    } 
+    
+    try { 
+      final u = Uri.parse(h); 
+      // 如果URL已经包含端口或者没有指定端口（使用默认端口），直接返回
+      if (u.hasPort || port == null) return h; 
+      // 否则添加指定的端口
+      return '$h:$port'; 
+    } catch (_) { 
+      return h; 
+    } 
+  }
   
   /// 获取API路径前缀（根据版本决定）
   String get _apiPrefix {
