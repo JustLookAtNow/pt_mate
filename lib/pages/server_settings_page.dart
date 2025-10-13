@@ -536,8 +536,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
   final _apiKeyController = TextEditingController();
   final _passKeyController = TextEditingController();
   final _cookieController = TextEditingController(); // 手工输入cookie的控制器
+  final _presetSearchController = TextEditingController(); // 预设站点搜索控制器
 
-  SiteType _selectedSiteType = SiteType.mteam;
+  SiteType? _selectedSiteType;
   int _presetIndex = -1; // -1 表示自定义
   bool _loading = false;
   String? _error;
@@ -545,16 +546,22 @@ class _SiteEditPageState extends State<SiteEditPage> {
   List<SearchCategoryConfig> _searchCategories = [];
   SiteFeatures _siteFeatures = SiteFeatures.mteamDefault;
   List<SiteConfig> _presetSites = [];
+  List<SiteConfig> _filteredPresetSites = []; // 过滤后的预设站点列表
   String? _cookieStatus; // 登录状态信息
   String? _savedCookie; // 保存的cookie
+  bool _isCustomSite = true; // 是否选择自定义站点
+  bool _hasUserMadeSelection = false; // 用户是否已经做出选择（预设或自定义）
 
   @override
   void initState() {
     super.initState();
     _loadPresetSites();
+    
+    // 添加预设站点搜索监听器
+    _presetSearchController.addListener(_filterPresetSites);
+    
     if (widget.site != null) {
-      _nameController.text = widget.site!.name;
-      _baseUrlController.text = widget.site!.baseUrl;
+      // 编辑现有站点时，先保存原始数据，但不立即填充到UI字段
       _apiKeyController.text = widget.site!.apiKey ?? '';
       _passKeyController.text = widget.site!.passKey ?? '';
       _cookieController.text = widget.site!.cookie ?? '';
@@ -562,9 +569,14 @@ class _SiteEditPageState extends State<SiteEditPage> {
       _searchCategories = List.from(widget.site!.searchCategories);
       _siteFeatures = widget.site!.features;
       _savedCookie = widget.site!.cookie;
+      
+      // 检查是否是预设站点，这会根据检测结果填充相应字段
+      _checkIfPresetSite();
     } else {
-      // 新建站点时，查询分类配置初始为空
+      // 新建站点时，查询分类配置初始为空，字段保持空白
       _searchCategories = [];
+      _hasUserMadeSelection = false; // 新建站点时用户还未做出选择
+      // 不设置默认的 _selectedSiteType，让用户选择后再设置
     }
   }
 
@@ -573,25 +585,108 @@ class _SiteEditPageState extends State<SiteEditPage> {
       final presets = await SiteConfigService.loadPresetSites();
       setState(() {
         _presetSites = presets;
+        _filteredPresetSites = presets; // 初始化过滤列表
       });
-
-      // 如果是编辑现有站点，检查是否是预设站点
-      if (widget.site != null) {
-        for (int i = 0; i < presets.length; i++) {
-          if (presets[i].baseUrl == widget.site!.baseUrl) {
-            setState(() {
-              _presetIndex = i;
-            });
-            break;
-          }
-        }
-      }
     } catch (e) {
       // 加载失败时使用空列表
       setState(() {
         _presetSites = [];
+        _filteredPresetSites = [];
       });
     }
+  }
+
+  void _filterPresetSites() {
+    final query = _presetSearchController.text.toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredPresetSites = _presetSites;
+      } else {
+        _filteredPresetSites = _presetSites.where((site) {
+          return site.name.toLowerCase().contains(query) ||
+                 site.baseUrl.toLowerCase().contains(query) ||
+                 site.siteType.displayName.toLowerCase().contains(query);
+        }).toList();
+      }
+    });
+  }
+
+  void _checkIfPresetSite() {
+    if (widget.site != null) {
+      bool foundPreset = false;
+      for (int i = 0; i < _presetSites.length; i++) {
+        if (_presetSites[i].baseUrl == widget.site!.baseUrl) {
+          setState(() {
+            _presetIndex = i;
+            _isCustomSite = false;
+            _selectedSiteType = _presetSites[i].siteType;
+            _hasUserMadeSelection = true; // 编辑现有站点时用户已经有选择
+            // 填充预设站点信息
+            _nameController.text = _presetSites[i].name;
+            _baseUrlController.text = _presetSites[i].baseUrl;
+          });
+          foundPreset = true;
+          break;
+        }
+      }
+      
+      // 如果没有找到匹配的预设站点，则设为自定义，填充原始站点信息
+      if (!foundPreset) {
+        setState(() {
+          _isCustomSite = true;
+          _presetIndex = -1;
+          _hasUserMadeSelection = true; // 编辑现有站点时用户已经有选择
+          // 填充原始站点的自定义配置信息
+          _nameController.text = widget.site!.name;
+          _baseUrlController.text = widget.site!.baseUrl;
+        });
+      }
+    } else {
+      // 新建站点时默认为自定义，清空字段
+      setState(() {
+        _isCustomSite = true;
+        _presetIndex = -1;
+        _nameController.clear();
+        _baseUrlController.clear();
+      });
+    }
+  }
+
+  void _selectPresetSite(SiteConfig? preset) {
+    setState(() {
+      if (preset == null) {
+        // 选择自定义 - 清空所有字段
+        _isCustomSite = true;
+        _presetIndex = -1;
+        _selectedSiteType = SiteType.mteam; // 默认类型
+        _searchCategories = [];
+        _hasUserMadeSelection = true; // 用户已做出选择
+        _loadDefaultFeatures(_selectedSiteType!);
+        
+        // 清空自定义字段
+        _nameController.clear();
+        _baseUrlController.clear();
+      } else {
+        // 选择预设站点 - 填充预设信息
+        _isCustomSite = false;
+        _presetIndex = _presetSites.indexOf(preset);
+        _selectedSiteType = preset.siteType;
+        _searchCategories = [];
+        _siteFeatures = preset.features;
+        _hasUserMadeSelection = true; // 用户已做出选择
+        
+        // 填充预设站点信息到字段中（用于显示，但不会在自定义模式下显示）
+        _nameController.text = preset.name;
+        _baseUrlController.text = preset.baseUrl;
+        
+        // 清空搜索框
+        _presetSearchController.clear();
+      }
+      
+      // 清空之前的错误和用户信息
+      _error = null;
+      _profile = null;
+    });
   }
 
   Future<void> _loadDefaultFeatures(SiteType siteType) async {
@@ -648,6 +743,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
     _apiKeyController.dispose();
     _passKeyController.dispose();
     _cookieController.dispose();
+    _presetSearchController.dispose();
     super.dispose();
   }
 
@@ -660,7 +756,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
           'site-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1000)}';
     }
 
-    if (_presetIndex >= 0 && _presetIndex < _presetSites.length) {
+    // 如果选择了预设站点（非自定义）
+    if (!_isCustomSite && _presetIndex >= 0 && _presetIndex < _presetSites.length) {
       final preset = _presetSites[_presetIndex];
       return SiteConfig(
         id: id,
@@ -670,13 +767,14 @@ class _SiteEditPageState extends State<SiteEditPage> {
         passKey: _passKeyController.text.trim().isEmpty
             ? null
             : _passKeyController.text.trim(),
-        siteType: _selectedSiteType,
+        siteType: preset.siteType, // 使用预设站点的类型
         searchCategories: _searchCategories,
         features: _siteFeatures,
-        cookie: _selectedSiteType == SiteType.nexusphpweb ? _savedCookie : null,
+        cookie: preset.siteType == SiteType.nexusphpweb ? _savedCookie : null,
       );
     }
 
+    // 自定义站点配置
     var baseUrl = _baseUrlController.text.trim();
     if (baseUrl.isNotEmpty && !baseUrl.endsWith('/')) {
       baseUrl = '$baseUrl/';
@@ -692,7 +790,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       passKey: _passKeyController.text.trim().isEmpty
           ? null
           : _passKeyController.text.trim(),
-      siteType: _selectedSiteType,
+      siteType: _selectedSiteType!,
       searchCategories: _searchCategories,
       features: _siteFeatures,
       cookie: _selectedSiteType == SiteType.nexusphpweb ? _savedCookie : null,
@@ -994,8 +1092,6 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
   @override
   Widget build(BuildContext context) {
-    final presets = _presetSites;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.site != null ? '编辑服务器' : '添加服务器'),
@@ -1023,91 +1119,143 @@ class _SiteEditPageState extends State<SiteEditPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 网站类型选择
-              DropdownButtonFormField<SiteType>(
-                initialValue: _selectedSiteType,
-                decoration: const InputDecoration(
-                  labelText: '网站类型',
-                  border: OutlineInputBorder(),
-                ),
-                items: SiteType.values
-                    .map(
-                      (type) => DropdownMenuItem(
-                        value: type,
-                        child: Text(type.displayName),
+              // 预设站点选择（第一位）
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.language,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '选择站点',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _selectedSiteType = value;
-                      _presetIndex = -1; // 重置预设选择为自定义
-                      _searchCategories = []; // 分类配置保持为空
-                      _loadDefaultFeatures(value);
-                    });
-                  }
-                },
+                      const SizedBox(height: 16),
+                      
+                      // 搜索框
+                      TextField(
+                        controller: _presetSearchController,
+                        decoration: const InputDecoration(
+                          labelText: '搜索预设站点',
+                          hintText: '输入站点名称、地址或类型进行搜索',
+                          prefixIcon: Icon(Icons.search),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // 预设站点列表
+                      Container(
+                        constraints: const BoxConstraints(maxHeight: 200),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              // 自定义选项（始终显示在第一位）
+                              ListTile(
+                                leading: const Icon(Icons.add_circle_outline),
+                                title: const Text('自定义'),
+                                subtitle: const Text('手动配置站点信息'),
+                                selected: _isCustomSite,
+                                onTap: () => _selectPresetSite(null),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              
+                              // 分隔线
+                              if (_filteredPresetSites.isNotEmpty) ...[
+                                const Divider(),
+                                
+                                // 过滤后的预设站点列表
+                                ..._filteredPresetSites.map((site) => ListTile(
+                                  leading: Icon(
+                                    Icons.public,
+                                    color: Theme.of(context).colorScheme.secondary,
+                                  ),
+                                  title: Text(site.name),
+                                  subtitle: Text('${site.baseUrl} (${site.siteType.displayName})'),
+                                  selected: !_isCustomSite && _presetIndex == _presetSites.indexOf(site),
+                                  onTap: () => _selectPresetSite(site),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                )),
+                              ],
+                              
+                              // 无搜索结果提示
+                              if (_filteredPresetSites.isEmpty && _presetSearchController.text.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Text(
+                                    '未找到匹配的预设站点',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
 
-              // 预设站点选择
-              if (presets
-                  .where((site) => site.siteType == _selectedSiteType)
-                  .isNotEmpty) ...[
-                DropdownButtonFormField<int>(
-                  initialValue: _presetIndex,
+              // 自定义配置（当用户做出选择后显示，无论是预设还是自定义）
+              if (_hasUserMadeSelection) ...[
+                // 网站类型选择
+                DropdownButtonFormField<SiteType>(
+                  initialValue: _selectedSiteType,
                   decoration: const InputDecoration(
-                    labelText: '选择预设站点',
+                    labelText: '网站类型',
                     border: OutlineInputBorder(),
                   ),
-                  isExpanded: true, // 添加这个属性来防止溢出
-                  items: [
-                    for (int i = 0; i < presets.length; i++)
-                      if (presets[i].siteType == _selectedSiteType)
-                        DropdownMenuItem(
-                          value: i,
-                          child: Text(
-                            '${presets[i].name} (${presets[i].baseUrl})',
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
+                  items: SiteType.values
+                      .map(
+                        (type) => DropdownMenuItem(
+                          value: type,
+                          child: Text(type.displayName),
                         ),
-                    const DropdownMenuItem(
-                      value: -1, 
-                      child: Text('自定义…'),
-                    ),
-                  ],
-                  onChanged: (value) {
+                      )
+                      .toList(),
+                  validator: (value) {
+                    if (value == null) {
+                      return '请选择网站类型';
+                    }
+                    return null;
+                  },
+                  onChanged: !_isCustomSite ? null : (value) {
                     if (value != null) {
                       setState(() {
-                        _presetIndex = value;
-                        _profile = null;
-                        _error = null;
-
-                        // 当选择预设站点时，分类配置保持为空
-                        if (value >= 0 && value < _presetSites.length) {
-                          _searchCategories = [];
-                          _siteFeatures = _presetSites[value].features;
-                        } else {
-                          // 选择自定义时，分类配置也保持为空
-                          _searchCategories = [];
-                          _loadDefaultFeatures(_selectedSiteType);
-                        }
+                        _selectedSiteType = value;
+                        _searchCategories = []; // 分类配置保持为空
+                        _loadDefaultFeatures(value);
                       });
                     }
                   },
                 ),
                 const SizedBox(height: 16),
-              ],
-
-              // 自定义配置（当选择自定义时显示）
-              if (_presetIndex < 0) ...[
                 TextFormField(
                   controller: _nameController,
-                  decoration: const InputDecoration(
+                  readOnly: !_isCustomSite,
+                  decoration: InputDecoration(
                     labelText: '站点名称',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
+                    filled: !_isCustomSite,
+                    fillColor: !_isCustomSite ? Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : null,
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -1119,10 +1267,13 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _baseUrlController,
-                  decoration: const InputDecoration(
+                  readOnly: !_isCustomSite,
+                  decoration: InputDecoration(
                     labelText: 'Base URL',
                     hintText: '例如: https://api.m-team.cc/',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
+                    filled: !_isCustomSite,
+                    fillColor: !_isCustomSite ? Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : null,
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -1137,13 +1288,13 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 const SizedBox(height: 16),
               ],
 
-              // API Key输入或登录按钮
-              if (_selectedSiteType != SiteType.nexusphpweb) ...[
+              // API Key输入或登录按钮（只有在用户做出选择时才显示）
+              if (_hasUserMadeSelection && _selectedSiteType != SiteType.nexusphpweb) ...[
                 TextFormField(
                   controller: _apiKeyController,
                   decoration: InputDecoration(
-                    labelText: _selectedSiteType.apiKeyLabel,
-                    hintText: _selectedSiteType.apiKeyHint,
+                    labelText: _selectedSiteType?.apiKeyLabel ?? 'API密钥',
+                    hintText: _selectedSiteType?.apiKeyHint ?? '请输入API密钥',
                     border: const OutlineInputBorder(),
                   ),
                   obscureText: true,
@@ -1155,8 +1306,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
                   },
                 ),
                 const SizedBox(height: 16),
-              ] else ...[
-                // NexusPHPWeb类型显示登录认证
+              ] else if (_hasUserMadeSelection) ...[
+                // NexusPHPWeb类型显示登录认证（只有在用户做出选择时才显示）
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -1271,18 +1422,18 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 const SizedBox(height: 16),
               ],
 
-              // Pass Key输入（仅NexusPHP类型显示）
-              if (_selectedSiteType.requiresPassKey) ...[
+              // Pass Key输入（仅NexusPHP类型显示，且用户已做出选择）
+              if (_hasUserMadeSelection && _selectedSiteType?.requiresPassKey == true) ...[
                 TextFormField(
                   controller: _passKeyController,
                   decoration: InputDecoration(
-                    labelText: _selectedSiteType.passKeyLabel,
-                    hintText: _selectedSiteType.passKeyHint,
+                    labelText: _selectedSiteType?.passKeyLabel ?? 'Pass Key',
+                    hintText: _selectedSiteType?.passKeyHint ?? '请输入Pass Key',
                     border: const OutlineInputBorder(),
                   ),
                   obscureText: true,
                   validator: (value) {
-                    if (_selectedSiteType.requiresPassKey &&
+                    if (_selectedSiteType?.requiresPassKey == true &&
                         (value == null || value.trim().isEmpty)) {
                       return '请输入Pass Key';
                     }
@@ -1293,8 +1444,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
               ],
               const SizedBox(height: 8),
 
-              // 查询分类配置
-              Card(
+              // 查询分类配置（只有在用户做出选择时才显示）
+              if (_hasUserMadeSelection) Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -1370,8 +1521,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
               ),
               const SizedBox(height: 24),
 
-              // 功能配置
-              Card(
+              // 功能配置（只有在用户做出选择时才显示）
+              if (_hasUserMadeSelection) Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -1473,8 +1624,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
               ),
               const SizedBox(height: 24),
 
-              // 操作按钮
-              Row(
+              // 操作按钮（只有在用户做出选择时才显示）
+              if (_hasUserMadeSelection) Row(
                 children: [
                   OutlinedButton.icon(
                     icon: const Icon(Icons.play_arrow),

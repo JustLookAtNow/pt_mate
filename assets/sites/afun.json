@@ -1,0 +1,18 @@
+{
+  "id": "afun",
+  "name": "AFUN",
+  "baseUrl": "https://www.ptlover.cc/",
+  "siteType": "NexusPHPWeb",
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": true,
+    "downloadHistory": true,
+    "categorySearch": true,
+    "advancedSearch": true
+  },
+  "discountMapping": {}
+}

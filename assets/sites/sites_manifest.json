@@ -1,0 +1,15 @@
+{
+  "sites": [
+    "mteam-kp.json",
+    "mteam-tp.json", 
+    "mteam-api.json",
+    "ptskit.json",
+    "hxpt.json",
+    "zmpt.json",
+    "afun.json",
+    "cangbao.json",
+    "lajidui.json",
+    "ptfans.json",
+    "xingyunge.json"
+  ]
+}

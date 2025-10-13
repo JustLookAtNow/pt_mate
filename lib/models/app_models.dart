@@ -215,13 +215,13 @@ enum TagType {
   chinese('中字', Colors.green, r'中字|中文|简体'),
   chineseTraditional('繁体', Colors.green, r'繁体'),
   mandarin('国语', Colors.blue, r'国语|国配|普通话|中配'),
-  fourK('4K', Colors.orange, r'4K|2160p'),
-  resolution1080('1080p', Colors.blue, r'1080p'),
-  hdr('HDR', Colors.purple, r'HDR|HDR10|Dolby Vision|DV'),
-  h265('H265', Color.fromARGB(255, 51, 162, 217), r'H\.?265|HEVC|x265'),
-  webDl('WEB-DL', Color.fromARGB(255, 162, 41, 178), r'WEB-DL|WEBDL|WEB\.DL'),
-  dovi('DOVI', Colors.pink, r'DOVI|Dolby Vision|DV'),
-  blueRay('Blu-ray', Colors.red, r'blu-ray|bluray');
+  fourK('4K', Colors.orange, r'\b4K\b|\b2160p\b'),
+  resolution1080('1080p', Colors.blue, r'\b1080p\b'),
+  hdr('HDR', Colors.purple, r'\bHDR\b|\bHDR10\b|Dolby Vision|\bDV\b'),
+  h265('H265', Color.fromARGB(255, 51, 162, 217), r'\bH\.?265\b|\bHEVC\b|\bx265\b'),
+  webDl('WEB-DL', Color.fromARGB(255, 162, 41, 178), r'\bWEB-DL\b|\bWEBDL\b|\bWEB\.DL\b'),
+  dovi('DOVI', Colors.pink, r'\bDOVI\b|Dolby Vision|\bDV\b'),
+  blueRay('Blu-ray', Colors.red, r'\bblu-ray\b|\bbluray\b');
 
   const TagType(this.content, this.color, this.regex);
   final String content;

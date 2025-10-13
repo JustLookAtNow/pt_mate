@@ -6,25 +6,48 @@ import '../models/app_models.dart';
 /// 负责从JSON文件加载预设的站点配置
 class SiteConfigService {
   static const String _configPath = 'assets/site_configs.json';
+  static const String _sitesManifestPath = 'assets/sites/sites_manifest.json';
+  static const String _sitesBasePath = 'assets/sites/';
+
+  /// 获取所有可用的预设站点文件列表
+  static Future<List<String>> _getPresetSiteFiles() async {
+    try {
+      // 从清单文件读取站点列表
+      final String manifestString = await rootBundle.loadString(_sitesManifestPath);
+      final Map<String, dynamic> manifest = json.decode(manifestString);
+      
+      final List<dynamic> siteFiles = manifest['sites'] ?? [];
+      return siteFiles.map((file) => '$_sitesBasePath$file').cast<String>().toList();
+    } catch (e) {
+      // 如果清单文件读取失败，返回空列表
+      // Failed to load sites manifest: $e
+      return [];
+    }
+  }
 
   /// 加载预设站点配置
   static Future<List<SiteConfig>> loadPresetSites() async {
-    try {
-      // 从assets读取JSON文件
-      final String jsonString = await rootBundle.loadString(_configPath);
-      final Map<String, dynamic> jsonData = json.decode(jsonString);
-
-      // 解析预设站点列表
-      final List<dynamic> presetSitesJson = jsonData['presetSites'] ?? [];
-
-      return presetSitesJson
-          .map((siteJson) => SiteConfig.fromJson(siteJson))
-          .toList();
-    } catch (e) {
-      // 如果加载失败，返回空列表
-      // Failed to load preset sites: $e
-      return [];
+    final List<SiteConfig> presetSites = [];
+    
+    // 动态获取站点文件列表
+    final presetSiteFiles = await _getPresetSiteFiles();
+    
+    for (final filePath in presetSiteFiles) {
+      try {
+        // 从assets读取每个站点的JSON文件
+        final String jsonString = await rootBundle.loadString(filePath);
+        final Map<String, dynamic> siteJson = json.decode(jsonString);
+        
+        final siteConfig = SiteConfig.fromJson(siteJson);
+        presetSites.add(siteConfig);
+      } catch (e) {
+        // 如果某个文件加载失败，跳过该文件继续加载其他文件
+        // Failed to load preset site from $filePath: $e
+        continue;
+      }
     }
+    
+    return presetSites;
   }
 
   /// 获取默认的站点功能配置
@@ -59,32 +82,38 @@ class SiteConfigService {
     String baseUrl,
   ) async {
     try {
-      // 从assets读取JSON文件
-      final String jsonString = await rootBundle.loadString(_configPath);
-      final Map<String, dynamic> jsonData = json.decode(jsonString);
-
-      final List<dynamic> presetSitesJson = jsonData['presetSites'] ?? [];
-
-      // 通过baseUrl匹配预设站点
-
       // 标准化baseUrl，移除末尾的斜杠
       final normalizedBaseUrl = baseUrl.endsWith('/')
           ? baseUrl.substring(0, baseUrl.length - 1)
           : baseUrl;
-
-      for (final siteJson in presetSitesJson) {
-        final presetBaseUrl = siteJson['baseUrl'] as String?;
-        if (presetBaseUrl != null) {
-          final normalizedPresetUrl = presetBaseUrl.endsWith('/')
-              ? presetBaseUrl.substring(0, presetBaseUrl.length - 1)
-              : presetBaseUrl;
-          if (normalizedPresetUrl == normalizedBaseUrl) {
+      
+      // 动态获取站点文件列表
+      final presetSiteFiles = await _getPresetSiteFiles();
+      
+      // 遍历所有站点文件，查找匹配的baseUrl
+      for (final filePath in presetSiteFiles) {
+        try {
+          final String jsonString = await rootBundle.loadString(filePath);
+          final Map<String, dynamic> siteJson = json.decode(jsonString);
+          
+          final String siteBaseUrl = siteJson['baseUrl'] ?? '';
+          final normalizedSiteUrl = siteBaseUrl.endsWith('/')
+              ? siteBaseUrl.substring(0, siteBaseUrl.length - 1)
+              : siteBaseUrl;
+              
+          if (normalizedSiteUrl == normalizedBaseUrl) {
+            // 找到匹配的站点，返回discountMapping
             final Map<dynamic, dynamic> discountMap =
                 siteJson['discountMapping'] ?? {};
             return discountMap.map((key, value) => MapEntry(key as String, value as String));
           }
+        } catch (e) {
+          // 如果某个文件加载失败，跳过该文件继续查找
+          continue;
         }
       }
+      
+      // 如果没有找到匹配的站点，返回空映射
       return {};
     } catch (e) {
       // 如果加载失败，返回空对象
@@ -92,56 +121,45 @@ class SiteConfigService {
     }
   }
 
-  /// 根据站点类型获取默认的搜索分类配置
-  /// 优先匹配baseUrl，然后类型
+  // 获取默认的搜索分类配置
   static Future<List<SearchCategoryConfig>> getDefaultSearchCategories(
-    String siteType, {
-    String? baseUrl,
-  }) async {
+    String baseUrl,
+  ) async {
     try {
-      // 从assets读取JSON文件
-      final String jsonString = await rootBundle.loadString(_configPath);
-      final Map<String, dynamic> jsonData = json.decode(jsonString);
-
-      final List<dynamic> presetSitesJson = jsonData['presetSites'] ?? [];
-
-      // 通过baseUrl匹配预设站点
-      if (baseUrl != null && baseUrl.isNotEmpty) {
-        // 标准化baseUrl，移除末尾的斜杠
-        final normalizedBaseUrl = baseUrl.endsWith('/')
-            ? baseUrl.substring(0, baseUrl.length - 1)
-            : baseUrl;
-
-        for (final siteJson in presetSitesJson) {
-          final presetBaseUrl = siteJson['baseUrl'] as String?;
-          if (presetBaseUrl != null) {
-            final normalizedPresetUrl = presetBaseUrl.endsWith('/')
-                ? presetBaseUrl.substring(0, presetBaseUrl.length - 1)
-                : presetBaseUrl;
-            if (normalizedPresetUrl == normalizedBaseUrl) {
-              final List<dynamic> categoriesJson =
-                  siteJson['searchCategories'] ?? [];
-              return categoriesJson
-                  .map(
-                    (categoryJson) =>
-                        SearchCategoryConfig.fromJson(categoryJson),
-                  )
-                  .toList();
-            }
+      // 标准化baseUrl，移除末尾的斜杠
+      final normalizedBaseUrl = baseUrl.endsWith('/')
+          ? baseUrl.substring(0, baseUrl.length - 1)
+          : baseUrl;
+      
+      // 动态获取站点文件列表
+      final presetSiteFiles = await _getPresetSiteFiles();
+      
+      // 遍历所有站点文件，查找匹配的baseUrl
+      for (final filePath in presetSiteFiles) {
+        try {
+          final String jsonString = await rootBundle.loadString(filePath);
+          final Map<String, dynamic> siteJson = json.decode(jsonString);
+          
+          final String siteBaseUrl = siteJson['baseUrl'] ?? '';
+          final normalizedSiteUrl = siteBaseUrl.endsWith('/')
+              ? siteBaseUrl.substring(0, siteBaseUrl.length - 1)
+              : siteBaseUrl;
+              
+          if (normalizedSiteUrl == normalizedBaseUrl) {
+            // 找到匹配的站点，返回searchCategories
+            final List<dynamic> categoriesJson =
+                siteJson['searchCategories'] ?? [];
+            return categoriesJson
+                .map((categoryJson) => SearchCategoryConfig.fromJson(categoryJson))
+                .toList();
           }
+        } catch (e) {
+          // 如果某个文件加载失败，跳过该文件继续查找
+          continue;
         }
       }
-
-      // 如果没有匹配的id或没有提供id，直接从模板获取
-      final List<dynamic> categoriesJson =
-          jsonData['defaultTemplates'][siteType]['searchCategories'] ?? [];
-      if (categoriesJson.isNotEmpty) {
-        return categoriesJson
-            .map((categoryJson) => SearchCategoryConfig.fromJson(categoryJson))
-            .toList();
-      }
-
-      // 如果没有找到匹配的站点类型，返回空列表
+      
+      // 如果没有找到匹配的站点，返回空列表
       return [];
     } catch (e) {
       // 如果加载失败，返回空列表

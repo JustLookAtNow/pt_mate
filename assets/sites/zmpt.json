@@ -1,0 +1,18 @@
+{
+  "id": "zmpt",
+  "name": "织梦",
+  "baseUrl": "https://zmpt.cc/",
+  "siteType": "NexusPHP",
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true, 
+    "download": true,
+    "favorites": false,
+    "downloadHistory": false,
+    "categorySearch": true,
+    "advancedSearch": true
+  },
+  "discountMapping": {}
+}

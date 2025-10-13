@@ -731,11 +731,10 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
   @override
   Future<List<SearchCategoryConfig>> getSearchCategories() async {
-    // 优先匹配baseUrl，然后类型
+    // 通过baseUrl匹配预设配置
     final defaultCategories =
         await SiteConfigService.getDefaultSearchCategories(
-          _siteConfig.siteType.id,
-          baseUrl: _siteConfig.baseUrl,
+          _siteConfig.baseUrl,
         );
 
     // 如果获取到默认分类配置，则直接返回

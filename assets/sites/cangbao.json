@@ -1,0 +1,18 @@
+{
+  "id": "cangbao",
+  "name": "藏宝阁",
+  "baseUrl": "https://cangbao.ge/",
+  "siteType": "NexusPHP",
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": false,
+    "downloadHistory": false,
+    "categorySearch": true,
+    "advancedSearch": true
+  },
+  "discountMapping": {}
+}
