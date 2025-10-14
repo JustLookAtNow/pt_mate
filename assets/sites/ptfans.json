@@ -1,7 +1,10 @@
 {
   "id": "ptfans",
   "name": "PTFans",
-  "baseUrl": "https://ptfans.cc/",
+  "baseUrls": [
+    "https://ptfans.cc/"
+  ],
+  "primaryUrl": "https://ptfans.cc/",
   "siteType": "NexusPHP",
   "searchCategories": [],
   "features": {

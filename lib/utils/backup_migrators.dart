@@ -90,10 +90,57 @@ class BackupMigratorV100To110 implements BackupMigrator {
 }
 
 
+/// 1.1.0 迁移到 1.2.0 - 多URL模板支持
+class BackupMigratorV110To120 implements BackupMigrator {
+  @override
+  String get fromVersion => '1.1.0';
+  
+  @override
+  String get toVersion => '1.2.0';
+  
+  @override
+  Map<String, dynamic> migrate(Map<String, dynamic> backupData) {
+    final migratedData = Map<String, dynamic>.from(backupData);
+    
+    // 更新版本号
+    migratedData['version'] = toVersion;
+    
+    // 迁移站点配置以支持多URL模板
+    if (backupData.containsKey('siteConfigs')) {
+      final siteConfigs = backupData['siteConfigs'] as List<dynamic>?;
+      if (siteConfigs != null) {
+        final migratedSiteConfigs = <Map<String, dynamic>>[];
+        
+        for (final siteConfig in siteConfigs) {
+          if (siteConfig is Map<String, dynamic>) {
+            final migratedSiteConfig = Map<String, dynamic>.from(siteConfig);
+            
+            // 如果站点配置有templateId，确保它与新的多URL模板系统兼容
+            if (migratedSiteConfig.containsKey('templateId')) {
+              final templateId = migratedSiteConfig['templateId'] as String?;
+              if (templateId != null && templateId.isNotEmpty) {
+                // 保持templateId不变，新的多URL模板系统向后兼容
+                // 单URL模板会自动转换为多URL格式
+              }
+            }
+            
+            migratedSiteConfigs.add(migratedSiteConfig);
+          }
+        }
+        
+        migratedData['siteConfigs'] = migratedSiteConfigs;
+      }
+    }
+    
+    return migratedData;
+  }
+}
+
 /// 备份迁移管理器
 class BackupMigrationManager {
   static final List<BackupMigrator> _migrators = [
     BackupMigratorV100To110(),
+    BackupMigratorV110To120(),
   ];
   
   /// 注册迁移器

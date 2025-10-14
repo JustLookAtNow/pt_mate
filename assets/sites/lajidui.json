@@ -1,7 +1,10 @@
 {
   "id": "lajidui",
   "name": "垃圾堆",
-  "baseUrl": "https://pt.lajidui.top/",
+  "baseUrls": [
+    "https://pt.lajidui.top/"
+  ],
+  "primaryUrl": "https://pt.lajidui.top/",
   "siteType": "NexusPHP",
   "searchCategories": [],
   "features": {

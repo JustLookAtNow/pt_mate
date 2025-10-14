@@ -1,7 +1,10 @@
 {
   "id": "xingyunge",
   "name": "星陨阁",
-  "baseUrl": "https://pt.xingyungept.org/",
+  "baseUrls": [
+    "https://pt.xingyungept.org/"
+  ],
+  "primaryUrl": "https://pt.xingyungept.org/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
   "features": {

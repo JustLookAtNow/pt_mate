@@ -1,7 +1,10 @@
 {
   "id": "hxpt",
   "name": "好学",
-  "baseUrl": "https://www.hxpt.org/",
+  "baseUrls": [
+    "https://www.hxpt.org/"
+  ],
+  "primaryUrl": "https://www.hxpt.org/",
   "siteType": "NexusPHP",
   "searchCategories": [],
   "features": {

@@ -1,7 +1,12 @@
 {
-  "id": "mteam-api",
+  "id": "mteam",
   "name": "M-Team",
-  "baseUrl": "https://api.m-team.cc",
+  "baseUrls": [
+    "https://api.m-team.cc",
+    "https://kp.m-team.cc",
+    "https://tp.m-team.cc"
+  ],
+  "primaryUrl": "https://api.m-team.cc",
   "siteType": "M-Team",
   "searchCategories": [
     {

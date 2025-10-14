@@ -13,11 +13,11 @@ import 'webdav_service.dart';
 
 // 备份版本管理
 class BackupVersion {
-  static const String current = '1.1.0';
+  static const String current = '1.2.0';
   
   static bool isCompatible(String version) {
     // 支持的版本列表
-    const supportedVersions = ['1.0.0', '1.1.0'];
+    const supportedVersions = ['1.0.0', '1.1.0', '1.2.0'];
     return supportedVersions.contains(version);
   }
   

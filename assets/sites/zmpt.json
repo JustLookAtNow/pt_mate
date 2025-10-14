@@ -1,7 +1,10 @@
 {
   "id": "zmpt",
   "name": "织梦",
-  "baseUrl": "https://zmpt.cc/",
+  "baseUrls": [
+    "https://zmpt.cc/"
+  ],
+  "primaryUrl": "https://zmpt.cc/",
   "siteType": "NexusPHP",
   "searchCategories": [],
   "features": {

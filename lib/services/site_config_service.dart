@@ -25,9 +25,9 @@ class SiteConfigService {
     }
   }
 
-  /// 加载预设站点配置
-  static Future<List<SiteConfig>> loadPresetSites() async {
-    final List<SiteConfig> presetSites = [];
+  /// 加载预设站点模板配置
+  static Future<List<SiteConfigTemplate>> loadPresetSiteTemplates() async {
+    final List<SiteConfigTemplate> presetTemplates = [];
     
     // 动态获取站点文件列表
     final presetSiteFiles = await _getPresetSiteFiles();
@@ -38,16 +38,45 @@ class SiteConfigService {
         final String jsonString = await rootBundle.loadString(filePath);
         final Map<String, dynamic> siteJson = json.decode(jsonString);
         
-        final siteConfig = SiteConfig.fromJson(siteJson);
-        presetSites.add(siteConfig);
+        final siteTemplate = SiteConfigTemplate.fromJson(siteJson);
+        presetTemplates.add(siteTemplate);
       } catch (e) {
         // 如果某个文件加载失败，跳过该文件继续加载其他文件
-        // Failed to load preset site from $filePath: $e
+        // Failed to load preset site template from $filePath: $e
+        continue;
+      }
+    }
+    
+    return presetTemplates;
+  }
+
+  /// 加载预设站点配置（向后兼容方法）
+  /// 将模板转换为SiteConfig实例，使用主要URL
+  static Future<List<SiteConfig>> loadPresetSites() async {
+    final List<SiteConfig> presetSites = [];
+    final templates = await loadPresetSiteTemplates();
+    
+    for (final template in templates) {
+      try {
+        final siteConfig = template.toSiteConfig();
+        presetSites.add(siteConfig);
+      } catch (e) {
+        // 如果转换失败，跳过该模板
         continue;
       }
     }
     
     return presetSites;
+  }
+
+  /// 根据模板ID获取站点模板
+  static Future<SiteConfigTemplate?> getTemplateById(String templateId) async {
+    final templates = await loadPresetSiteTemplates();
+    try {
+      return templates.firstWhere((template) => template.id == templateId);
+    } catch (e) {
+      return null;
+    }
   }
 
   /// 获取默认的站点功能配置
@@ -87,29 +116,19 @@ class SiteConfigService {
           ? baseUrl.substring(0, baseUrl.length - 1)
           : baseUrl;
       
-      // 动态获取站点文件列表
-      final presetSiteFiles = await _getPresetSiteFiles();
+      // 使用新的模板加载方法
+      final templates = await loadPresetSiteTemplates();
       
-      // 遍历所有站点文件，查找匹配的baseUrl
-      for (final filePath in presetSiteFiles) {
-        try {
-          final String jsonString = await rootBundle.loadString(filePath);
-          final Map<String, dynamic> siteJson = json.decode(jsonString);
-          
-          final String siteBaseUrl = siteJson['baseUrl'] ?? '';
-          final normalizedSiteUrl = siteBaseUrl.endsWith('/')
-              ? siteBaseUrl.substring(0, siteBaseUrl.length - 1)
-              : siteBaseUrl;
-              
-          if (normalizedSiteUrl == normalizedBaseUrl) {
-            // 找到匹配的站点，返回discountMapping
-            final Map<dynamic, dynamic> discountMap =
-                siteJson['discountMapping'] ?? {};
-            return discountMap.map((key, value) => MapEntry(key as String, value as String));
-          }
-        } catch (e) {
-          // 如果某个文件加载失败，跳过该文件继续查找
-          continue;
+      // 遍历所有模板，查找匹配的baseUrl
+      for (final template in templates) {
+        // 检查是否有匹配的URL
+        final normalizedUrls = template.baseUrls.map((url) => 
+          url.endsWith('/') ? url.substring(0, url.length - 1) : url
+        ).toList();
+        
+        if (normalizedUrls.contains(normalizedBaseUrl)) {
+          // 找到匹配的站点，返回discountMapping
+          return template.discountMapping;
         }
       }
       
@@ -131,31 +150,19 @@ class SiteConfigService {
           ? baseUrl.substring(0, baseUrl.length - 1)
           : baseUrl;
       
-      // 动态获取站点文件列表
-      final presetSiteFiles = await _getPresetSiteFiles();
+      // 使用新的模板加载方法
+      final templates = await loadPresetSiteTemplates();
       
-      // 遍历所有站点文件，查找匹配的baseUrl
-      for (final filePath in presetSiteFiles) {
-        try {
-          final String jsonString = await rootBundle.loadString(filePath);
-          final Map<String, dynamic> siteJson = json.decode(jsonString);
-          
-          final String siteBaseUrl = siteJson['baseUrl'] ?? '';
-          final normalizedSiteUrl = siteBaseUrl.endsWith('/')
-              ? siteBaseUrl.substring(0, siteBaseUrl.length - 1)
-              : siteBaseUrl;
-              
-          if (normalizedSiteUrl == normalizedBaseUrl) {
-            // 找到匹配的站点，返回searchCategories
-            final List<dynamic> categoriesJson =
-                siteJson['searchCategories'] ?? [];
-            return categoriesJson
-                .map((categoryJson) => SearchCategoryConfig.fromJson(categoryJson))
-                .toList();
-          }
-        } catch (e) {
-          // 如果某个文件加载失败，跳过该文件继续查找
-          continue;
+      // 遍历所有模板，查找匹配的baseUrl
+      for (final template in templates) {
+        // 检查是否有匹配的URL
+        final normalizedUrls = template.baseUrls.map((url) => 
+          url.endsWith('/') ? url.substring(0, url.length - 1) : url
+        ).toList();
+        
+        if (normalizedUrls.contains(normalizedBaseUrl)) {
+          // 找到匹配的站点，返回searchCategories
+          return template.searchCategories;
         }
       }
       

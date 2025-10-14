@@ -1,7 +1,10 @@
 {
   "id": "ptskit",
   "name": "PTSKit",
-  "baseUrl": "https://www.ptskit.org/",
+  "baseUrls": [
+    "https://www.ptskit.org/"
+  ],
+  "primaryUrl": "https://www.ptskit.org/",
   "siteType": "NexusPHP",
   "searchCategories": [
     {

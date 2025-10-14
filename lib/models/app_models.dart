@@ -381,6 +381,10 @@ class SiteFeatures {
     supportAdvancedSearch: true,
   );
 
+
+
+
+
   @override
   String toString() => jsonEncode(toJson());
 }
@@ -490,6 +494,8 @@ class AggregateSearchConfig {
     );
   }
 
+
+
   @override
   String toString() => jsonEncode(toJson());
 
@@ -569,6 +575,8 @@ class AggregateSearchSettings {
     );
   }
 
+
+
   @override
   String toString() => jsonEncode(toJson());
 }
@@ -585,6 +593,8 @@ class SiteConfig {
   final bool isActive; // 是否激活
   final List<SearchCategoryConfig> searchCategories; // 查询分类配置
   final SiteFeatures features; // 功能支持配置
+  final String templateId; // 模板ID，记录创建时的模板，自定义为-1
+  
 
   const SiteConfig({
     required this.id,
@@ -598,6 +608,7 @@ class SiteConfig {
     this.isActive = true,
     this.searchCategories = const [],
     this.features = SiteFeatures.mteamDefault,
+    this.templateId = '-1',
   });
 
   SiteConfig copyWith({
@@ -612,6 +623,7 @@ class SiteConfig {
     bool? isActive,
     List<SearchCategoryConfig>? searchCategories,
     SiteFeatures? features,
+    String? templateId,
   }) => SiteConfig(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -624,6 +636,7 @@ class SiteConfig {
     isActive: isActive ?? this.isActive,
     searchCategories: searchCategories ?? this.searchCategories,
     features: features ?? this.features,
+    templateId: templateId ?? this.templateId,
   );
 
   Map<String, dynamic> toJson() => {
@@ -638,6 +651,7 @@ class SiteConfig {
     'isActive': isActive,
     'searchCategories': searchCategories.map((e) => e.toJson()).toList(),
     'features': features.toJson(),
+    'templateId': templateId,
   };
 
   factory SiteConfig.fromJson(Map<String, dynamic> json) {
@@ -669,6 +683,14 @@ class SiteConfig {
       }
     }
 
+    // 处理 templateId 字段的兼容性
+    String templateId = json['templateId'] as String? ?? '';
+    if (templateId.isEmpty) {
+      // 如果没有 templateId，根据 baseUrl 匹配预设站点
+      final baseUrl = json['baseUrl'] as String;
+      templateId = SiteConfig._getTemplateIdByBaseUrl(baseUrl);
+    }
+
     return SiteConfig(
       id:
           json['id'] as String? ??
@@ -686,7 +708,228 @@ class SiteConfig {
       isActive: json['isActive'] as bool? ?? true,
       searchCategories: categories,
       features: features,
+      templateId: templateId,
     );
+  }
+
+  /// 根据 baseUrl 匹配预设站点的模板ID
+  static String _getTemplateIdByBaseUrl(String baseUrl) {
+    // 标准化 baseUrl，移除末尾的斜杠
+    final normalizedBaseUrl = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    
+    // 多URL模板的映射（新格式）
+    final Map<String, List<String>> multiUrlTemplateMapping = {
+      'mteam-kp': [
+        'https://kp.m-team.cc',
+        'https://kp.m-team.io',
+        'https://kp.m-team.org',
+      ],
+      'mteam-tp': [
+        'https://tp.m-team.cc',
+        'https://tp.m-team.io', 
+        'https://tp.m-team.org',
+      ],
+    };
+    
+    // 首先检查多URL模板
+    for (final entry in multiUrlTemplateMapping.entries) {
+      final templateId = entry.key;
+      final urls = entry.value;
+      for (final url in urls) {
+        final normalizedUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+        if (normalizedUrl == normalizedBaseUrl) {
+          return templateId;
+        }
+      }
+    }
+    
+    // 兼容旧的单URL映射
+    final Map<String, String> legacyPresetSiteMapping = {
+      'https://api.m-team.cc': 'mteam-api',
+      'https://ptskit.com': 'ptskit',
+      'https://www.hxpt.org': 'hxpt',
+      'https://zmpt.cc': 'zmpt',
+      'https://www.afun.tv': 'afun',
+      'https://cangbao.tv': 'cangbao',
+      'https://lajidui.org': 'lajidui',
+      'https://ptfans.org': 'ptfans',
+      'https://xingyunge.org': 'xingyunge',
+    };
+    
+    return legacyPresetSiteMapping[normalizedBaseUrl] ?? '-1';
+  }
+
+  @override
+  String toString() => jsonEncode(toJson());
+}
+
+/// 站点配置模板类
+/// 用于配置文件中的站点模板，支持多个URL
+class SiteConfigTemplate {
+  final String id; // 唯一标识符
+  final String name; // 站点名称
+  final List<String> baseUrls; // 支持多个URL地址
+  final String? primaryUrl; // 主要URL（可选，用于标识默认选择）
+  final SiteType siteType; // 网站类型
+  final List<SearchCategoryConfig> searchCategories; // 查询分类配置
+  final SiteFeatures features; // 功能支持配置
+  final Map<String, String> discountMapping; // 优惠映射配置
+
+  const SiteConfigTemplate({
+    required this.id,
+    required this.name,
+    required this.baseUrls,
+    this.primaryUrl,
+    this.siteType = SiteType.mteam,
+    this.searchCategories = const [],
+    this.features = SiteFeatures.mteamDefault,
+    this.discountMapping = const {},
+  });
+
+  SiteConfigTemplate copyWith({
+    String? id,
+    String? name,
+    List<String>? baseUrls,
+    String? primaryUrl,
+    SiteType? siteType,
+    List<SearchCategoryConfig>? searchCategories,
+    SiteFeatures? features,
+    Map<String, String>? discountMapping,
+  }) => SiteConfigTemplate(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    baseUrls: baseUrls ?? this.baseUrls,
+    primaryUrl: primaryUrl ?? this.primaryUrl,
+    siteType: siteType ?? this.siteType,
+    searchCategories: searchCategories ?? this.searchCategories,
+    features: features ?? this.features,
+    discountMapping: discountMapping ?? this.discountMapping,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'baseUrls': baseUrls,
+    'primaryUrl': primaryUrl,
+    'siteType': siteType.id,
+    'searchCategories': searchCategories.map((e) => e.toJson()).toList(),
+    'features': features.toJson(),
+    'discountMapping': discountMapping,
+  };
+
+  factory SiteConfigTemplate.fromJson(Map<String, dynamic> json) {
+    List<SearchCategoryConfig> categories = [];
+    if (json['searchCategories'] != null) {
+      try {
+        final list = (json['searchCategories'] as List)
+            .cast<Map<String, dynamic>>();
+        categories = list.map(SearchCategoryConfig.fromJson).toList();
+      } catch (_) {
+        // 解析失败时使用默认配置
+        categories = SearchCategoryConfig.getDefaultConfigs();
+      }
+    } else {
+      // 如果没有配置，使用默认配置
+      categories = SearchCategoryConfig.getDefaultConfigs();
+    }
+
+    // 解析功能配置
+    SiteFeatures features = SiteFeatures.mteamDefault;
+    if (json['features'] != null) {
+      try {
+        features = SiteFeatures.fromJson(
+          json['features'] as Map<String, dynamic>,
+        );
+      } catch (_) {
+        // 解析失败时使用默认配置
+        features = SiteFeatures.mteamDefault;
+      }
+    }
+
+    // 处理baseUrls字段，支持向后兼容
+    List<String> baseUrls = [];
+    if (json['baseUrls'] != null) {
+      // 新格式：多个URL
+      baseUrls = (json['baseUrls'] as List).cast<String>();
+    } else if (json['baseUrl'] != null) {
+      // 旧格式：单个URL，转换为列表
+      baseUrls = [json['baseUrl'] as String];
+    }
+
+    // 处理优惠映射配置
+    Map<String, String> discountMapping = {};
+    if (json['discountMapping'] != null) {
+      try {
+        discountMapping = Map<String, String>.from(
+          json['discountMapping'] as Map<String, dynamic>,
+        );
+      } catch (_) {
+        // 解析失败时使用空映射
+        discountMapping = {};
+      }
+    }
+
+    return SiteConfigTemplate(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      baseUrls: baseUrls,
+      primaryUrl: json['primaryUrl'] as String?,
+      siteType: SiteType.values.firstWhere(
+        (type) => type.id == (json['siteType'] as String? ?? 'M-Team'),
+        orElse: () => SiteType.mteam,
+      ),
+      searchCategories: categories,
+      features: features,
+      discountMapping: discountMapping,
+    );
+  }
+
+  /// 转换为SiteConfig实例
+  /// [selectedUrl] 指定要使用的URL，如果为null则使用primaryUrl或第一个URL
+  SiteConfig toSiteConfig({
+    String? selectedUrl,
+    String? apiKey,
+    String? passKey,
+    String? cookie,
+    String? userId,
+    bool isActive = true,
+  }) {
+    // 确定要使用的URL
+    String baseUrl;
+    if (selectedUrl != null && baseUrls.contains(selectedUrl)) {
+      baseUrl = selectedUrl;
+    } else if (primaryUrl != null && baseUrls.contains(primaryUrl)) {
+      baseUrl = primaryUrl!;
+    } else if (baseUrls.isNotEmpty) {
+      baseUrl = baseUrls.first;
+    } else {
+      throw ArgumentError('No valid baseUrl available in template');
+    }
+
+    return SiteConfig(
+      id: id,
+      name: name,
+      baseUrl: baseUrl,
+      apiKey: apiKey,
+      passKey: passKey,
+      cookie: cookie,
+      userId: userId,
+      siteType: siteType,
+      isActive: isActive,
+      searchCategories: searchCategories,
+      features: features,
+      templateId: id,
+    );
+  }
+
+  /// 获取主要URL（用于显示）
+  String get displayUrl {
+    if (primaryUrl != null && baseUrls.contains(primaryUrl)) {
+      return primaryUrl!;
+    }
+    return baseUrls.isNotEmpty ? baseUrls.first : '';
   }
 
   @override

@@ -1,7 +1,10 @@
 {
   "id": "cangbao",
   "name": "藏宝阁",
-  "baseUrl": "https://cangbao.ge/",
+  "baseUrls": [
+    "https://cangbao.ge/"
+  ],
+  "primaryUrl": "https://cangbao.ge/",
   "siteType": "NexusPHP",
   "searchCategories": [],
   "features": {

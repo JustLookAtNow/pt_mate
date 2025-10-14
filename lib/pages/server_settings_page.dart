@@ -539,18 +539,18 @@ class _SiteEditPageState extends State<SiteEditPage> {
   final _presetSearchController = TextEditingController(); // 预设站点搜索控制器
 
   SiteType? _selectedSiteType;
-  int _presetIndex = -1; // -1 表示自定义
   bool _loading = false;
   String? _error;
   MemberProfile? _profile;
   List<SearchCategoryConfig> _searchCategories = [];
   SiteFeatures _siteFeatures = SiteFeatures.mteamDefault;
-  List<SiteConfig> _presetSites = [];
-  List<SiteConfig> _filteredPresetSites = []; // 过滤后的预设站点列表
+  List<SiteConfigTemplate> _presetTemplates = []; // 预设站点模板列表
+  List<SiteConfigTemplate> _filteredPresetTemplates = []; // 过滤后的预设站点模板列表
   String? _cookieStatus; // 登录状态信息
   String? _savedCookie; // 保存的cookie
   bool _isCustomSite = true; // 是否选择自定义站点
   bool _hasUserMadeSelection = false; // 用户是否已经做出选择（预设或自定义）
+  String? _selectedTemplateUrl; // 从多URL模板中选择的URL
 
   @override
   void initState() {
@@ -582,16 +582,16 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
   Future<void> _loadPresetSites() async {
     try {
-      final presets = await SiteConfigService.loadPresetSites();
+      final templates = await SiteConfigService.loadPresetSiteTemplates();
       setState(() {
-        _presetSites = presets;
-        _filteredPresetSites = presets; // 初始化过滤列表
+        _presetTemplates = templates;
+        _filteredPresetTemplates = templates; // 初始化过滤模板列表
       });
     } catch (e) {
       // 加载失败时使用空列表
       setState(() {
-        _presetSites = [];
-        _filteredPresetSites = [];
+        _presetTemplates = [];
+        _filteredPresetTemplates = [];
       });
     }
   }
@@ -600,12 +600,12 @@ class _SiteEditPageState extends State<SiteEditPage> {
     final query = _presetSearchController.text.toLowerCase();
     setState(() {
       if (query.isEmpty) {
-        _filteredPresetSites = _presetSites;
+        _filteredPresetTemplates = _presetTemplates;
       } else {
-        _filteredPresetSites = _presetSites.where((site) {
-          return site.name.toLowerCase().contains(query) ||
-                 site.baseUrl.toLowerCase().contains(query) ||
-                 site.siteType.displayName.toLowerCase().contains(query);
+        _filteredPresetTemplates = _presetTemplates.where((template) {
+          return template.name.toLowerCase().contains(query) ||
+                 template.baseUrls.any((url) => url.toLowerCase().contains(query)) ||
+                 template.siteType.displayName.toLowerCase().contains(query);
         }).toList();
       }
     });
@@ -614,16 +614,18 @@ class _SiteEditPageState extends State<SiteEditPage> {
   void _checkIfPresetSite() {
     if (widget.site != null) {
       bool foundPreset = false;
-      for (int i = 0; i < _presetSites.length; i++) {
-        if (_presetSites[i].baseUrl == widget.site!.baseUrl) {
+      
+      // 检查模板格式（所有预设站点现在都是模板格式）
+      for (final template in _presetTemplates) {
+        if (template.baseUrls.contains(widget.site!.baseUrl)) {
           setState(() {
-            _presetIndex = i;
             _isCustomSite = false;
-            _selectedSiteType = _presetSites[i].siteType;
-            _hasUserMadeSelection = true; // 编辑现有站点时用户已经有选择
-            // 填充预设站点信息
-            _nameController.text = _presetSites[i].name;
-            _baseUrlController.text = _presetSites[i].baseUrl;
+            _selectedSiteType = template.siteType;
+            _hasUserMadeSelection = true;
+            _selectedTemplateUrl = widget.site!.baseUrl;
+            // 填充模板信息
+            _nameController.text = template.name;
+            _baseUrlController.text = widget.site!.baseUrl;
           });
           foundPreset = true;
           break;
@@ -634,7 +636,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       if (!foundPreset) {
         setState(() {
           _isCustomSite = true;
-          _presetIndex = -1;
+          _selectedTemplateUrl = null;
           _hasUserMadeSelection = true; // 编辑现有站点时用户已经有选择
           // 填充原始站点的自定义配置信息
           _nameController.text = widget.site!.name;
@@ -645,43 +647,52 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // 新建站点时默认为自定义，清空字段
       setState(() {
         _isCustomSite = true;
-        _presetIndex = -1;
+        _selectedTemplateUrl = null;
         _nameController.clear();
         _baseUrlController.clear();
       });
     }
   }
 
-  void _selectPresetSite(SiteConfig? preset) {
+  void _selectCustomSite() {
     setState(() {
-      if (preset == null) {
-        // 选择自定义 - 清空所有字段
-        _isCustomSite = true;
-        _presetIndex = -1;
-        _selectedSiteType = SiteType.mteam; // 默认类型
-        _searchCategories = [];
-        _hasUserMadeSelection = true; // 用户已做出选择
-        _loadDefaultFeatures(_selectedSiteType!);
-        
-        // 清空自定义字段
-        _nameController.clear();
-        _baseUrlController.clear();
-      } else {
-        // 选择预设站点 - 填充预设信息
-        _isCustomSite = false;
-        _presetIndex = _presetSites.indexOf(preset);
-        _selectedSiteType = preset.siteType;
-        _searchCategories = [];
-        _siteFeatures = preset.features;
-        _hasUserMadeSelection = true; // 用户已做出选择
-        
-        // 填充预设站点信息到字段中（用于显示，但不会在自定义模式下显示）
-        _nameController.text = preset.name;
-        _baseUrlController.text = preset.baseUrl;
-        
-        // 清空搜索框
-        _presetSearchController.clear();
-      }
+      // 选择自定义 - 清空所有字段
+      _isCustomSite = true;
+      _selectedTemplateUrl = null;
+      _selectedSiteType = SiteType.mteam; // 默认类型
+      _searchCategories = [];
+      _hasUserMadeSelection = true; // 用户已做出选择
+      _loadDefaultFeatures(_selectedSiteType!);
+      
+      // 清空自定义字段
+      _nameController.clear();
+      _baseUrlController.clear();
+      
+      // 清空搜索框
+      _presetSearchController.clear();
+      
+      // 清空之前的错误和用户信息
+      _error = null;
+      _profile = null;
+    });
+  }
+
+  void _selectPresetTemplate(SiteConfigTemplate template, String selectedUrl) {
+    setState(() {
+      // 选择模板站点 - 填充模板信息
+      _isCustomSite = false;
+      _selectedTemplateUrl = selectedUrl;
+      _selectedSiteType = template.siteType;
+      _searchCategories = [];
+      _siteFeatures = template.features;
+      _hasUserMadeSelection = true; // 用户已做出选择
+      
+      // 填充模板站点信息到字段中
+      _nameController.text = template.name;
+      _baseUrlController.text = selectedUrl;
+      
+      // 清空搜索框
+      _presetSearchController.clear();
       
       // 清空之前的错误和用户信息
       _error = null;
@@ -749,28 +760,50 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
   SiteConfig _composeCurrentSite() {
     String id;
+    String templateId;
+    
     if (widget.site != null) {
+      // 编辑现有站点时，保持原有的 id 和 templateId
       id = widget.site!.id;
+      templateId = widget.site!.templateId;
     } else {
-      id =
-          'site-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1000)}';
+      // 新建站点时，生成新的 id 和设置 templateId
+      id = 'site-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1000)}';
+      
+      // 根据是否选择预设站点来设置 templateId
+      if (!_isCustomSite && _selectedTemplateUrl != null) {
+        // 使用模板的 id 作为 templateId
+        final template = _presetTemplates.firstWhere(
+          (t) => t.baseUrls.contains(_selectedTemplateUrl),
+          orElse: () => throw StateError('Template not found for selected URL'),
+        );
+        templateId = template.id;
+      } else {
+        // 自定义站点使用 -1 作为 templateId
+        templateId = '-1';
+      }
     }
 
     // 如果选择了预设站点（非自定义）
-    if (!_isCustomSite && _presetIndex >= 0 && _presetIndex < _presetSites.length) {
-      final preset = _presetSites[_presetIndex];
+    if (!_isCustomSite && _selectedTemplateUrl != null) {
+      // 使用模板站点（所有预设站点现在都是模板格式）
+      final template = _presetTemplates.firstWhere(
+        (t) => t.baseUrls.contains(_selectedTemplateUrl),
+        orElse: () => throw StateError('Template not found for selected URL'),
+      );
       return SiteConfig(
         id: id,
-        name: preset.name,
-        baseUrl: preset.baseUrl,
+        name: template.name,
+        baseUrl: _selectedTemplateUrl!,
         apiKey: _apiKeyController.text.trim(),
         passKey: _passKeyController.text.trim().isEmpty
             ? null
             : _passKeyController.text.trim(),
-        siteType: preset.siteType, // 使用预设站点的类型
+        siteType: template.siteType,
         searchCategories: _searchCategories,
         features: _siteFeatures,
-        cookie: preset.siteType == SiteType.nexusphpweb ? _savedCookie : null,
+        cookie: template.siteType == SiteType.nexusphpweb ? _savedCookie : null,
+        templateId: templateId,
       );
     }
 
@@ -794,6 +827,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       searchCategories: _searchCategories,
       features: _siteFeatures,
       cookie: _selectedSiteType == SiteType.nexusphpweb ? _savedCookie : null,
+      templateId: templateId,
     );
   }
 
@@ -1061,6 +1095,44 @@ class _SiteEditPageState extends State<SiteEditPage> {
     }
   }
 
+  Widget _buildTemplateListTile(SiteConfigTemplate template) {
+    final isSelected = !_isCustomSite && _selectedTemplateUrl != null && 
+                      template.baseUrls.contains(_selectedTemplateUrl);
+    
+    return ExpansionTile(
+      leading: Icon(
+        Icons.public,
+        color: Theme.of(context).colorScheme.secondary,
+      ),
+      title: Text(template.name),
+      subtitle: Text('${template.baseUrls.length} 个地址 (${template.siteType.displayName})'),
+      initiallyExpanded: isSelected,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      children: template.baseUrls.map((url) {
+        final isUrlSelected = !_isCustomSite && _selectedTemplateUrl == url;
+        return ListTile(
+          leading: Icon(
+            url == template.primaryUrl ? Icons.star : Icons.link,
+            color: url == template.primaryUrl 
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+            size: 20,
+          ),
+          title: Text(url),
+          subtitle: url == template.primaryUrl ? const Text('主要地址') : null,
+          selected: isUrlSelected,
+          onTap: () => _selectPresetTemplate(template, url),
+          contentPadding: const EdgeInsets.only(left: 56, right: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Future<void> _openWebLogin() async {
     final site = _composeCurrentSite();
     if (site.baseUrl.isEmpty) {
@@ -1167,34 +1239,22 @@ class _SiteEditPageState extends State<SiteEditPage> {
                                 title: const Text('自定义'),
                                 subtitle: const Text('手动配置站点信息'),
                                 selected: _isCustomSite,
-                                onTap: () => _selectPresetSite(null),
+                                onTap: () => _selectCustomSite(),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
                               
                               // 分隔线
-                              if (_filteredPresetSites.isNotEmpty) ...[
+                              if (_filteredPresetTemplates.isNotEmpty) ...[
                                 const Divider(),
                                 
-                                // 过滤后的预设站点列表
-                                ..._filteredPresetSites.map((site) => ListTile(
-                                  leading: Icon(
-                                    Icons.public,
-                                    color: Theme.of(context).colorScheme.secondary,
-                                  ),
-                                  title: Text(site.name),
-                                  subtitle: Text('${site.baseUrl} (${site.siteType.displayName})'),
-                                  selected: !_isCustomSite && _presetIndex == _presetSites.indexOf(site),
-                                  onTap: () => _selectPresetSite(site),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                )),
+                                // 过滤后的预设模板列表（新格式，支持多URL）
+                                ..._filteredPresetTemplates.map((template) => _buildTemplateListTile(template)),
                               ],
                               
                               // 无搜索结果提示
-                              if (_filteredPresetSites.isEmpty && _presetSearchController.text.isNotEmpty)
+                              if (_filteredPresetTemplates.isEmpty && _presetSearchController.text.isNotEmpty)
                                 Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: Text(
@@ -1265,26 +1325,111 @@ class _SiteEditPageState extends State<SiteEditPage> {
                   },
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _baseUrlController,
-                  readOnly: !_isCustomSite,
-                  decoration: InputDecoration(
-                    labelText: 'Base URL',
-                    hintText: '例如: https://api.m-team.cc/',
-                    border: const OutlineInputBorder(),
-                    filled: !_isCustomSite,
-                    fillColor: !_isCustomSite ? Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : null,
+                // Base URL字段 - 根据是否选择模板显示不同的UI
+                if (_isCustomSite) ...[
+                  // 自定义站点：显示文本输入框
+                  TextFormField(
+                    controller: _baseUrlController,
+                    decoration: const InputDecoration(
+                      labelText: 'Base URL',
+                      hintText: '例如: https://api.m-team.cc/',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return '请输入站点地址';
+                      }
+                      if (!value.startsWith('http')) {
+                        return '请输入有效的URL（以http开头）';
+                      }
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return '请输入站点地址';
-                    }
-                    if (!value.startsWith('http')) {
-                      return '请输入有效的URL（以http开头）';
-                    }
-                    return null;
-                  },
-                ),
+                ] else ...[
+                  // 预设站点：显示URL选择下拉框（所有预设站点现在都是模板格式）
+                  if (_selectedTemplateUrl != null) ...[
+                    // 模板站点：显示下拉选择框
+                    () {
+                      final template = _presetTemplates.firstWhere(
+                        (t) => t.baseUrls.contains(_selectedTemplateUrl),
+                        orElse: () => throw StateError('Template not found for selected URL'),
+                      );
+                      
+                      return DropdownButtonFormField<String>(
+                         initialValue: _selectedTemplateUrl,
+                        decoration: InputDecoration(
+                          labelText: 'Base URL',
+                          border: const OutlineInputBorder(),
+                          filled: true,
+                          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                        ),
+                        items: template.baseUrls.map((url) {
+                          return DropdownMenuItem<String>(
+                            value: url,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  url == template.primaryUrl ? Icons.star : Icons.link,
+                                  color: url == template.primaryUrl 
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    url,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (url == template.primaryUrl) ...[
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '主要',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(context).colorScheme.primary,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (String? newUrl) {
+                          if (newUrl != null) {
+                            setState(() {
+                              _selectedTemplateUrl = newUrl;
+                              _baseUrlController.text = newUrl;
+                            });
+                          }
+                        },
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return '请选择站点地址';
+                          }
+                          return null;
+                        },
+                      );
+                    }(),
+                  ] else ...[
+                    // 如果没有选择模板URL但不是自定义站点，显示提示信息
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Theme.of(context).colorScheme.outline),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '请先选择一个预设站点',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
                 const SizedBox(height: 16),
               ],
 

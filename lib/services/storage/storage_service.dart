@@ -75,7 +75,7 @@ class StorageService {
   Future<SharedPreferences> get _prefs async => SharedPreferences.getInstance();
 
   // 版本管理
-  static const String currentVersion = '1.1.0';
+  static const String currentVersion = '1.2.0';
   
   /// 检查并执行数据迁移
   Future<void> checkAndMigrate() async {
@@ -90,6 +90,8 @@ class StorageService {
       // 处理其他版本迁移
       if (storedVersion == '1.0.0') {
         await _migrateFrom100To110();
+      } else if (storedVersion == '1.1.0') {
+        await _migrateFrom110To120();
       }
       await prefs.setString(StorageKeys.appVersion, currentVersion);
     }
@@ -205,6 +207,24 @@ class StorageService {
       }
     } catch (_) {
       // 迁移失败，忽略
+    }
+  }
+
+  /// 从1.1.0迁移到1.2.0
+  Future<void> _migrateFrom110To120() async {
+    // 1.2.0版本主要添加了多URL模板支持
+    // 由于SiteConfig.fromJson已经具备向后兼容性，
+    // 现有的站点配置可以无缝使用新的多URL模板系统
+    // 这里不需要特殊的数据迁移逻辑
+    try {
+      if (kDebugMode) {
+        print('数据迁移: 1.1.0 -> 1.2.0 (多URL模板支持)');
+      }
+    } catch (e) {
+      // 迁移失败时记录错误，但不阻塞应用启动
+      if (kDebugMode) {
+        print('数据迁移失败: $e');
+      }
     }
   }
 
