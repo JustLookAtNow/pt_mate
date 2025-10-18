@@ -34,7 +34,10 @@ abstract class SiteAdapter {
   Future<Map<String, dynamic>> queryHistory({required List<String> tids});
   
   /// 切换种子收藏状态
-  Future<void> toggleCollection({required String id, required bool make});
+  Future<void> toggleCollection({
+    required String torrentId,
+    required bool make,
+  });
   
   /// 测试连接是否有效
   Future<bool> testConnection();

@@ -130,13 +130,12 @@ class NexusPHPWebAdapter extends SiteAdapter {
   /// 加载优惠类型映射配置
   Future<void> _loadDiscountMapping() async {
     try {
-      final template = await SiteConfigService.getDefaultTemplate(
-        'NexusPHPWeb',
+      final template = await SiteConfigService.getTemplateById(
+        _siteConfig.templateId,
+        _siteConfig.siteType,
       );
-      if (template != null && template['discountMapping'] != null) {
-        _discountMapping = Map<String, String>.from(
-          template['discountMapping'],
-        );
+      if (template?.discountMapping != null) {
+        _discountMapping = Map<String, String>.from(template!.discountMapping);
       }
       final specialMapping = await SiteConfigService.getDiscountMapping(
         _siteConfig.baseUrl,
@@ -171,85 +170,24 @@ class NexusPHPWebAdapter extends SiteAdapter {
   @override
   Future<MemberProfile> fetchMemberProfile({String? apiKey}) async {
     try {
-      final response = await _dio.get('/usercp.php');
+      // 获取配置信息
+      final config = await _getUserInfoConfig();
+      final path = config['path'] as String? ?? 'usercp.php';
+
+      final response = await _dio.get('/$path');
       final soup = BeautifulSoup(response.data);
 
-      // 查找用户信息块
-      final infoBlock = soup.find('table', id: 'info_block');
-      if (infoBlock == null) {
-        throw Exception('未找到用户信息块');
-      }
+      // 根据配置提取用户信息
+      final userInfo = await _extractUserInfoByConfig(soup, config);
 
-      final userInfo = infoBlock.find('span', class_: 'medium');
-      if (userInfo == null) {
-        throw Exception('未找到用户信息');
-      }
+      // 提取PassKey（如果配置了）
+      String? passKey = await _extractPassKeyByConfig();
 
-      // 提取userId
-      String? userId;
-      final allLink = userInfo.findAll('a');
-      // 过滤 href 中含有 "abc" 的
-      for (var a in allLink) {
-        final href = a.attributes['href'];
-        if (href != null && href.contains('userdetails.php?id=')) {
-          RegExp regExp = RegExp(r'userdetails.php\?id=(\d+)');
-          final match = regExp.firstMatch(href);
-          if (match != null) {
-            userId = match.group(1);
-          }
-        }
-      }
-
-      // 提取用户名
-      final usernameElement = userInfo.find('span')?.a?.b;
-      if (usernameElement == null) {
-        throw Exception('未找到用户名');
-      }
-      final username = usernameElement.text.trim();
-
-      // 提取文本信息
-      final textInfo = userInfo.text.trim();
-
-      // 使用正则表达式提取各项数据
-      final ratioMatch = RegExp(r'分享率:\s*([^\s]+)').firstMatch(textInfo);
-      final ratio = ratioMatch?.group(1)?.trim() ?? '0';
-
-      final uploadMatch = RegExp(r'上传量:\s*(.*?B)').firstMatch(textInfo);
-      final uploadString = uploadMatch?.group(1)?.trim() ?? '0 B';
-
-      final downloadMatch = RegExp(r'下载量:\s*(.*?B)').firstMatch(textInfo);
-      final downloadString = downloadMatch?.group(1)?.trim() ?? '0 B';
-
-      final bonusMatch = RegExp(r':\s*([^\s]+)\s*\[签到').firstMatch(textInfo);
-      final bonus = bonusMatch?.group(1)?.trim() ?? '0';
-
-      // 提取PassKey
-      String? passKey;
-      final outerTd = soup.find('td', id: 'outer');
-      if (outerTd != null) {
-        final tables = outerTd.children;
-        var thisTable = false;
-        var mainText = '';
-        for (var table in tables) {
-          if (thisTable) {
-            mainText = table.text;
-            break;
-          }
-          if (table.getAttrValue('class') == 'main') {
-            thisTable = true;
-          }
-        }
-
-        final passKeyMatch = RegExp(r'密钥\s*([^\s]{32})').firstMatch(mainText);
-        if (passKeyMatch != null) {
-          passKey = passKeyMatch.group(1)?.trim();
-        }
-      }
-      // 提取userId
-
-      // 将字符串格式的数据转换为数字（简单转换，实际可能需要更复杂的逻辑）
-      double shareRate = double.tryParse(ratio) ?? 0.0;
-      double bonusPoints = double.tryParse(bonus.replaceAll(',', '')) ?? 0.0;
+      // 将字符串格式的数据转换为数字
+      double shareRate = double.tryParse(userInfo['ratio'] ?? '0') ?? 0.0;
+      double bonusPoints =
+          double.tryParse((userInfo['bonus'] ?? '0').replaceAll(',', '')) ??
+          0.0;
 
       // 对于bytes，由于web版本直接提供格式化字符串，这里设置为0
       // 实际使用时应该使用uploadedBytesString和downloadedBytesString
@@ -257,19 +195,435 @@ class NexusPHPWebAdapter extends SiteAdapter {
       int downloadedBytes = 0;
 
       return MemberProfile(
-        username: username,
+        username: userInfo['userName'] ?? '',
         bonus: bonusPoints,
         shareRate: shareRate,
         uploadedBytes: uploadedBytes,
         downloadedBytes: downloadedBytes,
-        uploadedBytesString: uploadString,
-        downloadedBytesString: downloadString,
-        userId: userId,
+        uploadedBytesString: userInfo['upload'] ?? '0 B',
+        downloadedBytesString: userInfo['download'] ?? '0 B',
+        userId: userInfo['userId'],
         passKey: passKey,
       );
     } catch (e) {
       throw Exception('获取用户资料失败: $e');
     }
+  }
+
+  /// 获取指定类型的配置
+  /// [configType] 配置类型，如 'userInfo', 'passKey', 'search', 'categories' 等
+  Future<Map<String, dynamic>> _getFinderConfig(String configType) async {
+    // 优先读取 SiteConfig.templateId 对应的配置
+    if (_siteConfig.templateId != '-1') {
+      try {
+        final template = await SiteConfigService.getTemplateById(
+          _siteConfig.templateId,
+          _siteConfig.siteType,
+        );
+        if (template != null && template.infoFinder != null) {
+          final infoFinder = template.infoFinder!;
+          if (infoFinder[configType] != null) {
+            return infoFinder[configType] as Map<String, dynamic>;
+          }
+        }
+      } catch (e) {
+        // 如果获取模板配置失败，继续使用默认配置
+        if (kDebugMode) {
+          print('获取模板配置失败: $e');
+        }
+      }
+    }
+
+    // 没有找到模板配置或模板ID为-1，使用默认的 NexusPHPWeb 配置
+    final template = await SiteConfigService.getTemplateById(
+      '',
+      SiteType.nexusphpweb,
+    );
+    if (template != null && template.infoFinder != null) {
+      final infoFinder = template.infoFinder!;
+      if (infoFinder[configType] != null) {
+        return infoFinder[configType] as Map<String, dynamic>;
+      }
+    }
+
+    // 如果都没有找到，返回空配置（会导致异常）
+    throw Exception('未找到 $configType 提取配置');
+  }
+
+  /// 获取用户信息配置（保持向后兼容）
+  Future<Map<String, dynamic>> _getUserInfoConfig() async {
+    return _getFinderConfig('userInfo');
+  }
+
+  /// 根据配置提取用户信息
+  Future<Map<String, String?>> _extractUserInfoByConfig(
+    BeautifulSoup soup,
+    Map<String, dynamic> config,
+  ) async {
+    final result = <String, String?>{};
+
+    // 获取行选择器配置
+    final rowsConfig = config['rows'] as Map<String, dynamic>?;
+    final fieldsConfig = config['fields'] as Map<String, dynamic>?;
+
+    if (rowsConfig == null || fieldsConfig == null) {
+      throw Exception('配置格式错误：缺少 rows 或 fields 配置');
+    }
+
+    // 根据行选择器找到目标元素
+    final rowSelector = rowsConfig['selector'] as String?;
+    if (rowSelector == null || rowSelector.isEmpty) {
+      throw Exception('配置错误：缺少行选择器');
+    }
+
+    final targetElement = _findFirstElementBySelector(soup, rowSelector);
+    if (targetElement == null) {
+      throw Exception('未找到目标元素：$rowSelector');
+    }
+
+    // 遍历字段配置，提取每个字段的值
+    for (final fieldEntry in fieldsConfig.entries) {
+      final fieldName = fieldEntry.key;
+      final fieldConfig = fieldEntry.value as Map<String, dynamic>;
+
+      try {
+        final value = await _extractFirstFieldValue(targetElement, fieldConfig);
+        result[fieldName] = value;
+      } catch (e) {
+        // 如果某个字段提取失败，记录但继续处理其他字段
+        result[fieldName] = null;
+      }
+    }
+
+    return result;
+  }
+
+  /// 根据配置提取PassKey
+  Future<String?> _extractPassKeyByConfig() async {
+    try {
+      // 获取PassKey配置
+      final passKeyConfig = await _getFinderConfig('passKey');
+
+      // 获取PassKey页面路径
+      final path = passKeyConfig['path'] as String?;
+      if (path == null || path.isEmpty) {
+        throw Exception('PassKey配置中缺少path字段');
+      }
+      final response = await _dio.get('/$path');
+      final soup = BeautifulSoup(response.data);
+
+      // 获取行选择器配置
+      final rowsConfig = passKeyConfig['rows'] as Map<String, dynamic>?;
+
+      if (rowsConfig == null) {
+        throw Exception('配置格式错误：缺少 rows 配置');
+      }
+
+      // 根据行选择器找到目标元素
+      final rowSelector = rowsConfig['selector'] as String?;
+      if (rowSelector == null || rowSelector.isEmpty) {
+        throw Exception('配置错误：缺少行选择器');
+      }
+
+      final targetElement = _findFirstElementBySelector(soup, rowSelector);
+      if (targetElement == null) {
+        throw Exception('未找到目标元素：$rowSelector');
+      }
+
+      // 根据配置提取PassKey
+      final fields = passKeyConfig['fields'] as Map<String, dynamic>?;
+      final passKeyField = fields?['passKey'] as Map<String, dynamic>?;
+
+      if (passKeyField != null) {
+        final value = await _extractFirstFieldValue(
+          targetElement,
+          passKeyField,
+        );
+        if (value != null && value.isNotEmpty) {
+          return value.trim();
+        }
+      }
+
+      throw Exception('无法从配置中提取PassKey');
+    } catch (e) {
+      throw Exception('提取PassKey失败: $e');
+    }
+  }
+
+  /// 根据选择器查找所有匹配的元素
+  List<dynamic> _findElementBySelector(dynamic soup, String selector) {
+    if (soup == null) return [];
+
+    selector = selector.trim();
+    if (selector.isEmpty) return [soup];
+
+    // 首先处理子选择器（>），因为它可能包含其他类型的选择器
+    if (selector.contains('>')) {
+      final parts = selector.split('>').map((s) => s.trim()).toList();
+      List<dynamic> current = [soup];
+
+      for (final part in parts) {
+        if (current.isEmpty) break;
+        List<dynamic> next = [];
+        for (final element in current) {
+          if (part == 'next') {
+            // 处理 next 关键字，获取下一个兄弟元素
+            final nextSibling = element.nextSibling;
+            if (nextSibling != null) {
+              next.add(nextSibling);
+            }
+          } else {
+            next.addAll(_findElementBySelector(element, part));
+          }
+        }
+        current = next;
+      }
+      return current;
+    }
+
+    // 处理属性选择器
+    // 1. 属性存在性选择器 tag[attr]
+    final attributeExistsMatch = RegExp(
+      r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)\]$',
+    ).firstMatch(selector);
+    if (attributeExistsMatch != null) {
+      final tag = attributeExistsMatch.group(1)?.trim();
+      final attribute = attributeExistsMatch.group(2)?.trim();
+
+      if (attribute != null) {
+        // 获取所有指定标签的元素（如果没有指定标签，则获取所有元素）
+        if (tag != null && tag.isNotEmpty) {
+          return soup.findAll(tag, attrs: {attribute: true});
+        } else {
+          return soup.findAll('*', attrs: {attribute: true});
+        }
+      }
+    }
+
+    // 2. 属性值选择器 tag[attr^="value"], tag[attr="value"], tag[attr~="pattern"]
+    final attributeValueMatch = RegExp(
+      r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$',
+    ).firstMatch(selector);
+    if (attributeValueMatch != null) {
+      final tag = attributeValueMatch.group(1)?.trim();
+      final attribute = attributeValueMatch.group(2)?.trim();
+      final operator = attributeValueMatch.group(3)?.trim();
+      final value = attributeValueMatch.group(4)?.trim();
+
+      if (attribute != null && operator != null && value != null) {
+        // 获取所有指定标签的元素（如果没有指定标签，则获取所有元素）
+        final elements = tag != null && tag.isNotEmpty
+            ? soup.findAll(tag)
+            : soup.findAll('*');
+
+        final filteredElements = <dynamic>[];
+        for (final element in elements) {
+          final attrValue = element.attributes[attribute];
+          if (attrValue != null) {
+            final normalizedAttrValue = _normalizeHrefForComparison(attrValue);
+
+            bool matches = false;
+            switch (operator) {
+              case '^': // 前缀匹配
+                matches = normalizedAttrValue.startsWith(value);
+                break;
+              case '=': // 完全匹配
+                matches = normalizedAttrValue == value;
+                break;
+              case '~': // 正则匹配
+                try {
+                  final regex = RegExp(value);
+                  matches = regex.hasMatch(normalizedAttrValue);
+                } catch (e) {
+                  // 正则表达式无效，跳过
+                  matches = false;
+                }
+                break;
+            }
+
+            if (matches) {
+              filteredElements.add(element);
+            }
+          }
+        }
+        return filteredElements;
+      }
+    }
+
+    // 处理单个选择器
+    if (selector.contains(':nth-child')) {
+      // nth-child选择器
+      if (selector.contains(':nth-child(')) {
+        // 带括号数字的 nth-child 选择器
+        final nthChildMatch = RegExp(
+          r'^([^:]*):nth-child\((\d+)\)',
+        ).firstMatch(selector);
+        if (nthChildMatch != null) {
+          final tag = nthChildMatch.group(1)?.trim();
+          final index = int.tryParse(nthChildMatch.group(2) ?? '1') ?? 1;
+
+          // 获取直接子元素
+          final children = soup.children;
+          if (children.isNotEmpty && index > 0 && index <= children.length) {
+            final nthChild = children[index - 1]; // nth-child是1-based索引
+
+            // 如果指定了标签，验证第n个子元素是否匹配该标签
+            if (tag != null && tag.isNotEmpty) {
+              if (nthChild.name.toLowerCase() == tag.toLowerCase()) {
+                return [nthChild];
+              }
+              // 如果第n个子元素不匹配指定标签，返回空列表
+              return [];
+            } else {
+              // 如果没有指定标签，直接返回第n个子元素
+              return [nthChild];
+            }
+          }
+        }
+      } else {
+        // 不带括号的 nth-child 选择器，只取直接子元素中的指定标签
+        final nthChildMatch = RegExp(
+          r'^([^:]+):nth-child$',
+        ).firstMatch(selector);
+        if (nthChildMatch != null) {
+          final tag = nthChildMatch.group(1)?.trim();
+          if (tag != null && tag.isNotEmpty) {
+            // 只在直接子元素中查找指定标签
+            final children = soup.children;
+            final matchingChildren = children
+                .where((child) => child.name.toLowerCase() == tag.toLowerCase())
+                .toList();
+            return matchingChildren;
+          }
+        }
+      }
+    } else if (selector.contains('#')) {
+      // ID选择器
+      final parts = selector.split('#');
+      if (parts.length == 2) {
+        final tag = parts[0].isEmpty ? null : parts[0];
+        final id = parts[1].split(' ').first; // 处理复合选择器
+        if (tag != null) {
+          return soup.findAll(tag, id: id);
+        } else {
+          return soup.findAll('*', id: id);
+        }
+      }
+    } else if (selector.contains('.')) {
+      // 类选择器
+      final parts = selector.split('.');
+      if (parts.length == 2) {
+        final tag = parts[0].isEmpty ? null : parts[0];
+        final className = parts[1].split(' ').first; // 处理复合选择器
+        if (tag != null) {
+          return soup.findAll(tag, attrs: {'class': className});
+        } else {
+          return soup.findAll('*', attrs: {'class': className});
+        }
+      }
+    } else {
+      // 简单标签选择器
+      return soup.findAll(selector);
+    }
+
+    return [];
+  }
+
+  /// 根据选择器查找第一个匹配的元素（向后兼容）
+  dynamic _findFirstElementBySelector(dynamic soup, String selector) {
+    final elements = _findElementBySelector(soup, selector);
+    return elements.isNotEmpty ? elements.first : null;
+  }
+
+  /// 根据字段配置提取字段值列表
+  Future<List<String>> _extractFieldValue(
+    dynamic element,
+    Map<String, dynamic> fieldConfig,
+  ) async {
+    final selector = fieldConfig['selector'] as String?;
+    final attribute = fieldConfig['attribute'] as String?;
+    final filter = fieldConfig['filter'] as Map<String, dynamic>?;
+
+    List<dynamic> targetElements = [element];
+
+    // 如果有选择器，进一步定位元素
+    if (selector != null && selector.isNotEmpty) {
+      targetElements = _findElementBySelector(element, selector);
+    }
+
+    if (targetElements.isEmpty) {
+      return [];
+    }
+
+    // 遍历所有目标元素，提取属性值
+    List<String> values = [];
+    for (final targetElement in targetElements) {
+      if (targetElement == null) continue;
+
+      // 根据属性类型获取值
+      String? value;
+      if (attribute == 'text') {
+        value = targetElement.text?.trim();
+      } else if (attribute == 'href') {
+        value = targetElement.attributes['href'];
+      } else {
+        value = targetElement.attributes[attribute ?? 'text'];
+      }
+
+      // 如果有过滤器，应用过滤器
+      if (filter != null && value != null) {
+        value = _applyFilter(value, filter);
+      }
+
+      // 只添加非空值
+      if (value != null && value.isNotEmpty) {
+        values.add(value.replaceAll('\n', ' ').replaceAll(RegExp(r'\s+'), ' '));
+      }
+    }
+
+    return values;
+  }
+
+  /// 根据字段配置提取第一个字段值（向后兼容）
+  Future<String?> _extractFirstFieldValue(
+    dynamic element,
+    Map<String, dynamic> fieldConfig,
+  ) async {
+    final values = await _extractFieldValue(element, fieldConfig);
+    return values.isNotEmpty ? values.first : null;
+  }
+
+  /// 标准化href属性用于比较
+  /// 将绝对URL转换为相对路径格式，便于与配置中的路径进行比较
+  String _normalizeHrefForComparison(String href) {
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+      final uri = Uri.tryParse(href);
+      if (uri != null) {
+        return uri.path.substring(1) +
+            (uri.query.isNotEmpty ? '?${uri.query}' : '');
+      }
+    }
+    return href;
+  }
+
+  /// 应用过滤器
+  String? _applyFilter(String value, Map<String, dynamic> filter) {
+    final filterName = filter['name'] as String?;
+
+    if (filterName == 'regexp') {
+      final args = filter['args'] as String?;
+      final index = filter['index'] as int? ?? 0;
+
+      if (args != null) {
+        final regex = RegExp(args);
+        final match = regex.firstMatch(value);
+        if (match != null && match.groupCount >= index) {
+          return match.group(index); // group(0) 是整个匹配，group(1) 是第一个捕获组
+        }
+      }
+    }
+
+    return null;
   }
 
   @override
@@ -330,7 +684,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
       );
       final soup = BeautifulSoup(response.data);
       // 解析种子列表
-      final torrents = parseTorrentList(soup);
+      final torrents = await parseTorrentList(soup);
 
       // 解析总页数（从JavaScript变量maxpage中提取）
       int totalPages = parseTotalPages(soup);
@@ -365,244 +719,237 @@ class NexusPHPWebAdapter extends SiteAdapter {
     return totalPages;
   }
 
-  List<TorrentItem> parseTorrentList(BeautifulSoup soup) {
-    // 解析种子列表
+  Future<List<TorrentItem>> parseTorrentList(BeautifulSoup soup) async {
     final torrents = <TorrentItem>[];
-    final torrentTable = soup.find('table', class_: 'torrents');
 
-    if (torrentTable != null) {
-      final List<Bs4Element> rows = torrentTable.children.isNotEmpty
-          ? torrentTable.children[0].children
-          : <Bs4Element>[];
+    try {
+      // 获取搜索配置
+      final searchConfig = await _getFinderConfig('search');
 
-      // 跳过表头行，从第二行开始处理种子数据
-      for (int i = 1; i < rows.length; i++) {
-        final Bs4Element row = rows[i];
-        final List<Bs4Element> tds = row.children;
+      final rowsConfig = searchConfig['rows'] as Map<String, dynamic>?;
+      final fieldsConfig = searchConfig['fields'] as Map<String, dynamic>?;
 
-        if (tds.length <= 6) continue;
+      if (rowsConfig == null || fieldsConfig == null) {
+        debugPrint('行配置或字段配置不存在');
+        return torrents;
+      }
+
+      final rowSelector = rowsConfig['selector'] as String?;
+      if (rowSelector == null) {
+        debugPrint('行选择器不存在');
+        return torrents;
+      }
+
+      // 使用配置的选择器查找行
+      final rows = _findElementBySelector(soup, rowSelector);
+
+      for (final rowElement in rows) {
+        final row = rowElement as Bs4Element;
         try {
-          final Bs4Element? torrentNameTable = tds[1].find(
-            'table',
-            class_: 'torrentname',
+          // 提取种子ID - 如果提取失败则跳过当前行
+          final torrentIdConfig =
+              fieldsConfig['torrentId'] as Map<String, dynamic>?;
+          if (torrentIdConfig == null) {
+            continue;
+          }
+
+          final torrentIdList = await _extractFieldValue(row, torrentIdConfig);
+          final torrentId = torrentIdList.isNotEmpty ? torrentIdList.first : '';
+          if (torrentId.isEmpty) {
+            continue; // 种子ID提取失败，跳过当前行
+          }
+
+          // 提取其他字段
+          final torrentNameList = await _extractFieldValue(
+            row,
+            fieldsConfig['torrentName'] as Map<String, dynamic>? ?? {},
           );
-          final List<Bs4Element> torrentNameTds =
-              torrentNameTable?.children[0].children[0].children ??
-              <Bs4Element>[];
-          var cover = "";
-          var doubanRating = 'N/A';
-          var imdbRating = 'N/A';
-          Bs4Element? coverTd;
-          Bs4Element? titleTd;
-          Bs4Element? scoreTd;
-          Bs4Element? starTd;
-          if (torrentNameTds.length > 3) {
-            //有封面，有评分的
-            coverTd = torrentNameTds[0];
-            titleTd = torrentNameTds[1];
-            scoreTd = torrentNameTds[2];
-            starTd = torrentNameTds[3];
-          } else if ((torrentNameTable?.find(
-                    'img',
-                    attrs: {'title': 'douban'},
-                  ) !=
-                  null) ||
-              (torrentNameTable?.find('img', attrs: {'title': 'imdb'}) !=
-                  null)) {
-            //有评分，没封面的
-            titleTd = torrentNameTds[0];
-            scoreTd = torrentNameTds[1];
-            starTd = torrentNameTds[2];
-          } else {
-            //有封面，没评分的
-            coverTd = torrentNameTds[0];
-            titleTd = torrentNameTds[1];
-            starTd = torrentNameTds[2];
-          }
-          //提取封面 
-          if(coverTd != null){
-            final Bs4Element? img = coverTd.find('img');
-            if (img != null) {
-              cover = img.getAttrValue('data-src') ?? '';
-            }
-          }
-          // 提取评分
-          if(scoreTd != null){
-            final Bs4Element? doubanRatingImg = scoreTd.find(
-              'img',
-              attrs: {'title': 'douban'},
+          final torrentName = torrentNameList.isNotEmpty
+              ? torrentNameList.first
+              : '';
+
+          final descriptionList = await _extractFieldValue(
+            row,
+            fieldsConfig['description'] as Map<String, dynamic>? ?? {},
+          );
+          final description = descriptionList.isNotEmpty
+              ? descriptionList.first
+              : '';
+
+          final discountList = await _extractFieldValue(
+            row,
+            fieldsConfig['discount'] as Map<String, dynamic>? ?? {},
+          );
+          final discount = discountList.isNotEmpty ? discountList.first : '';
+
+          final discountEndTimeList = await _extractFieldValue(
+            row,
+            fieldsConfig['discountEndTime'] as Map<String, dynamic>? ?? {},
+          );
+          final discountEndTime = discountEndTimeList.isNotEmpty
+              ? discountEndTimeList.first
+              : '';
+
+          final seedersTextList = await _extractFieldValue(
+            row,
+            fieldsConfig['seedersText'] as Map<String, dynamic>? ?? {},
+          );
+          final seedersText = seedersTextList.isNotEmpty
+              ? seedersTextList.first
+              : '';
+
+          final leechersTextList = await _extractFieldValue(
+            row,
+            fieldsConfig['leechersText'] as Map<String, dynamic>? ?? {},
+          );
+          final leechersText = leechersTextList.isNotEmpty
+              ? leechersTextList.first
+              : '';
+
+          final sizeTextList = await _extractFieldValue(
+            row,
+            fieldsConfig['sizeText'] as Map<String, dynamic>? ?? {},
+          );
+          final sizeText = sizeTextList.isNotEmpty ? sizeTextList.first : '';
+
+          final downloadStatusTextList = await _extractFieldValue(
+            row,
+            fieldsConfig['downloadStatus'] as Map<String, dynamic>? ?? {},
+          );
+          final downloadUrlConfig =
+              fieldsConfig['downloadUrl'] as Map<String, dynamic>? ?? {};
+          var downloadUrl = '';
+          if (downloadUrlConfig['value'] != null) {
+            downloadUrl = downloadUrlConfig['value'] as String? ?? '';
+            downloadUrl = downloadUrl.replaceAll('{torrentId}', torrentId);
+            downloadUrl = downloadUrl.replaceAll(
+              '{passKey}',
+              _siteConfig.passKey!,
             );
-            final Bs4Element? imdbRatingImg = scoreTd.find(
-              'img',
-              attrs: {'title': 'imdb'},
+            var baseUrl = _siteConfig.baseUrl;
+            if (_siteConfig.baseUrl.endsWith("/")) {
+              baseUrl = _siteConfig.baseUrl.substring(
+                0,
+                _siteConfig.baseUrl.length - 1,
+              );
+            }
+            downloadUrl = downloadUrl.replaceAll('{baseUrl}', baseUrl);
+          }
+
+          final downloadStatusText = downloadStatusTextList.isNotEmpty
+              ? downloadStatusTextList.first
+              : '';
+
+          final coverList = await _extractFieldValue(
+            row,
+            fieldsConfig['cover'] as Map<String, dynamic>? ?? {},
+          );
+          final cover = coverList.isNotEmpty ? coverList.first : '';
+
+          final createDateList = await _extractFieldValue(
+            row,
+            fieldsConfig['createData'] as Map<String, dynamic>? ?? {},
+          );
+          final createDate = createDateList.isNotEmpty
+              ? createDateList.first
+              : '';
+
+          final doubanRatingList = await _extractFieldValue(
+            row,
+            fieldsConfig['doubanRating'] as Map<String, dynamic>? ?? {},
+          );
+          final doubanRating = doubanRatingList.isNotEmpty
+              ? doubanRatingList.first
+              : '';
+
+          final imdbRatingList = await _extractFieldValue(
+            row,
+            fieldsConfig['imdbRating'] as Map<String, dynamic>? ?? {},
+          );
+          final imdbRating = imdbRatingList.isNotEmpty
+              ? imdbRatingList.first
+              : '';
+
+          // 检查收藏状态（布尔字段）
+          final collectionConfig =
+              fieldsConfig['collection'] as Map<String, dynamic>?;
+          bool collection = false;
+          if (collectionConfig != null) {
+            final collectionList = await _extractFieldValue(
+              row,
+              collectionConfig,
             );
-            if (doubanRatingImg != null) {
-              doubanRating = doubanRatingImg.nextSibling?.text ?? 'N/A';
-            }
-            if (imdbRatingImg != null) {
-              imdbRating = imdbRatingImg.nextSibling?.text ?? 'N/A';
-            }
+            collection = collectionList.isNotEmpty; // 如果找不到元素说明未收藏
           }
 
-
-          // 提取收藏
-          final Bs4Element? starImg = starTd.find(
-            'img',
-            class_: 'delbookmark',
-          );
-          final collection = starImg == null;
-          // 提取种子ID（从详情链接中）
-          final Bs4Element? detailLink = titleTd.find(
-            'a[href*="details.php"]',
-          );
-
-          final String href = detailLink?.attributes['href'] ?? '';
-          final RegExpMatch? idMatch = RegExp(r'id=(\d+)').firstMatch(href);
-          if (idMatch == null) continue;
-
-          final String torrentId = idMatch.group(1) ?? '';
-          if (torrentId.isEmpty) continue;
-
-          // 提取主标题（去除换行）
-          final Bs4Element? titleElement = titleTd.find(
-            'a[href*="details.php"] b',
-          );
-          String title = '';
-          if (titleElement != null) {
-            title = titleElement.text
-                .replaceAll('\n', ' ')
-                .replaceAll(RegExp(r'\s+'), ' ')
-                .trim();
-          }
-
-          // 提取描述：只要纯文本，把标题去掉。
-          String description =
-              titleTd.text
-                  .replaceAll('\n', ' ')
-                  .replaceAll(RegExp(r'\s+'), ' ')
-                  .trim()
-                  .replaceAll(title, '')
-                  .replaceAll(RegExp(r'剩余时间：\d+.*?\d+[分钟|时]'), '') ;
-          // 提取下载记录
-          DownloadStatus status = DownloadStatus.none;
-          final Bs4Element? downloadDiv = titleTd.find(
-            'div',
-            attrs: {'title': true},
-          );
-          if (downloadDiv != null) {
-            final String? downloadTitle = downloadDiv.getAttrValue('title');
-            if (downloadTitle != null) {
-              final RegExp regExp = RegExp(r'(\d+)\%');
-              final RegExpMatch? match = regExp.firstMatch(downloadTitle);
-              if (match != null) {
-                final String? percent = match.group(1);
-                if (percent != null) {
-                  final int percentInt = int.parse(percent);
-                  if (percentInt == 100) {
-                    status = DownloadStatus.completed;
-                  } else {
-                    status = DownloadStatus.downloading;
-                  }
-                }
+          // 解析下载状态
+          DownloadStatus downloadStatus = DownloadStatus.none;
+          if (downloadStatusText.isNotEmpty) {
+            final percentInt = int.tryParse(downloadStatusText);
+            if (percentInt != null) {
+              if (percentInt == 100) {
+                downloadStatus = DownloadStatus.completed;
+              } else {
+                downloadStatus = DownloadStatus.downloading;
               }
             }
           }
-          // 提取创建时间（第4列，索引3）
-          final String createDate =
-              tds[3].find('span[title]')?.attributes['title'] ?? '';
-          // 提取大小（第5列，索引4）
-          final String sizeText = tds[4].text.replaceAll('\n', ' ').trim();
 
-          // 提取做种数（第6列，索引5）
-          String seedersText = '';
-          final Bs4Element? seedersElement = tds[5].find('a');
-          if (seedersElement != null) {
-            seedersText = seedersElement.text.trim();
-          } else {
-            final Bs4Element? boldElement = tds[5].find('b');
-            if (boldElement != null) {
-              seedersText = boldElement.text.trim();
-            } else {
-              seedersText = tds[5].text.trim();
-            }
-          }
-
-          // 提取下载数（第7列，索引6）
-          String leechersText = '';
-          final Bs4Element? leechersElement = tds[6].find('a');
-          if (leechersElement != null) {
-            leechersText = leechersElement.text.trim();
-          } else {
-            final Bs4Element? boldElement = tds[6].find('b');
-            if (boldElement != null) {
-              leechersText = boldElement.text.trim();
-            } else {
-              leechersText = tds[6].text.trim();
-            }
-          }
-
-          // 提取优惠信息
-          String? promoType;
-          String? remainingTime;
-          Bs4Element? promoImg = tds[1].find('img[onmouseover]');
-          promoImg ??= tds[1].find('img', class_: 'pro_free');
-          if (promoImg != null) {
-            promoType = promoImg.attributes['alt'] ?? '';
-
-            // 提取剩余时间：使用正则表达式匹配"剩余时间：<span title=\"...\">...</span>"
-            final titleCellHtml = tds[1].innerHtml;
-            final timeRegex = RegExp(r'剩余时间：<span[^>]*>([^<]+)</span>');
-            final timeMatch = timeRegex.firstMatch(titleCellHtml);
-            if (timeMatch != null) {
-              remainingTime = timeMatch.group(1)?.trim() ?? '';
-            }
-          }
-
-          // 解析文件大小为字节数，因为有按大小排序，所以要处理单位
+          // 解析文件大小为字节数
           int sizeInBytes = 0;
-          final sizeMatch = RegExp(r'([\d.]+)\s*(\w+)').firstMatch(sizeText);
-          if (sizeMatch != null) {
-            final sizeValue = double.tryParse(sizeMatch.group(1) ?? '0') ?? 0;
-            final unit = sizeMatch.group(2)?.toUpperCase() ?? 'B';
+          if (sizeText.isNotEmpty) {
+            final sizeMatch = RegExp(r'([\d.]+)\s*(\w+)').firstMatch(sizeText);
+            if (sizeMatch != null) {
+              final sizeValue = double.tryParse(sizeMatch.group(1) ?? '0') ?? 0;
+              final unit = sizeMatch.group(2)?.toUpperCase() ?? 'B';
 
-            switch (unit) {
-              case 'KB':
-                sizeInBytes = (sizeValue * 1024).round();
-                break;
-              case 'MB':
-                sizeInBytes = (sizeValue * 1024 * 1024).round();
-                break;
-              case 'GB':
-                sizeInBytes = (sizeValue * 1024 * 1024 * 1024).round();
-                break;
-              case 'TB':
-                sizeInBytes = (sizeValue * 1024 * 1024 * 1024 * 1024).round();
-                break;
-              default:
-                sizeInBytes = sizeValue.round();
+              switch (unit) {
+                case 'KB':
+                  sizeInBytes = (sizeValue * 1024).round();
+                  break;
+                case 'MB':
+                  sizeInBytes = (sizeValue * 1024 * 1024).round();
+                  break;
+                case 'GB':
+                  sizeInBytes = (sizeValue * 1024 * 1024 * 1024).round();
+                  break;
+                case 'TB':
+                  sizeInBytes = (sizeValue * 1024 * 1024 * 1024 * 1024).round();
+                  break;
+                default:
+                  sizeInBytes = sizeValue.round();
+              }
             }
           }
+
+          // 清理文本字段
+          final cleanedDescription = description
+              .replaceAll(torrentName, '')
+              .replaceAll(RegExp(r'剩余时间：\d+.*?\d+[分钟|时]'), '')
+              .trim();
 
           torrents.add(
             TorrentItem(
               id: torrentId,
-              name: title,
-              smallDescr: description,
+              name: torrentName,
+              smallDescr: cleanedDescription,
               discount: _parseDiscountType(
-                promoType?.isNotEmpty == true ? promoType : null,
+                discount.isNotEmpty ? discount : null,
               ),
-              discountEndTime: _convertRelativeTimeToAbsolute(remainingTime),
-              downloadUrl: null, // 暂时不提供直接下载链接
+              discountEndTime: _convertRelativeTimeToAbsolute(
+                discountEndTime.isNotEmpty ? discountEndTime : null,
+              ),
+              downloadUrl: downloadUrl.isNotEmpty ? downloadUrl : null,
               seeders: int.tryParse(seedersText) ?? 0,
               leechers: int.tryParse(leechersText) ?? 0,
               sizeBytes: sizeInBytes,
-              downloadStatus: status,
+              downloadStatus: downloadStatus,
               collection: collection,
               imageList: [], // 暂时不解析图片列表
               cover: cover,
               createdDate: createDate,
-              doubanRating: doubanRating,
-              imdbRating: imdbRating,
+              doubanRating: doubanRating.isNotEmpty ? doubanRating : 'N/A',
+              imdbRating: imdbRating.isNotEmpty ? imdbRating : 'N/A',
             ),
           );
         } catch (e) {
@@ -610,7 +957,10 @@ class NexusPHPWebAdapter extends SiteAdapter {
           continue;
         }
       }
+    } catch (e) {
+      debugPrint('获取搜索配置失败: $e');
     }
+
     return torrents;
   }
 
@@ -711,13 +1061,65 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
   @override
   Future<void> toggleCollection({
-    required String id,
+    required String torrentId,
     required bool make,
   }) async {
     try {
-      // 发送GET请求到bookmark.php，传入torrentid参数
-      // 根据用户要求，不需要关注mark字段，直接请求即可自动切换收藏状态
-      await _dio.get('/bookmark.php', queryParameters: {'torrentid': id});
+      // 从站点模板配置中获取收藏请求配置
+      final template = await SiteConfigService.getTemplateById(
+        _siteConfig.templateId,
+        _siteConfig.siteType,
+      );
+
+      final collectConfig =
+          template?.request?['collect'] as Map<String, dynamic>?;
+
+      if (collectConfig != null) {
+        final url =
+            collectConfig['path'] as String? ??
+            collectConfig['url'] as String? ??
+            '/bookmark.php';
+        final method = collectConfig['method'] as String? ?? 'GET';
+        final params = Map<String, dynamic>.from(
+          collectConfig['params'] as Map<String, dynamic>? ?? {},
+        );
+        final headers = Map<String, String>.from(
+          collectConfig['headers'] as Map<String, dynamic>? ?? {},
+        );
+
+        // 替换参数中的占位符
+        final processedParams = <String, dynamic>{};
+        params.forEach((key, value) {
+          if (value is String && value.contains('{torrentId}')) {
+            processedParams[key] = value.replaceAll('{torrentId}', torrentId);
+          } else {
+            processedParams[key] = value;
+          }
+        });
+
+        // 准备请求选项
+        final options = Options(
+          method: method.toUpperCase(),
+          headers: headers.isNotEmpty ? headers : null,
+        );
+
+        // 根据配置的方法发送请求
+        if (method.toUpperCase() == 'POST') {
+          await _dio.post(url, data: processedParams, options: options);
+        } else {
+          await _dio.get(
+            url,
+            queryParameters: processedParams,
+            options: options,
+          );
+        }
+      } else {
+        // 如果没有配置，使用默认的收藏请求
+        await _dio.get(
+          '/bookmark.php',
+          queryParameters: {'torrentid': torrentId},
+        );
+      }
     } catch (e) {
       throw Exception('切换收藏状态失败: $e');
     }
@@ -733,9 +1135,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
   Future<List<SearchCategoryConfig>> getSearchCategories() async {
     // 通过baseUrl匹配预设配置
     final defaultCategories =
-        await SiteConfigService.getDefaultSearchCategories(
-          _siteConfig.baseUrl,
-        );
+        await SiteConfigService.getDefaultSearchCategories(_siteConfig.baseUrl);
 
     // 如果获取到默认分类配置，则直接返回
     if (defaultCategories.isNotEmpty) {
@@ -749,14 +1149,22 @@ class NexusPHPWebAdapter extends SiteAdapter {
     );
 
     try {
-      final response = await _dio.get('/usercp.php?action=tracker');
+      // 获取分类配置
+      final categoriesConfig = await _getFinderConfig('categories');
+      final path = categoriesConfig['path'] as String?;
+
+      if (path == null || path.isEmpty) {
+        throw Exception('配置错误：缺少 categories.path');
+      }
+
+      final response = await _dio.get('/$path');
 
       if (response.statusCode == 200) {
         final htmlContent = response.data as String;
         final soup = BeautifulSoup(htmlContent);
 
         // 解析HTML获取分类信息
-        final parsedCategories = _parseCategories(soup);
+        final parsedCategories = await _parseCategories(soup, categoriesConfig);
         categories.addAll(parsedCategories);
       }
 
@@ -767,119 +1175,102 @@ class NexusPHPWebAdapter extends SiteAdapter {
     }
   }
 
-  /// 解析HTML文档中的分类信息
-  List<SearchCategoryConfig> _parseCategories(BeautifulSoup soup) {
+  /// 配置驱动的分类解析
+  Future<List<SearchCategoryConfig>> _parseCategories(
+    BeautifulSoup soup,
+    Map<String, dynamic> categoriesConfig,
+  ) async {
     final List<SearchCategoryConfig> categories = [];
 
-    final outerElement = soup.find('#outer');
-    if (outerElement == null) return categories;
+    // 获取行选择器配置
+    final rowsConfig = categoriesConfig['rows'] as Map<String, dynamic>?;
+    final fieldsConfig = categoriesConfig['fields'] as Map<String, dynamic>?;
 
-    var currentBatch = <Map<String, String>>[];
+    if (rowsConfig == null || fieldsConfig == null) {
+      throw Exception('配置格式错误：缺少 rows 或 fields 配置');
+    }
 
-    final formElement = outerElement.find(
-      'form',
-      attrs: {'action': 'usercp.php'},
-    );
+    // 根据行选择器找到所有目标元素（支持多个批次）
+    final rowSelector = rowsConfig['selector'] as String?;
+    if (rowSelector == null || rowSelector.isEmpty) {
+      throw Exception('配置错误：缺少行选择器');
+    }
 
-    if (formElement == null) return categories;
+    final rowElements = _findElementBySelector(soup, rowSelector);
+    if (rowElements.isEmpty) {
+      throw Exception('未找到目标元素：$rowSelector');
+    }
 
-    final table2 = formElement.find('table');
-    List<Bs4Element> infoTables = [];
-    if (table2 == null) {
-      //<form method="post" action="usercp.php"></form>没闭合。
-      for (var element in outerElement.children) {
-        final checkboxes = element.findAll('input[type="checkbox"]');
-        if (checkboxes.isNotEmpty) {
-          for (var checkbox in checkboxes) {
-            final categoryName = checkbox.attributes['name'] ?? '';
-            final categoryId = checkbox.attributes['id'] ?? '';
-            if (categoryName.isNotEmpty &&
-                categoryName.startsWith("cat") &&
-                categoryId.isNotEmpty &&
-                categoryId.startsWith("cat")) {
-              infoTables = element.findAll('table');
-              if (infoTables.isNotEmpty) {
-                break;
-              }
-            }
-          }
-        }
-      }
-    } else {
-      infoTables = table2.findAll('table');
+    // 获取字段配置
+    final categoryIdConfig =
+        fieldsConfig['categoryId'] as Map<String, dynamic>?;
+    final categoryNameConfig =
+        fieldsConfig['categoryName'] as Map<String, dynamic>?;
+
+    if (categoryIdConfig == null || categoryNameConfig == null) {
+      throw Exception('配置错误：缺少 categoryId 或 categoryName 字段配置');
     }
 
     int batchIndex = 1;
 
-    for (final infoTable in infoTables) {
-      final rows = infoTable.findAll('tr');
+    // 遍历每个 row 元素（每个代表一个批次）
+    for (final rowElement in rowElements) {
+      // 提取当前 row 中的所有 categoryId
+      final categoryIds = await _extractFieldValue(
+        rowElement,
+        categoryIdConfig,
+      );
 
-      for (final row in rows) {
-        final tds = row.findAll('td');
-        var hasCategories = false;
+      // 提取当前 row 中的所有 categoryName
+      final categoryNames = await _extractFieldValue(
+        rowElement,
+        categoryNameConfig,
+      );
 
-        if (tds.isNotEmpty) {
-          for (final td in tds) {
-            final img = td.find('img');
-            final checkbox = td.find('input[type="checkbox"]');
+      // 检查是否有有效的字段提取结果
+      if (categoryIds.isEmpty && categoryNames.isEmpty) {
+        // 未提取到有效fields的不计数
+        continue;
+      }
 
-            if (img != null) {
-              final alt = img.attributes['alt'] ?? '';
-              final title = img.attributes['title'] ?? '';
-              final categoryName = alt.isNotEmpty ? alt : title;
-              final categoryId = checkbox?.attributes['id'] ?? '';
+      // 确保 categoryId 和 categoryName 数量一致
+      final minLength = categoryIds.length < categoryNames.length
+          ? categoryIds.length
+          : categoryNames.length;
 
-              if (categoryName.isNotEmpty && categoryId.isNotEmpty) {
-                currentBatch.add({'name': categoryName, 'id': categoryId});
-                hasCategories = true;
-              }
-            }
+      if (minLength == 0) {
+        continue; // 跳过没有有效数据的批次
+      }
+
+      // 一一对应创建分类配置
+      for (int i = 0; i < minLength; i++) {
+        final categoryId = categoryIds[i];
+        final categoryName = categoryNames[i];
+
+        if (categoryId.isNotEmpty && categoryName.isNotEmpty) {
+          // 确定前缀
+          String prefix;
+          if (batchIndex == 1) {
+            prefix = 'normal#';
+          } else if (batchIndex == 2) {
+            prefix = 'special#';
+          } else {
+            prefix = 'batch$batchIndex#';
           }
-        }
 
-        // 如果当前行没有分类信息，处理当前批次（如果有内容）
-        if (!hasCategories && currentBatch.isNotEmpty) {
-          _processBatch(categories, currentBatch, batchIndex);
-          batchIndex++;
-          currentBatch.clear();
+          categories.add(
+            SearchCategoryConfig(
+              id: categoryId,
+              displayName: batchIndex > 1 ? 's_$categoryName' : categoryName,
+              parameters: '{"category":"$prefix$categoryId"}',
+            ),
+          );
         }
       }
-    }
 
-    // 处理最后一个批次（如果还有未处理的分类）
-    if (currentBatch.isNotEmpty) {
-      _processBatch(categories, currentBatch, batchIndex);
+      batchIndex++;
     }
 
     return categories;
-  }
-
-  /// 处理分类批次，添加到分类列表中
-  void _processBatch(
-    List<SearchCategoryConfig> categories,
-    List<Map<String, String>> batch,
-    int batchIndex,
-  ) {
-    String prefix;
-    if (batchIndex == 1) {
-      prefix = 'normal#';
-    } else if (batchIndex == 2) {
-      prefix = 'special#';
-    } else {
-      prefix = 'batch$batchIndex#';
-    }
-
-    for (final category in batch) {
-      final categoryName = category['name']!;
-      final categoryId = category['id']!;
-
-      categories.add(
-        SearchCategoryConfig(
-          id: categoryId,
-          displayName: batchIndex > 1 ? 's_$categoryName' : categoryName,
-          parameters: '{"category":"$prefix$categoryId"}',
-        ),
-      );
-    }
   }
 }

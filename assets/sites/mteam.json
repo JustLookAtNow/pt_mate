@@ -1,6 +1,7 @@
 {
   "id": "mteam",
   "name": "M-Team",
+  "isShow": true,
   "baseUrls": [
     "https://api.m-team.cc",
     "https://kp.m-team.cc",

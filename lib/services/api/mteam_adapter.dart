@@ -54,9 +54,12 @@ class MTeamAdapter extends SiteAdapter {
   /// 加载优惠类型映射配置
   Future<void> _loadDiscountMapping() async {
     try {
-      final template = await SiteConfigService.getDefaultTemplate('M-Team');
-      if (template != null && template['discountMapping'] != null) {
-        _discountMapping = Map<String, String>.from(template['discountMapping']);
+      final template = await SiteConfigService.getTemplateById(
+        '',
+        SiteType.mteam,
+      );
+      if (template?.discountMapping != null) {
+        _discountMapping = Map<String, String>.from(template!.discountMapping);
       }
       final specialMapping = await SiteConfigService.getDiscountMapping(_siteConfig.baseUrl);
       if (specialMapping.isNotEmpty) {
@@ -348,9 +351,9 @@ class MTeamAdapter extends SiteAdapter {
   }
   
   @override
-  Future<void> toggleCollection({required String id, required bool make}) async {
+  Future<void> toggleCollection({required String torrentId, required bool make}) async {
     final formData = FormData.fromMap({
-      'id': id,
+      'id': torrentId,
       'make': make,
     });
     

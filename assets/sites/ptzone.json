@@ -1,13 +1,9 @@
 {
-  "id": "xingyunge",
-  "name": "星陨阁",
+  "id": "ptzone",
+  "name": "PTZone",
   "isShow": true,
-  "baseUrls": [
-    "https://pt.xingyungept.org/",
-    "https://pt.xingyungept.cn/",
-    "http://xing.xingyunge.sbs/"
-  ],
-  "primaryUrl": "https://pt.xingyungept.org/",
+  "baseUrls": ["https://ptzone.xyz/"],
+  "primaryUrl": "https://ptzone.xyz/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
   "features": {

@@ -1,13 +1,9 @@
 {
-  "id": "xingyunge",
-  "name": "星陨阁",
-  "isShow": true,
-  "baseUrls": [
-    "https://pt.xingyungept.org/",
-    "https://pt.xingyungept.cn/",
-    "http://xing.xingyunge.sbs/"
-  ],
-  "primaryUrl": "https://pt.xingyungept.org/",
+  "id": "nicept",
+  "name": "老师",
+  "isShow": false,
+  "baseUrls": ["https://www.nicept.net/"],
+  "primaryUrl": "https://www.nicept.net/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
   "features": {

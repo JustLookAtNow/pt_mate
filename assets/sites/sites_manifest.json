@@ -1,8 +1,6 @@
 {
   "sites": [
-    "mteam-kp.json",
-    "mteam-tp.json", 
-    "mteam-api.json",
+    "mteam.json",
     "ptskit.json",
     "hxpt.json",
     "zmpt.json",
@@ -10,6 +8,9 @@
     "cangbao.json",
     "lajidui.json",
     "ptfans.json",
-    "xingyunge.json"
+    "xingyunge.json",
+    "ourbits.json",
+    "ptzone.json",
+    "nicept.json"
   ]
 }

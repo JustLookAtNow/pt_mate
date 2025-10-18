@@ -313,11 +313,23 @@ class StorageService {
     try {
       final list = (jsonDecode(str) as List).cast<Map<String, dynamic>>();
       final configs = <SiteConfig>[];
+      bool hasUpdates = false;
       
       for (final json in list) {
-        final baseConfig = SiteConfig.fromJson(json);
-        final apiKey = await _loadSiteApiKey(baseConfig.id);
-        configs.add(baseConfig.copyWith(apiKey: apiKey));
+        final result = await SiteConfig.fromJsonAsync(json);
+        final apiKey = await _loadSiteApiKey(result.config.id);
+        final finalConfig = result.config.copyWith(apiKey: apiKey);
+        configs.add(finalConfig);
+        
+        // 如果templateId被更新了，标记需要重新保存
+        if (result.needsUpdate) {
+          hasUpdates = true;
+        }
+      }
+      
+      // 如果有配置被更新，重新保存到持久化存储
+      if (hasUpdates) {
+        await saveSiteConfigs(configs);
       }
       
       return configs;

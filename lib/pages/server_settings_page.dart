@@ -600,12 +600,17 @@ class _SiteEditPageState extends State<SiteEditPage> {
     final query = _presetSearchController.text.toLowerCase();
     setState(() {
       if (query.isEmpty) {
-        _filteredPresetTemplates = _presetTemplates;
+        _filteredPresetTemplates = _presetTemplates
+            .where((template) => template.isShow)
+            .toList();
       } else {
         _filteredPresetTemplates = _presetTemplates.where((template) {
-          return template.name.toLowerCase().contains(query) ||
-                 template.baseUrls.any((url) => url.toLowerCase().contains(query)) ||
-                 template.siteType.displayName.toLowerCase().contains(query);
+          return template.isShow &&
+              (template.name.toLowerCase().contains(query) ||
+                  template.baseUrls.any(
+                    (url) => url.toLowerCase().contains(query),
+                  ) ||
+                  template.siteType.displayName.toLowerCase().contains(query));
         }).toList();
       }
     });
@@ -702,14 +707,13 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
   Future<void> _loadDefaultFeatures(SiteType siteType) async {
     try {
-      final defaultTemplate = await SiteConfigService.getDefaultTemplate(
-        siteType.id,
+      final defaultTemplate = await SiteConfigService.getTemplateById(
+        "",
+        siteType
       );
-      if (defaultTemplate != null && defaultTemplate['features'] != null) {
+      if (defaultTemplate?.features != null) {
         setState(() {
-          _siteFeatures = SiteFeatures.fromJson(
-            defaultTemplate['features'] as Map<String, dynamic>,
-          );
+          _siteFeatures = defaultTemplate!.features;
         });
       } else {
         // 如果没有找到默认模板，使用硬编码的默认值
@@ -1872,6 +1876,7 @@ class _ProfileView extends StatelessWidget {
           Text('上传: ${profile.uploadedBytesString}'),
           Text('下载: ${profile.downloadedBytesString}'),
           Text('分享率: ${Formatters.shareRate(profile.shareRate)}'),
+          Text('passKey: ${profile.passKey}')
         ],
       ),
     );

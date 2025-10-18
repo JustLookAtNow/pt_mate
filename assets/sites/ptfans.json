@@ -1,9 +1,8 @@
 {
   "id": "ptfans",
   "name": "PTFans",
-  "baseUrls": [
-    "https://ptfans.cc/"
-  ],
+  "isShow": true,
+  "baseUrls": ["https://ptfans.cc/"],
   "primaryUrl": "https://ptfans.cc/",
   "siteType": "NexusPHP",
   "searchCategories": [],

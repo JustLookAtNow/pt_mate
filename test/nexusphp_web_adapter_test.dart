@@ -54,7 +54,7 @@ void main() {
       }
     });
 
-    test('should extract torrent data from all applicable files', () {
+    test('should extract torrent data from all applicable files', () async {
       print('\n=== Torrent Data Extraction ===');
 
       for (final fileName in soups.keys) {
@@ -63,7 +63,7 @@ void main() {
           continue;
         }
         final soup = soups[fileName]!;
-        List<TorrentItem> torrents = adapter.parseTorrentList(soup);
+        List<TorrentItem> torrents = await adapter.parseTorrentList(soup);
         print('  Found ${torrents.length} torrents');
         int totalPages = adapter.parseTotalPages(soup);
         print('  Total pages: $totalPages');

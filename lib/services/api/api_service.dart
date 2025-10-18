@@ -165,7 +165,7 @@ class ApiService {
     if (_activeAdapter == null) {
       throw StateError('No active site adapter available');
     }
-    return _activeAdapter!.toggleCollection(id: id, make: make);
+    return _activeAdapter!.toggleCollection(torrentId: id, make: make);
   }
   
   /// 测试连接

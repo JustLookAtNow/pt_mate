@@ -1,9 +1,8 @@
 {
   "id": "afun",
   "name": "AFUN",
-  "baseUrls": [
-    "https://www.ptlover.cc/"
-  ],
+  "isShow": true,
+  "baseUrls": ["https://www.ptlover.cc/"],
   "primaryUrl": "https://www.ptlover.cc/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],

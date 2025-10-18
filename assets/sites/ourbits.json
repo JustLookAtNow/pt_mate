@@ -1,9 +1,8 @@
 {
   "id": "outbits",
   "name": "我堡",
-  "baseUrls": [
-    "https://ourbits.club/"
-  ],
+  "isShow": true,
+  "baseUrls": ["https://ourbits.club/"],
   "primaryUrl": "https://ourbits.club/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
@@ -18,128 +17,189 @@
     "advancedSearch": true
   },
   "discountMapping": {},
-  "infoFinder":{
-    "userInfo":{},
-    "search":{
-   
-      "path": "torrents.php",
+  "infoFinder": {
+    "userInfo": {
+      "path": "usercp.php",
       "rows": {
-        "selector": "table.torrents > tbody > tr:has(a[href^=\"download.php?id=\"])"
+        "selector": "table#info_block > span.medium"
       },
       "fields": {
-        "category": {
-          "selector": "a[href^=\"?cat=\"]",
+        "userId": {
+          "selector": "a[href^=\"userdetails.php?id=\"]",
           "attribute": "href",
-          "filters": [
-            {
-              "name": "querystring",
-              "args": "cat"
-            }
-          ]
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "index": 1
+          }
         },
-        "title_default": {
-          "selector": "a[href^=\"details.php?id=\"]"
+        "userName": {
+          "selector": "a[href^=\"userdetails.php?id=\"] > b",
+          "attribute": "text"
         },
-        "title": {
-          "selector": "a[title][href^=\"details.php?id=\"]",
-          "attribute": "title",
-          "optional": true,
-          "default": "{{ .Result.title_default }}"
+        "ratio": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "分享率:\\s*([^\\s]+)",
+            "index": 1
+          }
         },
-        "details": {
-          "selector": "a[href^=\"details.php?id=\"]",
-          "attribute": "href"
+        "upload": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "上传量:\\s*(.*?B)",
+            "index": 1
+          }
         },
         "download": {
-          "selector": "a[href^=\"download.php?id=\"]",
-          "attribute": "href"
-        },
-        "poster": {
-          "selector": "img[data-src]",
-          "attribute": "data-src"
-        },
-        "imdbid": {
-          "selector": "a[href*=\"imdb.com/title/tt\"]",
-          "attribute": "href"
-        },
-        "doubanid": {
-          "selector": "a[href*=\"movie.douban.com/subject/\"]",
-          "attribute": "href"
-        },
-        "date_elapsed": {
-          "selector": "td:nth-child(4) > span[title]",
-          "attribute": "title",
-          "optional": true,
-          "filters": [
-            {
-              "name": "append",
-              "args": " +08:00"
-            },
-            {
-              "name": "dateparse",
-              "args": "yyyy-MM-dd HH:mm:ss zzz"
-            }
-          ]
-        },
-        "date_added": {
-          "selector": "td:nth-child(4):not(:has(span))",
-          "optional": true,
-          "filters": [
-            {
-              "name": "append",
-              "args": " +08:00"
-            },
-            {
-              "name": "dateparse",
-              "args": "yyyy-MM-ddHH:mm:ss zzz"
-            }
-          ]
-        },
-        "date": {
-          "text": "{{ if or .Result.date_elapsed .Result.date_added }}{{ or .Result.date_elapsed .Result.date_added }}{{ else }}now{{ end }}"
-        },
-        "size": {
-          "selector": "td:nth-child(5)"
-        },
-        "seeders": {
-          "selector": "td:nth-child(6)"
-        },
-        "leechers": {
-          "selector": "td:nth-child(7)"
-        },
-        "grabs": {
-          "selector": "td:nth-child(8)"
-        },
-        "downloadvolumefactor": {
-          "case": {
-            "img.pro_free": 0,
-            "img.pro_free2up": 0,
-            "img.pro_50pctdown": 0.5,
-            "img.pro_50pctdown2up": 0.5,
-            "img.pro_30pctdown": 0.3,
-            "*": 1
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "下载量:\\s*(.*?B)",
+            "index": 1
           }
         },
-        "uploadvolumefactor": {
-          "case": {
-            "img.pro_50pctdown2up": 2,
-            "img.pro_free2up": 2,
-            "img.pro_2up": 2,
-            "*": 1
+        "bonus": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": ":\\s*([^\\s]+)\\s*\\(签到",
+            "index": 1
           }
-        },
-        "description": {
-          "selector": "td:nth-child(2)",
-          "remove": "a, b, font, img, span"
-        },
-        "minimumratio": {
-          "text": "1.0"
-        },
-        "minimumseedtime": {
-          "text": "172800"
         }
       }
     },
-    "categories":{}
+    "passKey": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "#outer > table:nth-child(2) > tbody > tr:nth-child(5) > td.rowfollow > p"
+      },
+      "fields": {
+        "passKey": {
+          "selector": "",
+          "attribute": "text"
+        }
+      }
+    },
+    "search": {
+      "torrentPath": "torrents.php",
+      "specialPath": "special.php",
+      "rows": {
+        "selector": "table.torrents > tbody:nth-child(1) > tr:nth-child"
+      },
+      "fields": {
+        "torrentId": {
+          "selector": "a[href^=\"details.php?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "index": 1
+          }
+        },
+        "torrentName": {
+          "selector": "a[href^=\"details.php?id=\"] > b",
+          "attribute": "text"
+        },
+        "description": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1)",
+          "attribute": "text"
+        },
+        "discount": {
+          "selector": "table.torrentname > img[class^=\"pro_free\"]",
+          "attribute": "alt"
+        },
+        "discountEndTime": {
+          "selector": "table.torrentname > img[class^=\"pro_free\"]",
+          "attribute": "onmouseover",
+          "filter": {
+            "name": "regexp",
+            "args": "<span title=&quot;(.*?)&quot;>",
+            "index": 1
+          }
+        },
+        "downloadUrl": {
+          "value": "{baseUrl}/download.php?id={torrentId}&passkey={passKey}&https=1"
+        },
+        "seedersText": {
+          "selector": "td:nth-child(6)",
+          "attribute": "text"
+        },
+        "leechersText": {
+          "selector": "td:nth-child(7)",
+          "attribute": "text"
+        },
+        "sizeText": {
+          "selector": "td:nth-child(5)",
+          "attribute": "text"
+        },
+        "downloadStatus": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > div[title]",
+          "attribute": "title",
+          "filter": {
+            "name": "regexp",
+            "args": "(d+)%",
+            "index": 1
+          }
+        },
+        "collection": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(5) > img.bookmark",
+          "attribute": "src"
+        },
+        "cover": {},
+        "createData": {
+          "selector": "td:nth-child(4) > span[title]",
+          "attribute": "title"
+        },
+        "doubanRating": {
+          "selector": "table.torrentname > img[title==\"douban\"] > next",
+          "attribute": "text"
+        },
+        "imdbRating": {
+          "selector": "table.torrentname > img[title==\"imdb\"] > next",
+          "attribute": "text"
+        }
+      }
+    },
+    "categories": {
+      "path": "usercp.php?action=tracker",
+      "rows": {
+        "selector": "#outer > table:nth-child(2) > tbody > tr:nth-child(1) > td.rowfollow > table"
+      },
+      "fields": {
+        "categoryId": {
+          "selector": "a[href~=\"(torrents|special)\\.php\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "cat=(\\d+)",
+            "index": 1
+          }
+        },
+        "categoryName": {
+          "selector": "a[href~=\"(torrents|special)\\.php\"] > img",
+          "attribute": "title"
+        }
+      }
+    }
+  },
+  "request": {
+    "collect": {
+      "path": "/api.php",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "params": {
+        "action": "bookmark",
+        "tid": "{torrentId}"
+      }
+    }
   }
 }

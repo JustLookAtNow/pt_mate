@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../services/site_config_service.dart';
 
 // 用户资料信息
 class MemberProfile {
@@ -581,6 +582,17 @@ class AggregateSearchSettings {
   String toString() => jsonEncode(toJson());
 }
 
+/// 站点配置加载结果
+class SiteConfigLoadResult {
+  final SiteConfig config;
+  final bool needsUpdate; // 是否需要更新持久化数据
+
+  const SiteConfigLoadResult({
+    required this.config,
+    required this.needsUpdate,
+  });
+}
+
 class SiteConfig {
   final String id; // 唯一标识符
   final String name;
@@ -608,7 +620,7 @@ class SiteConfig {
     this.isActive = true,
     this.searchCategories = const [],
     this.features = SiteFeatures.mteamDefault,
-    this.templateId = '-1',
+    this.templateId = '',
   });
 
   SiteConfig copyWith({
@@ -712,6 +724,74 @@ class SiteConfig {
     );
   }
 
+  /// 异步版本的fromJson方法，使用配置文件中的URL映射
+  static Future<SiteConfigLoadResult> fromJsonAsync(Map<String, dynamic> json) async {
+    List<SearchCategoryConfig> categories = [];
+    if (json['searchCategories'] != null) {
+      try {
+        final list = (json['searchCategories'] as List)
+            .cast<Map<String, dynamic>>();
+        categories = list.map(SearchCategoryConfig.fromJson).toList();
+      } catch (_) {
+        // 解析失败时使用默认配置
+        categories = SearchCategoryConfig.getDefaultConfigs();
+      }
+    } else {
+      // 如果没有配置，使用默认配置
+      categories = SearchCategoryConfig.getDefaultConfigs();
+    }
+
+    // 解析功能配置
+    SiteFeatures features = SiteFeatures.mteamDefault;
+    if (json['features'] != null) {
+      try {
+        features = SiteFeatures.fromJson(
+          json['features'] as Map<String, dynamic>,
+        );
+      } catch (_) {
+        // 解析失败时使用默认配置
+        features = SiteFeatures.mteamDefault;
+      }
+    }
+
+    // 处理 templateId 字段的兼容性（异步版本）
+    String templateId = json['templateId'] as String? ?? '';
+    bool needsUpdate = false;
+    
+    if (templateId.isEmpty || templateId == '-1') {
+      // 如果没有 templateId，根据 baseUrl 匹配预设站点（使用异步方法）
+      final baseUrl = json['baseUrl'] as String;
+      templateId = await SiteConfig.getTemplateIdByBaseUrlAsync(baseUrl);
+      // 如果成功获取到了有效的templateId，标记需要更新持久化数据
+      needsUpdate = templateId.isNotEmpty && templateId != '-1';
+    }
+
+    final config = SiteConfig(
+      id:
+          json['id'] as String? ??
+          'legacy-${DateTime.now().millisecondsSinceEpoch}',
+      name: json['name'] as String,
+      baseUrl: json['baseUrl'] as String,
+      apiKey: json['apiKey'] as String?,
+      passKey: json['passKey'] as String?,
+      cookie: json['cookie'] as String?,
+      userId: json['userId'] as String?,
+      siteType: SiteType.values.firstWhere(
+        (type) => type.id == (json['siteType'] as String? ?? 'M-Team'),
+        orElse: () => SiteType.mteam,
+      ),
+      isActive: json['isActive'] as bool? ?? true,
+      searchCategories: categories,
+      features: features,
+      templateId: templateId,
+    );
+
+    return SiteConfigLoadResult(
+      config: config,
+      needsUpdate: needsUpdate,
+    );
+  }
+
   /// 根据 baseUrl 匹配预设站点的模板ID
   static String _getTemplateIdByBaseUrl(String baseUrl) {
     // 标准化 baseUrl，移除末尾的斜杠
@@ -719,36 +799,19 @@ class SiteConfig {
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
     
-    // 多URL模板的映射（新格式）
-    final Map<String, List<String>> multiUrlTemplateMapping = {
-      'mteam-kp': [
-        'https://kp.m-team.cc',
-        'https://kp.m-team.io',
-        'https://kp.m-team.org',
-      ],
-      'mteam-tp': [
-        'https://tp.m-team.cc',
-        'https://tp.m-team.io', 
-        'https://tp.m-team.org',
-      ],
-    };
+    // 注意：这个方法保留硬编码映射作为后备方案
+    // 主要的URL映射现在从配置文件中读取，请使用 getTemplateIdByBaseUrlAsync 方法
     
-    // 首先检查多URL模板
-    for (final entry in multiUrlTemplateMapping.entries) {
-      final templateId = entry.key;
-      final urls = entry.value;
-      for (final url in urls) {
-        final normalizedUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
-        if (normalizedUrl == normalizedBaseUrl) {
-          return templateId;
-        }
-      }
-    }
-    
-    // 兼容旧的单URL映射
-    final Map<String, String> legacyPresetSiteMapping = {
+    // 兼容性映射（后备方案）
+    final Map<String, String> fallbackMapping = {
       'https://api.m-team.cc': 'mteam-api',
-      'https://ptskit.com': 'ptskit',
+      'https://kp.m-team.cc': 'mteam-kp',
+      'https://kp.m-team.io': 'mteam-kp',
+      'https://kp.m-team.org': 'mteam-kp',
+      'https://tp.m-team.cc': 'mteam-tp',
+      'https://tp.m-team.io': 'mteam-tp',
+      'https://tp.m-team.org': 'mteam-tp',
+      'https://www.ptskit.org': 'ptskit',
       'https://www.hxpt.org': 'hxpt',
       'https://zmpt.cc': 'zmpt',
       'https://www.afun.tv': 'afun',
@@ -758,7 +821,31 @@ class SiteConfig {
       'https://xingyunge.org': 'xingyunge',
     };
     
-    return legacyPresetSiteMapping[normalizedBaseUrl] ?? '-1';
+    return fallbackMapping[normalizedBaseUrl] ?? '-1';
+  }
+
+  /// 异步方法：根据 baseUrl 匹配预设站点的模板ID（从配置文件读取）
+  static Future<String> getTemplateIdByBaseUrlAsync(String baseUrl) async {
+    // 标准化 baseUrl，移除末尾的斜杠
+    final normalizedBaseUrl = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    
+    try {
+      // 从配置文件获取URL映射
+      final urlMapping = await SiteConfigService.getUrlToTemplateIdMapping();
+      final templateId = urlMapping[normalizedBaseUrl];
+      
+      if (templateId != null) {
+        return templateId;
+      }
+    } catch (e) {
+      // 如果从配置文件读取失败，使用同步方法作为后备
+      // Failed to load URL mapping from config: $e
+    }
+    
+    // 后备方案：使用同步方法
+    return _getTemplateIdByBaseUrl(baseUrl);
   }
 
   @override
@@ -770,53 +857,68 @@ class SiteConfig {
 class SiteConfigTemplate {
   final String id; // 唯一标识符
   final String name; // 站点名称
+  final bool isShow; // 是否在下拉列表中显示，默认为 true
   final List<String> baseUrls; // 支持多个URL地址
   final String? primaryUrl; // 主要URL（可选，用于标识默认选择）
   final SiteType siteType; // 网站类型
   final List<SearchCategoryConfig> searchCategories; // 查询分类配置
   final SiteFeatures features; // 功能支持配置
   final Map<String, String> discountMapping; // 优惠映射配置
+  final Map<String, dynamic>? infoFinder; // 信息提取器配置
+  final Map<String, dynamic>? request; // 请求配置
 
   const SiteConfigTemplate({
     required this.id,
     required this.name,
+    this.isShow = true,
     required this.baseUrls,
     this.primaryUrl,
     this.siteType = SiteType.mteam,
     this.searchCategories = const [],
     this.features = SiteFeatures.mteamDefault,
     this.discountMapping = const {},
+    this.infoFinder,
+    this.request,
   });
 
   SiteConfigTemplate copyWith({
     String? id,
     String? name,
+    bool? isShow,
     List<String>? baseUrls,
     String? primaryUrl,
     SiteType? siteType,
     List<SearchCategoryConfig>? searchCategories,
     SiteFeatures? features,
     Map<String, String>? discountMapping,
+    Map<String, dynamic>? infoFinder,
+    Map<String, dynamic>? request,
   }) => SiteConfigTemplate(
     id: id ?? this.id,
     name: name ?? this.name,
+    isShow: isShow ?? this.isShow,
     baseUrls: baseUrls ?? this.baseUrls,
     primaryUrl: primaryUrl ?? this.primaryUrl,
     siteType: siteType ?? this.siteType,
     searchCategories: searchCategories ?? this.searchCategories,
     features: features ?? this.features,
     discountMapping: discountMapping ?? this.discountMapping,
+    infoFinder: infoFinder ?? this.infoFinder,
+    request: request ?? this.request,
   );
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
+    'isShow': isShow,
     'baseUrls': baseUrls,
     'primaryUrl': primaryUrl,
     'siteType': siteType.id,
     'searchCategories': searchCategories.map((e) => e.toJson()).toList(),
     'features': features.toJson(),
     'discountMapping': discountMapping,
+    'infoFinder': infoFinder,
+    'request': request,
   };
 
   factory SiteConfigTemplate.fromJson(Map<String, dynamic> json) {
@@ -871,9 +973,23 @@ class SiteConfigTemplate {
       }
     }
 
+    // 处理 infoFinder 配置
+    Map<String, dynamic>? infoFinder;
+    if (json['infoFinder'] != null) {
+      try {
+        infoFinder = Map<String, dynamic>.from(
+          json['infoFinder'] as Map<String, dynamic>,
+        );
+      } catch (_) {
+        // 解析失败时使用 null
+        infoFinder = null;
+      }
+    }
+
     return SiteConfigTemplate(
       id: json['id'] as String,
       name: json['name'] as String,
+      isShow: json['isShow'] as bool? ?? true,
       baseUrls: baseUrls,
       primaryUrl: json['primaryUrl'] as String?,
       siteType: SiteType.values.firstWhere(
@@ -883,6 +999,8 @@ class SiteConfigTemplate {
       searchCategories: categories,
       features: features,
       discountMapping: discountMapping,
+      infoFinder: infoFinder,
+      request: json['request'] as Map<String, dynamic>?,
     );
   }
 

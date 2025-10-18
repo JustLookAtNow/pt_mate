@@ -53,10 +53,13 @@ class NexusPHPAdapter implements SiteAdapter {
   /// 加载优惠类型映射配置
   Future<void> _loadDiscountMapping() async {
     try {
-      final template = await SiteConfigService.getDefaultTemplate('NexusPHP');
-      if (template != null && template['discountMapping'] != null) {
+      final template = await SiteConfigService.getTemplateById(
+        '',
+        SiteType.nexusphp,
+      );
+      if (template?.discountMapping != null) {
         _discountMapping = Map<String, String>.from(
-          template['discountMapping'],
+          template!.discountMapping,
         );
       }
       final specialMapping = await SiteConfigService.getDiscountMapping(
@@ -292,7 +295,7 @@ class NexusPHPAdapter implements SiteAdapter {
 
   @override
   Future<void> toggleCollection({
-    required String id,
+    required String torrentId,
     required bool make,
   }) async {
     try {
@@ -306,7 +309,7 @@ class NexusPHPAdapter implements SiteAdapter {
       }
 
       // 使用FormData发送请求
-      final formData = FormData.fromMap({'torrent_id': id});
+      final formData = FormData.fromMap({'torrent_id': torrentId});
 
       final response = await _dio.post(
         endpoint,

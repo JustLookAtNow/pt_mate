@@ -107,6 +107,189 @@
         "80%": "PERCENT_80",
         "90%": "PERCENT_90",
         "Normal": "NORMAL"
+      },
+      "infoFinder": {
+        "userInfo": {
+          "path": "usercp.php",
+          "rows": {
+            "selector": "table#info_block > span.medium"
+          },
+          "fields": {
+            "userId": {
+              "selector": "a[href^=\"userdetails.php?id=\"]",
+              "attribute": "href",
+              "filter": {
+                "name": "regexp",
+                "args": "id=(\\d+)",
+                "index": 1
+              }
+            },
+            "userName": {
+              "selector": "a[href^=\"userdetails.php?id=\"] > b",
+              "attribute": "text"
+            },
+            "ratio": {
+              "selector": "",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": "分享率:\\s*([^\\s]+)",
+                "index": 1
+              }
+            },
+            "upload": {
+              "selector": "",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": "上传量:\\s*(.*?B)",
+                "index": 1
+              }
+            },
+            "download": {
+              "selector": "",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": "下载量:\\s*(.*?B)",
+                "index": 1
+              }
+            },
+            "bonus": {
+              "selector": "",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": ":\\s*([^\\s]+)\\s*\\[签到",
+                "index": 1
+              }
+            }
+          }
+        },
+        "passKey": {
+          "path": "usercp.php",
+          "rows": {
+            "selector": "#outer > table:nth-child(3) > tbody > tr:nth-child(4) > td.rowfollow"
+          },
+          "fields": {
+            "passKey": {
+              "selector": "",
+              "attribute": "text"
+            }
+          }
+        },
+        "search": {
+          "torrentPath": "torrents.php",
+          "specialPath": "special.php",
+          "rows": {
+            "selector": "table.torrents > tbody:nth-child(1) > tr:nth-child"
+          },
+          "fields": {
+            "torrentId": {
+              "selector": "a[href^=\"details.php?id=\"]",
+              "attribute": "href",
+              "filter": {
+                "name": "regexp",
+                "args": "id=(\\d+)",
+                "index": 1
+              }
+            },
+            "torrentName": {
+              "selector": "a[href^=\"details.php?id=\"] > b",
+              "attribute": "text"
+            },
+            "description": {
+              "selector": "table.torrentname > tbody > tr > td:nth-child(2)",
+              "attribute": "text"
+            },
+            "discount": {
+              "selector": "table.torrentname > img[class^=\"pro_free\"]",
+              "attribute": "alt"
+            },
+            "discountEndTime":{
+              "selector": "table.torrentname > img[class^=\"pro_free\"]",
+              "attribute": "onmouseover",
+              "filter": {
+                "name": "regexp",
+                "args": "<span title=&quot;(.*?)&quot;>",
+                "index": 1
+              }
+            },
+            "downloadUrl":{
+            },
+            "seedersText":{
+              "selector": "td:nth-child(6)",
+              "attribute": "text"
+            },
+            "leechersText":{
+              "selector": "td:nth-child(7)",
+              "attribute": "text"
+            },
+            "sizeText":{
+              "selector": "td:nth-child(5)",
+              "attribute": "text"
+            },
+            "downloadStatus":{
+              "selector": "table.torrentname > tbody > tr > td:nth-child(2) > div[title]",
+              "attribute": "title",
+              "filter": {
+                "name": "regexp",
+                "args": "(d+)%",
+                "index": 1
+              }
+            },
+            "collection":{
+              "selector": "table.torrentname > tbody > tr > td:nth-child(4) > img.bookmark",
+              "attribute": "src"
+            },
+            "cover":{
+              "selector": "table.torrentname > tbody > tr > td:nth-child(1) > img[data-src]",
+              "attribute": "data-src"
+            },
+            "createData":{
+              "selector": "td:nth-child(4) > span[title]",
+              "attribute": "title"
+            },
+            "doubanRating":{
+              "selector": "table.torrentname > img[title==\"douban\"] > next",
+              "attribute": "text"
+            },
+            "imdbRating":{
+              "selector": "table.torrentname > img[title==\"imdb\"] > next",
+              "attribute": "text"
+            }
+          }
+        },
+        "categories": {
+          "path": "usercp.php?action=tracker",
+          "rows": {
+            "selector": "#outer > table:nth-child(3) > tbody > tr:nth-child(2) > td.rowfollow > table"
+          },
+          "fields": {
+            "categoryId": {
+              "selector": "a[href~=\"(torrents|special)\\.php\"]",
+              "attribute": "href",
+              "filter": {
+                "name": "regexp",
+                "args": "cat=(\\d+)",
+                "index": 1
+              }
+            },
+            "categoryName": {
+              "selector": "a[href~=\"(torrents|special)\\.php\"] > img",
+              "attribute": "title"
+            }
+          }
+        }
+      },
+      "request":{
+        "collect": {
+          "path":"/bookmark.php",
+          "method":"GET",
+          "params":{
+            "torrentid":"{torrentId}"
+          }
+        }
       }
     }
   }
