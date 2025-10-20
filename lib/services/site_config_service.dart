@@ -7,7 +7,7 @@ import '../models/app_models.dart';
 /// 负责从JSON文件加载预设的站点配置
 class SiteConfigService {
   static const String _configPath = 'assets/site_configs.json';
-  static const String _sitesManifestPath = 'assets/sites/sites_manifest.json';
+  static const String _sitesManifestPath = 'assets/sites_manifest.json';
   static const String _sitesBasePath = 'assets/sites/';
   
   /// URL到模板ID的映射缓存

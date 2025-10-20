@@ -4,6 +4,16 @@
 # 用法: ./install_all.sh release
 # 或者: ./install_all.sh debug
 
+# 首先生成最新的 sites_manifest.json
+echo "🔄 正在更新网站配置清单..."
+if [ -f "./generate_sites_manifest.sh" ]; then
+    ./generate_sites_manifest.sh
+    echo ""
+else
+    echo "⚠️  警告: generate_sites_manifest.sh 脚本未找到，跳过清单更新"
+    echo ""
+fi
+
 # 默认使用debug版本
 BUILD_TYPE="debug"
 
