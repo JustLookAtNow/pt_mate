@@ -410,17 +410,15 @@ class TorrentListItem extends StatelessWidget {
                       fontSize: 12,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     '发布于 ${Formatters.formatTorrentCreatedDate(torrent.createdDate)} 前',
                     style: TextStyle(
                       fontSize: 10,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   // 底部信息行（优惠标签、做种/下载数、大小、下载状态）
                   Row(
                     children: [
