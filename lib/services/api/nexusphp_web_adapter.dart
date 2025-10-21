@@ -661,16 +661,15 @@ class NexusPHPWebAdapter extends SiteAdapter {
           if (key == 'category') {
             final categoryParam = value as String?;
             if (categoryParam != null) {
-              // 解析category参数，格式为 {"category":"prefix#id"}
+              // 解析category参数，格式为 {"category":"prefix#catid"}
               try {
+                // 检查是否是special前缀
+                if (categoryParam.startsWith('special')) {
+                  requestPath = '/special.php';
+                }
                 final parts = categoryParam.split('#');
-                if (parts.length == 2) {
-                  final categoryValue = parts[1];
-                  // 检查是否是special前缀
-                  if (categoryParam.startsWith('special')) {
-                    requestPath = '/special.php';
-                  }
-                  queryParams[categoryValue] = 1;
+                if (parts.length == 2 && parts[1].isNotEmpty) {
+                  queryParams['cat'] = parts[1];
                 }
               } catch (e) {
                 // 解析失败时忽略分类参数

@@ -93,12 +93,29 @@ mode:"normal";teams:["44","9","43"]
 - `teams`：制作组ID数组
 - `categories`：分类ID数组 （数组格式，如：["407", "420"]）
 - `discount`：促销（如 "FREE"、"PERCENT_50" 等）
-- 其他自定义参数请自行在浏览器中的网络请求里面查找。
+- 
+#### 参数说明(nexus php api)
+- 直接看接口文档：[NexusPHP API 文档](https://s.apifox.cn/43608c09-bab0-4e2e-9a56-77ffa629c8e0/api-87956324)
+#### 参数说明(nexus php api)
+- 在浏览器中过滤好你的条件打开想要展示的内容，然后观察地址栏的url，最终将请求参数转为json格式。
+- 例如：`https://nexusphp.org/torrents.php?cat=404&inclbookmarked=0&incldead=1&spstate=0&seeders_begin=1&seeders_end=1&page=0`
+- category参数（特别）：它的格式是`分区#分类id`，所以首先观察请求地址是torrents.php还是special.php
+  - 如果是torrents.php，那么category参数的格式就是`narmal#分类id`
+  - 如果是special.php，那么category参数的格式就是`special#分类id`
+  - 这里要注意下分类id前面要加上cat三个字母，例如：`cat407`。举个完整点的例子，如果请求地址为`torrents.php?cat=403`那category的值就是`normal#cat403`
+  - 特殊情况：无分类，这时看一下分区，如果是torrents.php那么可以直接不传category字段，如果是special分区则必须传category字段，值为`special#`
+- 其他参数： 直接按键值对转换就行，如：`{"inclbookmarked":"0","incldead":"1","spstate":"0","seeders_begin":"1","seeders_end":"1"}`
+- 最终的转换结果就是：
+  ```json
+  {"category":"normal#cat404","inclbookmarked":"0","incldead":"1","spstate":"0","seeders_begin":"1","seeders_end":"1"}
+  ```
+- 最后实在看不懂上面的说明也可以使用ai，将你的页面地址还有上面的参数说明一起输入，让ai帮助你生成你要的参数。
+  比如：`我当前的地址是http://xxx，请帮我按以下说明转为json格式。(把上面的说明复制进去)`。
 
 #### 特别注意
-> pageNumber、pageSize、keyword、onlyFav 这几个参数不能自定义配置，因为这几个参数是动态设置用来分页以及查询的，自定义配置会导致查询结果及分页错误。
+> m-team 的 pageNumber、pageSize、keyword、onlyFav 以及 nexusPHP 的 page、pageSize、search、inclbookmarked 这几个参数不能自定义配置，因为这几个参数是用来动态设置用来分页以及查询的，自定义配置会导致查询结果及分页错误。
 
-#### 使用示例
+#### 使用示例（m-team）
 
 **电影分类配置**
 ```json
