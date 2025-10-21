@@ -386,10 +386,10 @@ jobs:
           android-artifacts/pt_mate-${{ steps.version.outputs.version }}-armeabi-v7a.apk
           windows-artifact/pt_mate-${{ steps.version.outputs.version }}-windows-x64.exe
           linux-artifact/pt_mate-${{ steps.version.outputs.version }}-linux-x64.AppImage
-          ios-macos-artifacts/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa
-          ios-macos-artifacts/pt_mate-${{ steps.version.outputs.version }}.xcarchive.zip
-          ios-macos-artifacts/pt_mate-${{ steps.version.outputs.version }}-macos-x64.dmg
-          ios-macos-artifacts/pt_mate-${{ steps.version.outputs.version }}-macos-x64.app.zip
+          ios-macos-artifacts/ios/build/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa
+          ios-macos-artifacts/ios/build/pt_mate-${{ steps.version.outputs.version }}.xcarchive.zip
+          ios-macos-artifacts/build/macos/Build/Products/Release/pt_mate-${{ steps.version.outputs.version }}-macos-x64.dmg
+          ios-macos-artifacts/build/macos/Build/Products/Release/pt_mate-${{ steps.version.outputs.version }}-macos-x64.app.zip
         fail_on_unmatched_files: true
         
     - name: Send Telegram notification
