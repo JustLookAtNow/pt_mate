@@ -211,7 +211,33 @@ lib/
 ```bash
 flutter pub get
 ```
+如果你新增了网站配置，请手动运行`generate_sites_manifest.sh`脚本来更新站点清单文件，
+或者把以下内容写到你的`.git/hooks/pre-commit`文件中：
+```bash
+#!/bin/sh
 
+# 检查 assets 目录下是否有变动
+if git diff --cached --name-only | grep -q ^assets/; then
+    echo "检测到 assets 目录变动，执行 generate_sites_manifest.sh..."
+    
+    # 执行脚本
+    ./generate_sites_manifest.sh
+    if [ $? -ne 0 ]; then
+        echo "generate_sites_manifest.sh 执行失败，提交已取消。"
+        exit 1
+    fi
+
+    # 自动把生成的文件加入本次 commit
+    if [ -f assets/sites_manifest.json ]; then
+        git add assets/sites_manifest.json
+        echo "assets/sites_manifest.json 已加入本次提交。"
+    else
+        echo "警告: assets/sites_manifest.json 没有生成！"
+    fi
+fi
+
+exit 0
+```
 ### 运行应用
 ```bash
 # 调试模式
