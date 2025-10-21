@@ -216,7 +216,7 @@ jobs:
         path: windows/Output/pt_mate-${{ steps.version.outputs.version }}-windows-x64.exe
         retention-days: 1
 
-  build-ios:
+  build-ios-and-macos:
     runs-on: macos-latest
     
     steps:
@@ -276,18 +276,39 @@ jobs:
         cd ios/build
         zip -r pt_mate-${{ steps.version.outputs.version }}.xcarchive.zip Runner.xcarchive
         
-    - name: Upload iOS artifacts
+    - name: Build macOS
+      run: flutter build macos --release
+      
+    - name: Ad-hoc sign macOS app
+      run: codesign --force --deep --sign - "build/macos/Build/Products/Release/pt_mate.app"
+      
+    - name: Create macOS DMG
+      run: |
+        hdiutil create -volname "PT Mate ${{ steps.version.outputs.version }}" \
+          -srcfolder "build/macos/Build/Products/Release/pt_mate.app" \
+          -ov -format UDZO \
+          "build/macos/Build/Products/Release/pt_mate-${{ steps.version.outputs.version }}-macos-x64.dmg"
+
+    - name: Zip macOS app
+      run: |
+        cd build/macos/Build/Products/Release
+        zip -r pt_mate-${{ steps.version.outputs.version }}-macos-x64.app.zip pt_mate.app
+        cd -
+          
+    - name: Upload iOS and macOS artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ios-artifacts
+        name: ios-macos-artifacts
         path: |
           ios/build/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa
           ios/build/pt_mate-${{ steps.version.outputs.version }}.xcarchive.zip
+          build/macos/Build/Products/Release/pt_mate-${{ steps.version.outputs.version }}-macos-x64.dmg
+          build/macos/Build/Products/Release/pt_mate-${{ steps.version.outputs.version }}-macos-x64.app.zip
         retention-days: 1
 
   create-release:
     runs-on: ubuntu-latest
-    needs: [build-android-linux, build-windows, build-ios]
+    needs: [build-android-linux, build-windows, build-ios-and-macos]
     
     steps:
     - name: Checkout code
@@ -349,7 +370,9 @@ jobs:
           
           - **Windows x64**: Windows installer for 64-bit systems
           - **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)
-          
+          - **macOS x64**: macOS DMG image for 64-bit systems
+          - **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred
+
           ## 🍎 iOS Downloads
           
           - **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.
@@ -363,8 +386,10 @@ jobs:
           android-artifacts/pt_mate-${{ steps.version.outputs.version }}-armeabi-v7a.apk
           windows-artifact/pt_mate-${{ steps.version.outputs.version }}-windows-x64.exe
           linux-artifact/pt_mate-${{ steps.version.outputs.version }}-linux-x64.AppImage
-          ios-artifacts/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa
-          ios-artifacts/pt_mate-${{ steps.version.outputs.version }}.xcarchive.zip
+          ios-macos-artifacts/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa
+          ios-macos-artifacts/pt_mate-${{ steps.version.outputs.version }}.xcarchive.zip
+          ios-macos-artifacts/pt_mate-${{ steps.version.outputs.version }}-macos-x64.dmg
+          ios-macos-artifacts/pt_mate-${{ steps.version.outputs.version }}-macos-x64.app.zip
         fail_on_unmatched_files: true
         
     - name: Send Telegram notification
