@@ -656,25 +656,30 @@ class NexusPHPWebAdapter extends SiteAdapter {
       String requestPath = '/torrents.php';
 
       // 处理分类参数
-      if (additionalParams != null &&
-          additionalParams.containsKey('category')) {
-        final categoryParam = additionalParams['category'] as String?;
-        if (categoryParam != null) {
-          // 解析category参数，格式为 {"category":"prefix#id"}
-          try {
-            final parts = categoryParam.split('#');
-            if (parts.length == 2) {
-              final categoryValue = parts[1];
-              // 检查是否是special前缀
-              if (categoryParam.startsWith('special')) {
-                requestPath = '/special.php';
+      if (additionalParams != null) {
+        additionalParams.forEach((key, value) {
+          if (key == 'category') {
+            final categoryParam = value as String?;
+            if (categoryParam != null) {
+              // 解析category参数，格式为 {"category":"prefix#id"}
+              try {
+                final parts = categoryParam.split('#');
+                if (parts.length == 2) {
+                  final categoryValue = parts[1];
+                  // 检查是否是special前缀
+                  if (categoryParam.startsWith('special')) {
+                    requestPath = '/special.php';
+                  }
+                  queryParams[categoryValue] = 1;
+                }
+              } catch (e) {
+                // 解析失败时忽略分类参数
               }
-              queryParams[categoryValue] = 1;
             }
-          } catch (e) {
-            // 解析失败时忽略分类参数
+          } else {
+            queryParams[key] = value;
           }
-        }
+        });
       }
 
       // 发送请求
