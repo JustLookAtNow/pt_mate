@@ -1,0 +1,138 @@
+{
+  "id": "qingwapt",
+  "name": "青蛙",
+  "isShow": true,
+  "baseUrls": ["https://www.qingwapt.org/"],
+  "primaryUrl": "https://www.qingwapt.org/",
+  "siteType": "NexusPHPWeb",
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": true,
+    "downloadHistory": true,
+    "categorySearch": true,
+    "advancedSearch": true
+  },
+  "discountMapping": {},
+  "infoFinder": {
+    "passKey": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "#outer > table.main > next > tbody > tr:nth-child(5) > td.rowfollow"
+      },
+      "fields": {
+        "passKey": {
+          "selector": "",
+          "attribute": "text"
+        }
+      }
+    },
+    "categories": {
+      "path": "usercp.php?action=tracker",
+      "rows": {
+        "selector": "#outer > table.main > next > tbody:nth-child > tr:nth-child(1) > td.rowfollow > table"
+      },
+      "fields": {
+        "categoryId": {
+          "selector": "a[href~=\"(torrents|special)\\.php\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "cat=(\\d+)",
+            "index": 1
+          }
+        },
+        "categoryName": {
+          "selector": "a[href~=\"(torrents|special)\\.php\"] > img",
+          "attribute": "title"
+        }
+      }
+    },
+    "search": {
+      "torrentPath": "torrents.php",
+      "specialPath": "special.php",
+      "rows": {
+        "selector": "table.torrents > tbody:nth-child(1) > tr:nth-child"
+      },
+      "fields": {
+        "torrentId": {
+          "selector": "a[href^=\"details.php?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "index": 1
+          }
+        },
+        "torrentName": {
+          "selector": "a[href^=\"details.php?id=\"] > b",
+          "attribute": "text"
+        },
+        "description": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(2)",
+          "attribute": "text"
+        },
+        "discount": {
+          "selector": "table.torrentname > span[onmouseover^=\"domTT_activate\"]",
+          "attribute": "alt"
+        },
+        "discountEndTime": {
+          "selector": "table.torrentname > span[onmouseover^=\"domTT_activate\"]",
+          "attribute": "onmouseover",
+          "filter": {
+            "name": "regexp",
+            "args": "<span title=\\\"(.*?)\\\">",
+            "index": 1
+          }
+        },
+        "downloadUrl": {
+          "value": "{baseUrl}/download.php?id={torrentId}&passkey={passKey}"
+        },
+        "seedersText": {
+          "selector": "td:nth-child(6)",
+          "attribute": "text"
+        },
+        "leechersText": {
+          "selector": "td:nth-child(7)",
+          "attribute": "text"
+        },
+        "sizeText": {
+          "selector": "td:nth-child(5)",
+          "attribute": "text"
+        },
+        "downloadStatus": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(2) > div[title]",
+          "attribute": "title",
+          "filter": {
+            "name": "regexp",
+            "args": "(d+)%",
+            "index": 1
+          }
+        },
+        "collection": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(4) > img.bookmark",
+          "attribute": "src"
+        },
+        "cover": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > img[data-src]",
+          "attribute": "data-src"
+        },
+        "createData": {
+          "selector": "td:nth-child(4) > span[title]",
+          "attribute": "title"
+        },
+        "doubanRating": {
+          "selector": "table.torrentname > img[title==\"douban\"] > next",
+          "attribute": "text"
+        },
+        "imdbRating": {
+          "selector": "table.torrentname > img[title==\"imdb\"] > next",
+          "attribute": "text"
+        }
+      }
+    }
+  }
+}

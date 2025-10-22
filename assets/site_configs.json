@@ -169,7 +169,7 @@
         "passKey": {
           "path": "usercp.php",
           "rows": {
-            "selector": "#outer > table:nth-child(3) > tbody > tr:nth-child(4) > td.rowfollow"
+            "selector": "#outer > table.main > next > tbody > tr:nth-child(4) > td.rowfollow"
           },
           "fields": {
             "passKey": {
@@ -182,7 +182,7 @@
           "torrentPath": "torrents.php",
           "specialPath": "special.php",
           "rows": {
-            "selector": "table.torrents > tbody:nth-child(1) > tr:nth-child"
+            "selector": "table.torrents > tbody:nth-child > tr:nth-child"
           },
           "fields": {
             "torrentId": {
@@ -206,30 +206,29 @@
               "selector": "table.torrentname > img[class^=\"pro_free\"]",
               "attribute": "alt"
             },
-            "discountEndTime":{
+            "discountEndTime": {
               "selector": "table.torrentname > img[class^=\"pro_free\"]",
               "attribute": "onmouseover",
               "filter": {
                 "name": "regexp",
-                "args": "<span title=&quot;(.*?)&quot;>",
+                "args": "<span title=\\\"(.*?)\\\"",
                 "index": 1
               }
             },
-            "downloadUrl":{
-            },
-            "seedersText":{
+            "downloadUrl": {},
+            "seedersText": {
               "selector": "td:nth-child(6)",
               "attribute": "text"
             },
-            "leechersText":{
+            "leechersText": {
               "selector": "td:nth-child(7)",
               "attribute": "text"
             },
-            "sizeText":{
+            "sizeText": {
               "selector": "td:nth-child(5)",
               "attribute": "text"
             },
-            "downloadStatus":{
+            "downloadStatus": {
               "selector": "table.torrentname > tbody > tr > td:nth-child(2) > div[title]",
               "attribute": "title",
               "filter": {
@@ -238,23 +237,23 @@
                 "index": 1
               }
             },
-            "collection":{
+            "collection": {
               "selector": "table.torrentname > tbody > tr > td:nth-child(4) > img.bookmark",
               "attribute": "src"
             },
-            "cover":{
+            "cover": {
               "selector": "table.torrentname > tbody > tr > td:nth-child(1) > img[data-src]",
               "attribute": "data-src"
             },
-            "createData":{
+            "createData": {
               "selector": "td:nth-child(4) > span[title]",
               "attribute": "title"
             },
-            "doubanRating":{
+            "doubanRating": {
               "selector": "table.torrentname > img[title==\"douban\"] > next",
               "attribute": "text"
             },
-            "imdbRating":{
+            "imdbRating": {
               "selector": "table.torrentname > img[title==\"imdb\"] > next",
               "attribute": "text"
             }
@@ -263,7 +262,7 @@
         "categories": {
           "path": "usercp.php?action=tracker",
           "rows": {
-            "selector": "#outer > table:nth-child(3) > tbody > tr:nth-child(2) > td.rowfollow > table"
+            "selector": "#outer > table.main > next > tbody:nth-child > tr:nth-child(2) > td.rowfollow > table"
           },
           "fields": {
             "categoryId": {

@@ -120,7 +120,7 @@
           "attribute": "onmouseover",
           "filter": {
             "name": "regexp",
-            "args": "<span title=&quot;(.*?)&quot;>",
+            "args": "<span title=\\\"(.*?)\\\"",
             "index": 1
           }
         },

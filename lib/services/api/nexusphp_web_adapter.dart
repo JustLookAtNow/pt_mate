@@ -137,12 +137,6 @@ class NexusPHPWebAdapter extends SiteAdapter {
       if (template?.discountMapping != null) {
         _discountMapping = Map<String, String>.from(template!.discountMapping);
       }
-      final specialMapping = await SiteConfigService.getDiscountMapping(
-        _siteConfig.baseUrl,
-      );
-      if (specialMapping.isNotEmpty) {
-        _discountMapping?.addAll(specialMapping);
-      }
     } catch (e) {
       // 使用默认映射
       _discountMapping = {};
@@ -940,9 +934,9 @@ class NexusPHPWebAdapter extends SiteAdapter {
               discount: _parseDiscountType(
                 discount.isNotEmpty ? discount : null,
               ),
-              discountEndTime: _convertRelativeTimeToAbsolute(
-                discountEndTime.isNotEmpty ? discountEndTime : null,
-              ),
+              discountEndTime: discountEndTime.isNotEmpty
+                  ? discountEndTime
+                  : null,
               downloadUrl: downloadUrl.isNotEmpty ? downloadUrl : null,
               seeders: int.tryParse(seedersText) ?? 0,
               leechers: int.tryParse(leechersText) ?? 0,

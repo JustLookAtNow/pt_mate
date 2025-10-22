@@ -9,9 +9,12 @@ class SiteConfigService {
   static const String _configPath = 'assets/site_configs.json';
   static const String _sitesManifestPath = 'assets/sites_manifest.json';
   static const String _sitesBasePath = 'assets/sites/';
-  
+
   /// URL到模板ID的映射缓存
   static Map<String, String>? _urlToTemplateIdMapping;
+
+  /// 模板缓存：按模板ID和站点类型缓存已解析的模板，避免重复IO与合并
+  static final Map<String, SiteConfigTemplate?> _templateCache = {};
 
   /// 获取所有可用的预设站点文件列表
   static Future<List<String>> _getPresetSiteFiles() async {
@@ -50,11 +53,13 @@ class SiteConfigService {
 
         final siteTemplate = SiteConfigTemplate.fromJson(siteJson);
         presetTemplates.add(siteTemplate);
-        
+
         // 构建URL映射缓存
         final templateId = siteTemplate.id;
         for (final url in siteTemplate.baseUrls) {
-          final normalizedUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+          final normalizedUrl = url.endsWith('/')
+              ? url.substring(0, url.length - 1)
+              : url;
           urlMapping[normalizedUrl] = templateId;
         }
       } catch (e) {
@@ -93,6 +98,14 @@ class SiteConfigService {
     String templateId,
     SiteType siteType,
   ) async {
+    // 先查缓存，命中直接返回
+    final String cacheKey = '$templateId|${siteType.id}';
+    if (_templateCache.containsKey(cacheKey)) {
+      return _templateCache[cacheKey];
+    }
+
+    SiteConfigTemplate? result;
+
     if (templateId.isNotEmpty && templateId != "-1") {
       final templates = await loadPresetSiteTemplates();
       try {
@@ -101,51 +114,66 @@ class SiteConfigService {
         );
 
         // 如果模板没有 infoFinder 或 request 配置，尝试从默认模板中获取
-        if ((template.infoFinder == null || template.request == null) &&
+        if ((template.infoFinder == null ||
+                template.request == null ||
+                template.discountMapping.isEmpty) &&
             template.siteType != SiteType.mteam) {
           final defaultTemplate = await _getDefaultTemplateConfig(siteType);
           if (defaultTemplate != null) {
             Map<String, dynamic>? infoFinder = template.infoFinder;
             Map<String, dynamic>? request = template.request;
-            
+            Map<String, String>? discountMapping = Map<String, String>.from(
+              defaultTemplate['discountMapping'] as Map<String, dynamic>,
+            );
+
             // 如果模板没有 infoFinder 配置，从默认模板中获取
             if (infoFinder == null && defaultTemplate['infoFinder'] != null) {
-              infoFinder = defaultTemplate['infoFinder'] as Map<String, dynamic>;
+              infoFinder =
+                  defaultTemplate['infoFinder'] as Map<String, dynamic>;
             }
-            
+
             // 如果模板没有 request 配置，从默认模板中获取
             if (request == null && defaultTemplate['request'] != null) {
               request = defaultTemplate['request'] as Map<String, dynamic>;
             }
-            
-            // 如果有任何配置需要合并，返回新的模板
-            if ((template.infoFinder == null && infoFinder != null) ||
-                (template.request == null && request != null)) {
-              return template.copyWith(
-                infoFinder: infoFinder,
-                request: request,
-              );
+            if (template.discountMapping.isNotEmpty) {
+              discountMapping.addAll(template.discountMapping);
             }
-          }
-        }
+            // 如果有任何配置需要合并，返回新的模板
 
-        return template;
+            result = template.copyWith(
+              infoFinder: infoFinder,
+              request: request,
+              discountMapping: discountMapping,
+            );
+          } else {
+            result = template;
+          }
+        } else {
+          result = template;
+        }
       } catch (e) {
         if (kDebugMode) {
           print('Failed to find template with ID $templateId: $e');
         }
       }
     }
-    // 如果没有找到对应的模板，尝试返回默认模板配置
-    final defaultTemplate = await _getDefaultTemplateConfig(siteType);
-    if (defaultTemplate != null) {
-      // 将默认模板配置转换为 SiteConfigTemplate
-      return _convertDefaultTemplateToSiteConfigTemplate(
-        templateId,
-        defaultTemplate,
-      );
+
+    if (result == null) {
+      // 如果没有找到对应的模板，尝试返回默认模板配置
+      final defaultTemplate = await _getDefaultTemplateConfig(siteType);
+      if (defaultTemplate != null) {
+        // 将默认模板配置转换为 SiteConfigTemplate
+        result = _convertDefaultTemplateToSiteConfigTemplate(
+          templateId,
+          defaultTemplate,
+        );
+      }
     }
-    return null;
+
+    // 写入缓存（包括null结果，避免重复IO）
+    _templateCache[cacheKey] = result;
+    return result;
   }
 
   /// 将默认模板配置转换为 SiteConfigTemplate
@@ -323,5 +351,10 @@ class SiteConfigService {
       await loadPresetSiteTemplates();
     }
     return _urlToTemplateIdMapping ?? {};
+  }
+
+  /// 清空模板缓存（例如切换环境或资产更新后）
+  static void clearTemplateCache() {
+    _templateCache.clear();
   }
 }
