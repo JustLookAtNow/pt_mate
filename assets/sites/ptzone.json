@@ -4,7 +4,7 @@
   "isShow": true,
   "baseUrls": ["https://ptzone.xyz/"],
   "primaryUrl": "https://ptzone.xyz/",
-  "siteType": "NexusPHPWeb",
+  "siteType": "NexusPHP",
   "searchCategories": [],
   "features": {
     "userProfile": true,
@@ -15,41 +15,5 @@
     "downloadHistory": true,
     "categorySearch": true,
     "advancedSearch": true
-  },
-  "discountMapping": {},
-  "infoFinder": {
-    "passKey": {
-      "path": "usercp.php",
-      "rows": {
-        "selector": "#outer > table:nth-child(2) > tbody > tr:nth-child(4) > td.rowfollow"
-      },
-      "fields": {
-        "passKey": {
-          "selector": "",
-          "attribute": "text"
-        }
-      }
-    },
-    "categories": {
-      "path": "usercp.php?action=tracker",
-      "rows": {
-        "selector": "#outer > form > table > tbody > tr:nth-child(1) > td.rowfollow > table"
-      },
-      "fields": {
-        "categoryId": {
-          "selector": "a[href~=\"(torrents|special)\\.php\"]",
-          "attribute": "href",
-          "filter": {
-            "name": "regexp",
-            "args": "cat=(\\d+)",
-            "index": 1
-          }
-        },
-        "categoryName": {
-          "selector": "a[href~=\"(torrents|special)\\.php\"] > img",
-          "attribute": "title"
-        }
-      }
-    }
   }
 }
