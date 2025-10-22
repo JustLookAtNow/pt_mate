@@ -42,7 +42,7 @@
           "attribute": "text",
           "filter": {
             "name": "regexp",
-            "args": "分享率:\\s*([^\\s]+)",
+            "args": "分享率：\\s*([^\\s]+)",
             "index": 1
           }
         },
@@ -51,7 +51,7 @@
           "attribute": "text",
           "filter": {
             "name": "regexp",
-            "args": "(上传量|上傳量):\\s*(.*?B)",
+            "args": "(上传|上傳)量：\\s*(.*?B)",
             "index": 2
           }
         },
@@ -60,7 +60,7 @@
           "attribute": "text",
           "filter": {
             "name": "regexp",
-            "args": "(下载量|下載量):\\s*(.*?B)",
+            "args": "(下载|下載)量：\\s*(.*?B)",
             "index": 2
           }
         },

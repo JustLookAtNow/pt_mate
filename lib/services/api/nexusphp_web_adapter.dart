@@ -132,7 +132,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
       String? passKey = await _extractPassKeyByConfig();
 
       // 将字符串格式的数据转换为数字
-      double shareRate = double.tryParse(userInfo['ratio'] ?? '0') ?? 0.0;
+      double shareRate =
+          double.tryParse(userInfo['ratio']?.replaceAll(',', '') ?? '0') ?? 0.0;
       double bonusPoints =
           double.tryParse((userInfo['bonus'] ?? '0').replaceAll(',', '')) ??
           0.0;
