@@ -280,7 +280,10 @@ jobs:
       run: flutter build macos --release
       
     - name: Ad-hoc sign macOS app
-      run: codesign --force --deep --sign - "build/macos/Build/Products/Release/pt_mate.app"
+      run: |
+        codesign --force --deep --sign - \
+          --entitlements "macos/Runner/Release.entitlements" \
+          "build/macos/Build/Products/Release/pt_mate.app"
       
     - name: Create macOS DMG
       run: |
