@@ -1618,7 +1618,9 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   // 构建WebView内容
   Widget buildWebViewContent(String webviewUrl) {
     // 检查是否为Android平台
-    if (defaultTargetPlatform != TargetPlatform.android) {
+    if (defaultTargetPlatform == TargetPlatform.linux ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.macOS) {
       // 非Android平台显示按钮打开系统浏览器
       return Center(
         child: Container(
