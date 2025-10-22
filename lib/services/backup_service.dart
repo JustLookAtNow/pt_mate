@@ -268,7 +268,8 @@ class BackupService {
       
       // 恢复下载器配置
       if (migratedData['downloaderConfigs'] != null) {
-        final downloaderConfigMaps = migratedData['downloaderConfigs'] as List<Map<String, dynamic>>;
+        final downloaderConfigList = migratedData['downloaderConfigs'] as List<dynamic>;
+        final downloaderConfigMaps = downloaderConfigList.cast<Map<String, dynamic>>();
         final downloaderConfigs = downloaderConfigMaps.map((configMap) => DownloaderConfig.fromJson(configMap)).toList();
         
         // 恢复默认下载器ID
