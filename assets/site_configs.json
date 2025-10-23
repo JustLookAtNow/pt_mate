@@ -160,7 +160,7 @@
               "attribute": "text",
               "filter": {
                 "name": "regexp",
-                "args": ":\\s*([^\\s]+)\\s*\\[(签到|簽到)",
+                "args": ":\\s*([^\\s]+)\\s*\\[*(签|簽)到",
                 "index": 1
               }
             }
