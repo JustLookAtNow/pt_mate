@@ -10,11 +10,17 @@ class SiteConfigService {
   static const String _sitesManifestPath = 'assets/sites_manifest.json';
   static const String _sitesBasePath = 'assets/sites/';
 
+  /// 预设站点模板列表缓存
+  static List<SiteConfigTemplate>? _presetTemplatesCache;
+
   /// URL到模板ID的映射缓存
   static Map<String, String>? _urlToTemplateIdMapping;
 
   /// 模板缓存：按模板ID和站点类型缓存已解析的模板，避免重复IO与合并
   static final Map<String, SiteConfigTemplate?> _templateCache = {};
+
+  /// 默认模板配置缓存
+  static Map<String, dynamic>? _defaultTemplatesCache;
 
   /// 获取所有可用的预设站点文件列表
   static Future<List<String>> _getPresetSiteFiles() async {
@@ -39,6 +45,11 @@ class SiteConfigService {
 
   /// 加载预设站点模板配置
   static Future<List<SiteConfigTemplate>> loadPresetSiteTemplates() async {
+    // 如果缓存存在，直接返回缓存的数据
+    if (_presetTemplatesCache != null) {
+      return _presetTemplatesCache!;
+    }
+
     final List<SiteConfigTemplate> presetTemplates = [];
     final Map<String, String> urlMapping = {};
 
@@ -69,8 +80,10 @@ class SiteConfigService {
       }
     }
 
-    // 缓存URL映射
+    // 缓存预设站点模板列表和URL映射
+    _presetTemplatesCache = presetTemplates;
     _urlToTemplateIdMapping = urlMapping;
+    
     return presetTemplates;
   }
 
@@ -249,14 +262,19 @@ class SiteConfigService {
     SiteType siteType,
   ) async {
     try {
-      // 从assets读取JSON文件
-      final String jsonString = await rootBundle.loadString(_configPath);
-      final Map<String, dynamic> jsonData = json.decode(jsonString);
+      // 如果缓存不存在，先加载默认模板配置
+      if (_defaultTemplatesCache == null) {
+        // 从assets读取JSON文件
+        final String jsonString = await rootBundle.loadString(_configPath);
+        final Map<String, dynamic> jsonData = json.decode(jsonString);
 
-      // 获取默认模板配置
-      final Map<String, dynamic>? templates = jsonData['defaultTemplates'];
-      if (templates != null && templates.containsKey(siteType.id)) {
-        return templates[siteType.id] as Map<String, dynamic>;
+        // 缓存默认模板配置
+        _defaultTemplatesCache = jsonData['defaultTemplates'] as Map<String, dynamic>?;
+      }
+
+      // 从缓存中获取默认模板配置
+      if (_defaultTemplatesCache != null && _defaultTemplatesCache!.containsKey(siteType.id)) {
+        return _defaultTemplatesCache![siteType.id] as Map<String, dynamic>;
       }
 
       return null;
@@ -353,8 +371,16 @@ class SiteConfigService {
     return _urlToTemplateIdMapping ?? {};
   }
 
-  /// 清空模板缓存（例如切换环境或资产更新后）
-  static void clearTemplateCache() {
+  /// 清空所有缓存（例如切换环境或资产更新后）
+  static void clearAllCache() {
+    _presetTemplatesCache = null;
+    _urlToTemplateIdMapping = null;
+    _defaultTemplatesCache = null;
     _templateCache.clear();
+  }
+
+  /// 清空模板缓存（向后兼容方法）
+  static void clearTemplateCache() {
+    clearAllCache();
   }
 }

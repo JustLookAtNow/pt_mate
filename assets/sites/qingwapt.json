@@ -2,7 +2,12 @@
   "id": "qingwapt",
   "name": "青蛙",
   "isShow": true,
-  "baseUrls": ["https://www.qingwapt.org/"],
+  "baseUrls": [
+    "https://www.qingwapt.org/",
+    "https://www.qingwapt.com/",
+    "https://www.qingwa.pro/",
+    "https://qingwapt.com/"
+  ],
   "primaryUrl": "https://www.qingwapt.org/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
