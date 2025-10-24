@@ -8,7 +8,7 @@
 
 - `assets/sites/` - 存放具体网站的配置文件
 - `assets/site_configs.json` - 存放默认模板配置
-- `assets/sites_manifest.json` - 网站清单文件
+- `assets/sites_manifest.json` - 网站清单文件（此文件不需要手动改动，增加配置文件后运行根目录下的generate_sites_manifest.sh即可自动生成也可以自行配置githook，详见[readme.md](./README.md)）
 
 ## 配置文件类型
 
@@ -44,11 +44,12 @@
 | `baseUrls`         | array   | ✅   | 网站基础 URL 列表                                   |
 | `primaryUrl`       | string  | ✅   | 主要 URL                                            |
 | `siteType`         | string  | ✅   | 网站类型，支持：`M-Team`、`NexusPHP`、`NexusPHPWeb` |
-| `searchCategories` | array   | ❌   | 搜索分类配置                                        |
+| `searchCategories` | array   | ❌   | 搜索分类配置  如果这里有配置会直接根据这里配置返回，
+适用于api权限没开或者dom比较难适配的网站                                                    |
 | `features`         | object  | ✅   | 功能支持配置                                        |
 | `discountMapping`  | object  | ❌   | 折扣映射配置                                        |
 | `infoFinder`       | object  | ❌   | 信息提取配置（仅 NexusPHPWeb 类型需要）             |
-| `request`          | object  | ❌   | 自定义请求配置                                      |
+| `request`          | object  | ❌   | 自定义请求配置（暂不完善有具体需求可以提issue）     |
 
 ### 2. 功能配置 (features)
 
@@ -123,6 +124,15 @@
 
 仅适用于 `NexusPHPWeb` 类型网站，用于配置如何从网页中提取信息。
 
+#### 主要构成
+- `userInfo`: 用户信息提取配置。
+- `passKey`: 用户密钥提取配置。
+- `search`: 种子列表提取配置。
+- `categories`: 网站分类提取配置。
+
+#### 配置示例
+里面的具体内容都大同小异，下面以`userInfo`为例：
+
 ```json
 {
   "infoFinder": {
@@ -146,6 +156,43 @@
   }
 }
 ```
+#### 字段说明
+
+##### `selector` 选择器的说明
+
+目前支持两种选择器：
+
+- `css selector`：基于 CSS 选择器的选择器，这会严格按照 CSS 选择器的规则进行匹配，内容请以`@@`开头后面跟着具体的选择器，比如：
+`@@table#info_block > span.medium`。CSS 选择器有一些局限性，比如不能跨层级选择、不能过滤属性等，
+并且网站一旦dom发生变动，越精细的选择器越容易失效。
+- `ptm selector`：其实整体上也类似与CSS 选择器，但是更加强大，支持更多的操作，具体有以下不同：
+  - 内容**无需**以`@@`开头，直接写具体的选择器即可，比如：`table#info_block > span.medium`。
+  - 默认就是跨层级选择，`>`会从所有子孙元素中进行匹配，而不是只匹配直接子元素。如果只想要子元素请使用`nth-child`,
+    `nth-child(1)`表示第一个子元素，`nth-child(2)`表示第二个子元素，以此类推。也可以直接不跟数字比如：`tr:nth-child`
+    表示所有子元素中的`tr`元素。
+  - 支持属性过滤，比如：`[href^=\"userdetails.php?id=\"]`表示提取所有`href`属性以`userdetails.php?id=`开头的元素。
+    同时支持三种符号表达式：
+    - `^=`：表示以...开头
+    - `~=`：表示以正则表达式匹配
+    - `==`：表示相等
+  - 一些特殊用法：
+    - `img[data-src]` 表示提取所有`img`元素中`data-src`属性不为空的元素。
+    - `next`：表示提取当前元素的下一个兄弟元素。
+
+##### 其它字段说明
+
+- `path`：提取用户信息的页面路径
+- `rows`：
+  - `selector`：包含提取目标的大区域，方便提取fields时进一步在此基础上筛选。可以匹配到多个，比如种子列表就需要匹配多个。
+- `fields`：从上面的区域中提取具体的字段。
+  - `userId`：要提取的字段id，这是固定的，具体请参考[默认配置文件site_configs.json](/assets/site_configs.json)。
+    - `selector`：进一步的选择器，在这里进一步定位到目标数据所在dom节点。
+    - `attribute`：提取属性，比如`href`、`src`等，其中有一个比较特殊的`text`，效果类似于innerHTML，提取节点的纯文本（去除所有的html标签）内容。
+    - `filter`：如果需要对提取到的数据进行进一步处理，这里可以配置相应的过滤器。
+      - `name`：过滤器名称，目前只支持`regexp`（正则表达式）。
+      - `args`：过滤器参数，根据名称不同有不同的格式。
+        - `regexp`：正则表达式字符串，用于提取匹配的部分。
+      - `index`：如果正则表达式有捕获组，这里可以指定提取哪个组的内容。
 
 ## 网站类型说明
 

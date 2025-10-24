@@ -255,6 +255,12 @@ flutter build apk --debug
 # 发布版本
 flutter build apk --release
 ```
+### 适配新网站
+- 新增网站配置文件到 `assets/sites/` 目录
+- 运行 `generate_sites_manifest.sh` 脚本更新清单文件
+- 测试新网站功能是否正常
+详见[网站配置指南](./SITE_CONFIGURATION_GUIDE.md)
+
 
 ## 配置说明
 

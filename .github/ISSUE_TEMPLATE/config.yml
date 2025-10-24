@@ -3,3 +3,6 @@ contact_links:
   - name: 📖 项目文档
     url: https://github.com/JustLookAtNow/pt_mate/README.md
     about: 查看项目文档和使用指南
+  - name: 适配新网站
+    url: https://github.com/JustLookAtNow/pt_mate/SITE_CONFIGURATION_GUIDE.md
+    about: 适配新网站请参考此文档

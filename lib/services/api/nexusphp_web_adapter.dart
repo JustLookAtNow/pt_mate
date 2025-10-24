@@ -300,11 +300,16 @@ class NexusPHPWebAdapter extends SiteAdapter {
   }
 
   /// 根据选择器查找所有匹配的元素
+  /// [soup] 可以是 BeautifulSoup 或 Bs4Element 类型
   List<dynamic> _findElementBySelector(dynamic soup, String selector) {
     if (soup == null) return [];
 
     selector = selector.trim();
     if (selector.isEmpty) return [soup];
+
+    if (selector.startsWith('@@')) {
+      return soup.findAll('', selector: selector.substring(2));
+    }
 
     // 首先处理子选择器（>），因为它可能包含其他类型的选择器
     if (selector.contains('>')) {
@@ -479,6 +484,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
   }
 
   /// 根据选择器查找第一个匹配的元素（向后兼容）
+  /// [soup] 可以是 BeautifulSoup 或 Bs4Element 类型
   dynamic _findFirstElementBySelector(dynamic soup, String selector) {
     final elements = _findElementBySelector(soup, selector);
     return elements.isNotEmpty ? elements.first : null;
