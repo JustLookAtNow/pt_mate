@@ -160,35 +160,53 @@ lib/
 │   └── app_models.dart             # 数据模型定义
 ├── pages/
 │   ├── about_page.dart             # 关于页面
+│   ├── aggregate_search_page.dart  # 聚合搜索页面
+│   ├── aggregate_search_settings_page.dart # 聚合搜索设置页面
 │   ├── backup_restore_page.dart    # 备份恢复页面
+│   ├── download_tasks_page.dart    # 下载任务页面
 │   ├── downloader_settings_page.dart # 下载器设置页面
 │   ├── server_settings_page.dart   # 服务器设置页面
 │   ├── settings_page.dart          # 设置页面
 │   └── torrent_detail_page.dart    # 种子详情页面
+├── providers/
+│   └── aggregate_search_provider.dart # 聚合搜索状态管理
 ├── services/
 │   ├── api/                        # API 服务
-│   │   ├── api_client.dart         # PT站点 API 客户端
+│   │   ├── api_service.dart        # API 服务基类
 │   │   ├── mteam_adapter.dart      # M-Team 适配器
-│   │   └── nexusphp_adapter.dart   # NexusPHP 适配器
-│   ├── qbittorrent/                # qBittorrent 相关
-│   │   ├── qb_client.dart          # qBittorrent API 封装
-│   │   └── qb_models.dart          # qBittorrent 数据模型
+│   │   ├── nexusphp_adapter.dart   # NexusPHP 适配器
+│   │   ├── nexusphp_web_adapter.dart # NexusPHP Web 适配器
+│   │   └── site_adapter.dart       # 站点适配器基类
+│   ├── downloader/                 # 下载器相关
+│   │   ├── downloader_client.dart  # 下载器客户端基类
+│   │   ├── downloader_config.dart  # 下载器配置
+│   │   ├── downloader_factory.dart # 下载器工厂
+│   │   ├── downloader_models.dart  # 下载器数据模型
+│   │   ├── downloader_service.dart # 下载器服务
+│   │   ├── qbittorrent_client.dart # qBittorrent 客户端
+│   │   └── transmission_client.dart # Transmission 客户端
 │   ├── storage/                    # 存储服务
-│   │   ├── storage_keys.dart       # 存储键定义
 │   │   └── storage_service.dart    # 本地存储服务
 │   ├── theme/                      # 主题服务
-│   │   └── theme_service.dart      # 主题管理
+│   │   └── theme_manager.dart      # 主题管理
+│   ├── aggregate_search_service.dart # 聚合搜索服务
 │   ├── backup_service.dart         # 备份恢复服务
 │   ├── image_http_client.dart      # 图片加载客户端
-│   └── site_config_service.dart    # 站点配置服务
+│   ├── site_config_service.dart    # 站点配置服务
+│   └── webdav_service.dart         # WebDAV 服务
 ├── utils/
 │   ├── backup_migrators.dart       # 备份数据迁移器
+│   ├── downloader_utils.dart       # 下载器工具函数
 │   └── format.dart                 # 格式化工具函数
 └── widgets/
     ├── app_drawer.dart             # 应用侧边栏
+    ├── cached_network_image.dart   # 缓存网络图片组件
     ├── nexusphp_web_login.dart     # NexusPHP Web 登录组件
     ├── qb_speed_indicator.dart     # qBittorrent 速度指示器
-    └── server_settings_back_button.dart # 服务器设置返回按钮
+    ├── responsive_layout.dart      # 响应式布局组件
+    ├── server_settings_back_button.dart # 服务器设置返回按钮
+    ├── torrent_download_dialog.dart # 种子下载对话框
+    └── torrent_list_item.dart      # 种子列表项组件
 ```
 
 ## 技术栈
