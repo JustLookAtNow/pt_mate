@@ -44,15 +44,15 @@
           "attribute": "text"
         },
         "description": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(2)",
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1)",
           "attribute": "text"
         },
         "discount": {
-          "selector": "table.torrentname > img[class^=\"pro_free\"]",
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
           "attribute": "alt"
         },
         "discountEndTime": {
-          "selector": "table.torrentname > img[class^=\"pro_free\"]",
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
           "attribute": "onmouseover",
           "filter": {
             "name": "regexp",
@@ -74,7 +74,7 @@
           "attribute": "text"
         },
         "downloadStatus": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(2) > div[title]",
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > div[title]",
           "attribute": "title",
           "filter": {
             "name": "regexp",
@@ -83,12 +83,10 @@
           }
         },
         "collection": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(4) > img.bookmark",
+          "selector": "table.torrentname > tbody > tr > td:nth-child(3) > img.bookmark",
           "attribute": "src"
         },
         "cover": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > img[data-src]",
-          "attribute": "data-src"
         },
         "createData": {
           "selector": "td:nth-child(4) > span[title]",
