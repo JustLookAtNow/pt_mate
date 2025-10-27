@@ -203,11 +203,11 @@
               "attribute": "text"
             },
             "discount": {
-              "selector": "table.torrentname > img[class^=\"pro_free\"]",
+              "selector": "table.torrentname > img[class^=\"pro_\"]",
               "attribute": "alt"
             },
             "discountEndTime": {
-              "selector": "table.torrentname > img[class^=\"pro_free\"]",
+              "selector": "table.torrentname > img[class^=\"pro_\"]",
               "attribute": "onmouseover",
               "filter": {
                 "name": "regexp",
@@ -215,7 +215,9 @@
                 "index": 1
               }
             },
-            "downloadUrl": {},
+            "downloadUrl": {
+              "value": "{baseUrl}/download.php?downhash={torrentId}|{jwt}"
+            },
             "seedersText": {
               "selector": "td:nth-child(6)",
               "attribute": "text"
