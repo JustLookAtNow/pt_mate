@@ -60,7 +60,9 @@
             "index": 1
           }
         },
-        "downloadUrl": {},
+        "downloadUrl": {
+          "value": "{baseUrl}/download.php?downhash={torrentId}|{jwt}"
+        },
         "seedersText": {
           "selector": "td:nth-child(6)",
           "attribute": "text"
@@ -86,8 +88,7 @@
           "selector": "table.torrentname > tbody > tr > td:nth-child(3) > img.bookmark",
           "attribute": "src"
         },
-        "cover": {
-        },
+        "cover": {},
         "createData": {
           "selector": "td:nth-child(4) > span[title]",
           "attribute": "title"

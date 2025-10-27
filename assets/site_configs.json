@@ -216,7 +216,7 @@
               }
             },
             "downloadUrl": {
-              "value": "{baseUrl}/download.php?downhash={torrentId}|{jwt}"
+              
             },
             "seedersText": {
               "selector": "td:nth-child(6)",
