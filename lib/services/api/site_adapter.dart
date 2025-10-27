@@ -28,7 +28,7 @@ abstract class SiteAdapter {
   Future<TorrentDetail> fetchTorrentDetail(String id);
   
   /// 生成下载令牌并返回下载URL
-  Future<String> genDlToken({required String id});
+  Future<String> genDlToken({required String id, String? url});
   
   /// 查询下载历史
   Future<Map<String, dynamic>> queryHistory({required List<String> tids});

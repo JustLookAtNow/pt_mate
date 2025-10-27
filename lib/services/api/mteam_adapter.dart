@@ -304,7 +304,7 @@ class MTeamAdapter extends SiteAdapter {
   }
   
   @override
-  Future<String> genDlToken({required String id}) async {
+  Future<String> genDlToken({required String id, String? url}) async {
     final form = FormData.fromMap({'id': id});
     final resp = await _dio.post(
       '/api/torrent/genDlToken',

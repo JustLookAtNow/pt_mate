@@ -270,7 +270,7 @@ class NexusPHPAdapter implements SiteAdapter {
 
   //实际上调用不到了
   @override
-  Future<String> genDlToken({required String id}) async {
+  Future<String> genDlToken({required String id, String? url}) async {
     // 检查必要的配置参数
     if (_siteConfig.passKey == null || _siteConfig.passKey!.isEmpty) {
       throw Exception('站点配置缺少passKey，无法生成下载链接');

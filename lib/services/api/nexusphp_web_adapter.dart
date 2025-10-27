@@ -961,7 +961,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
   }
 
   @override
-  Future<String> genDlToken({required String id}) async {
+  Future<String> genDlToken({required String id, String? url}) async {
     // 检查必要的配置参数
     if (_siteConfig.passKey == null || _siteConfig.passKey!.isEmpty) {
       throw Exception('站点配置缺少passKey，无法生成下载链接');
@@ -972,6 +972,9 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
     // https://www.ptskit.org/download.php?downhash={userId}.{jwt}
     final jwt = getDownLoadHash(_siteConfig.passKey!, id, _siteConfig.userId!);
+    if (url != null && url.isNotEmpty) {
+      return url.replaceAll('{jwt}', jwt);
+    }
     return '${_siteConfig.baseUrl}download.php?downhash=${_siteConfig.userId!}.$jwt';
   }
 
