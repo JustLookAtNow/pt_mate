@@ -1,0 +1,106 @@
+{
+  "id": "hdkyl",
+  "name": "麒麟",
+  "isShow": true,
+  "baseUrls": [
+    "https://www.hdkyl.in/",
+    "https://cf.hdkylin.com/",
+    "https://na.hdkylin.com/"
+  ],
+  "primaryUrl": "https://www.hdkyl.in/",
+  "siteType": "NexusPHPWeb",
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": true,
+    "downloadHistory": true,
+    "categorySearch": true,
+    "advancedSearch": true
+  },
+  "discountMapping": {},
+  "infoFinder": {
+
+    "search": {
+      "torrentPath": "torrents.php",
+      "specialPath": "special.php",
+      "rows": {
+        "selector": "table.torrents > tbody:nth-child > tr:nth-child"
+      },
+      "fields": {
+        "torrentId": {
+          "selector": "a[href^=\"details.php?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "index": 1
+          }
+        },
+        "torrentName": {
+          "selector": "a[href^=\"details.php?id=\"] > b",
+          "attribute": "text"
+        },
+        "description": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1)",
+          "attribute": "text"
+        },
+        "discount": {
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
+          "attribute": "alt"
+        },
+        "discountEndTime": {
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
+          "attribute": "onmouseover",
+          "filter": {
+            "name": "regexp",
+            "args": "<span title=\\\"(.*?)\\\"",
+            "index": 1
+          }
+        },
+        "downloadUrl": {},
+        "seedersText": {
+          "selector": "td:nth-child(6)",
+          "attribute": "text"
+        },
+        "leechersText": {
+          "selector": "td:nth-child(7)",
+          "attribute": "text"
+        },
+        "sizeText": {
+          "selector": "td:nth-child(5)",
+          "attribute": "text"
+        },
+        "downloadStatus": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > div[title]",
+          "attribute": "title",
+          "filter": {
+            "name": "regexp",
+            "args": "(d+)%",
+            "index": 1
+          }
+        },
+        "collection": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(3) > img.bookmark",
+          "attribute": "src"
+        },
+        "cover": {
+        },
+        "createData": {
+          "selector": "td:nth-child(4) > span[title]",
+          "attribute": "title"
+        },
+        "doubanRating": {
+          "selector": "table.torrentname > img[title==\"douban\"] > next",
+          "attribute": "text"
+        },
+        "imdbRating": {
+          "selector": "table.torrentname > img[title==\"imdb\"] > next",
+          "attribute": "text"
+        }
+      }
+    }
+  }
+}
