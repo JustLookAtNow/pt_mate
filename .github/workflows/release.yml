@@ -125,15 +125,6 @@ jobs:
         retention-days: 1
         
     # 直接在Android构建后添加Linux构建步骤
-    # Linux 系统依赖缓存
-    - name: Cache Linux dependencies
-      uses: actions/cache@v4
-      with:
-        path: /var/cache/apt
-        key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/release.yml') }}
-        restore-keys: |
-          ${{ runner.os }}-apt-
-    
     - name: Install Linux dependencies
       run: |
         sudo apt-get update -y
@@ -279,18 +270,14 @@ jobs:
     - name: Build Windows
       run: flutter build windows --release
     
-    # Chocolatey 缓存
-    - name: Cache Chocolatey
-      uses: actions/cache@v4
-      with:
-        path: C:\ProgramData\chocolatey
-        key: ${{ runner.os }}-choco-innosetup
-        restore-keys: |
-          ${{ runner.os }}-choco-
-      
     - name: Install Inno Setup
       run: |
-        choco install innosetup -y
+        # 检查是否已安装，避免重复安装
+        if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+          choco install innosetup -y
+        } else {
+          Write-Host "Inno Setup already installed"
+        }
         
     - name: Download Chinese language file
       run: |
