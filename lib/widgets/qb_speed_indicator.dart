@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:pt_mate/pages/download_tasks_page.dart';
 
 import '../services/storage/storage_service.dart';
 import '../services/downloader/downloader_config.dart';
@@ -46,7 +47,7 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
         });
         return;
       }
-      
+
       final configs = await StorageService.instance.loadDownloaderConfigs();
       if (configs.isEmpty) {
         setState(() {
@@ -56,7 +57,7 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
         });
         return;
       }
-      
+
       // 查找默认客户端
       DownloaderConfig? defaultClient;
       for (final configMap in configs) {
@@ -65,7 +66,7 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
           break;
         }
       }
-      
+
       if (defaultClient == null) {
         setState(() {
           _err = '未找到默认下载器 ID: $defId，请重新设置默认下载器';
@@ -74,8 +75,10 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
         });
         return;
       }
-      
-      final pwd = await StorageService.instance.loadDownloaderPassword(defaultClient.id);
+
+      final pwd = await StorageService.instance.loadDownloaderPassword(
+        defaultClient.id,
+      );
       if ((pwd ?? '').isEmpty) {
         setState(() {
           _err = '未保存密码';
@@ -84,7 +87,7 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
         });
         return;
       }
-      
+
       // 使用统一的下载器服务API
       // 同时获取传输信息和服务器状态
       final futures = await Future.wait([
@@ -97,7 +100,7 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
           password: pwd ?? '',
         ),
       ]);
-      
+
       if (!mounted) return;
       setState(() {
         _info = futures[0] as TransferInfo;
@@ -116,19 +119,29 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
 
   void _openDownloader() {
     if (!mounted) return;
-    
+
     // 检查当前是否已经在下载器设置页面
     final currentRoute = ModalRoute.of(context);
-    if (currentRoute != null && currentRoute.settings.name == '/downloader_settings') {
+    if (currentRoute != null &&
+        currentRoute.settings.name == '/downloader_settings') {
       return; // 已经在下载器设置页面，不需要重复打开
     }
-    
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(
-      builder: (_) => const DownloaderSettingsPage(),
-      settings: const RouteSettings(name: '/downloader_settings'),
-    ));
+    if (currentRoute != null &&
+        currentRoute.settings.name == '/download_tasks') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const DownloaderSettingsPage(),
+          settings: const RouteSettings(name: '/downloader_settings'),
+        ),
+      );
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const DownloadTasksPage(),
+          settings: const RouteSettings(name: '/download_tasks'),
+        ),
+      );
+    }
   }
 
   @override
@@ -171,16 +184,16 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
                 Icon(
                   Icons.cloud_download,
                   size: 16,
-                  color: Theme.of(context).brightness == Brightness.light 
-                      ? Theme.of(context).colorScheme.onPrimary 
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? Theme.of(context).colorScheme.onPrimary
                       : Theme.of(context).colorScheme.onSurface,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   '↑${Formatters.speedFromBytesPerSec(info.upSpeed)} ↓${Formatters.speedFromBytesPerSec(info.dlSpeed)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).brightness == Brightness.light 
-                        ? Theme.of(context).colorScheme.onPrimary 
+                    color: Theme.of(context).brightness == Brightness.light
+                        ? Theme.of(context).colorScheme.onPrimary
                         : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
@@ -190,9 +203,11 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
             Text(
               '剩余空间: ${Formatters.dataFromBytes(serverState.freeSpaceOnDisk)}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: (Theme.of(context).brightness == Brightness.light 
-                    ? Theme.of(context).colorScheme.onPrimary 
-                    : Theme.of(context).colorScheme.onSurface).withValues(alpha: 0.8),
+                color:
+                    (Theme.of(context).brightness == Brightness.light
+                            ? Theme.of(context).colorScheme.onPrimary
+                            : Theme.of(context).colorScheme.onSurface)
+                        .withValues(alpha: 0.8),
               ),
             ),
           ],
