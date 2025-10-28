@@ -51,11 +51,39 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
         
+    # Flutter SDK 缓存
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.35.2'
         channel: 'stable'
+        cache: true  # 启用 Flutter SDK 缓存
+        cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+        cache-path: '${{ runner.tool_cache }}/flutter'
+    
+    # Pub 依赖缓存
+    - name: Cache pub dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.pub-cache
+          ${{ runner.tool_cache }}/flutter
+        key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pub-
+    
+    # Gradle 缓存
+    - name: Cache Gradle
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+          android/.gradle
+          android/app/.gradle
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
         
     - name: Get dependencies
       run: flutter pub get
@@ -97,17 +125,48 @@ jobs:
         retention-days: 1
         
     # 直接在Android构建后添加Linux构建步骤
+    # Linux 系统依赖缓存
+    - name: Cache Linux dependencies
+      uses: actions/cache@v4
+      with:
+        path: /var/cache/apt
+        key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/release.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-apt-
+    
     - name: Install Linux dependencies
       run: |
         sudo apt-get update -y
         sudo apt-get install -y ninja-build libgtk-3-dev libblkid-dev libsecret-1-dev file libfuse2
+    
+    # CMake 缓存
+    - name: Cache CMake
+      uses: actions/cache@v4
+      with:
+        path: |
+          build/linux
+          ~/.cmake
+        key: ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-cmake-
         
     - name: Build Linux
       run: flutter build linux --release
       
+    # AppImageTool 缓存
+    - name: Cache AppImageTool
+      uses: actions/cache@v4
+      with:
+        path: appimagetool-x86_64.AppImage
+        key: ${{ runner.os }}-appimagetool-continuous
+        restore-keys: |
+          ${{ runner.os }}-appimagetool-
+    
     - name: Download AppImageTool
       run: |
-        wget -O appimagetool-x86_64.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        if [ ! -f appimagetool-x86_64.AppImage ]; then
+          wget -O appimagetool-x86_64.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        fi
         chmod +x appimagetool-x86_64.AppImage
         
     - name: Create AppImage
@@ -182,17 +241,52 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "tag=$TAG" >> $GITHUB_OUTPUT
         
+    # Flutter SDK 缓存
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.35.2'
         channel: 'stable'
+        cache: true  # 启用 Flutter SDK 缓存
+        cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+        cache-path: '${{ runner.tool_cache }}/flutter'
+    
+    # Pub 依赖缓存
+    - name: Cache pub dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.pub-cache
+          ${{ runner.tool_cache }}/flutter
+        key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pub-
         
+    # Visual Studio 缓存
+    - name: Cache Visual Studio
+      uses: actions/cache@v4
+      with:
+        path: |
+          C:\Users\runneradmin\AppData\Local\Microsoft\VisualStudio
+          build/windows
+        key: ${{ runner.os }}-vs-${{ hashFiles('**/CMakeLists.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-vs-
+    
     - name: Get dependencies
       run: flutter pub get
       
     - name: Build Windows
       run: flutter build windows --release
+    
+    # Chocolatey 缓存
+    - name: Cache Chocolatey
+      uses: actions/cache@v4
+      with:
+        path: C:\ProgramData\chocolatey
+        key: ${{ runner.os }}-choco-innosetup
+        restore-keys: |
+          ${{ runner.os }}-choco-
       
     - name: Install Inno Setup
       run: |
@@ -237,11 +331,46 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "tag=$TAG" >> $GITHUB_OUTPUT
         
+    # Flutter SDK 缓存
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.35.2'
         channel: 'stable'
+        cache: true  # 启用 Flutter SDK 缓存
+        cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+        cache-path: '${{ runner.tool_cache }}/flutter'
+    
+    # Pub 依赖缓存
+    - name: Cache pub dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.pub-cache
+          ${{ runner.tool_cache }}/flutter
+        key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pub-
+    
+    # CocoaPods 缓存
+    - name: Cache CocoaPods
+      uses: actions/cache@v4
+      with:
+        path: |
+          ios/Pods
+          ~/.cocoapods
+        key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pods-
+    
+    # Xcode 缓存
+    - name: Cache Xcode DerivedData
+      uses: actions/cache@v4
+      with:
+        path: ~/Library/Developer/Xcode/DerivedData
+        key: ${{ runner.os }}-xcode-${{ hashFiles('**/project.pbxproj') }}
+        restore-keys: |
+          ${{ runner.os }}-xcode-
         
     - name: Get dependencies
       run: flutter pub get
