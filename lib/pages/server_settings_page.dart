@@ -551,6 +551,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
   bool _isCustomSite = true; // 是否选择自定义站点
   bool _hasUserMadeSelection = false; // 用户是否已经做出选择（预设或自定义）
   String? _selectedTemplateUrl; // 从多URL模板中选择的URL
+  bool _showPresetList = true; // 控制预设站点列表的显示/隐藏
 
   @override
   void initState() {
@@ -1107,13 +1108,21 @@ class _SiteEditPageState extends State<SiteEditPage> {
       leading: Icon(
         Icons.public,
         color: Theme.of(context).colorScheme.secondary,
+        size: 20,
       ),
-      title: Text(template.name),
-      subtitle: Text('${template.baseUrls.length} 个地址 (${template.siteType.displayName})'),
+      title: Text(template.name, style: const TextStyle(fontSize: 14)),
+      subtitle: Text(
+        '${template.baseUrls.length} 个地址 (${template.siteType.displayName})',
+        style: const TextStyle(fontSize: 12),
+      ),
       initiallyExpanded: isSelected,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
       ),
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      childrenPadding: EdgeInsets.zero,
       children: template.baseUrls.map((url) {
         final isUrlSelected = !_isCustomSite && _selectedTemplateUrl == url;
         return ListTile(
@@ -1122,16 +1131,35 @@ class _SiteEditPageState extends State<SiteEditPage> {
             color: url == template.primaryUrl 
                 ? Theme.of(context).colorScheme.primary
                 : Theme.of(context).colorScheme.onSurfaceVariant,
-            size: 20,
+            size: 16,
           ),
-          title: Text(url),
-          subtitle: url == template.primaryUrl ? const Text('主要地址') : null,
+          title: Text(url, style: const TextStyle(fontSize: 13)),
+          subtitle: url == template.primaryUrl
+              ? const Text('主要地址', style: TextStyle(fontSize: 11))
+              : null,
           selected: isUrlSelected,
-          onTap: () => _selectPresetTemplate(template, url),
-          contentPadding: const EdgeInsets.only(left: 56, right: 16),
+          onTap: () {
+            _selectPresetTemplate(template, url);
+            // 选中后收起下拉框
+            _presetSearchController.clear();
+            setState(() {
+              _filteredPresetTemplates = _presetTemplates
+                  .where((template) => template.isShow)
+                  .toList();
+              _showPresetList = false; // 收起列表
+            });
+          },
+          contentPadding: const EdgeInsets.only(
+            left: 48,
+            right: 16,
+            top: 2,
+            bottom: 2,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
+          dense: true,
+          visualDensity: VisualDensity.compact,
         );
       }).toList(),
     );
@@ -1222,56 +1250,106 @@ class _SiteEditPageState extends State<SiteEditPage> {
                       // 搜索框
                       TextField(
                         controller: _presetSearchController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: '搜索预设站点',
                           hintText: '输入站点名称、地址或类型进行搜索',
-                          prefixIcon: Icon(Icons.search),
-                          border: OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.search),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: _showPresetList
+                              ? IconButton(
+                                  icon: const Icon(Icons.keyboard_arrow_up),
+                                  onPressed: () {
+                                    setState(() {
+                                      _showPresetList = false;
+                                    });
+                                    FocusScope.of(context).unfocus();
+                                  },
+                                )
+                              : const Icon(Icons.keyboard_arrow_down),
                         ),
+                        onTap: () {
+                          setState(() {
+                            _showPresetList = true;
+                          });
+                        },
+                        onChanged: (value) {
+                          setState(() {
+                            _showPresetList = true;
+                          });
+                        },
                       ),
                       const SizedBox(height: 12),
                       
-                      // 预设站点列表
-                      Container(
-                        constraints: const BoxConstraints(maxHeight: 200),
-                        child: SingleChildScrollView(
-                          child: Column(
-                            children: [
-                              // 自定义选项（始终显示在第一位）
-                              ListTile(
-                                leading: const Icon(Icons.add_circle_outline),
-                                title: const Text('自定义'),
-                                subtitle: const Text('手动配置站点信息'),
-                                selected: _isCustomSite,
-                                onTap: () => _selectCustomSite(),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              
-                              // 分隔线
-                              if (_filteredPresetTemplates.isNotEmpty) ...[
-                                const Divider(),
-                                
-                                // 过滤后的预设模板列表（新格式，支持多URL）
-                                ..._filteredPresetTemplates.map((template) => _buildTemplateListTile(template)),
-                              ],
-                              
-                              // 无搜索结果提示
-                              if (_filteredPresetTemplates.isEmpty && _presetSearchController.text.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Text(
-                                    '未找到匹配的预设站点',
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                    ),
+                      // 预设站点列表（只在_showPresetList为true时显示）
+                      if (_showPresetList)
+                        Container(
+                          constraints: const BoxConstraints(maxHeight: 400),
+                          child: SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                // 自定义选项（始终显示在第一位）
+                                ListTile(
+                                  leading: const Icon(Icons.add_circle_outline),
+                                  title: const Text('自定义'),
+                                  subtitle: const Text('手动配置站点信息'),
+                                  selected: _isCustomSite,
+                                  onTap: () {
+                                    _selectCustomSite();
+                                    // 选中后收起下拉框
+                                    _presetSearchController.clear();
+                                    setState(() {
+                                      _filteredPresetTemplates =
+                                          _presetTemplates
+                                              .where(
+                                                (template) => template.isShow,
+                                              )
+                                              .toList();
+                                      _showPresetList = false; // 收起列表
+                                    });
+                                  },
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  dense: true,
+                                  visualDensity: VisualDensity.compact,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 4,
                                   ),
                                 ),
-                            ],
+
+                                // 分隔线
+                                if (_filteredPresetTemplates.isNotEmpty) ...[
+                                  const Divider(height: 1),
+
+                                  // 过滤后的预设模板列表（新格式，支持多URL）
+                                  ..._filteredPresetTemplates.map(
+                                    (template) =>
+                                        _buildTemplateListTile(template),
+                                  ),
+                                ],
+
+                                // 无搜索结果提示
+                                if (_filteredPresetTemplates.isEmpty &&
+                                    _presetSearchController.text.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Text(
+                                      '未找到匹配的预设站点',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
