@@ -99,29 +99,17 @@ jobs:
         echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
         echo "storeFile=keystore.jks" >> android/key.properties
       
-    - name: Build APK - All-in-one (arm64-v8a + armeabi-v7a)
-      run: |
-        flutter build apk --release --target-platform android-arm64,android-arm
-        mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/pt_mate-${{ steps.version.outputs.version }}-allinone.apk
-        
     - name: Build APK - ARM64 (v8a)
       run: |
         flutter build apk --release --target-platform android-arm64
         mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/pt_mate-${{ steps.version.outputs.version }}-arm64-v8a.apk
-        
-    - name: Build APK - ARMv7
-      run: |
-        flutter build apk --release --target-platform android-arm
-        mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/pt_mate-${{ steps.version.outputs.version }}-armeabi-v7a.apk
-        
+          
     - name: Upload Android artifacts
       uses: actions/upload-artifact@v4
       with:
         name: android-artifacts
         path: |
-          build/app/outputs/flutter-apk/pt_mate-${{ steps.version.outputs.version }}-allinone.apk
           build/app/outputs/flutter-apk/pt_mate-${{ steps.version.outputs.version }}-arm64-v8a.apk
-          build/app/outputs/flutter-apk/pt_mate-${{ steps.version.outputs.version }}-armeabi-v7a.apk
         retention-days: 1
         
     # 直接在Android构建后添加Linux构建步骤
@@ -481,9 +469,7 @@ jobs:
           
           ## 📱 Android APK Downloads
           
-          - **All-in-one APK** (arm64-v8a + armeabi-v7a): Compatible with most devices
           - **ARM64 APK** (arm64-v8a): For modern 64-bit devices
-          - **ARMv7 APK** (armeabi-v7a): For older 32-bit devices
           
           ## 💻 Desktop Downloads
           
@@ -500,9 +486,7 @@ jobs:
         draft: false
         prerelease: ${{ steps.version.outputs.is_prerelease }}
         files: |
-          android-artifacts/pt_mate-${{ steps.version.outputs.version }}-allinone.apk
           android-artifacts/pt_mate-${{ steps.version.outputs.version }}-arm64-v8a.apk
-          android-artifacts/pt_mate-${{ steps.version.outputs.version }}-armeabi-v7a.apk
           windows-artifact/pt_mate-${{ steps.version.outputs.version }}-windows-x64.exe
           linux-artifact/pt_mate-${{ steps.version.outputs.version }}-linux-x64.AppImage
           ios-macos-artifacts/ios/build/pt_mate-${{ steps.version.outputs.version }}-unsigned.ipa
