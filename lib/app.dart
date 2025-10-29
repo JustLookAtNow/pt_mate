@@ -294,9 +294,14 @@ class _CategoryFilterDialogState extends State<_CategoryFilterDialog> {
   }
 }
 
-class MTeamApp extends StatelessWidget {
+class MTeamApp extends StatefulWidget {
   const MTeamApp({super.key});
 
+  @override
+  State<MTeamApp> createState() => _MTeamAppState();
+}
+
+class _MTeamAppState extends State<MTeamApp> {
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -351,6 +356,7 @@ class _HomePageState extends State<HomePage> {
   List<SearchCategoryConfig> _categories = [];
   bool _loading = false;
   String? _error;
+  DateTime? _lastPressedAt;
 
   // 用户信息与搜索结果分页状态
   MemberProfile? _profile;
@@ -1032,10 +1038,49 @@ class _HomePageState extends State<HomePage> {
           }
         }
 
-        return ResponsiveLayout(
-          currentRoute: '/',
-          onSettingsChanged: _reloadCategories,
-          appBar: AppBar(
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) async {
+            if (didPop) return;
+
+            final now = DateTime.now();
+            if (_lastPressedAt == null ||
+                now.difference(_lastPressedAt!) > const Duration(seconds: 3)) {
+              _lastPressedAt = now;
+
+              // 显示提示信息
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    '再按一次返回键退出应用',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                  duration: const Duration(seconds: 3),
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer,
+                  behavior: SnackBarBehavior.floating,
+                  action: SnackBarAction(
+                    label: '退出',
+                    textColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                    onPressed: () {
+                      SystemNavigator.pop();
+                    },
+                  ),
+                ),
+              );
+              return;
+            }
+
+            // 第二次按返回键，退出应用
+            SystemNavigator.pop();
+          },
+          child: ResponsiveLayout(
+            currentRoute: '/',
+            onSettingsChanged: _reloadCategories,
+            appBar: AppBar(
             title: GestureDetector(
               onTap: () {
                 Navigator.of(context).push(
@@ -1660,6 +1705,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
             ],
+          ),
           ),
         );
       },
