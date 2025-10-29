@@ -60,6 +60,11 @@ abstract class DownloaderClient {
   /// 返回下载器的版本号
   Future<String> getVersion();
   
+  /// 获取现有下载路径列表
+  /// 
+  /// 返回下载器中已存在的下载路径
+  Future<List<String>> getPaths();
+  
   /// 暂停单个任务的便捷方法
   Future<void> pauseTask(String hash) async {
     await pauseTasks([hash]);

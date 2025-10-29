@@ -350,6 +350,28 @@ class TransmissionClient implements DownloaderClient {
   }
   
   @override
+  Future<List<String>> getPaths() async {
+    // 获取所有种子的下载路径
+    final response = await _rpcRequest('torrent-get', arguments: {
+      'fields': ['downloadDir'],
+    });
+    
+    final List<dynamic> torrents = response['torrents'] as List<dynamic>? ?? [];
+    final Set<String> allPaths = {};
+    
+    for (final torrent in torrents) {
+      final downloadDir = torrent['downloadDir'] as String?;
+      if (downloadDir != null && downloadDir.isNotEmpty) {
+        allPaths.add(downloadDir);
+      }
+    }
+    
+    final paths = allPaths.toList();
+    paths.sort(); // 按字母顺序排序
+    return paths;
+  }
+  
+  @override
   Future<void> pauseTask(String hash) async {
     await pauseTasks([hash]);
   }

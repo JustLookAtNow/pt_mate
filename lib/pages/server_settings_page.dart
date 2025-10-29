@@ -195,7 +195,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     return ResponsiveLayout(
       currentRoute: '/server_settings',
       appBar: AppBar(
-        title: const Text('服务器配置'),
+        title: const Text('站点配置'),
         actions: const [QbSpeedIndicator()],
         backgroundColor: Theme.of(context).brightness == Brightness.light
             ? Theme.of(context).colorScheme.primary
@@ -230,7 +230,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            '暂无服务器配置',
+                            '暂无站点配置',
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
                                   color: Theme.of(context).colorScheme.outline,

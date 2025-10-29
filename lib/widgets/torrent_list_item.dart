@@ -414,6 +414,7 @@ class TorrentListItem extends StatelessWidget {
                   Text(
                     '发布于 ${Formatters.formatTorrentCreatedDate(torrent.createdDate)} 前',
                     style: TextStyle(
+                      fontWeight: FontWeight.w600,
                       fontSize: 10,
                       color: Theme.of(context).colorScheme.primary,
                     ),

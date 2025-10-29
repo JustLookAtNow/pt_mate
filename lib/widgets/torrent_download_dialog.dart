@@ -29,6 +29,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
 
   List<String> _categories = [];
   List<String> _tags = [];
+  List<String> _paths = [];
   bool _loading = false;
   String? _error;
 
@@ -63,7 +64,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
         });
 
         if (_selectedClient != null) {
-          _loadCategoriesAndTags();
+          _loadCategoriesTagsAndPaths();
         }
       }
     } catch (e) {
@@ -71,7 +72,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
     }
   }
 
-  Future<void> _loadCategoriesAndTags() async {
+  Future<void> _loadCategoriesTagsAndPaths() async {
     if (_selectedClient == null) return;
 
     setState(() => _loading = true);
@@ -83,26 +84,32 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
       final cachedTags = await StorageService.instance.loadDownloaderTags(
         _selectedClient!.id,
       );
+      final cachedPaths = await StorageService.instance.loadDownloaderPaths(
+        _selectedClient!.id,
+      );
 
       if (mounted) {
         setState(() {
           _categories = cachedCategories;
           _tags = cachedTags;
+          _paths = cachedPaths;
         });
       }
 
       // 只有缓存为空时才刷新
-      if (cachedCategories.isEmpty || cachedTags.isEmpty) {
-        await _refreshCategoriesAndTags();
+      if (cachedCategories.isEmpty ||
+          cachedTags.isEmpty ||
+          cachedPaths.isEmpty) {
+        await _refreshCategoriesTagsAndPaths();
       }
     } catch (e) {
-      if (mounted) setState(() => _error = '加载分类标签失败：$e');
+      if (mounted) setState(() => _error = '加载分类标签路径失败：$e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _refreshCategoriesAndTags() async {
+  Future<void> _refreshCategoriesTagsAndPaths() async {
     if (_selectedClient == null) return;
 
     try {
@@ -124,6 +131,10 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
         config: _selectedClient!,
         password: password,
       );
+      final paths = await DownloaderService.instance.getPaths(
+        config: _selectedClient!,
+        password: password,
+      );
 
       // 保存到缓存
       await StorageService.instance.saveDownloaderCategories(
@@ -131,16 +142,21 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
         categories,
       );
       await StorageService.instance.saveDownloaderTags(_selectedClient!.id, tags);
+      await StorageService.instance.saveDownloaderPaths(
+        _selectedClient!.id,
+        paths,
+      );
 
       if (mounted) {
         setState(() {
           _categories = categories;
           _tags = tags;
+          _paths = paths;
           _error = null;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = '刷新分类标签失败：$e');
+      if (mounted) setState(() => _error = '刷新分类标签路径失败：$e');
     }
   }
 
@@ -312,7 +328,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
               _selectedTags.clear();
             });
             if (client != null) {
-              _loadCategoriesAndTags();
+              _loadCategoriesTagsAndPaths();
             }
           },
         ),
@@ -325,7 +341,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
           children: [
             Expanded(
               child: Text(
-                '分类',
+                '分类（选择后使用分类路径）',
                 style: Theme.of(context).textTheme.titleSmall,
               ),
             ),
@@ -337,7 +353,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
               ),
             if (!_loading)
               IconButton(
-                onPressed: _refreshCategoriesAndTags,
+                onPressed: _refreshCategoriesTagsAndPaths,
                 icon: const Icon(Icons.refresh, size: 20),
                 tooltip: '刷新',
               ),
@@ -398,13 +414,39 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
         const SizedBox(height: 16),
         Text('保存路径（可选）', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        TextField(
-          controller: _savePathCtrl,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: '留空使用默认路径',
-            isDense: true,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _savePathCtrl,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: '留空使用默认路径',
+                  isDense: true,
+                ),
+              ),
+            ),
+            if (_paths.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.folder_open),
+                tooltip: '选择已有路径',
+                onSelected: (path) {
+                  _savePathCtrl.text = path;
+                },
+                itemBuilder: (context) => _paths.map((path) {
+                  return PopupMenuItem<String>(
+                    value: path,
+                    child: Text(
+                      path,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
         )
       ],
     );

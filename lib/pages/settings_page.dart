@@ -212,7 +212,7 @@ class _SettingsBody extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         
-        // 查询条件配置已移至站点配置中，可在服务器配置页面管理
+        // 查询条件配置已移至站点配置中，可在站点配置页面管理
       ],
     );
   }

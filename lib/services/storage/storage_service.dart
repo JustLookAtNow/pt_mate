@@ -33,6 +33,7 @@ class StorageKeys {
   static String downloaderPasswordFallbackKey(String id) => 'downloader.password.fallback.$id';
   static String downloaderCategoriesKey(String id) => 'downloader.categories.$id';
   static String downloaderTagsKey(String id) => 'downloader.tags.$id';
+  static String downloaderPathsKey(String id) => 'downloader.paths.$id';
   
   // 默认下载设置
   static const String defaultDownloadCategory = 'download.defaultCategory';
@@ -696,5 +697,15 @@ class StorageService {
   Future<List<String>> loadDownloaderTags(String id) async {
     final prefs = await _prefs;
     return prefs.getStringList(StorageKeys.downloaderTagsKey(id)) ?? <String>[];
+  }
+
+  Future<void> saveDownloaderPaths(String id, List<String> paths) async {
+    final prefs = await _prefs;
+    await prefs.setStringList(StorageKeys.downloaderPathsKey(id), paths);
+  }
+
+  Future<List<String>> loadDownloaderPaths(String id) async {
+    final prefs = await _prefs;
+    return prefs.getStringList(StorageKeys.downloaderPathsKey(id)) ?? <String>[];
   }
 }

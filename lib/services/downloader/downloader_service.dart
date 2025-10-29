@@ -223,6 +223,18 @@ class DownloaderService {
     return await client.getVersion();
   }
   
+  /// 获取现有下载路径列表
+  /// 
+  /// [config] 下载器配置
+  /// [password] 密码
+  Future<List<String>> getPaths({
+    required DownloaderConfig config,
+    required String password,
+  }) async {
+    final client = DownloaderFactory.getClient(config: config, password: password);
+    return await client.getPaths();
+  }
+  
   /// 获取包含版本信息的配置并自动保存
   /// 
   /// [config] 下载器配置

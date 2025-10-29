@@ -395,6 +395,26 @@ class QbittorrentClient implements DownloaderClient {
   }
   
   @override
+  Future<List<String>> getPaths() async {
+    // 获取所有种子的信息，包括保存路径
+    final response = await _request('GET', '/torrents/info');
+    final List<dynamic> data = response.data as List<dynamic>;
+    
+    final Set<String> allPaths = {};
+    
+    for (final torrent in data) {
+      final savePath = torrent['save_path'] as String?;
+      if (savePath != null && savePath.isNotEmpty) {
+        allPaths.add(savePath);
+      }
+    }
+    
+    final paths = allPaths.toList();
+    paths.sort(); // 按字母顺序排序
+    return paths;
+  }
+  
+  @override
   Future<void> pauseTask(String hash) async {
     await pauseTasks([hash]);
   }

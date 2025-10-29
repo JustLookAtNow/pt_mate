@@ -141,7 +141,7 @@ class AppDrawer extends StatelessWidget {
           ),
           _DrawerItem(
             icon: Icons.dns,
-            title: '服务器配置',
+            title: '站点配置',
             isActive: currentRoute == '/server_settings',
             onTap: () {
               if (!isFixedSidebar) {
