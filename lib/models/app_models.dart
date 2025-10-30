@@ -13,6 +13,7 @@ class MemberProfile {
   final String downloadedBytesString; // 下载量字符串格式，如"500 MB"
   final String? userId; // 用户ID，NexusPHP类型从data.data.id获取
   final String? passKey; // Pass Key，nexusphpweb类型从usercp.php获取
+  final String? lastAccess; // 最后访问时间，来自 API data['last_access']
 
   MemberProfile({
     required this.username,
@@ -24,6 +25,7 @@ class MemberProfile {
     required this.downloadedBytesString,
     this.userId,
     this.passKey,
+    this.lastAccess,
   });
 }
 

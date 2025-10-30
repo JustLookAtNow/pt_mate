@@ -25,6 +25,50 @@ import 'widgets/responsive_layout.dart';
 import 'widgets/torrent_download_dialog.dart';
 import 'widgets/torrent_list_item.dart';
 
+/// 判断最后访问时间是否超过一个月
+bool _isLastAccessOverMonth(String? lastAccess) {
+  final dt = _parseLastAccess(lastAccess);
+  if (dt == null) return false;
+  final now = DateTime.now();
+  return now.difference(dt).inDays >= 30;
+}
+
+/// 解析 "yyyy-MM-dd HH:mm:ss" 格式的时间字符串
+DateTime? _parseLastAccess(String? lastAccess) {
+  if (lastAccess == null) return null;
+  final raw = lastAccess.trim();
+  if (raw.isEmpty) return null;
+
+  // 期望格式：2025-10-30 11:09:04
+  final parts = raw.split(' ');
+  if (parts.length != 2) return null;
+  final dateParts = parts[0].split('-');
+  final timeParts = parts[1].split(':');
+  if (dateParts.length != 3 || timeParts.length < 2) return null;
+
+  final year = int.tryParse(dateParts[0]);
+  final month = int.tryParse(dateParts[1]);
+  final day = int.tryParse(dateParts[2]);
+  final hour = int.tryParse(timeParts[0]);
+  final minute = int.tryParse(timeParts[1]);
+  final second = timeParts.length > 2 ? int.tryParse(timeParts[2]) : 0;
+
+  if (year == null ||
+      month == null ||
+      day == null ||
+      hour == null ||
+      minute == null ||
+      second == null) {
+    return null;
+  }
+
+  try {
+    return DateTime(year, month, day, hour, minute, second);
+  } catch (_) {
+    return null;
+  }
+}
+
 class AppState extends ChangeNotifier {
   SiteConfig? _site;
   SiteConfig? get site => _site;
@@ -1197,6 +1241,47 @@ class _HomePageState extends State<HomePage> {
                                                     ),
                                               ),
                                             ),
+                                              if (_profile!.lastAccess !=
+                                                      null &&
+                                                  _profile!.lastAccess!
+                                                      .trim()
+                                                      .isNotEmpty &&
+                                                  _isLastAccessOverMonth(
+                                                    _profile!.lastAccess,
+                                                  ))
+                                                IconButton(
+                                                  onPressed: () {
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text(
+                                                          '已经超过一个月没登陆网站了',
+                                                          style: TextStyle(
+                                                            color: Theme.of(context)
+                                                                .colorScheme
+                                                                .onPrimaryContainer,
+                                                          ),
+                                                        ),
+                                                        backgroundColor:
+                                                            Theme.of(context)
+                                                                .colorScheme
+                                                                .primaryContainer,
+                                                        behavior:
+                                                            SnackBarBehavior
+                                                                .floating,
+                                                      ),
+                                                    );
+                                                  },
+                                                  icon: Icon(
+                                                    Icons.priority_high,
+                                                    color: Theme.of(
+                                                      context,
+                                                    ).colorScheme.error,
+                                                    size: 20,
+                                                  ),
+                                                  tooltip: '超过一个月未登录',
+                                                ),
                                             Icon(
                                               _userInfoExpanded
                                                   ? Icons.expand_less
@@ -1234,6 +1319,16 @@ class _HomePageState extends State<HomePage> {
                                                 '魔力 ${Formatters.bonus(_profile!.bonus)}',
                                                 Colors.purple,
                                               ),
+                                                if (_profile!.lastAccess !=
+                                                        null &&
+                                                    _profile!.lastAccess!
+                                                        .trim()
+                                                        .isNotEmpty)
+                                                  _buildStatChip(
+                                                    context,
+                                                    '最后访问 ${_profile!.lastAccess!}',
+                                                    Colors.grey,
+                                                  ),
                                             ],
                                           ),
                                         ],

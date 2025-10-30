@@ -111,6 +111,7 @@ class MTeamAdapter extends SiteAdapter {
   /// 解析 M-Team 站点的用户资料数据
   MemberProfile _parseMemberProfile(Map<String, dynamic> json) {
     final mc = json['memberCount'] as Map<String, dynamic>?;
+    final memberStatus = json['memberStatus'] as Map<String, dynamic>?;
     double parseDouble(dynamic v) => v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
     int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
     
@@ -126,6 +127,7 @@ class MTeamAdapter extends SiteAdapter {
       uploadedBytesString: Formatters.dataFromBytes(uploadedBytes),
       downloadedBytesString: Formatters.dataFromBytes(downloadedBytes),
       passKey: null, // M-Team类型不提供passKey
+      lastAccess: memberStatus?['lastBrowse']?.toString(),
     );
   }
   

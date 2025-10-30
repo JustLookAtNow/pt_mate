@@ -153,6 +153,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
         downloadedBytesString: userInfo['download'] ?? '0 B',
         userId: userInfo['userId'],
         passKey: passKey,
+        lastAccess: null, // Web版本暂不提供该字段
       );
     } catch (e) {
       throw Exception('获取用户资料失败: $e');
