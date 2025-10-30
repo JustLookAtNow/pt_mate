@@ -515,7 +515,10 @@ class AggregateSearchConfig {
   bool get isAllSitesType => type == 'all';
 
   // 判断是否可以编辑或删除
-  bool get canEdit => type != 'all';
+  bool get canEdit => type != 'all'; // 允许编辑所有配置，包括"所有站点"配置
+  
+  // 判断是否可以删除
+  bool get canDelete => type != 'all';
 
   // 获取实际启用的站点ID列表
   List<String> getEnabledSiteIds(List<String> allSiteIds) {
@@ -528,7 +531,20 @@ class AggregateSearchConfig {
   // 获取启用的站点对象列表
   List<SiteSearchItem> getEnabledSites(List<String> allSiteIds) {
     if (type == 'all') {
-      return allSiteIds.map((id) => SiteSearchItem(id: id)).toList(); // 返回所有站点
+      // 对于"所有站点"配置，需要合并已配置的站点参数和所有可用站点
+      final Map<String, SiteSearchItem> configuredSites = {};
+      for (final site in enabledSites) {
+        configuredSites[site.id] = site;
+      }
+      
+      return allSiteIds.map((id) {
+        // 如果该站点已有配置（包含分类等参数），使用已配置的版本
+        if (configuredSites.containsKey(id)) {
+          return configuredSites[id]!;
+        }
+        // 否则创建默认的站点项
+        return SiteSearchItem(id: id);
+      }).toList();
     }
     return enabledSites; // 返回自定义列表
   }

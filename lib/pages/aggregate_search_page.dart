@@ -576,20 +576,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   }
 
   void _performSearch(String query) async {
-    if (query.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '请输入搜索关键词',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onErrorContainer,
-            ),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-        ),
-      );
-      return;
-    }
+    // 允许空关键字搜索，用于获取站点最新种子
 
     final provider = Provider.of<AggregateSearchProvider>(
       context,
@@ -619,7 +606,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     try {
       final result = await AggregateSearchService.instance
           .performAggregateSearch(
-            keyword: query.trim(),
+            keyword: query.trim().isEmpty ? '' : query.trim(),
             configId: provider.selectedStrategy,
             maxResultsPerSite: 10,
             onProgress: (progress) {

@@ -212,13 +212,45 @@ class AggregateSearchService {
         return SearchResult.error('站点不支持搜索功能');
       }
 
+      // 转换分类参数
+      Map<String, dynamic>? processedParams;
+      if (additionalParams != null) {
+        processedParams = Map<String, dynamic>.from(additionalParams);
+        
+        // 处理分类参数转换
+        if (processedParams.containsKey('selectedCategories')) {
+          final selectedCategoryIds = processedParams['selectedCategories'] as List<dynamic>?;
+          if (selectedCategoryIds != null && selectedCategoryIds.isNotEmpty) {
+            // 移除原始的selectedCategories
+            processedParams.remove('selectedCategories');
+            
+            // 获取站点的分类配置
+            final categories = site.searchCategories;
+            
+            // 将分类ID转换为对应的参数
+            for (final categoryId in selectedCategoryIds) {
+              final category = categories.firstWhere(
+                (cat) => cat.id == categoryId,
+                orElse: () => throw Exception('找不到分类配置: $categoryId'),
+              );
+              
+              // 解析分类参数并合并到请求参数中
+              final categoryParams = category.parseParameters();
+              categoryParams.forEach((key, value) {
+                processedParams![key] = value;
+              });
+            }
+          }
+        }
+      }
+
       // 使用专用方法直接搜索指定站点，无需切换全局状态
       final result = await ApiService.instance.searchTorrentsWithSite(
         siteConfig: site,
         keyword: keyword.trim().isEmpty ? null : keyword.trim(),
         pageNumber: 1,
         pageSize: maxResults,
-        additionalParams: additionalParams, 
+        additionalParams: processedParams, 
       );
 
       return SearchResult.success(result.items);

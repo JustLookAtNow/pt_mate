@@ -272,19 +272,19 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
                             value: config.isActive,
                             onChanged: (value) => _toggleConfig(config.id, value),
                           ),
-                          if (config.canEdit)
-                            PopupMenuButton<String>(
-                              onSelected: (action) {
-                                switch (action) {
-                                  case 'edit':
-                                    _showEditConfigDialog(config);
-                                    break;
-                                  case 'delete':
-                                    _deleteConfig(config.id);
-                                    break;
-                                }
-                              },
-                              itemBuilder: (context) => [
+                          PopupMenuButton<String>(
+                            onSelected: (action) {
+                              switch (action) {
+                                case 'edit':
+                                  _showEditConfigDialog(config);
+                                  break;
+                                case 'delete':
+                                  _deleteConfig(config.id);
+                                  break;
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              if (config.canEdit)
                                 const PopupMenuItem(
                                   value: 'edit',
                                   child: Row(
@@ -295,6 +295,7 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
                                     ],
                                   ),
                                 ),
+                              if (config.canDelete)
                                 const PopupMenuItem(
                                   value: 'delete',
                                   child: Row(
@@ -375,7 +376,30 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
 
   void _showConfigDialog(AggregateSearchConfig? existingConfig) {
     final nameController = TextEditingController(text: existingConfig?.name ?? '');
-    final selectedSiteIds = Set<String>.from(existingConfig?.enabledSites.map((site) => site.id) ?? []);
+    
+    // 初始化选中的站点ID
+    Set<String> selectedSiteIds;
+    if (existingConfig?.isAllSitesType == true) {
+      // 对于"所有站点"配置，默认选中所有站点
+      selectedSiteIds = Set<String>.from(_allSites.map((site) => site.id));
+    } else {
+      selectedSiteIds = Set<String>.from(existingConfig?.enabledSites.map((site) => site.id) ?? []);
+    }
+    
+    // 存储每个站点的分类选择
+    final Map<String, Set<String>> siteCategories = {};
+    
+    // 初始化现有配置的分类选择
+    if (existingConfig != null) {
+      for (final siteItem in existingConfig.enabledSites) {
+        final params = siteItem.additionalParams;
+        if (params != null && params['selectedCategories'] != null) {
+          siteCategories[siteItem.id] = Set<String>.from(params['selectedCategories'] as List);
+        } else {
+          siteCategories[siteItem.id] = <String>{};
+        }
+      }
+    }
 
     showDialog(
       context: context,
@@ -384,6 +408,7 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
           title: Text(existingConfig == null ? '添加搜索配置' : '编辑搜索配置'),
           content: SizedBox(
             width: double.maxFinite,
+            height: 600, // 增加高度以容纳分类选择
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,32 +422,92 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  '选择站点',
+                  '选择站点和分类',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 8),
-                Flexible(
+                Expanded(
                   child: Container(
                     decoration: BoxDecoration(
                       border: Border.all(color: Theme.of(context).colorScheme.outline),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: ListView(
-                      shrinkWrap: true,
-                      children: _allSites.map((site) => CheckboxListTile(
-                        title: Text(site.name),
-                        subtitle: Text(site.baseUrl),
-                        value: selectedSiteIds.contains(site.id),
-                        onChanged: (value) {
-                          setDialogState(() {
-                            if (value == true) {
-                              selectedSiteIds.add(site.id);
-                            } else {
-                              selectedSiteIds.remove(site.id);
-                            }
-                          });
-                        },
-                      )).toList(),
+                      children: _allSites.map((site) {
+                        final isSelected = selectedSiteIds.contains(site.id);
+                        final selectedCategories = siteCategories[site.id] ?? <String>{};
+                        
+                        return ExpansionTile(
+                          leading: Checkbox(
+                            value: isSelected,
+                            onChanged: (value) {
+                              setDialogState(() {
+                                if (value == true) {
+                                  selectedSiteIds.add(site.id);
+                                  if (!siteCategories.containsKey(site.id)) {
+                                    siteCategories[site.id] = <String>{};
+                                  }
+                                } else {
+                                  selectedSiteIds.remove(site.id);
+                                  siteCategories.remove(site.id);
+                                }
+                              });
+                            },
+                          ),
+                          title: Text(site.name),
+                          subtitle: Text(site.baseUrl),
+                          initiallyExpanded: false, // 默认关闭分类选择
+                          children: site.searchCategories.isNotEmpty
+                              ? [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        if (!isSelected)
+                                          Text(
+                                            '请先选择站点才能配置分类',
+                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              color: Theme.of(context).colorScheme.outline,
+                                            ),
+                                          )
+                                        else ...[
+                                          Text(
+                                            '选择分类（不选择表示使用所有分类）',
+                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              color: Theme.of(context).colorScheme.outline,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 4,
+                                            children: site.searchCategories.map((category) {
+                                              final isCategorySelected = selectedCategories.contains(category.id);
+                                              return FilterChip(
+                                                label: Text(category.displayName),
+                                                selected: isCategorySelected,
+                                                onSelected: isSelected ? (selected) {
+                                                  setDialogState(() {
+                                                    if (selected) {
+                                                      selectedCategories.add(category.id);
+                                                    } else {
+                                                      selectedCategories.remove(category.id);
+                                                    }
+                                                    siteCategories[site.id] = selectedCategories;
+                                                  });
+                                                } : null, // 未选中站点时禁用分类选择
+                                              );
+                                            }).toList(),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ]
+                              : [],
+                        );
+                      }).toList(),
                     ),
                   ),
                 ),
@@ -472,7 +557,7 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
                 }
 
                 Navigator.pop(context);
-                _saveConfig(existingConfig, nameController.text.trim(), selectedSiteIds.toList());
+                _saveConfig(existingConfig, nameController.text.trim(), selectedSiteIds.toList(), siteCategories);
               },
               child: const Text('保存'),
             ),
@@ -482,11 +567,27 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
     );
   }
 
-  void _saveConfig(AggregateSearchConfig? existingConfig, String name, List<String> siteIds) {
+  void _saveConfig(AggregateSearchConfig? existingConfig, String name, List<String> siteIds, Map<String, Set<String>> siteCategories) {
     final config = AggregateSearchConfig(
       id: existingConfig?.id ?? 'config-${DateTime.now().millisecondsSinceEpoch}',
       name: name,
-      enabledSites: siteIds.map((id) => SiteSearchItem(id: id)).toList(),
+      type: existingConfig?.type ?? 'custom', // 保持原有类型
+      enabledSites: siteIds.map((id) {
+        final selectedCategories = siteCategories[id];
+        Map<String, dynamic>? additionalParams;
+        
+        // 只有当用户选择了特定分类时才保存分类信息
+        if (selectedCategories != null && selectedCategories.isNotEmpty) {
+          additionalParams = {
+            'selectedCategories': selectedCategories.toList(),
+          };
+        }
+        
+        return SiteSearchItem(
+          id: id,
+          additionalParams: additionalParams,
+        );
+      }).toList(),
       isActive: existingConfig?.isActive ?? true,
     );
 
