@@ -1048,6 +1048,9 @@ class _HomePageState extends State<HomePage> {
                 now.difference(_lastPressedAt!) > const Duration(seconds: 3)) {
               _lastPressedAt = now;
 
+              // 先清除之前的 SnackBar
+              ScaffoldMessenger.of(context).clearSnackBars();
+              
               // 显示提示信息
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -1062,13 +1065,7 @@ class _HomePageState extends State<HomePage> {
                     context,
                   ).colorScheme.primaryContainer,
                   behavior: SnackBarBehavior.floating,
-                  action: SnackBarAction(
-                    label: '退出',
-                    textColor: Theme.of(context).colorScheme.onPrimaryContainer,
-                    onPressed: () {
-                      SystemNavigator.pop();
-                    },
-                  ),
+                  dismissDirection: DismissDirection.horizontal,
                 ),
               );
               return;
