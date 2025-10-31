@@ -156,7 +156,7 @@ class NexusPHPAdapter implements SiteAdapter {
     final Map<String, dynamic> params = {
       'page': pageNumber.toString(),
       'per_page': pageSize.toString(),
-      'include_fields[torrent]': 'download_url,has_bookmarked',
+      'include_fields[torrent]': 'download_url,has_bookmarked,active_status',
     };
 
     if (keyword != null && keyword.isNotEmpty) {
@@ -226,6 +226,18 @@ class NexusPHPAdapter implements SiteAdapter {
       }
     }
 
+    // 解析下载状态
+    DownloadStatus status = DownloadStatus.none;
+    final activeStatus = item['active_status'];
+    if (activeStatus is Map<String, dynamic>) {
+      final s = activeStatus['active_status']?.toString().toLowerCase();
+      if (s == 'leeching') {
+        status = DownloadStatus.downloading;
+      } else if (s == 'seeding' || s == 'inactivity') {
+        status = DownloadStatus.completed;
+      }
+    }
+
     return TorrentItem(
       id: (item['id'] as int).toString(),
       name: item['name'] as String,
@@ -236,7 +248,7 @@ class NexusPHPAdapter implements SiteAdapter {
       seeders: item['seeders'] as int,
       leechers: item['leechers'] as int,
       sizeBytes: item['size'] as int,
-      downloadStatus: DownloadStatus.none, // 不支持
+      downloadStatus: status,
       collection: item['has_bookmarked'] as bool? ?? false, 
       imageList: const [], // 暂时没有图片列表
       cover: item['cover'] as String? ?? '',
