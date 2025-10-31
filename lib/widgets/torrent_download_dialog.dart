@@ -32,6 +32,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
   List<String> _paths = [];
   bool _loading = false;
   String? _error;
+  bool _startPaused = false; // 不立即开始（添加后暂停）
 
   @override
   void initState() {
@@ -49,6 +50,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
     try {
       final clientsData = await StorageService.instance.loadDownloaderConfigs();
       final defaultId = await StorageService.instance.loadDefaultDownloaderId();
+      final startPaused = await StorageService.instance.loadDefaultDownloadStartPaused();
       
       final clients = clientsData.map((data) => DownloaderConfig.fromJson(data)).toList();
 
@@ -61,6 +63,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                   orElse: () => clients.first,
                 )
               : null;
+          _startPaused = startPaused;
         });
 
         if (_selectedClient != null) {
@@ -195,6 +198,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
           ? null
           : _savePathCtrl.text.trim(),
       'autoTMM': autoTMM,
+      'startPaused': _startPaused,
     });
   }
 
@@ -447,7 +451,26 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
               ),
             ],
           ],
-        )
+        ),
+
+        const SizedBox(height: 16),
+        // 不立即开始（添加后暂停）选项
+        Row(
+          children: [
+            Expanded(
+              child: Text('不立即开始（添加后暂停）',
+                  style: Theme.of(context).textTheme.titleSmall),
+            ),
+            Switch(
+              value: _startPaused,
+              onChanged: (val) async {
+                setState(() => _startPaused = val);
+                // 保存用户偏好以便下次打开默认状态
+                await StorageService.instance.saveDefaultDownloadStartPaused(val);
+              },
+            ),
+          ],
+        ),
       ],
     );
   }

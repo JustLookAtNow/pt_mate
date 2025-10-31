@@ -624,6 +624,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       final tags = result['tags'] as List<String>?;
       final savePath = result['savePath'] as String?;
       final autoTMM = result['autoTMM'] as bool?;
+      final startPaused = result['startPaused'] as bool?;
 
       // 4. 发送到下载器
       await DownloaderService.instance.addTask(
@@ -635,6 +636,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
           tags: tags,
           savePath: savePath,
           autoTMM: autoTMM,
+          startPaused: startPaused,
         ),
       );
 

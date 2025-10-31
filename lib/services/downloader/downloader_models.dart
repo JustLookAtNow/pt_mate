@@ -203,6 +203,8 @@ class AddTaskParams {
   final List<String>? tags;
   final String? savePath;
   final bool? autoTMM;
+  /// 是否添加后暂停（不立即开始），默认空表示遵循下载器默认行为
+  final bool? startPaused;
   
   const AddTaskParams({
     required this.url,
@@ -210,6 +212,7 @@ class AddTaskParams {
     this.tags,
     this.savePath,
     this.autoTMM,
+    this.startPaused,
   });
   
   factory AddTaskParams.fromJson(Map<String, dynamic> json) {
@@ -219,6 +222,7 @@ class AddTaskParams {
       tags: json['tags'] is List ? (json['tags'] as List).map((e) => e.toString()).toList() : null,
       savePath: json['savePath'],
       autoTMM: json['autoTMM'],
+      startPaused: json['startPaused'] is bool ? json['startPaused'] : (json['startPaused']?.toString() == 'true' ? true : null),
     );
   }
   
@@ -229,6 +233,7 @@ class AddTaskParams {
       if (tags != null) 'tags': tags,
       if (savePath != null) 'savePath': savePath,
       if (autoTMM != null) 'autoTMM': autoTMM,
+      if (startPaused != null) 'startPaused': startPaused,
     };
   }
 }

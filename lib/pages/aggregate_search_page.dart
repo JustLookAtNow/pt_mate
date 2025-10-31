@@ -744,6 +744,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       final tags = result['tags'] as List<String>?;
       final savePath = result['savePath'] as String?;
       final autoTMM = result['autoTMM'] as bool?;
+      final startPaused = result['startPaused'] as bool?;
 
       // 5. 发送到 qBittorrent
       await _onTorrentDownload(
@@ -755,6 +756,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         tags,
         savePath,
         autoTMM,
+        startPaused,
       );
     } catch (e) {
       if (mounted) {
@@ -783,6 +785,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     List<String>? tags,
     String? savePath,
     bool? autoTMM,
+    bool? startPaused,
   ) async {
     try {
       // 使用统一的下载器服务
@@ -795,6 +798,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           tags: tags,
           savePath: savePath,
           autoTMM: autoTMM,
+          startPaused: startPaused,
         ),
       );
 

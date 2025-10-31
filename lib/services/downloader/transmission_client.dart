@@ -266,8 +266,9 @@ class TransmissionClient implements DownloaderClient {
       arguments['labels'] = labels;
     }
     
-    // 设置任务自动开始（不暂停）
-    arguments['paused'] = false;
+    // 设置任务自动开始或暂停
+    // 当 startPaused 为 true 时，添加后暂停；默认行为为自动开始
+    arguments['paused'] = params.startPaused == true;
     
     await _rpcRequest('torrent-add', arguments: arguments);
   }

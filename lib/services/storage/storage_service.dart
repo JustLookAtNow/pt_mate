@@ -39,6 +39,7 @@ class StorageKeys {
   static const String defaultDownloadCategory = 'download.defaultCategory';
   static const String defaultDownloadTags = 'download.defaultTags';
   static const String defaultDownloadSavePath = 'download.defaultSavePath';
+  static const String defaultDownloadStartPaused = 'download.defaultStartPaused';
 
   // 多站点API密钥存储
   static String siteApiKey(String siteId) => 'site.apiKey.$siteId';
@@ -518,6 +519,18 @@ class StorageService {
   Future<String?> loadDefaultDownloadSavePath() async {
     final prefs = await _prefs;
     return prefs.getString(StorageKeys.defaultDownloadSavePath);
+  }
+
+  /// 保存“添加后暂停”默认设置
+  Future<void> saveDefaultDownloadStartPaused(bool startPaused) async {
+    final prefs = await _prefs;
+    await prefs.setBool(StorageKeys.defaultDownloadStartPaused, startPaused);
+  }
+
+  /// 读取“添加后暂停”默认设置（默认 false）
+  Future<bool> loadDefaultDownloadStartPaused() async {
+    final prefs = await _prefs;
+    return prefs.getBool(StorageKeys.defaultDownloadStartPaused) ?? false;
   }
 
   // WebDAV密码安全存储方法
