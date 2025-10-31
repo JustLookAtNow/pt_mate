@@ -32,22 +32,24 @@ class ResponsiveLayout extends StatelessWidget {
             appBar: appBar != null ? _buildAppBarForLargeScreen(context) : null,
             floatingActionButton: floatingActionButton,
             floatingActionButtonLocation: floatingActionButtonLocation,
-            body: Row(
-              children: [
-                // 固定侧边栏
-                SizedBox(
-                  width: 240,
-                  child: AppDrawer(
-                    currentRoute: currentRoute,
-                    onSettingsChanged: onSettingsChanged,
-                    isFixedSidebar: true,
+            body: SafeArea(
+              top: true,
+              bottom: true,
+              child: Row(
+                children: [
+                  // 固定侧边栏
+                  SizedBox(
+                    width: 240,
+                    child: AppDrawer(
+                      currentRoute: currentRoute,
+                      onSettingsChanged: onSettingsChanged,
+                      isFixedSidebar: true,
+                    ),
                   ),
-                ),
-                // 主内容区域
-                Expanded(
-                  child: body,
-                ),
-              ],
+                  // 主内容区域
+                  Expanded(child: body),
+                ],
+              ),
             ),
           );
         } else {
@@ -61,7 +63,7 @@ class ResponsiveLayout extends StatelessWidget {
             ),
             floatingActionButton: floatingActionButton,
             floatingActionButtonLocation: floatingActionButtonLocation,
-            body: body,
+            body: SafeArea(top: true, bottom: true, child: body),
           );
         }
       },
