@@ -23,10 +23,13 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
   
   // 状态变量
   bool _isLoading = true;
- String? _errorMessage;
+  String? _errorMessage;
   List<DownloadTask> _tasks = [];
   DownloaderConfig? _downloaderConfig;
   String? _password;
+  bool _showAllTasks = false; // 控制是否显示全部任务
+  String _searchQuery = ''; // 搜索关键词
+  final TextEditingController _searchController = TextEditingController();
   
 
   
@@ -50,6 +53,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
   void dispose() {
     _refreshTimer?.cancel();
     _configChangeSubscription?.cancel();
+    _searchController.dispose();
     _resetClient(); // 清理 client 实例
     super.dispose();
   }
@@ -240,6 +244,8 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                             textAlign: TextAlign.center,
                           ),
                   ),
+                // 搜索和过滤UI
+                _buildSearchAndFilterBar(),
                 Expanded(
                   child: _buildAllTasksList(),
                 ),
@@ -374,14 +380,86 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
     }
   }
 
+  // 构建搜索和过滤UI
+  Widget _buildSearchAndFilterBar() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // 搜索框和筛选按钮在一排
+          Row(
+            children: [
+              // 搜索框
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: '搜索种子名称...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              // 切换按钮
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _showAllTasks = !_showAllTasks;
+                  });
+                },
+                child: Text(_showAllTasks ? '仅活跃' : '全部'),
+              ),
+            ],
+          ),
+
+        ],
+      ),
+    );
+  }
+
+
+
   Widget _buildAllTasksList() {
-    // 过滤只显示这三种状态的任务
-    final filteredTasks = _tasks.where((task) => 
-      task.state == DownloadTaskState.downloading || 
-      task.state == DownloadTaskState.pausedDL ||
-      task.state == DownloadTaskState.stalledDL ||
-      task.state == DownloadTaskState.stoppedDL 
-    ).toList();
+    // 首先根据状态过滤任务
+    List<DownloadTask> statusFilteredTasks = _showAllTasks
+        ? _tasks // 显示全部任务
+        : _tasks
+              .where(
+                (task) =>
+                    task.state == DownloadTaskState.downloading || 
+                    task.state == DownloadTaskState.uploading || 
+                    task.state == DownloadTaskState.pausedDL ||
+                    task.state == DownloadTaskState.stalledDL ||
+                    task.state == DownloadTaskState.stoppedDL 
+              )
+              .toList(); // 只显示活跃状态的任务
+    
+    // 然后根据搜索关键词过滤任务名称
+    final filteredTasks = _searchQuery.isEmpty
+        ? statusFilteredTasks
+        : statusFilteredTasks
+              .where((task) => task.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+              .toList();
     
     if (filteredTasks.isEmpty) {
       return const Center(
@@ -564,17 +642,25 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                   style: const TextStyle(fontSize: 12),
                 ),
                 const SizedBox(width: 16),
-                if (isDownloading) ...[                  
+                // 显示下载速度（仅在下载状态时）
+                if (isDownloading && task.dlspeed > 0) ...[                  
                   Text(
                     '↓ ${FormatUtil.formatSpeed(task.dlspeed)}',
                     style: const TextStyle(fontSize: 12),
                   ),
                   const SizedBox(width: 8),
+                ],
+                // 显示上传速度（只要有上传速度就显示）
+                if (task.upspeed > 0) ...[
                   Text(
                     '↑ ${FormatUtil.formatSpeed(task.upspeed)}',
                     style: const TextStyle(fontSize: 12),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
+                ],
+                const Spacer(),
+                // 显示剩余时间（仅在下载状态时）
+                if (isDownloading && task.eta > 0) ...[
                   Text(
                     '剩余: ${FormatUtil.formatEta(task.eta)}',
                     style: const TextStyle(fontSize: 12),
