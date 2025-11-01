@@ -1431,6 +1431,12 @@ class _HomePageState extends State<HomePage> {
           onPopInvokedWithResult: (didPop, result) async {
             if (didPop) return;
 
+            // 如果处于选中模式，先退出选中模式
+            if (_isSelectionMode) {
+              _onCancelSelection();
+              return;
+            }
+
             final now = DateTime.now();
             if (_lastPressedAt == null ||
                 now.difference(_lastPressedAt!) > const Duration(seconds: 3)) {

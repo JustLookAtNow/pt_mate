@@ -556,6 +556,12 @@ class _SiteEditPageState extends State<SiteEditPage> {
   @override
   void initState() {
     super.initState();
+    
+    // 如果是编辑模式，默认不展开预设站点列表
+    if (widget.site != null) {
+      _showPresetList = false;
+    }
+    
     _loadPresetSites();
     
     // 添加预设站点搜索监听器
