@@ -235,7 +235,7 @@
               "attribute": "title",
               "filter": {
                 "name": "regexp",
-                "args": "(d+)%",
+                "args": "(\\d+)%",
                 "index": 1
               }
             },
