@@ -1741,7 +1741,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(errorMessage),
+                            content: Text(errorMessage
+                            ,style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onErrorContainer,
+                            ),),
                             backgroundColor: Theme.of(
                               context,
                             ).colorScheme.errorContainer,
