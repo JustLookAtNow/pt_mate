@@ -2,9 +2,7 @@
   "id": "cspt",
   "name": "财神",
   "isShow": true,
-  "baseUrls": [
-    "https://cspt.top/"
-  ],
+  "baseUrls": ["https://cspt.top/", "https://cspt.cc/", "https://cspt.date/"],
   "primaryUrl": "https://cspt.top/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
