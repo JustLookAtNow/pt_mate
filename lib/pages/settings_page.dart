@@ -9,6 +9,7 @@ import '../widgets/responsive_layout.dart';
 import 'backup_restore_page.dart';
 import 'aggregate_search_settings_page.dart';
 import 'downloader_settings_page.dart';
+import '../services/update_service.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -211,6 +212,14 @@ class _SettingsBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
+        // 更新设置
+        Text(
+          '更新设置',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        const _BetaUpdateTile(),
+        const SizedBox(height: 16),
         
         // 查询条件配置已移至站点配置中，可在站点配置页面管理
       ],
@@ -226,6 +235,67 @@ class _SettingsBody extends StatelessWidget {
       case AppThemeMode.dark:
         return '深色';
     }
+  }
+}
+
+class _BetaUpdateTile extends StatefulWidget {
+  const _BetaUpdateTile();
+
+  @override
+  State<_BetaUpdateTile> createState() => _BetaUpdateTileState();
+}
+
+class _BetaUpdateTileState extends State<_BetaUpdateTile> {
+  bool _enabled = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final v = await UpdateService.instance.isBetaOptInEnabled();
+    if (!mounted) return;
+    setState(() {
+      _enabled = v;
+      _loading = false;
+    });
+  }
+
+  Future<void> _set(bool value) async {
+    setState(() {
+      _enabled = value;
+    });
+    await UpdateService.instance.setBetaOptIn(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Card(
+        child: ListTile(
+          leading: SizedBox(
+            height: 24,
+            width: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          title: Text('尝鲜（接收 Beta 版本更新）'),
+          subtitle: Text('正在加载当前设置…'),
+        ),
+      );
+    }
+
+    return Card(
+      child: SwitchListTile(
+        secondary: const Icon(Icons.new_releases),
+        title: const Text('尝鲜（接收 Beta 版本更新）'),
+        subtitle: const Text('默认仅接收稳定版本；开启后可接收 Beta/RC 等预发布版本更新'),
+        value: _enabled,
+        onChanged: _set,
+      ),
+    );
   }
 }
 

@@ -7,8 +7,9 @@ import 'device_id_service.dart';
 
 class UpdateService {
   static const String _baseUrl =
-      'https://ptmate.fly2sky.dpdns.org'; // 替换为实际的服务器地址
+      'https://ptmate.fly2sky.dpdns.org';
   static const String _lastCheckKey = 'last_update_check';
+  static const String _betaOptInKey = 'enable_beta_updates';
   static const Duration _checkInterval = Duration(hours: 24); // 24小时检查一次
 
   static UpdateService? _instance;
@@ -37,11 +38,15 @@ class UpdateService {
       String platform = DeviceIdService.instance.getPlatform();
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
 
+      // 读取是否接收 Beta 更新
+      final betaEnabled = await isBetaOptInEnabled();
+
       // 构建请求数据
       Map<String, dynamic> requestData = {
         'device_id': deviceId,
         'platform': platform,
         'app_version': packageInfo.version,
+        'is_beta': betaEnabled,
       };
 
       // 发送请求
@@ -132,6 +137,26 @@ class UpdateService {
       return false;
     }
   }
+
+  /// 是否开启尝鲜（beta 更新）
+  Future<bool> isBetaOptInEnabled() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_betaOptInKey) ?? false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 设置是否开启尝鲜（beta 更新）
+  Future<void> setBetaOptIn(bool enabled) async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_betaOptInKey, enabled);
+    } catch (e) {
+      // 忽略错误
+    }
+  }
 }
 
 /// 更新检查结果
@@ -140,20 +165,24 @@ class UpdateCheckResult {
   final String? latestVersion;
   final String? releaseNotes;
   final String? downloadUrl;
+  final bool isPreRelease;
 
   UpdateCheckResult({
     required this.hasUpdate,
     this.latestVersion,
     this.releaseNotes,
     this.downloadUrl,
+    this.isPreRelease = false,
   });
 
   factory UpdateCheckResult.fromJson(Map<String, dynamic> json) {
+    final latest = json['latest_version'] as String?;
     return UpdateCheckResult(
       hasUpdate: json['has_update'] ?? false,
-      latestVersion: json['latest_version'],
+      latestVersion: latest,
       releaseNotes: json['release_notes'],
       downloadUrl: json['download_url'],
+      isPreRelease: _isPreReleaseVersion(latest),
     );
   }
 
@@ -163,6 +192,7 @@ class UpdateCheckResult {
       'latest_version': latestVersion,
       'release_notes': releaseNotes,
       'download_url': downloadUrl,
+      'is_pre_release': isPreRelease,
     };
   }
 
@@ -170,4 +200,16 @@ class UpdateCheckResult {
   String toString() {
     return 'UpdateCheckResult(hasUpdate: $hasUpdate, latestVersion: $latestVersion)';
   }
+}
+
+bool _isPreReleaseVersion(String? version) {
+  if (version == null) return false;
+  final v = version.toLowerCase();
+  // 只要包含预发布标识或带有 '-' 预发布后缀，则视为预发布
+  return v.contains('-') ||
+      v.contains('alpha') ||
+      v.contains('beta') ||
+      v.contains('rc') ||
+      v.contains('preview') ||
+      v.contains('pre');
 }
