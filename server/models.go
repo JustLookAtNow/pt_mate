@@ -4,9 +4,10 @@ import "time"
 
 // CheckUpdateRequest represents the request payload for update checking
 type CheckUpdateRequest struct {
-	DeviceID    string `json:"device_id" binding:"required"`
-	Platform    string `json:"platform" binding:"required"`
-	AppVersion  string `json:"app_version" binding:"required"`
+    DeviceID    string `json:"device_id" binding:"required"`
+    Platform    string `json:"platform" binding:"required"`
+    AppVersion  string `json:"app_version" binding:"required"`
+    IsBeta      bool   `json:"is_beta"`
 }
 
 // CheckUpdateResponse represents the response for update checking
@@ -26,13 +27,14 @@ type VersionUpdateRequest struct {
 
 // AppVersion represents a version record in database
 type AppVersion struct {
-	ID           int       `json:"id"`
-	Version      string    `json:"version"`
-	ReleaseNotes string    `json:"release_notes"`
-	DownloadURL  string    `json:"download_url"`
-	IsLatest     bool      `json:"is_latest"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+    ID           int       `json:"id"`
+    Version      string    `json:"version"`
+    ReleaseNotes string    `json:"release_notes"`
+    DownloadURL  string    `json:"download_url"`
+    IsLatest     bool      `json:"is_latest"`
+    IsBeta       bool      `json:"is_beta"`
+    CreatedAt    time.Time `json:"created_at"`
+    UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // AppStatistic represents usage statistics in database

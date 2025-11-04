@@ -33,13 +33,13 @@ func (s *AppService) CheckUpdate(c *gin.Context) {
         // Don't fail the request if statistics update fails
     }
 
-	// Get latest version
-	latestVersion, err := s.getLatestVersion()
-	if err != nil {
-		log.Printf("Failed to get latest version: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check for updates"})
-		return
-	}
+    // Get latest version according to beta opt-in
+    latestVersion, err := s.getLatestVersion(req.IsBeta)
+    if err != nil {
+        log.Printf("Failed to get latest version: %v", err)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check for updates"})
+        return
+    }
 
 	if latestVersion == nil {
 		// No version information available
@@ -56,11 +56,11 @@ func (s *AppService) CheckUpdate(c *gin.Context) {
 		HasUpdate: hasUpdate,
 	}
 
-	if hasUpdate {
-		response.LatestVersion = latestVersion.Version
-		response.ReleaseNotes = latestVersion.ReleaseNotes
-		response.DownloadURL = latestVersion.DownloadURL
-	}
+    if hasUpdate {
+        response.LatestVersion = latestVersion.Version
+        response.ReleaseNotes = latestVersion.ReleaseNotes
+        response.DownloadURL = latestVersion.DownloadURL
+    }
 
 	c.JSON(http.StatusOK, response)
 }
@@ -94,23 +94,25 @@ func (s *AppService) updateStatistics(deviceID, platform, appVersion, ip string)
     return err
 }
 
-func (s *AppService) getLatestVersion() (*AppVersion, error) {
-	var version AppVersion
-	err := s.db.QueryRow(`
-		SELECT id, version, release_notes, download_url, is_latest, created_at, updated_at
-		FROM app_versions 
-		WHERE is_latest = true 
-		ORDER BY created_at DESC 
-		LIMIT 1
-	`).Scan(
-		&version.ID,
-		&version.Version,
-		&version.ReleaseNotes,
-		&version.DownloadURL,
-		&version.IsLatest,
-		&version.CreatedAt,
-		&version.UpdatedAt,
-	)
+func (s *AppService) getLatestVersion(includeBeta bool) (*AppVersion, error) {
+    var version AppVersion
+    query := `SELECT id, version, release_notes, download_url, is_latest, is_beta, created_at, updated_at
+              FROM app_versions 
+              WHERE is_latest = true `
+    if !includeBeta {
+        query += `AND (is_beta = false OR is_beta IS NULL) `
+    }
+    query += `ORDER BY created_at DESC LIMIT 1`
+    err := s.db.QueryRow(query).Scan(
+        &version.ID,
+        &version.Version,
+        &version.ReleaseNotes,
+        &version.DownloadURL,
+        &version.IsLatest,
+        &version.IsBeta,
+        &version.CreatedAt,
+        &version.UpdatedAt,
+    )
 
 	if err == sql.ErrNoRows {
 		return nil, nil

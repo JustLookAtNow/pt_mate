@@ -42,16 +42,17 @@ func InitDB() (*sql.DB, error) {
 }
 
 func RunMigrations(db *sql.DB) error {
-	migrations := []string{
-		`CREATE TABLE IF NOT EXISTS app_versions (
-			id SERIAL PRIMARY KEY,
-			version VARCHAR(50) NOT NULL UNIQUE,
-			release_notes TEXT,
-			download_url VARCHAR(500),
-			is_latest BOOLEAN DEFAULT FALSE,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		)`,
+    migrations := []string{
+        `CREATE TABLE IF NOT EXISTS app_versions (
+            id SERIAL PRIMARY KEY,
+            version VARCHAR(50) NOT NULL UNIQUE,
+            release_notes TEXT,
+            download_url VARCHAR(500),
+            is_latest BOOLEAN DEFAULT FALSE,
+            is_beta BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`,
 		
 		`CREATE TABLE IF NOT EXISTS app_statistics (
 			id SERIAL PRIMARY KEY,
@@ -69,13 +70,19 @@ func RunMigrations(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_app_statistics_platform ON app_statistics(platform)`,
 		`CREATE INDEX IF NOT EXISTS idx_app_statistics_last_seen ON app_statistics(last_seen)`,
 		`CREATE INDEX IF NOT EXISTS idx_app_versions_is_latest ON app_versions(is_latest)`,
-	}
+    }
 
-	for _, migration := range migrations {
-		if _, err := db.Exec(migration); err != nil {
-			return fmt.Errorf("failed to execute migration: %v", err)
-		}
-	}
+    for _, migration := range migrations {
+        if _, err := db.Exec(migration); err != nil {
+            return fmt.Errorf("failed to execute migration: %v", err)
+        }
+    }
 
-	return nil
+    // Ensure columns exist for existing deployments
+    // Add is_beta column if missing
+    if _, err := db.Exec(`ALTER TABLE app_versions ADD COLUMN IF NOT EXISTS is_beta BOOLEAN DEFAULT FALSE`); err != nil {
+        return fmt.Errorf("failed to add is_beta column: %v", err)
+    }
+
+    return nil
 }

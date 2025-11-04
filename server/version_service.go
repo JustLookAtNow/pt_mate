@@ -53,8 +53,8 @@ func (s *VersionService) UpdateVersion(c *gin.Context) {
 	}
 	defer tx.Rollback()
 
-	// Set all existing versions to not latest
-	_, err = tx.Exec("UPDATE app_versions SET is_latest = false")
+    // Set all existing versions to not latest
+    _, err = tx.Exec("UPDATE app_versions SET is_latest = false")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update existing versions"})
 		return
@@ -64,12 +64,14 @@ func (s *VersionService) UpdateVersion(c *gin.Context) {
 	var existingID int
 	err = tx.QueryRow("SELECT id FROM app_versions WHERE version = $1", req.Version).Scan(&existingID)
 	
-	if err == sql.ErrNoRows {
-		// Insert new version
-		_, err = tx.Exec(`
-			INSERT INTO app_versions (version, release_notes, download_url, is_latest, created_at, updated_at)
-			VALUES ($1, $2, $3, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		`, req.Version, req.ReleaseNotes, req.DownloadURL)
+    if err == sql.ErrNoRows {
+        // Insert new version
+        // infer beta by version suffix containing '-' or beta/alpha/rc markers
+        isBeta := inferBeta(req.Version)
+        _, err = tx.Exec(`
+            INSERT INTO app_versions (version, release_notes, download_url, is_latest, is_beta, created_at, updated_at)
+            VALUES ($1, $2, $3, true, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `, req.Version, req.ReleaseNotes, req.DownloadURL, isBeta)
 		
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to insert new version"})
@@ -78,13 +80,14 @@ func (s *VersionService) UpdateVersion(c *gin.Context) {
 	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check existing version"})
 		return
-	} else {
-		// Update existing version
-		_, err = tx.Exec(`
-			UPDATE app_versions 
-			SET release_notes = $2, download_url = $3, is_latest = true, updated_at = CURRENT_TIMESTAMP
-			WHERE id = $1
-		`, existingID, req.ReleaseNotes, req.DownloadURL)
+    } else {
+        // Update existing version
+        isBeta := inferBeta(req.Version)
+        _, err = tx.Exec(`
+            UPDATE app_versions 
+            SET release_notes = $2, download_url = $3, is_latest = true, is_beta = $4, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $1
+        `, existingID, req.ReleaseNotes, req.DownloadURL, isBeta)
 		
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update existing version"})
@@ -102,4 +105,9 @@ func (s *VersionService) UpdateVersion(c *gin.Context) {
 		"message": "Version updated successfully",
 		"version": req.Version,
 	})
+}
+
+func inferBeta(version string) bool {
+    v := strings.ToLower(version)
+    return strings.Contains(v, "-") || strings.Contains(v, "alpha") || strings.Contains(v, "beta") || strings.Contains(v, "rc") || strings.Contains(v, "preview") || strings.Contains(v, "pre")
 }
