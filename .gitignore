@@ -51,3 +51,5 @@ upload_apks.sh
 mise.toml
 
 test/html
+server/ptmate-server
+server/curl-test.sh

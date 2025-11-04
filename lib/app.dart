@@ -24,6 +24,8 @@ import 'widgets/qb_speed_indicator.dart';
 import 'widgets/responsive_layout.dart';
 import 'widgets/torrent_download_dialog.dart';
 import 'widgets/torrent_list_item.dart';
+import 'services/update_service.dart';
+import 'widgets/update_notification_dialog.dart';
 
 /// 判断最后访问时间是否超过一个月
 bool _isLastAccessOverMonth(String? lastAccess) {
@@ -548,6 +550,10 @@ class _HomePageState extends State<HomePage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    
+    // 检查应用更新（异步执行，不阻塞界面）
+    _checkForUpdates();
+    
     // 仅在站点支持种子搜索功能时执行默认搜索
     if (_currentSite?.features.supportTorrentSearch ?? true) {
       await _search(reset: true);
@@ -610,6 +616,27 @@ class _HomePageState extends State<HomePage> {
       // 忽略其他用户信息失败
     }
     await _search(reset: true);
+  }
+
+  /// 检查应用更新
+  Future<void> _checkForUpdates() async {
+    try {
+      final updateResult = await UpdateService.instance.checkForUpdates();
+      
+      if (updateResult != null && updateResult.hasUpdate && mounted) {
+        // 延迟显示更新对话框，避免与其他初始化对话框冲突
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            UpdateNotificationDialog.show(context, updateResult);
+          }
+        });
+      }
+    } catch (e) {
+      // 更新检查失败时静默处理，不影响用户体验
+      if (kDebugMode) {
+        print('Update check failed: $e');
+      }
+    }
   }
 
   void _showCookieExpiredDialog() {

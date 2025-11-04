@@ -589,3 +589,48 @@ jobs:
           echo "Response: $RESPONSE"
           exit 1
         fi
+
+    - name: Notify Update Server (POST /api/v1/github/version-update)
+      if: ${{ success() }}
+      env:
+        UPDATE_SERVER_URL: ${{ vars.UPDATE_SERVER_URL }}
+        GITHUB_WEBHOOK_SECRET: ${{ secrets.UPDATE_WEBHOOK_SECRET }}
+      run: |
+        set -euo pipefail
+
+        if [ -z "${UPDATE_SERVER_URL:-}" ]; then
+          echo "UPDATE_SERVER_URL is not set. Skipping update server notification."
+          exit 0
+        fi
+
+        VERSION_TAG="${{ steps.version.outputs.tag }}"
+        VERSION="${{ steps.version.outputs.version }}"
+        RELEASE_NOTES="${{ steps.commit_message.outputs.message }}"
+
+        DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/tag/${VERSION_TAG}"
+        
+        # Build JSON payload safely
+        JSON_PAYLOAD=$(jq -n \
+          --arg version "$VERSION" \
+          --arg release_notes "$RELEASE_NOTES" \
+          --arg download_url "$DOWNLOAD_URL" \
+          '{
+            version: $version,
+            release_notes: $release_notes,
+            download_url: $download_url
+          }')
+
+        echo "Sending version update to $UPDATE_SERVER_URL/api/v1/github/version-update"
+        echo "$JSON_PAYLOAD" | curl -sS -X POST "$UPDATE_SERVER_URL/api/v1/github/version-update" \
+          -H "Content-Type: application/json" \
+          -H "X-Webhook-Secret: ${GITHUB_WEBHOOK_SECRET}" \
+          -d @- | tee /tmp/update_server_response.json
+
+        HTTP_OK=$(jq -r '.message? // empty' /tmp/update_server_response.json || true)
+        if [ -z "$HTTP_OK" ]; then
+          echo "😒 Update server did not return success message. Response:" >&2
+          cat /tmp/update_server_response.json >&2
+          exit 1
+        else
+          echo "✅ Update server acknowledged: $HTTP_OK"
+        fi
