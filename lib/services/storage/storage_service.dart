@@ -53,6 +53,11 @@ class StorageKeys {
   // WebDAV密码安全存储
   static String webdavPassword(String configId) => 'webdav.password.$configId';
   static String webdavPasswordFallback(String configId) => 'webdav.password.fallback.$configId';
+  
+  // 设备ID（与历史 DeviceIdService 使用的 key 保持一致）
+  static const String deviceId = 'device_id';
+  // 非安全存储的降级 Key（例如 Linux 桌面端 keyring 被锁定时）
+  static const String deviceIdFallback = 'device_id.fallback';
 
   // 主题相关
   static const String themeMode = 'theme.mode'; // system | light | dark
@@ -72,9 +77,46 @@ class StorageService {
   StorageService._();
   static final StorageService instance = StorageService._();
 
-  final FlutterSecureStorage _secure = const FlutterSecureStorage();
+  final FlutterSecureStorage _secure = const FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+    ),
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+    ),
+  );
+  final FlutterSecureStorage _legacySecure = const FlutterSecureStorage();
 
   Future<SharedPreferences> get _prefs async => SharedPreferences.getInstance();
+  
+  /// 统一安全存储读取：优先使用统一选项的安全存储，若没有读到则尝试旧构造参数的安全存储，并在读到旧值后自动迁移到新存储。
+  Future<String?> _secureReadWithMigration(String key) async {
+    try {
+      final v = await _secure.read(key: key);
+      if (v != null && v.isNotEmpty) {
+        return v;
+      }
+    } catch (_) {
+      // 忽略，继续尝试旧存储
+    }
+
+    try {
+      final legacy = await _legacySecure.read(key: key);
+      if (legacy != null && legacy.isNotEmpty) {
+        // 迁移到新存储
+        try {
+          await _secure.write(key: key, value: legacy);
+          await _legacySecure.delete(key: key);
+        } catch (_) {
+          // 写入或删除失败不影响读取返回
+        }
+        return legacy;
+      }
+    } catch (_) {
+      // 忽略
+    }
+    return null;
+  }
 
   // 版本管理
   static const String currentVersion = '1.2.0';
@@ -161,10 +203,11 @@ class StorageService {
   Future<void> _migratePassword(String clientId) async {
     try {
       // 尝试从安全存储读取旧密码
-      final oldPassword = await _secure.read(key: StorageKeys.legacyQbPasswordKey(clientId));
+      final oldPassword = await _secureReadWithMigration(StorageKeys.legacyQbPasswordKey(clientId));
       if (oldPassword != null && oldPassword.isNotEmpty) {
         await _secure.write(key: StorageKeys.downloaderPasswordKey(clientId), value: oldPassword);
         await _secure.delete(key: StorageKeys.legacyQbPasswordKey(clientId));
+        try { await _legacySecure.delete(key: StorageKeys.legacyQbPasswordKey(clientId)); } catch (_) {}
         return;
       }
     } catch (_) {
@@ -263,7 +306,7 @@ class StorageService {
 
     String? apiKey;
     try {
-      apiKey = await _secure.read(key: StorageKeys.legacySiteApiKey);
+      apiKey = await _secureReadWithMigration(StorageKeys.legacySiteApiKey);
     } catch (_) {
       // 读取失败时，从降级存储取值
       apiKey = prefs.getString(StorageKeys.legacySiteApiKeyFallback);
@@ -415,7 +458,7 @@ class StorageService {
 
   Future<String?> _loadSiteApiKey(String siteId) async {
     try {
-      final apiKey = await _secure.read(key: StorageKeys.siteApiKey(siteId));
+      final apiKey = await _secureReadWithMigration(StorageKeys.siteApiKey(siteId));
       if (apiKey != null && apiKey.isNotEmpty) return apiKey;
     } catch (_) {
       // ignore and try fallback
@@ -431,6 +474,7 @@ class StorageService {
     } catch (_) {
       // ignore
     }
+    try { await _legacySecure.delete(key: StorageKeys.siteApiKey(siteId)); } catch (_) {}
     
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.siteApiKeyFallback(siteId));
@@ -554,7 +598,7 @@ class StorageService {
 
   Future<String?> loadWebDAVPassword(String configId) async {
     try {
-      final password = await _secure.read(key: StorageKeys.webdavPassword(configId));
+      final password = await _secureReadWithMigration(StorageKeys.webdavPassword(configId));
       if (password != null && password.isNotEmpty) return password;
     } catch (_) {
       // 读取失败时，从降级存储取值
@@ -576,6 +620,7 @@ class StorageService {
     } catch (_) {
       // ignore
     }
+    try { await _legacySecure.delete(key: StorageKeys.webdavPassword(configId)); } catch (_) {}
     
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.webdavPasswordFallback(configId));
@@ -665,7 +710,7 @@ class StorageService {
 
   Future<String?> loadDownloaderPassword(String id) async {
     try {
-      final password = await _secure.read(key: StorageKeys.downloaderPasswordKey(id));
+      final password = await _secureReadWithMigration(StorageKeys.downloaderPasswordKey(id));
       if (password != null && password.isNotEmpty) return password;
     } catch (_) {
       // 读取失败时，从降级存储取值
@@ -687,6 +732,7 @@ class StorageService {
     } catch (_) {
       // ignore
     }
+    try { await _legacySecure.delete(key: StorageKeys.downloaderPasswordKey(id)); } catch (_) {}
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.downloaderPasswordFallbackKey(id));
   }
@@ -720,5 +766,46 @@ class StorageService {
   Future<List<String>> loadDownloaderPaths(String id) async {
     final prefs = await _prefs;
     return prefs.getStringList(StorageKeys.downloaderPathsKey(id)) ?? <String>[];
+  }
+
+  // 设备ID统一读写删除（使用安全存储，支持旧存储兼容与自动迁移；在桌面环境等不可用时降级到本地存储）
+  Future<void> saveDeviceId(String deviceId) async {
+    try {
+      await _secure.write(key: StorageKeys.deviceId, value: deviceId);
+      // 清理降级存储
+      final prefs = await _prefs;
+      await prefs.remove(StorageKeys.deviceIdFallback);
+    } catch (_) {
+      // 降级到本地存储，避免因 keyring 未解锁导致崩溃
+      final prefs = await _prefs;
+      await prefs.setString(StorageKeys.deviceIdFallback, deviceId);
+    }
+  }
+
+  Future<String?> loadDeviceId() async {
+    try {
+      final id = await _secureReadWithMigration(StorageKeys.deviceId);
+      if (id != null && id.isNotEmpty) return id;
+    } catch (_) {
+      // 忽略错误，尝试降级存储
+    }
+    final prefs = await _prefs;
+    final fallback = prefs.getString(StorageKeys.deviceIdFallback);
+    if (fallback != null && fallback.isNotEmpty) {
+      return fallback;
+    }
+    return null;
+  }
+
+  Future<void> deleteDeviceId() async {
+    try {
+      await _secure.delete(key: StorageKeys.deviceId);
+    } catch (_) {
+      // ignore
+    }
+    try { await _legacySecure.delete(key: StorageKeys.deviceId); } catch (_) {}
+
+    final prefs = await _prefs;
+    await prefs.remove(StorageKeys.deviceIdFallback);
   }
 }

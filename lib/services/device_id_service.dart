@@ -1,18 +1,9 @@
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'storage/storage_service.dart';
 import 'package:uuid/uuid.dart';
 
 class DeviceIdService {
-  static const String _deviceIdKey = 'device_id';
-  static const FlutterSecureStorage _storage = FlutterSecureStorage(
-    aOptions: AndroidOptions(
-      encryptedSharedPreferences: true,
-    ),
-    iOptions: IOSOptions(
-      accessibility: KeychainAccessibility.first_unlock_this_device,
-    ),
-  );
 
   static DeviceIdService? _instance;
   static DeviceIdService get instance => _instance ??= DeviceIdService._();
@@ -28,8 +19,8 @@ class DeviceIdService {
     }
 
     try {
-      // 尝试从安全存储中读取
-      String? storedDeviceId = await _storage.read(key: _deviceIdKey);
+      // 统一由 StorageService 管理设备ID的读写，支持旧存储兼容与自动迁移
+      String? storedDeviceId = await StorageService.instance.loadDeviceId();
       
       if (storedDeviceId != null && storedDeviceId.isNotEmpty) {
         _cachedDeviceId = storedDeviceId;
@@ -40,7 +31,7 @@ class DeviceIdService {
       String newDeviceId = await _generateDeviceId();
       
       // 保存到安全存储
-      await _storage.write(key: _deviceIdKey, value: newDeviceId);
+      await StorageService.instance.saveDeviceId(newDeviceId);
       
       _cachedDeviceId = newDeviceId;
       return newDeviceId;
@@ -115,7 +106,7 @@ class DeviceIdService {
   /// 重置设备ID（用于测试或重置）
   Future<void> resetDeviceId() async {
     try {
-      await _storage.delete(key: _deviceIdKey);
+      await StorageService.instance.deleteDeviceId();
       _cachedDeviceId = null;
     } catch (e) {
       // 忽略删除错误
@@ -125,7 +116,7 @@ class DeviceIdService {
   /// 检查是否有存储的设备ID
   Future<bool> hasStoredDeviceId() async {
     try {
-      String? storedDeviceId = await _storage.read(key: _deviceIdKey);
+      String? storedDeviceId = await StorageService.instance.loadDeviceId();
       return storedDeviceId != null && storedDeviceId.isNotEmpty;
     } catch (e) {
       return false;
