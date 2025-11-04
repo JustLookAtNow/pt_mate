@@ -58,6 +58,7 @@ func RunMigrations(db *sql.DB) error {
 			device_id VARCHAR(100) NOT NULL,
 			platform VARCHAR(50) NOT NULL,
 			app_version VARCHAR(50) NOT NULL,
+			ip VARCHAR(64),
 			first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			total_launches INTEGER DEFAULT 1,

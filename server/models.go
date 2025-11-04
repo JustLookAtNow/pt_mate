@@ -37,11 +37,12 @@ type AppVersion struct {
 
 // AppStatistic represents usage statistics in database
 type AppStatistic struct {
-	ID            int       `json:"id"`
-	DeviceID      string    `json:"device_id"`
-	Platform      string    `json:"platform"`
-	AppVersion    string    `json:"app_version"`
-	FirstSeen     time.Time `json:"first_seen"`
-	LastSeen      time.Time `json:"last_seen"`
-	TotalLaunches int       `json:"total_launches"`
+    ID            int       `json:"id"`
+    DeviceID      string    `json:"device_id"`
+    Platform      string    `json:"platform"`
+    AppVersion    string    `json:"app_version"`
+    IP            string    `json:"ip"`
+    FirstSeen     time.Time `json:"first_seen"`
+    LastSeen      time.Time `json:"last_seen"`
+    TotalLaunches int       `json:"total_launches"`
 }

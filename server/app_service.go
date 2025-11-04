@@ -18,17 +18,20 @@ func NewAppService(db *sql.DB) *AppService {
 }
 
 func (s *AppService) CheckUpdate(c *gin.Context) {
-	var req CheckUpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+    var req CheckUpdateRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
 
-	// Update or insert statistics
-	if err := s.updateStatistics(req.DeviceID, req.Platform, req.AppVersion); err != nil {
-		log.Printf("Failed to update statistics: %v", err)
-		// Don't fail the request if statistics update fails
-	}
+    // Record client IP
+    clientIP := c.ClientIP()
+
+    // Update or insert statistics
+    if err := s.updateStatistics(req.DeviceID, req.Platform, req.AppVersion, clientIP); err != nil {
+        log.Printf("Failed to update statistics: %v", err)
+        // Don't fail the request if statistics update fails
+    }
 
 	// Get latest version
 	latestVersion, err := s.getLatestVersion()
@@ -62,33 +65,33 @@ func (s *AppService) CheckUpdate(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-func (s *AppService) updateStatistics(deviceID, platform, appVersion string) error {
-	// Check if device exists
-	var exists bool
-	err := s.db.QueryRow(`
-		SELECT EXISTS(SELECT 1 FROM app_statistics WHERE device_id = $1)
-	`, deviceID).Scan(&exists)
+func (s *AppService) updateStatistics(deviceID, platform, appVersion, ip string) error {
+    // Check if device exists
+    var exists bool
+    err := s.db.QueryRow(`
+        SELECT EXISTS(SELECT 1 FROM app_statistics WHERE device_id = $1)
+    `, deviceID).Scan(&exists)
 
 	if err != nil {
 		return err
 	}
 
-	if exists {
-		// Update existing record
-		_, err = s.db.Exec(`
-			UPDATE app_statistics 
-			SET platform = $2, app_version = $3, last_seen = CURRENT_TIMESTAMP, total_launches = total_launches + 1
-			WHERE device_id = $1
-		`, deviceID, platform, appVersion)
-	} else {
-		// Insert new record
-		_, err = s.db.Exec(`
-			INSERT INTO app_statistics (device_id, platform, app_version, first_seen, last_seen, total_launches)
-			VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)
-		`, deviceID, platform, appVersion)
-	}
+    if exists {
+        // Update existing record
+        _, err = s.db.Exec(`
+            UPDATE app_statistics 
+            SET platform = $2, app_version = $3, ip = $4, last_seen = CURRENT_TIMESTAMP, total_launches = total_launches + 1
+            WHERE device_id = $1
+        `, deviceID, platform, appVersion, ip)
+    } else {
+        // Insert new record
+        _, err = s.db.Exec(`
+            INSERT INTO app_statistics (device_id, platform, app_version, ip, first_seen, last_seen, total_launches)
+            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)
+        `, deviceID, platform, appVersion, ip)
+    }
 
-	return err
+    return err
 }
 
 func (s *AppService) getLatestVersion() (*AppVersion, error) {
