@@ -1,88 +1,75 @@
 package main
 
 import (
-	"database/sql"
-	"fmt"
-	"os"
+    "fmt"
+    "log"
+    "os"
+    "time"
 
-	_ "github.com/lib/pq"
+    goose "github.com/pressly/goose/v3"
+    "gorm.io/driver/postgres"
+    "gorm.io/gorm"
 )
 
-func InitDB() (*sql.DB, error) {
-	host := os.Getenv("DB_HOST")
-	port := os.Getenv("DB_PORT")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASSWORD")
-	dbname := os.Getenv("DB_NAME")
-	sslmode := os.Getenv("DB_SSLMODE")
+// InitDB creates a GORM DB connection using Postgres driver.
+// It enforces session TimeZone=UTC for consistency with TIMESTAMPTZ storage.
+func InitDB() (*gorm.DB, error) {
+    host := os.Getenv("DB_HOST")
+    port := os.Getenv("DB_PORT")
+    user := os.Getenv("DB_USER")
+    password := os.Getenv("DB_PASSWORD")
+    dbname := os.Getenv("DB_NAME")
+    sslmode := os.Getenv("DB_SSLMODE")
+    if sslmode == "" {
+        sslmode = "disable"
+    }
 
-	if host == "" {
-		host = "localhost"
-	}
-	if port == "" {
-		port = "5432"
-	}
-	if sslmode == "" {
-		sslmode = "disable"
-	}
+    dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s TimeZone=UTC", host, port, user, password, dbname, sslmode)
+    db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+    if err != nil {
+        return nil, err
+    }
 
-	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		host, port, user, password, dbname, sslmode)
+    sqlDB, err := db.DB()
+    if err != nil {
+        return nil, err
+    }
+    sqlDB.SetConnMaxLifetime(time.Minute * 3)
+    sqlDB.SetMaxOpenConns(10)
+    sqlDB.SetMaxIdleConns(10)
 
-	db, err := sql.Open("postgres", psqlInfo)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = db.Ping(); err != nil {
-		return nil, err
-	}
-
-	return db, nil
+    return db, nil
 }
 
-func RunMigrations(db *sql.DB) error {
-    migrations := []string{
-        `CREATE TABLE IF NOT EXISTS app_versions (
-            id SERIAL PRIMARY KEY,
-            version VARCHAR(50) NOT NULL UNIQUE,
-            release_notes TEXT,
-            download_url VARCHAR(500),
-            is_latest BOOLEAN DEFAULT FALSE,
-            is_beta BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )`,
-		
-		`CREATE TABLE IF NOT EXISTS app_statistics (
-			id SERIAL PRIMARY KEY,
-			device_id VARCHAR(100) NOT NULL,
-			platform VARCHAR(50) NOT NULL,
-			app_version VARCHAR(50) NOT NULL,
-			ip VARCHAR(64),
-			first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			total_launches INTEGER DEFAULT 1,
-			UNIQUE(device_id)
-		)`,
-		
-		`CREATE INDEX IF NOT EXISTS idx_app_statistics_device_id ON app_statistics(device_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_app_statistics_platform ON app_statistics(platform)`,
-		`CREATE INDEX IF NOT EXISTS idx_app_statistics_last_seen ON app_statistics(last_seen)`,
-		`CREATE INDEX IF NOT EXISTS idx_app_versions_is_latest ON app_versions(is_latest)`,
-    }
-
-    for _, migration := range migrations {
-        if _, err := db.Exec(migration); err != nil {
-            return fmt.Errorf("failed to execute migration: %v", err)
+// RunMigrations applies goose migrations using either DATABASE_URL or environment DSN.
+func RunMigrations() error {
+    dsn := os.Getenv("DATABASE_URL")
+    if dsn == "" {
+        host := os.Getenv("DB_HOST")
+        port := os.Getenv("DB_PORT")
+        user := os.Getenv("DB_USER")
+        password := os.Getenv("DB_PASSWORD")
+        dbname := os.Getenv("DB_NAME")
+        sslmode := os.Getenv("DB_SSLMODE")
+        if sslmode == "" {
+            sslmode = "disable"
         }
+        dsn = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", user, password, host, port, dbname, sslmode)
     }
 
-    // Ensure columns exist for existing deployments
-    // Add is_beta column if missing
-    if _, err := db.Exec(`ALTER TABLE app_versions ADD COLUMN IF NOT EXISTS is_beta BOOLEAN DEFAULT FALSE`); err != nil {
-        return fmt.Errorf("failed to add is_beta column: %v", err)
+    if err := goose.SetDialect("postgres"); err != nil {
+        return err
     }
+    db, err := goose.OpenDBWithDriver("postgres", dsn)
+    if err != nil {
+        return err
+    }
+    defer db.Close()
 
+    migrationsDir := "server/migrations"
+    if err := goose.Up(db, migrationsDir); err != nil {
+        return err
+    }
+    log.Println("Migrations applied successfully")
     return nil
 }

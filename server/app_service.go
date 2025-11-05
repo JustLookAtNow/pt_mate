@@ -1,20 +1,20 @@
 package main
 
 import (
-	"database/sql"
-	"log"
-	"net/http"
-	"strings"
+    "log"
+    "net/http"
+    "strings"
 
-	"github.com/gin-gonic/gin"
+    "github.com/gin-gonic/gin"
+    "gorm.io/gorm"
 )
 
 type AppService struct {
-	db *sql.DB
+    db *gorm.DB
 }
 
-func NewAppService(db *sql.DB) *AppService {
-	return &AppService{db: db}
+func NewAppService(db *gorm.DB) *AppService {
+    return &AppService{db: db}
 }
 
 func (s *AppService) CheckUpdate(c *gin.Context) {
@@ -66,62 +66,46 @@ func (s *AppService) CheckUpdate(c *gin.Context) {
 }
 
 func (s *AppService) updateStatistics(deviceID, platform, appVersion, ip string) error {
-    // Check if device exists
-    var exists bool
-    err := s.db.QueryRow(`
-        SELECT EXISTS(SELECT 1 FROM app_statistics WHERE device_id = $1)
-    `, deviceID).Scan(&exists)
-
-	if err != nil {
-		return err
-	}
-
-    if exists {
-        // Update existing record
-        _, err = s.db.Exec(`
-            UPDATE app_statistics 
-            SET platform = $2, app_version = $3, ip = $4, last_seen = CURRENT_TIMESTAMP, total_launches = total_launches + 1
-            WHERE device_id = $1
-        `, deviceID, platform, appVersion, ip)
-    } else {
-        // Insert new record
-        _, err = s.db.Exec(`
-            INSERT INTO app_statistics (device_id, platform, app_version, ip, first_seen, last_seen, total_launches)
-            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)
-        `, deviceID, platform, appVersion, ip)
+    var stat AppStatistic
+    tx := s.db.Where("device_id = ?", deviceID).First(&stat)
+    if tx.Error == nil && stat.ID != 0 {
+        // Update existing
+        stat.Platform = platform
+        stat.AppVersion = appVersion
+        stat.IP = ip
+        stat.LastSeen = nowUTC()
+        stat.TotalLaunches = stat.TotalLaunches + 1
+        return s.db.Save(&stat).Error
     }
-
-    return err
+    if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
+        return tx.Error
+    }
+    // Create new
+    newStat := AppStatistic{
+        DeviceID:      deviceID,
+        Platform:      platform,
+        AppVersion:    appVersion,
+        IP:            ip,
+        FirstSeen:     nowUTC(),
+        LastSeen:      nowUTC(),
+        TotalLaunches: 1,
+    }
+    return s.db.Create(&newStat).Error
 }
 
 func (s *AppService) getLatestVersion(includeBeta bool) (*AppVersion, error) {
     var version AppVersion
-    query := `SELECT id, version, release_notes, download_url, is_latest, is_beta, created_at, updated_at
-              FROM app_versions 
-              WHERE is_latest = true `
+    q := s.db.Model(&AppVersion{}).Where("is_latest = ?", true)
     if !includeBeta {
-        query += `AND (is_beta = false OR is_beta IS NULL) `
+        q = q.Where("is_beta = ?", false)
     }
-    query += `ORDER BY created_at DESC LIMIT 1`
-    err := s.db.QueryRow(query).Scan(
-        &version.ID,
-        &version.Version,
-        &version.ReleaseNotes,
-        &version.DownloadURL,
-        &version.IsLatest,
-        &version.IsBeta,
-        &version.CreatedAt,
-        &version.UpdatedAt,
-    )
-
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return &version, nil
+    if err := q.Order("created_at DESC").Limit(1).First(&version).Error; err != nil {
+        if err == gorm.ErrRecordNotFound {
+            return nil, nil
+        }
+        return nil, err
+    }
+    return &version, nil
 }
 
 // Simple version comparison - assumes semantic versioning (x.y.z)

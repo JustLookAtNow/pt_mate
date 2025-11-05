@@ -27,24 +27,24 @@ type VersionUpdateRequest struct {
 
 // AppVersion represents a version record in database
 type AppVersion struct {
-    ID           int       `json:"id"`
-    Version      string    `json:"version"`
+    ID           int       `json:"id" gorm:"primaryKey"`
+    Version      string    `json:"version" gorm:"uniqueIndex;size:50;not null"`
     ReleaseNotes string    `json:"release_notes"`
-    DownloadURL  string    `json:"download_url"`
-    IsLatest     bool      `json:"is_latest"`
-    IsBeta       bool      `json:"is_beta"`
+    DownloadURL  string    `json:"download_url" gorm:"size:500"`
+    IsLatest     bool      `json:"is_latest" gorm:"index"`
+    IsBeta       bool      `json:"is_beta" gorm:"index"`
     CreatedAt    time.Time `json:"created_at"`
     UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // AppStatistic represents usage statistics in database
 type AppStatistic struct {
-    ID            int       `json:"id"`
-    DeviceID      string    `json:"device_id"`
-    Platform      string    `json:"platform"`
-    AppVersion    string    `json:"app_version"`
-    IP            string    `json:"ip"`
+    ID            int       `json:"id" gorm:"primaryKey"`
+    DeviceID      string    `json:"device_id" gorm:"uniqueIndex;size:100;not null"`
+    Platform      string    `json:"platform" gorm:"index;size:50;not null"`
+    AppVersion    string    `json:"app_version" gorm:"size:50;not null"`
+    IP            string    `json:"ip" gorm:"size:64"`
     FirstSeen     time.Time `json:"first_seen"`
-    LastSeen      time.Time `json:"last_seen"`
+    LastSeen      time.Time `json:"last_seen" gorm:"index"`
     TotalLaunches int       `json:"total_launches"`
 }
