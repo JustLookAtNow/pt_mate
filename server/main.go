@@ -1,12 +1,12 @@
 package main
 
 import (
-    "log"
-    "net/http"
-    "os"
+	"log"
+	"net/http"
+	"os"
 
-    "github.com/gin-gonic/gin"
-    "github.com/joho/godotenv"
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 // load .env files using godotenv; ignore missing files
@@ -43,8 +43,8 @@ func main() {
     })
 
     // Routes
-    r.POST("/api/check_update", appSvc.CheckUpdate)
-    r.POST("/api/version/update", verSvc.UpdateVersion)
+    r.POST("/api/v1/check-update", appSvc.CheckUpdate)
+    r.POST("/api/v1/github/version-update", verSvc.UpdateVersion)
 
     addr := os.Getenv("SERVER_ADDR")
     if addr == "" {
