@@ -4,16 +4,6 @@
 # 用法: ./install_all.sh release
 # 或者: ./install_all.sh debug
 
-# 首先生成最新的 sites_manifest.json
-echo "🔄 正在更新网站配置清单..."
-if [ -f "./generate_sites_manifest.sh" ]; then
-    ./generate_sites_manifest.sh
-    echo ""
-else
-    echo "⚠️  警告: generate_sites_manifest.sh 脚本未找到，跳过清单更新"
-    echo ""
-fi
-
 # 默认使用debug版本
 BUILD_TYPE="debug"
 
@@ -21,6 +11,15 @@ BUILD_TYPE="debug"
 if [ -n "$1" ] && [ "$1" = "release" ]; then
     BUILD_TYPE="release"
 fi
+# 根据构建类型构建apk
+if [ "$BUILD_TYPE" = "release" ]; then
+    echo "🔧 正在构建 release 版本..."
+    flutter build apk --release --target-platform=android-arm64
+else
+    echo "🔧 正在构建 debug 版本..."
+    flutter build apk --debug --target-platform=android-arm64
+fi
+
 
 # 根据构建类型设置APK路径
 if [ "$BUILD_TYPE" = "release" ]; then
