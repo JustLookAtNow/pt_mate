@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../services/site_config_service.dart';
 
 // 用户资料信息
@@ -744,6 +745,7 @@ class SiteConfig {
 
   /// 异步版本的fromJson方法，使用配置文件中的URL映射
   static Future<SiteConfigLoadResult> fromJsonAsync(Map<String, dynamic> json) async {
+    final swTotal = Stopwatch()..start();
     List<SearchCategoryConfig> categories = [];
     if (json['searchCategories'] != null) {
       try {
@@ -779,7 +781,14 @@ class SiteConfig {
     if (templateId.isEmpty || templateId == '-1') {
       // 如果没有 templateId，根据 baseUrl 匹配预设站点（使用异步方法）
       final baseUrl = json['baseUrl'] as String;
+      final swMap = Stopwatch()..start();
       templateId = await SiteConfig.getTemplateIdByBaseUrlAsync(baseUrl);
+      swMap.stop();
+      if (kDebugMode) {
+        print(
+          'SiteConfig.fromJsonAsync: URL映射耗时=${swMap.elapsedMilliseconds}ms，baseUrl=$baseUrl，templateId=$templateId',
+        );
+      }
       // 如果成功获取到了有效的templateId，标记需要更新持久化数据
       needsUpdate = templateId.isNotEmpty && templateId != '-1';
     }
@@ -804,10 +813,17 @@ class SiteConfig {
       templateId: templateId,
     );
 
-    return SiteConfigLoadResult(
+    final result = SiteConfigLoadResult(
       config: config,
       needsUpdate: needsUpdate,
     );
+    swTotal.stop();
+    if (kDebugMode) {
+      print(
+        'SiteConfig.fromJsonAsync: 总耗时=${swTotal.elapsedMilliseconds}ms，siteId=${config.id}',
+      );
+    }
+    return result;
   }
 
   /// 根据 baseUrl 匹配预设站点的模板ID
@@ -849,21 +865,25 @@ class SiteConfig {
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
     
+    // 优先使用快速映射（同步后备方案），避免首帧阻塞读取资产
+    final quick = _getTemplateIdByBaseUrl(normalizedBaseUrl);
+    if (quick != '-1') {
+      return quick;
+    }
+
+    // 若快速映射未命中，再尝试从配置文件读取（可能涉及IO，但只在必要时发生）
     try {
-      // 从配置文件获取URL映射
       final urlMapping = await SiteConfigService.getUrlToTemplateIdMapping();
       final templateId = urlMapping[normalizedBaseUrl];
-      
       if (templateId != null) {
         return templateId;
       }
     } catch (e) {
-      // 如果从配置文件读取失败，使用同步方法作为后备
-      // Failed to load URL mapping from config: $e
+      // 读取失败则继续使用后备方案
     }
-    
-    // 后备方案：使用同步方法
-    return _getTemplateIdByBaseUrl(baseUrl);
+
+    // 最终后备：仍未命中则返回同步方法的结果（可能为'-1'）
+    return _getTemplateIdByBaseUrl(normalizedBaseUrl);
   }
 
   @override

@@ -96,21 +96,56 @@ class AppState extends ChangeNotifier {
 
     _initCompleter = Completer<void>();
 
+    // 使用microtask异步执行，避免阻塞UI
+    Future.microtask(() => _performInitialLoad(forceReload: forceReload));
+
+    return _initCompleter!.future;
+  }
+
+  Future<void> _performInitialLoad({bool forceReload = false}) async {
     try {
+      final swTotal = Stopwatch()..start();
+      if (kDebugMode) {
+        print('AppState: _performInitialLoad开始，forceReload=$forceReload');
+      }
+
       // 应用启动时首先检查并执行数据迁移
+      final swMigrate = Stopwatch()..start();
       await StorageService.instance.checkAndMigrate();
+      swMigrate.stop();
+      if (kDebugMode) {
+        print('AppState: 数据迁移耗时=${swMigrate.elapsedMilliseconds}ms');
+      }
       
+      // 加载活跃站点配置
+      final swLoadSite = Stopwatch()..start();
       _site = await StorageService.instance.getActiveSiteConfig();
+      swLoadSite.stop();
+      if (kDebugMode) {
+        print('AppState: 加载活跃站点耗时=${swLoadSite.elapsedMilliseconds}ms, siteId=${_site?.id}');
+      }
+
+      // 初始化API服务（适配器）
+      final swApi = Stopwatch()..start();
       await ApiService.instance.init();
+      swApi.stop();
+      if (kDebugMode) {
+        print('AppState: ApiService.init耗时=${swApi.elapsedMilliseconds}ms');
+      }
+
       _isInitialized = true;
       _configVersion++; // 增加配置版本号
+      swTotal.stop();
       if (kDebugMode) {
-        print('AppState: loadInitial完成，配置版本号: $_configVersion, 强制重新加载: $forceReload');
+        print('AppState: _performInitialLoad完成，总耗时=${swTotal.elapsedMilliseconds}ms，配置版本号: $_configVersion, 强制重新加载: $forceReload');
       }
       notifyListeners();
+
+      // 持久化在迁移过程中更新的配置
+      await StorageService.instance.persistPendingConfigUpdates();
       
       // 应用启动时检查自动同步
-      _checkAutoSync();
+      Future.microtask(() => _checkAutoSync());
       
       _initCompleter!.complete();
     } catch (e) {
@@ -360,8 +395,8 @@ class _MTeamAppState extends State<MTeamApp> {
         ChangeNotifierProvider(create: (_) => AggregateSearchProvider()),
         Provider<StorageService>(create: (_) => StorageService.instance),
       ],
-      child: Consumer<ThemeManager>(
-        builder: (context, themeManager, child) {
+      child: Consumer2<ThemeManager, AppState>(
+        builder: (context, themeManager, appState, child) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'PT Mate',
@@ -379,7 +414,15 @@ class _MTeamAppState extends State<MTeamApp> {
               Locale('en', 'US'), // 英文
             ],
             locale: const Locale('zh', 'CN'), // 默认使用中文简体
-            home: const HomePage(),
+            home: !appState.isInitialized
+                ? const Scaffold(
+                    body: Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                : appState.site == null
+                    ? const ServerSettingsPage()
+                    : const HomePage(),
           );
         },
       ),

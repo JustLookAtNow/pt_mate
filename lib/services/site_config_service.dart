@@ -25,6 +25,7 @@ class SiteConfigService {
   /// 获取所有可用的预设站点文件列表
   static Future<List<String>> _getPresetSiteFiles() async {
     try {
+      final swManifest = Stopwatch()..start();
       // 从清单文件读取站点列表
       final String manifestString = await rootBundle.loadString(
         _sitesManifestPath,
@@ -32,6 +33,10 @@ class SiteConfigService {
       final Map<String, dynamic> manifest = json.decode(manifestString);
 
       final List<dynamic> siteFiles = manifest['sites'] ?? [];
+      swManifest.stop();
+      if (kDebugMode) {
+        print('SiteConfigService._getPresetSiteFiles: 清单加载耗时=${swManifest.elapsedMilliseconds}ms');
+      }
       return siteFiles
           .map((file) => '$_sitesBasePath$file')
           .cast<String>()
@@ -50,14 +55,21 @@ class SiteConfigService {
       return _presetTemplatesCache!;
     }
 
+    final swTotal = Stopwatch()..start();
     final List<SiteConfigTemplate> presetTemplates = [];
     final Map<String, String> urlMapping = {};
 
     // 动态获取站点文件列表
+    final swList = Stopwatch()..start();
     final presetSiteFiles = await _getPresetSiteFiles();
+    swList.stop();
+    if (kDebugMode) {
+      print('SiteConfigService.loadPresetSiteTemplates: 站点清单获取耗时=${swList.elapsedMilliseconds}ms, 文件数=${presetSiteFiles.length}');
+    }
 
     for (final filePath in presetSiteFiles) {
       try {
+        final swFile = Stopwatch()..start();
         // 从assets读取每个站点的JSON文件
         final String jsonString = await rootBundle.loadString(filePath);
         final Map<String, dynamic> siteJson = json.decode(jsonString);
@@ -73,6 +85,10 @@ class SiteConfigService {
               : url;
           urlMapping[normalizedUrl] = templateId;
         }
+        swFile.stop();
+        if (kDebugMode) {
+          print('SiteConfigService.loadPresetSiteTemplates: 解析模板 $filePath 耗时=${swFile.elapsedMilliseconds}ms');
+        }
       } catch (e) {
         // 如果某个文件加载失败，跳过该文件继续加载其他文件
         // Failed to load preset site template from $filePath: $e
@@ -83,6 +99,10 @@ class SiteConfigService {
     // 缓存预设站点模板列表和URL映射
     _presetTemplatesCache = presetTemplates;
     _urlToTemplateIdMapping = urlMapping;
+    swTotal.stop();
+    if (kDebugMode) {
+      print('SiteConfigService.loadPresetSiteTemplates: 加载模板数量=${presetTemplates.length}, 总耗时=${swTotal.elapsedMilliseconds}ms');
+    }
     
     return presetTemplates;
   }
@@ -111,9 +131,14 @@ class SiteConfigService {
     String templateId,
     SiteType siteType,
   ) async {
+    final swTotal = Stopwatch()..start();
     // 先查缓存，命中直接返回
     final String cacheKey = '$templateId|${siteType.id}';
     if (_templateCache.containsKey(cacheKey)) {
+      swTotal.stop();
+      if (kDebugMode) {
+        print('SiteConfigService.getTemplateById: 命中缓存($cacheKey), 耗时=${swTotal.elapsedMilliseconds}ms');
+      }
       return _templateCache[cacheKey];
     }
 
@@ -122,16 +147,26 @@ class SiteConfigService {
     if (templateId.isNotEmpty && templateId != "-1") {
       final templates = await loadPresetSiteTemplates();
       try {
+        final swSearch = Stopwatch()..start();
         final template = templates.firstWhere(
           (template) => template.id == templateId,
         );
+        swSearch.stop();
+        if (kDebugMode) {
+          print('SiteConfigService.getTemplateById: 搜索模板ID=$templateId 耗时=${swSearch.elapsedMilliseconds}ms');
+        }
 
         // 如果模板没有 infoFinder 或 request 配置，尝试从默认模板中获取
         if ((template.infoFinder == null ||
                 template.request == null ||
                 template.discountMapping.isEmpty) &&
             template.siteType != SiteType.mteam) {
+          final swDefault = Stopwatch()..start();
           final defaultTemplate = await _getDefaultTemplateConfig(siteType);
+          swDefault.stop();
+          if (kDebugMode) {
+            print('SiteConfigService.getTemplateById: 加载默认模板(${siteType.id})耗时=${swDefault.elapsedMilliseconds}ms');
+          }
           if (defaultTemplate != null) {
             Map<String, dynamic>? infoFinder = template.infoFinder;
             Map<String, dynamic>? request = template.request;
@@ -174,7 +209,12 @@ class SiteConfigService {
 
     if (result == null) {
       // 如果没有找到对应的模板，尝试返回默认模板配置
+      final swDefault2 = Stopwatch()..start();
       final defaultTemplate = await _getDefaultTemplateConfig(siteType);
+      swDefault2.stop();
+      if (kDebugMode) {
+        print('SiteConfigService.getTemplateById: 备用默认模板(${siteType.id})加载耗时=${swDefault2.elapsedMilliseconds}ms');
+      }
       if (defaultTemplate != null) {
         // 将默认模板配置转换为 SiteConfigTemplate
         result = _convertDefaultTemplateToSiteConfigTemplate(
@@ -186,6 +226,12 @@ class SiteConfigService {
 
     // 写入缓存（包括null结果，避免重复IO）
     _templateCache[cacheKey] = result;
+    if (swTotal.isRunning) {
+      swTotal.stop();
+    }
+    if (kDebugMode) {
+      print('SiteConfigService.getTemplateById: 模板ID=$templateId, 站点类型=${siteType.id}, 总耗时=${swTotal.elapsedMilliseconds}ms');
+    }
     return result;
   }
 
@@ -262,24 +308,41 @@ class SiteConfigService {
     SiteType siteType,
   ) async {
     try {
+      final swTotal = Stopwatch()..start();
       // 如果缓存不存在，先加载默认模板配置
       if (_defaultTemplatesCache == null) {
+        final swLoad = Stopwatch()..start();
         // 从assets读取JSON文件
         final String jsonString = await rootBundle.loadString(_configPath);
         final Map<String, dynamic> jsonData = json.decode(jsonString);
 
         // 缓存默认模板配置
         _defaultTemplatesCache = jsonData['defaultTemplates'] as Map<String, dynamic>?;
+        swLoad.stop();
+        if (kDebugMode) {
+          print('SiteConfigService._getDefaultTemplateConfig: 首次加载默认模板耗时=${swLoad.elapsedMilliseconds}ms');
+        }
       }
 
       // 从缓存中获取默认模板配置
       if (_defaultTemplatesCache != null && _defaultTemplatesCache!.containsKey(siteType.id)) {
+        swTotal.stop();
+        if (kDebugMode) {
+          print('SiteConfigService._getDefaultTemplateConfig: 命中 ${siteType.id}, 总耗时=${swTotal.elapsedMilliseconds}ms');
+        }
         return _defaultTemplatesCache![siteType.id] as Map<String, dynamic>;
       }
 
+      swTotal.stop();
+      if (kDebugMode) {
+        print('SiteConfigService._getDefaultTemplateConfig: 未找到 ${siteType.id}, 总耗时=${swTotal.elapsedMilliseconds}ms');
+      }
       return null;
     } catch (e) {
       // 如果加载失败，返回null
+      if (kDebugMode) {
+        print('SiteConfigService._getDefaultTemplateConfig: 加载失败 ${siteType.id}, 错误=$e');
+      }
       return null;
     }
   }
@@ -292,6 +355,7 @@ class SiteConfigService {
   // 获取默认的优惠映射配置
   static Future<Map<String, String>> getDiscountMapping(String baseUrl) async {
     try {
+      final swTotal = Stopwatch()..start();
       // 标准化baseUrl，移除末尾的斜杠
       final normalizedBaseUrl = baseUrl.endsWith('/')
           ? baseUrl.substring(0, baseUrl.length - 1)
@@ -312,14 +376,25 @@ class SiteConfigService {
 
         if (normalizedUrls.contains(normalizedBaseUrl)) {
           // 找到匹配的站点，返回discountMapping
+          swTotal.stop();
+          if (kDebugMode) {
+            print('SiteConfigService.getDiscountMapping: 命中 $normalizedBaseUrl, 模板=${template.id}, 耗时=${swTotal.elapsedMilliseconds}ms');
+          }
           return template.discountMapping;
         }
       }
 
       // 如果没有找到匹配的站点，返回空映射
+      swTotal.stop();
+      if (kDebugMode) {
+        print('SiteConfigService.getDiscountMapping: 未命中 $normalizedBaseUrl, 耗时=${swTotal.elapsedMilliseconds}ms');
+      }
       return {};
     } catch (e) {
       // 如果加载失败，返回空对象
+      if (kDebugMode) {
+        print('SiteConfigService.getDiscountMapping: 加载失败 baseUrl=$baseUrl, 错误=$e');
+      }
       return {};
     }
   }
@@ -329,6 +404,7 @@ class SiteConfigService {
     String baseUrl,
   ) async {
     try {
+      final swTotal = Stopwatch()..start();
       // 标准化baseUrl，移除末尾的斜杠
       final normalizedBaseUrl = baseUrl.endsWith('/')
           ? baseUrl.substring(0, baseUrl.length - 1)
@@ -349,14 +425,25 @@ class SiteConfigService {
 
         if (normalizedUrls.contains(normalizedBaseUrl)) {
           // 找到匹配的站点，返回searchCategories
+           swTotal.stop();
+           if (kDebugMode) {
+             print('SiteConfigService.getDefaultSearchCategories: 命中 $normalizedBaseUrl, 模板=${template.id}, 耗时=${swTotal.elapsedMilliseconds}ms');
+           }
           return template.searchCategories;
         }
       }
 
       // 如果没有找到匹配的站点，返回空列表
+      swTotal.stop();
+      if (kDebugMode) {
+        print('SiteConfigService.getDefaultSearchCategories: 未命中 $normalizedBaseUrl, 耗时=${swTotal.elapsedMilliseconds}ms');
+      }
       return [];
     } catch (e) {
       // 如果加载失败，返回空列表
+      if (kDebugMode) {
+        print('SiteConfigService.getDefaultSearchCategories: 加载失败 baseUrl=$baseUrl, 错误=$e');
+      }
       return [];
     }
   }
@@ -364,9 +451,14 @@ class SiteConfigService {
   /// 获取URL到模板ID的映射
   /// 如果缓存为空，会先加载预设站点模板来构建缓存
   static Future<Map<String, String>> getUrlToTemplateIdMapping() async {
+    final swTotal = Stopwatch()..start();
     if (_urlToTemplateIdMapping == null) {
       // 如果缓存为空，先加载预设站点模板来构建缓存
       await loadPresetSiteTemplates();
+    }
+    swTotal.stop();
+    if (kDebugMode) {
+      print('SiteConfigService.getUrlToTemplateIdMapping: 映射数量=${_urlToTemplateIdMapping?.length ?? 0}, 总耗时=${swTotal.elapsedMilliseconds}ms');
     }
     return _urlToTemplateIdMapping ?? {};
   }

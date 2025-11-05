@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../../models/app_models.dart';
 import '../storage/storage_service.dart';
 import 'site_adapter.dart';
@@ -13,9 +14,19 @@ class ApiService {
 
   /// 初始化服务，加载活跃站点的适配器
   Future<void> init() async {
+    final swTotal = Stopwatch()..start();
     final activeSite = await StorageService.instance.getActiveSiteConfig();
     if (activeSite != null) {
+      final swInitAdapter = Stopwatch()..start();
       await _initAdapter(activeSite);
+      swInitAdapter.stop();
+      if (kDebugMode) {
+        print('ApiService.init: 初始化活跃适配器耗时=${swInitAdapter.elapsedMilliseconds}ms');
+      }
+    }
+    swTotal.stop();
+    if (kDebugMode) {
+      print('ApiService.init: 总耗时=${swTotal.elapsedMilliseconds}ms');
     }
   }
 
@@ -32,7 +43,12 @@ class ApiService {
 
     // 创建新的适配器实例
     final adapter = SiteAdapterFactory.createAdapter(siteConfig);
+    final swInit = Stopwatch()..start();
     await adapter.init(siteConfig);
+    swInit.stop();
+    if (kDebugMode) {
+      print('ApiService.getAdapter: 适配器(${siteConfig.siteType.id})初始化耗时=${swInit.elapsedMilliseconds}ms');
+    }
     _adapters[adapterId] = adapter;
 
     return adapter;

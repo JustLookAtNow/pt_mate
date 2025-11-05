@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../models/app_models.dart';
 import '../site_config_service.dart';
 import 'site_adapter.dart';
@@ -15,21 +16,24 @@ class MTeamAdapter extends SiteAdapter {
   
   @override
   Future<void> init(SiteConfig config) async {
+    final swTotal = Stopwatch()..start();
     _siteConfig = config;
     
     // 加载优惠类型映射配置
+    final swDiscount = Stopwatch()..start();
     await _loadDiscountMapping();
+    swDiscount.stop();
+    if (kDebugMode) {
+      print('MTeamAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms');
+    }
     
     _dio = Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 5),
       receiveTimeout: const Duration(seconds: 10),
       sendTimeout: const Duration(seconds: 30),
-      headers: {
-        'accept': 'application/json, text/plain, */*',
-        'user-agent': 'MTeamApp/1.0 (Flutter; Dio)',
-      },
     ));
     
+    final swInterceptors = Stopwatch()..start();
     _dio.interceptors.clear();
     _dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) async {
       // 设置baseUrl
@@ -39,7 +43,9 @@ class MTeamAdapter extends SiteAdapter {
         options.baseUrl = base;
       }
       
-      // 设置API密钥
+      // 动态设置API密钥和UA
+      options.headers['accept'] = 'application/json, text/plain, */*';
+      options.headers['user-agent'] = 'MTeamApp/1.0 (Flutter; Dio)';
       final hasExplicitKey = options.headers.containsKey('x-api-key') &&
           ((options.headers['x-api-key']?.toString().isNotEmpty) == true);
       final siteKey = _siteConfig.apiKey ?? '';
@@ -49,6 +55,14 @@ class MTeamAdapter extends SiteAdapter {
       
       return handler.next(options);
     }));
+    swInterceptors.stop();
+    if (kDebugMode) {
+      print('MTeamAdapter.init: 配置Dio与拦截器耗时=${swInterceptors.elapsedMilliseconds}ms');
+    }
+    swTotal.stop();
+    if (kDebugMode) {
+      print('MTeamAdapter.init: 总耗时=${swTotal.elapsedMilliseconds}ms');
+    }
   }
   
   /// 加载优惠类型映射配置

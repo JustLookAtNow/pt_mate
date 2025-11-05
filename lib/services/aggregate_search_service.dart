@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:logger/logger.dart';
+
 import '../models/app_models.dart';
 import '../services/api/api_service.dart';
 import '../services/storage/storage_service.dart';
@@ -62,7 +64,7 @@ class AggregateSearchService {
     required String keyword,
     required String configId,
     required Function(AggregateSearchProgress) onProgress,
-    int maxResultsPerSite = 20,
+    int maxResultsPerSite = 30,
   }) async {
     // 加载搜索配置
     final settings = await StorageService.instance.loadAggregateSearchSettings();
@@ -206,9 +208,14 @@ class AggregateSearchService {
     required int maxResults,
     Map<String, dynamic>? additionalParams,
   }) async {
+    final logger = Logger();
     try {
+      logger.d(
+        '开始搜索站点: ${site.name} (ID: ${site.id})\n关键字: "$keyword"\n最大结果数: $maxResults\n附加参数: $additionalParams',
+      );
       // 检查站点是否支持搜索
       if (!site.features.supportTorrentSearch) {
+        logger.w('站点 ${site.name} 不支持搜索功能');
         return SearchResult.error('站点不支持搜索功能');
       }
 
@@ -253,8 +260,10 @@ class AggregateSearchService {
         additionalParams: processedParams, 
       );
 
+      logger.d('站点 ${site.name} 搜索成功，返回 ${result.items.length} 条结果');
       return SearchResult.success(result.items);
     } catch (e) {
+      logger.e('站点 ${site.name} 搜索失败', error: e);
       return SearchResult.error(e.toString());
     }
   }

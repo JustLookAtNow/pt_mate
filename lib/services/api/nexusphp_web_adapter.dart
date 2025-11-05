@@ -32,11 +32,18 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
   @override
   Future<void> init(SiteConfig config) async {
+    final swTotal = Stopwatch()..start();
     _siteConfig = config;
 
     // 加载优惠类型映射配置
+    final swDiscount = Stopwatch()..start();
     await _loadDiscountMapping();
+    swDiscount.stop();
+    if (kDebugMode) {
+      print('NexusPHPWebAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms');
+    }
 
+    final swDio = Stopwatch()..start();
     _dio = Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 5),
@@ -48,15 +55,22 @@ class NexusPHPWebAdapter extends SiteAdapter {
     _dio.options.headers['User-Agent'] =
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
     _dio.options.responseType = ResponseType.plain; // 设置为plain避免JSON解析警告
-
-    // 设置Cookie
-    if (_siteConfig.cookie != null && _siteConfig.cookie!.isNotEmpty) {
-      _dio.options.headers['Cookie'] = _siteConfig.cookie;
+    swDio.stop();
+    if (kDebugMode) {
+      print('NexusPHPWebAdapter.init: 创建Dio与基本配置耗时=${swDio.elapsedMilliseconds}ms');
     }
 
     // 添加响应拦截器处理302重定向
+    final swInterceptors = Stopwatch()..start();
     _dio.interceptors.add(
       InterceptorsWrapper(
+        onRequest: (options, handler) {
+          // 动态添加Cookie
+          if (_siteConfig.cookie != null && _siteConfig.cookie!.isNotEmpty) {
+            options.headers['Cookie'] = _siteConfig.cookie;
+          }
+          handler.next(options);
+        },
         onResponse: (response, handler) {
           // 检查是否是302重定向到登录页面
           if (response.statusCode == 302) {
@@ -79,6 +93,14 @@ class NexusPHPWebAdapter extends SiteAdapter {
         },
       ),
     );
+    swInterceptors.stop();
+    if (kDebugMode) {
+      print('NexusPHPWebAdapter.init: 添加拦截器耗时=${swInterceptors.elapsedMilliseconds}ms');
+    }
+    swTotal.stop();
+    if (kDebugMode) {
+      print('NexusPHPWebAdapter.init: 总耗时=${swTotal.elapsedMilliseconds}ms');
+    }
   }
 
   /// 加载优惠类型映射配置
@@ -592,11 +614,11 @@ class NexusPHPWebAdapter extends SiteAdapter {
   }) async {
     try {
       // 构建查询参数
-      final queryParams = <String, dynamic>{
-        'page': pageNumber - 1, // 页面从0开始
-        'pageSize': pageSize,
-        'incldead': 1, // 添加默认参数
-      };
+    final queryParams = <String, dynamic>{
+      'page': pageNumber - 1, // 页面从0开始
+      'pageSize': pageSize,
+      'incldead': 1, // 添加默认参数
+    };
 
       // 添加关键词搜索
       if (keyword != null && keyword.isNotEmpty) {

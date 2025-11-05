@@ -64,6 +64,8 @@ dependencies:
   flutter_svg: ^2.0.10
   uuid: ^4.5.1
   flutter_markdown: ^0.7.2
+  logger: ^2.6.2
+  get_it: ^9.0.5
 
 
 dev_dependencies:

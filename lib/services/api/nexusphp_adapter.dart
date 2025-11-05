@@ -1,10 +1,12 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
+import 'package:pt_mate/services/storage/storage_service.dart';
 import '../../models/app_models.dart';
 import 'site_adapter.dart';
-import '../site_config_service.dart';
+import 'package:pt_mate/services/site_config_service.dart';
 import '../../utils/format.dart';
 
 /// NexusPHP 站点适配器
@@ -19,35 +21,56 @@ class NexusPHPAdapter implements SiteAdapter {
 
   @override
   Future<void> init(SiteConfig config) async {
+    final swTotal = Stopwatch()..start();
     _siteConfig = config;
 
     // 加载优惠类型映射配置
+    final swDiscount = Stopwatch()..start();
     await _loadDiscountMapping();
+    swDiscount.stop();
+    if (kDebugMode) {
+      print('NexusPHPAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms');
+    }
 
     _dio = Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 5),
         receiveTimeout: const Duration(seconds: 10),
         sendTimeout: const Duration(seconds: 30),
-        headers: _buildHeaders(config.apiKey),
       ),
     );
 
+    final swInterceptors = Stopwatch()..start();
     _dio.interceptors.clear();
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // 重新加载最新的站点配置，确保apiKey是最新的
+          final allSites = await StorageService.instance.loadSiteConfigs(includeApiKeys: true);
+          final latestConfig = allSites.firstWhere((site) => site.id == _siteConfig.id, orElse: () => _siteConfig);
+          _siteConfig = latestConfig;
           // 设置baseUrl
           if (options.baseUrl.isEmpty || options.baseUrl == '/') {
             var base = _siteConfig.baseUrl.trim();
             if (base.endsWith('/')) base = base.substring(0, base.length - 1);
             options.baseUrl = base;
           }
+          
+          // 动态构建请求头
+          options.headers.addAll(_buildHeaders(_siteConfig.apiKey));
 
           return handler.next(options);
         },
       ),
     );
+    swInterceptors.stop();
+    if (kDebugMode) {
+      print('NexusPHPAdapter.init: 配置Dio与拦截器耗时=${swInterceptors.elapsedMilliseconds}ms');
+    }
+    swTotal.stop();
+    if (kDebugMode) {
+      print('NexusPHPAdapter.init: 总耗时=${swTotal.elapsedMilliseconds}ms');
+    }
   }
 
   /// 加载优惠类型映射配置

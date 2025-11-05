@@ -8,6 +8,7 @@ import '../services/aggregate_search_service.dart';
 import '../services/downloader/downloader_config.dart';
 import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
+
 import '../providers/aggregate_search_provider.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/qb_speed_indicator.dart';
@@ -423,6 +424,78 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                       ],
 
                       // 搜索结果
+                      if (provider.searchErrors.isNotEmpty) ...[
+                        FutureBuilder<List<SiteConfig>>(
+                          future: Provider.of<StorageService>(
+                            context,
+                            listen: false,
+                          ).loadSiteConfigs(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const SizedBox(); // or a loading indicator
+                            }
+                            if (snapshot.hasError) {
+                              return const SizedBox(); // or an error message
+                            }
+                            final sites = snapshot.data ?? [];
+                            return Card(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.errorContainer,
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '部分站点搜索失败',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onErrorContainer,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    ...provider.searchErrors.entries.map((
+                                      entry,
+                                    ) {
+                                      final siteName = sites
+                                          .firstWhere(
+                                            (site) => site.id == entry.key,
+                                            orElse: () => SiteConfig(
+                                              id: '',
+                                              name: '未知站点',
+                                              baseUrl: '',
+                                            ),
+                                          )
+                                          .name;
+
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 4.0,
+                                        ),
+                                        child: Text(
+                                          '$siteName: ${entry.value}',
+                                          style: TextStyle(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onErrorContainer,
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       Expanded(
                         child:
                             provider.searchResults.isEmpty &&
@@ -608,7 +681,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           .performAggregateSearch(
             keyword: query.trim().isEmpty ? '' : query.trim(),
             configId: provider.selectedStrategy,
-            maxResultsPerSite: 10,
+            maxResultsPerSite: 50,
             onProgress: (progress) {
               if (mounted) {
                 provider.setSearchProgress(progress);

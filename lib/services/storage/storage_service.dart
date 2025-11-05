@@ -77,6 +77,8 @@ class StorageService {
   StorageService._();
   static final StorageService instance = StorageService._();
 
+  bool _hasPendingConfigUpdates = false;
+
   final FlutterSecureStorage _secure = const FlutterSecureStorage(
     aOptions: AndroidOptions(
       encryptedSharedPreferences: true,
@@ -337,46 +339,81 @@ class StorageService {
     }
   }
 
-  Future<List<SiteConfig>> loadSiteConfigs() async {
-    final prefs = await _prefs;
-    final str = prefs.getString(StorageKeys.siteConfigs);
-    if (str == null) {
-      // 尝试从旧的单站点配置迁移
-      final legacySite = await loadSite();
-      if (legacySite != null) {
-        // 为旧配置生成ID并迁移
-        final migratedSite = legacySite.copyWith(
-          id: 'migrated-${DateTime.now().millisecondsSinceEpoch}',
-        );
-        await saveSiteConfigs([migratedSite]);
-        await setActiveSiteId(migratedSite.id);
-        return [migratedSite];
-      }
-      return [];
-    }
-    
+  Future<List<SiteConfig>> loadSiteConfigs({
+    bool includeApiKeys = false,
+  }) async {
+    final swTotal = Stopwatch()..start();
     try {
-      final list = (jsonDecode(str) as List).cast<Map<String, dynamic>>();
+      final prefs = await _prefs;
+      final str = prefs.getString(StorageKeys.siteConfigs);
+      if (str == null) return [];
+
+      final List<dynamic> jsonList = jsonDecode(str);
       final configs = <SiteConfig>[];
       bool hasUpdates = false;
-      
-      for (final json in list) {
+      int idx = 0;
+
+      for (final json in jsonList) {
+        final swItem = Stopwatch()..start();
         final result = await SiteConfig.fromJsonAsync(json);
-        final apiKey = await _loadSiteApiKey(result.config.id);
-        final finalConfig = result.config.copyWith(apiKey: apiKey);
+        swItem.stop();
+        if (kDebugMode) {
+          print(
+            'StorageService.loadSiteConfigs: 第${idx + 1}个站点 fromJsonAsync 耗时=${swItem.elapsedMilliseconds}ms，templateId=${result.config.templateId}，needsUpdate=${result.needsUpdate}',
+          );
+        }
+
+        SiteConfig finalConfig;
+        if (includeApiKeys) {
+          final swKey = Stopwatch()..start();
+          final apiKey = await _loadSiteApiKey(result.config.id);
+          swKey.stop();
+          if (kDebugMode) {
+            print(
+              'StorageService.loadSiteConfigs: 第${idx + 1}个站点 加载API密钥耗时=${swKey.elapsedMilliseconds}ms',
+            );
+          }
+          finalConfig = result.config.copyWith(apiKey: apiKey);
+        } else {
+          // 跳过API密钥加载以加速启动流程
+          finalConfig = result.config;
+        }
         configs.add(finalConfig);
+        idx++;
         
         // 如果templateId被更新了，标记需要重新保存
         if (result.needsUpdate) {
           hasUpdates = true;
         }
       }
-      
-      // 如果有配置被更新，重新保存到持久化存储
-      if (hasUpdates) {
+
+      // 当跳过API密钥加载时，如果检测到需要更新（例如模板ID修正），
+      // 为避免清除密钥，这里不立即持久化，改在后续全量加载或设置页中再保存。
+      if (hasUpdates && includeApiKeys) {
+        final swSave = Stopwatch()..start();
         await saveSiteConfigs(configs);
+        swSave.stop();
+        if (kDebugMode) {
+          print(
+            'StorageService.loadSiteConfigs: 保存更新耗时=${swSave.elapsedMilliseconds}ms',
+          );
+        }
+      } else if (hasUpdates && !includeApiKeys) {
+        _hasPendingConfigUpdates = true;
+        if (kDebugMode) {
+          print(
+            'StorageService.loadSiteConfigs: 检测到配置需要更新，但已跳过保存以避免清除API密钥（稍后持久化）',
+          );
+        }
       }
-      
+
+      swTotal.stop();
+      if (kDebugMode) {
+        print(
+          'StorageService.loadSiteConfigs: 总耗时=${swTotal.elapsedMilliseconds}ms',
+        );
+      }
+
       return configs;
     } catch (_) {
       return [];
@@ -428,10 +465,13 @@ class StorageService {
   Future<SiteConfig?> getActiveSiteConfig() async {
     final activeSiteId = await getActiveSiteId();
     if (activeSiteId == null) return null;
-    
-    final configs = await loadSiteConfigs();
+
+    // 加载站点配置但跳过API密钥，随后仅为活跃站点读取密钥
+    final configs = await loadSiteConfigs(includeApiKeys: false);
     try {
-      return configs.firstWhere((c) => c.id == activeSiteId);
+      final base = configs.firstWhere((c) => c.id == activeSiteId);
+      final apiKey = await _loadSiteApiKey(activeSiteId);
+      return base.copyWith(apiKey: apiKey);
     } catch (_) {
       return null;
     }
@@ -637,7 +677,7 @@ class StorageService {
     final str = prefs.getString(StorageKeys.aggregateSearchSettings);
     if (str == null) {
       // 返回默认设置，包含一个"全部站点"的默认配置
-      final allSites = await loadSiteConfigs();
+      final allSites = await loadSiteConfigs(includeApiKeys: false);
       final defaultConfig = AggregateSearchConfig.createDefaultConfig(
         allSites.map((site) => site.id).toList(),
       );
@@ -652,7 +692,7 @@ class StorageService {
       return AggregateSearchSettings.fromJson(json);
     } catch (_) {
       // 解析失败时返回默认设置
-      final allSites = await loadSiteConfigs();
+      final allSites = await loadSiteConfigs(includeApiKeys: false);
       final defaultConfig = AggregateSearchConfig.createDefaultConfig(
         allSites.map((site) => site.id).toList(),
       );
@@ -807,5 +847,20 @@ class StorageService {
 
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.deviceIdFallback);
+  }
+
+  /// 如果有待处理的配置更新，则执行持久化
+  Future<void> persistPendingConfigUpdates() async {
+    if (_hasPendingConfigUpdates) {
+      if (kDebugMode) {
+        print('StorageService: 开始持久化待处理的站点配置更新...');
+      }
+      // 通过全量加载（包含API密钥）来触发保存逻辑
+      await loadSiteConfigs(includeApiKeys: true);
+      _hasPendingConfigUpdates = false;
+      if (kDebugMode) {
+        print('StorageService: 待处理的站点配置更新已持久化。');
+      }
+    }
   }
 }
