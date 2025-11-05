@@ -1,21 +1,46 @@
 package main
 
 import (
-	"flag"
-	"fmt"
-	"log"
-	"os"
-	"strconv"
+    "flag"
+    "fmt"
+    "log"
+    "os"
+    "strconv"
 
-	goose "github.com/pressly/goose/v3"
+    "github.com/joho/godotenv"
+    goose "github.com/pressly/goose/v3"
+    migfs "server/migrations"
 )
 
+// load .env files using godotenv; ignore missing files
+func loadDotEnv(paths ...string) {
+    for _, p := range paths {
+        _ = godotenv.Load(p)
+    }
+}
+
 func main() {
-	// Database DSN via env for flexibility. Same format used in database.go
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		log.Fatal("DATABASE_URL env is required, e.g. postgres://user:pass@host:5432/dbname?sslmode=disable")
-	}
+    // Load env so CLI can use DB_* variables when DATABASE_URL is not set
+    loadDotEnv("server/.env", ".env")
+
+    // Database DSN via env for flexibility. Same format used in database.go
+    dsn := os.Getenv("DATABASE_URL")
+    if dsn == "" {
+        // Build DSN from DB_* variables
+        host := os.Getenv("DB_HOST")
+        port := os.Getenv("DB_PORT")
+        user := os.Getenv("DB_USER")
+        password := os.Getenv("DB_PASSWORD")
+        dbname := os.Getenv("DB_NAME")
+        sslmode := os.Getenv("DB_SSLMODE")
+        if sslmode == "" {
+            sslmode = "disable"
+        }
+        if user == "" || dbname == "" {
+            log.Fatal("missing DB_USER or DB_NAME; provide DATABASE_URL or set DB_* envs")
+        }
+        dsn = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", user, password, host, port, dbname, sslmode)
+    }
 
 	// Set goose dialect
 	if err := goose.SetDialect("postgres"); err != nil {
@@ -31,14 +56,16 @@ func main() {
 	}
 	cmd := args[0]
 
-	// Open DB
-	db, err := goose.OpenDBWithDriver("postgres", dsn)
-	if err != nil {
-		log.Fatalf("goose OpenDB: %v", err)
-	}
-	defer db.Close()
+    // Open DB
+    db, err := goose.OpenDBWithDriver("postgres", dsn)
+    if err != nil {
+        log.Fatalf("goose OpenDB: %v", err)
+    }
+    defer db.Close()
 
-	migrationsDir := "server/migrations"
+    // Use embedded FS (go:embed provides an io/fs)
+    goose.SetBaseFS(migfs.FS)
+    migrationsDir := "."
 
 	switch cmd {
 	case "status":
@@ -65,24 +92,24 @@ func main() {
 		if len(args) < 2 {
 			log.Fatal("up-to requires a version")
 		}
-		version, err := strconv.ParseInt(args[1], 10, 64)
-		if err != nil {
-			log.Fatalf("invalid version: %v", err)
-		}
-		if err := goose.UpTo(db, migrationsDir, version); err != nil {
-			log.Fatalf("goose up-to: %v", err)
-		}
+        version, err := strconv.ParseInt(args[1], 10, 64)
+        if err != nil {
+            log.Fatalf("invalid version: %v", err)
+        }
+        if err := goose.UpTo(db, migrationsDir, version); err != nil {
+            log.Fatalf("goose up-to: %v", err)
+        }
 	case "down-to":
 		if len(args) < 2 {
 			log.Fatal("down-to requires a version")
 		}
-		version, err := strconv.ParseInt(args[1], 10, 64)
-		if err != nil {
-			log.Fatalf("invalid version: %v", err)
-		}
-		if err := goose.DownTo(db, migrationsDir, version); err != nil {
-			log.Fatalf("goose down-to: %v", err)
-		}
+        version, err := strconv.ParseInt(args[1], 10, 64)
+        if err != nil {
+            log.Fatalf("invalid version: %v", err)
+        }
+        if err := goose.DownTo(db, migrationsDir, version); err != nil {
+            log.Fatalf("goose down-to: %v", err)
+        }
 	default:
 		log.Fatalf("unknown command: %s", cmd)
 	}

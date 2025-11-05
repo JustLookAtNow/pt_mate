@@ -6,9 +6,20 @@ import (
     "os"
 
     "github.com/gin-gonic/gin"
+    "github.com/joho/godotenv"
 )
 
+// load .env files using godotenv; ignore missing files
+func loadDotEnv(paths ...string) {
+    for _, p := range paths {
+        _ = godotenv.Load(p)
+    }
+}
+
 func main() {
+    // Load environment variables from .env files (server/.env and root .env)
+    loadDotEnv("server/.env", ".env")
+
     // Run migrations first to ensure schema is up-to-date
     if err := RunMigrations(); err != nil {
         log.Fatalf("migrations failed: %v", err)

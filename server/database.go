@@ -9,6 +9,8 @@ import (
     goose "github.com/pressly/goose/v3"
     "gorm.io/driver/postgres"
     "gorm.io/gorm"
+
+    migfs "server/migrations"
 )
 
 // InitDB creates a GORM DB connection using Postgres driver.
@@ -60,14 +62,16 @@ func RunMigrations() error {
     if err := goose.SetDialect("postgres"); err != nil {
         return err
     }
+    // Use embedded migrations FS (io/fs)
+    goose.SetBaseFS(migfs.FS)
     db, err := goose.OpenDBWithDriver("postgres", dsn)
     if err != nil {
         return err
     }
     defer db.Close()
 
-    migrationsDir := "server/migrations"
-    if err := goose.Up(db, migrationsDir); err != nil {
+    // With embedded migrations, use current directory "."
+    if err := goose.Up(db, "."); err != nil {
         return err
     }
     log.Println("Migrations applied successfully")

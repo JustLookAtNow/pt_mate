@@ -3,6 +3,7 @@
 -- This is safe to run multiple times; ALTER TYPE only applies when current type is TIMESTAMP
 
 -- app_versions timestamps
+-- +goose StatementBegin
 DO $$
 BEGIN
     IF EXISTS (
@@ -11,8 +12,10 @@ BEGIN
     ) THEN
         ALTER TABLE app_versions ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
     END IF;
-END$$;
+END $$;
+-- +goose StatementEnd
 
+-- +goose StatementBegin
 DO $$
 BEGIN
     IF EXISTS (
@@ -21,9 +24,11 @@ BEGIN
     ) THEN
         ALTER TABLE app_versions ALTER COLUMN updated_at TYPE TIMESTAMPTZ USING updated_at AT TIME ZONE 'UTC';
     END IF;
-END$$;
+END $$;
+-- +goose StatementEnd
 
 -- app_statistics timestamps
+-- +goose StatementBegin
 DO $$
 BEGIN
     IF EXISTS (
@@ -32,8 +37,10 @@ BEGIN
     ) THEN
         ALTER TABLE app_statistics ALTER COLUMN first_seen TYPE TIMESTAMPTZ USING first_seen AT TIME ZONE 'UTC';
     END IF;
-END$$;
+END $$;
+-- +goose StatementEnd
 
+-- +goose StatementBegin
 DO $$
 BEGIN
     IF EXISTS (
@@ -42,7 +49,8 @@ BEGIN
     ) THEN
         ALTER TABLE app_statistics ALTER COLUMN last_seen TYPE TIMESTAMPTZ USING last_seen AT TIME ZONE 'UTC';
     END IF;
-END$$;
+END $$;
+-- +goose StatementEnd
 
 -- +goose Down
 -- No-op: do not convert back to TIMESTAMP
