@@ -14,18 +14,12 @@ fi
 # 根据构建类型构建apk
 if [ "$BUILD_TYPE" = "release" ]; then
     echo "🔧 正在构建 release 版本..."
+    APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
     flutter build apk --release --target-platform=android-arm64
 else
     echo "🔧 正在构建 debug 版本..."
-    flutter build apk --debug --target-platform=android-arm64
-fi
-
-
-# 根据构建类型设置APK路径
-if [ "$BUILD_TYPE" = "release" ]; then
-    APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
-else
     APK_PATH="build/app/outputs/flutter-apk/app-debug.apk"
+    flutter build apk --debug --target-platform=android-arm64
 fi
 
 # 显示当前使用的构建类型
