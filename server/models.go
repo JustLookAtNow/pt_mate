@@ -48,3 +48,13 @@ type AppStatistic struct {
     LastSeen      time.Time `json:"last_seen" gorm:"index"`
     TotalLaunches int       `json:"total_launches"`
 }
+
+// AppActivity records daily activity per device for trend analytics
+type AppActivity struct {
+    ID         int       `json:"id" gorm:"primaryKey"`
+    DeviceID   string    `json:"device_id" gorm:"index;size:100;not null"`
+    Platform   string    `json:"platform" gorm:"index;size:50;not null"`
+    AppVersion string    `json:"app_version" gorm:"index;size:50;not null"`
+    SeenDate   time.Time `json:"seen_date" gorm:"type:date;index;not null"`
+    SeenAt     time.Time `json:"seen_at" gorm:"not null"`
+}

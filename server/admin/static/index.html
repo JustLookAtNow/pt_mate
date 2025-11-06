@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PTMate 管理看板</title>
+  <script src="https://unpkg.com/vue@3.4.21/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root { --bg:#f8fafc; --card:#fff; --text:#0f172a; --muted:#64748b; --primary:#3b82f6; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:var(--bg); color:var(--text); }
+    .wrap { max-width:1200px; margin: 24px auto; padding:0 16px; }
+    .row { display:flex; gap:16px; }
+    .col { flex:1; }
+    .card { background:var(--card); border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,0.06); padding:16px; }
+    h1 { font-size:20px; margin:0 0 12px; }
+    .kpi { display:flex; gap:16px; }
+    .kpi .item { flex:1; background:#fff; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.05); }
+    .kpi .num { font-size:22px; font-weight:700; }
+    .filters { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+    select, input[type=date] { padding:6px 8px; border:1px solid #e2e8f0; border-radius:8px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border-bottom:1px solid #e2e8f0; padding:8px; text-align:left; font-size:13px; }
+    .pager { display:flex; gap:8px; align-items:center; margin-top:8px; }
+    .link { color: var(--primary); cursor:pointer; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    /* 固定图表容器高度，避免 Chart.js 按父元素高度无限扩展 */
+    .chart-box { position: relative; height: 220px; }
+    .chart-box canvas { width: 100% !important; height: 100% !important; }
+  </style>
+</head>
+<body>
+  <div id="app" class="wrap">
+    <h1>PTMate 管理看板</h1>
+
+    <div class="card">
+      <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+        <span class="link" @click="logout">退出登录</span>
+      </div>
+
+      <div class="kpi">
+        <div class="item">
+          <div>今日 DAU</div>
+          <div class="num">{{kpi.dauToday}}</div>
+        </div>
+        <div class="item">
+          <div>最近30天 MAU</div>
+          <div class="num">{{kpi.mau30d}}</div>
+        </div>
+        <div class="item">
+          <div>累计设备</div>
+          <div class="num">{{kpi.totalDevices}}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-top:16px;">
+      <div class="card">
+        <h3>平台占比</h3>
+        <canvas id="platformChart" height="200"></canvas>
+      </div>
+      <div class="card">
+        <h3>版本占比</h3>
+        <canvas id="versionChart" height="200"></canvas>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="filters">
+        <label>平台筛选</label>
+        <select v-model="filterPlatform" @change="applyFilters">
+          <option value="">全部</option>
+          <option value="android">android</option>
+          <option value="ios">ios</option>
+          <option value="linux">linux</option>
+          <option value="macos">macos</option>
+          <option value="windows">windows</option>
+          <option value="web">web</option>
+        </select>
+        <label>版本筛选</label>
+        <input v-model="filterVersion" @keyup.enter="applyFilters" placeholder="例如 2.13.0" />
+        <label>搜索</label>
+        <input v-model="q" @keyup.enter="applyFilters" placeholder="device id 或 IP" />
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>DeviceID</th><th>平台</th><th>版本</th><th>首次见</th><th>最后见</th><th>启动次数</th><th>IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="it in devices.items" :key="it.device_id">
+            <td>{{it.device_id}}</td>
+            <td>{{it.platform}}</td>
+            <td>{{it.app_version}}</td>
+            <td>{{formatDate(it.first_seen)}}</td>
+            <td>{{formatDate(it.last_seen)}}</td>
+            <td>{{it.total_launches}}</td>
+            <td>{{it.ip}}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="pager">
+        <button @click="prevPage" :disabled="page<=1">上一页</button>
+        <span>第 {{page}} 页 / 共 {{Math.ceil(devices.total/pageSize)}} 页</span>
+        <button @click="nextPage" :disabled="page>=Math.ceil(devices.total/pageSize)">下一页</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="filters">
+        <h3 style="margin:0;">日活趋势</h3>
+        <span style="flex:1"></span>
+        <label>时间范围</label>
+        <select v-model="window">
+          <option value="7d">最近 7 天</option>
+          <option value="30d">最近 30 天</option>
+          <option value="custom">自定义</option>
+        </select>
+        <template v-if="window==='custom'">
+          <input type="date" v-model="from" />
+          <input type="date" v-model="to" />
+        </template>
+        <span style="margin-left:8px; color: var(--muted);">窗口设备：{{windowDevices}}</span>
+      </div>
+      <div class="chart-box"><canvas id="dauChart"></canvas></div>
+    </div>
+  </div>
+
+  <script>
+    const tokenKey = 'ptmate_admin_token';
+    function authHeaders(){
+      const t = localStorage.getItem(tokenKey);
+      return { 'Authorization': 'Bearer ' + t };
+    }
+    function buildRange(window, from, to){
+      const p = new URLSearchParams();
+      if(window==='custom' && from && to){ p.set('from', from); p.set('to', to); }
+      else { p.set('window', window); }
+      return p.toString();
+    }
+
+    const App = {
+      data(){
+        return { window:'7d', from:'', to:'', kpi:{dauToday:0,mau30d:0,totalDevices:0}, windowDevices:0,
+          platformChart:null, versionChart:null, dauChart:null,
+          filterPlatform:'', filterVersion:'', q:'', devices:{total:0,items:[]}, page:1, pageSize:20, loading:false };
+      },
+      mounted(){
+        if(!localStorage.getItem(tokenKey)) { window.location.href = '/admin/login'; return; }
+        this.refreshAll();
+      },
+      watch:{ window(){ this.fetchDauTrend(); }, from(){ if(this.window==='custom') this.fetchDauTrend(); }, to(){ if(this.window==='custom') this.fetchDauTrend(); } },
+      methods:{
+        logout(){ localStorage.removeItem(tokenKey); window.location.href='/admin/login'; },
+        async refreshAll(){ await Promise.all([this.fetchKPI(), this.fetchPlatforms(), this.fetchVersions(), this.fetchDevices(), this.fetchDauTrend()]); },
+        async fetchKPI(){ const r = await fetch('/api/v1/admin/stats/overview',{ headers:authHeaders()}); const j = await r.json(); this.kpi = j; },
+        async fetchPlatforms(){ const r = await fetch('/api/v1/admin/stats/platforms',{ headers:authHeaders()}); const j = await r.json(); this.renderPie('platformChart', j.items.map(x=>x.platform), j.items.map(x=>x.count), 'platform'); },
+        async fetchVersions(){ const r = await fetch('/api/v1/admin/stats/versions',{ headers:authHeaders()}); const j = await r.json(); this.renderPie('versionChart', j.items.map(x=>x.version), j.items.map(x=>x.count), 'version'); },
+        async fetchDevices(){
+          const p = new URLSearchParams(); p.set('page', this.page); p.set('pageSize', this.pageSize);
+          if(this.filterPlatform) p.set('platform', this.filterPlatform);
+          if(this.filterVersion) p.set('version', this.filterVersion);
+          if(this.q) p.set('q', this.q);
+          const r = await fetch('/api/v1/admin/stats/devices?'+p.toString(), { headers:authHeaders()});
+          const j = await r.json(); this.devices = j; },
+        applyFilters(){ this.page = 1; this.fetchDevices(); },
+        async fetchDauTrend(){ const qs = buildRange(this.window, this.from, this.to);
+          const r = await fetch('/api/v1/admin/stats/trend/dau?'+qs, { headers:authHeaders()}); const j = await r.json();
+          this.windowDevices = j.windowDevices || 0;
+          const labels = j.items.map(x=> new Date(x.date).toLocaleDateString('zh-CN', { timeZone:'Asia/Shanghai' }));
+          this.renderLine('dauChart', labels, j.items.map(x=>x.count)); },
+        renderPie(id, labels, data, kind){
+          const ctx = document.getElementById(id);
+          if(this[id+'Instance']) { this[id+'Instance'].destroy(); }
+          const colors = ['#3b82f6','#f59e0b','#10b981','#ef4444','#6366f1','#22d3ee','#84cc16','#e11d48'];
+          const chart = new Chart(ctx, { type:'pie', data:{ labels, datasets:[{ data, backgroundColor: colors }] }, options:{ onClick:(evt, elements)=>{
+            if(elements.length>0){ const idx = elements[0].index; const label = labels[idx]; if(kind==='platform') this.filterPlatform=label; if(kind==='version') this.filterVersion=label; this.page=1; this.fetchDevices(); }
+          } } });
+          this[id+'Instance'] = chart;
+        },
+        renderLine(id, labels, data){ const ctx = document.getElementById(id); if(this[id+'Instance']) this[id+'Instance'].destroy(); this[id+'Instance']= new Chart(ctx, { type:'line', data:{ labels, datasets:[{ label:'DAU', data, borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.15)', tension:0.2 }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ maxRotation:0, autoSkip:true } }, y:{ beginAtZero:true } } } }); },
+        prevPage(){ if(this.page>1){ this.page--; this.fetchDevices(); } },
+        nextPage(){ const totalPages = Math.ceil(this.devices.total/this.pageSize); if(this.page<totalPages){ this.page++; this.fetchDevices(); } },
+        formatDate(s){ if(!s) return ''; const d = new Date(s); return d.toLocaleString('zh-CN', { timeZone:'Asia/Shanghai' }).replace(/\//g,'-'); },
+      }
+    };
+    Vue.createApp(App).mount('#app');
+  </script>
+</body>
+</html>

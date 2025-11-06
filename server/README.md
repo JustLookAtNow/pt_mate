@@ -69,6 +69,12 @@ GITHUB_WEBHOOK_SECRET=your_github_webhook_secret
 
 # CORS配置
 ALLOWED_ORIGINS=*
+
+# 管理端登录配置
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=change_me
+ADMIN_JWT_SECRET=super_secret_key
+ADMIN_TOKEN_TTL_HOURS=168 # 默认7天
 ```
 
 ## 数据库设置
@@ -101,3 +107,14 @@ go run .
 - AWS/GCP/Azure
 
 确保配置好环境变量和PostgreSQL数据库连接。
+
+## 管理看板
+
+- 访问 `/admin/login` 登录后进入 `/admin`
+- 看板功能：
+  - KPI：今日DAU、最近30天MAU、累计设备
+  - 饼图：平台占比、版本占比（点击分片可联动下方列表筛选）
+  - 设备列表：分页、搜索、筛选
+  - 趋势：日活（DAU）折线图，支持 7 天 / 30 天 / 自定义范围；旁边显示窗口设备数（仅趋势模块受时间窗口影响）
+
+> 时区说明：趋势的每日统计以 UTC+8 为准（Asia/Shanghai）；数据库仍使用 UTC 存储。

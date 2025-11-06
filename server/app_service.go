@@ -4,6 +4,7 @@ import (
     "log"
     "net/http"
     "strings"
+    "time"
 
     "github.com/gin-gonic/gin"
     "gorm.io/gorm"
@@ -31,6 +32,12 @@ func (s *AppService) CheckUpdate(c *gin.Context) {
     if err := s.updateStatistics(req.DeviceID, req.Platform, req.AppVersion, clientIP); err != nil {
         log.Printf("Failed to update statistics: %v", err)
         // Don't fail the request if statistics update fails
+    }
+
+    // Record daily activity for DAU trend (Asia/Shanghai UTC+8 day window)
+    if err := s.recordDailyActivity(req.DeviceID, req.Platform, req.AppVersion); err != nil {
+        log.Printf("Failed to record daily activity: %v", err)
+        // Do not fail the main request due to analytics logging
     }
 
     // Get latest version according to beta opt-in
@@ -91,6 +98,38 @@ func (s *AppService) updateStatistics(deviceID, platform, appVersion, ip string)
         TotalLaunches: 1,
     }
     return s.db.Create(&newStat).Error
+}
+
+// recordDailyActivity inserts a record into app_activity for the current day (UTC+8),
+// ensuring uniqueness per device per day.
+func (s *AppService) recordDailyActivity(deviceID, platform, appVersion string) error {
+    // Compute seen_date in UTC+8
+    // Asia/Shanghai is UTC+8 without DST; we will derive date by adding +8h to UTC and truncating
+    now := nowUTC()
+    // Shift to UTC+8
+    shifted := now.Add(8 * time.Hour)
+    // Take date component (YYYY-MM-DD) by constructing time at midnight and then back to UTC midnight for storage
+    y, m, d := shifted.Date()
+    // Build time at local midnight (in UTC+8)
+    localMidnight := time.Date(y, m, d, 0, 0, 0, 0, time.FixedZone("UTC+8", 8*3600))
+    // Convert to date by taking the same Y-M-D but store as date type; GORM with type:date needs a time.Time
+    seenDate := localMidnight
+
+    // Insert with conflict ignore
+    activity := AppActivity{
+        DeviceID:   deviceID,
+        Platform:   platform,
+        AppVersion: appVersion,
+        SeenDate:   seenDate,
+        SeenAt:     now,
+    }
+
+    // Use ON CONFLICT DO NOTHING on (device_id, seen_date)
+    // Explicitly cast seen_date to date type to avoid driver type mismatch
+    sql := `INSERT INTO app_activity (device_id, platform, app_version, seen_date, seen_at)
+            VALUES (?, ?, ?, (?::date), ?)
+            ON CONFLICT (device_id, seen_date) DO NOTHING`
+    return s.db.Exec(sql, activity.DeviceID, activity.Platform, activity.AppVersion, activity.SeenDate, activity.SeenAt).Error
 }
 
 func (s *AppService) getLatestVersion(includeBeta bool) (*AppVersion, error) {
