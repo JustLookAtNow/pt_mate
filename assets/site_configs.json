@@ -243,6 +243,10 @@
               "selector": "table.torrentname > tbody > tr > td:nth-child(4) > img.bookmark",
               "attribute": "src"
             },
+            "isTop": {
+              "selector": "table.torrentname > img[alt=\"Sticky\"]",
+              "attribute": "src"
+            },
             "cover": {
               "selector": "table.torrentname > tbody > tr > td:nth-child(1) > img[data-src]",
               "attribute": "data-src"

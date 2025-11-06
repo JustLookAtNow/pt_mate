@@ -22,7 +22,6 @@
   },
   "discountMapping": {},
   "infoFinder": {
-
     "search": {
       "torrentPath": "torrents.php",
       "specialPath": "special.php",
@@ -86,6 +85,10 @@
         },
         "collection": {
           "selector": "table.torrentname > tbody > tr > td:nth-child(3) > img.bookmark",
+          "attribute": "src"
+        },
+        "isTop": {
+          "selector": "table.torrentname > img[alt=\"Sticky\"]",
           "attribute": "src"
         },
         "cover": {},

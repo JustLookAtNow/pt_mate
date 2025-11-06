@@ -2,7 +2,9 @@
   "id": "outbits",
   "name": "我堡",
   "isShow": true,
-  "baseUrls": ["https://ourbits.club/"],
+  "baseUrls": [
+    "https://ourbits.club/"
+  ],
   "primaryUrl": "https://ourbits.club/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
@@ -150,6 +152,10 @@
         },
         "collection": {
           "selector": "table.torrentname > tbody > tr > td:nth-child(5) > img.bookmark",
+          "attribute": "src"
+        },
+        "isTop": {
+          "selector": "table.torrentname > img[alt=\"Sticky\"]",
           "attribute": "src"
         },
         "cover": {},

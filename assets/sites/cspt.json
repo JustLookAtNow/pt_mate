@@ -2,7 +2,11 @@
   "id": "cspt",
   "name": "财神",
   "isShow": true,
-  "baseUrls": ["https://cspt.top/", "https://cspt.cc/", "https://cspt.date/"],
+  "baseUrls": [
+    "https://cspt.top/",
+    "https://cspt.cc/",
+    "https://cspt.date/"
+  ],
   "primaryUrl": "https://cspt.top/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
@@ -140,8 +144,7 @@
             "index": 1
           }
         },
-        "downloadUrl": {
-        },
+        "downloadUrl": {},
         "seedersText": {
           "selector": "div.torrent-info-text-seeders > a",
           "attribute": "text"
@@ -165,6 +168,10 @@
         },
         "collection": {
           "selector": "div.torrent-manage > img.bookmark",
+          "attribute": "src"
+        },
+        "isTop": {
+          "selector": "table.torrentname > img[alt=\"Sticky\"]",
           "attribute": "src"
         },
         "cover": {},

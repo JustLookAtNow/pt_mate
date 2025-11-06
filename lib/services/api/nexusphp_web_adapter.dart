@@ -871,6 +871,13 @@ class NexusPHPWebAdapter extends SiteAdapter {
             );
             collection = collectionList.isNotEmpty; // 如果找不到元素说明未收藏
           }
+          // 检查置顶状态（布尔字段）
+          final isTopConfig = fieldsConfig['isTop'] as Map<String, dynamic>?;
+          bool isTop = false;
+          if (isTopConfig != null) {
+            final isTopList = await _extractFieldValue(row, isTopConfig);
+            isTop = isTopList.isNotEmpty; // 如果找不到元素说明未置顶
+          }
 
           // 解析下载状态
           DownloadStatus downloadStatus = DownloadStatus.none;
@@ -940,6 +947,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
               createdDate: createDate,
               doubanRating: doubanRating.isNotEmpty ? doubanRating : 'N/A',
               imdbRating: imdbRating.isNotEmpty ? imdbRating : 'N/A',
+              isTop: isTop,
             ),
           );
         } catch (e) {
