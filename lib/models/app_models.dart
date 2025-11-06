@@ -67,6 +67,7 @@ class TorrentItem {
   final String createdDate; // 种子创建时间
   final String? doubanRating; // 豆瓣评分
   final String? imdbRating; // IMDB评分
+  final bool isTop; // 是否置顶（M-Team：toppingLevel>0）
 
   TorrentItem({
     required this.id,
@@ -85,6 +86,7 @@ class TorrentItem {
     this.collection = false,
     this.doubanRating = 'N/A',
     this.imdbRating = 'N/A',
+    this.isTop = false,
   });
 
   TorrentItem copyWith({
@@ -102,6 +104,7 @@ class TorrentItem {
     DownloadStatus? downloadStatus,
     bool? collection,
     String? createdDate,
+    bool? isTop,
   }) {
     return TorrentItem(
       id: id ?? this.id,
@@ -118,6 +121,7 @@ class TorrentItem {
       downloadStatus: downloadStatus ?? this.downloadStatus,
       collection: collection ?? this.collection,
       createdDate: createdDate ?? this.createdDate,
+      isTop: isTop ?? this.isTop,
     );
   }
 }

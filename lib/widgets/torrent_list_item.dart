@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import '../models/app_models.dart';
@@ -68,28 +69,35 @@ class TorrentListItem extends StatelessWidget {
 
     // 构建主要内容
     Widget mainContent = Container(
-      decoration: BoxDecoration(
-        color: isSelected
-            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
-            : Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: isSelected
-            ? Border.all(
-                color: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.6),
-                width: 1,
-              )
-            : null,
-      ),
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: SizedBox(
-          height: 142,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // 主体卡片内容
+          Container(
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
+                  : Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: isSelected
+                  ? Border.all(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.6),
+                      width: 1,
+                    )
+                  : null,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: SizedBox(
+                height: 142,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
             // 封面截图和创建时间
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -515,8 +523,25 @@ class TorrentListItem extends StatelessWidget {
               ),
             ],
           ],
+                ),
+              ),
+            ),
           ),
-        ),
+          // 置顶标记（右上角）
+          if (torrent.isTop)
+            Positioned(
+              top: -3,
+              right: -3,
+              child: Transform.rotate(
+                angle: math.pi / 4,
+                child: Icon(
+                  Icons.push_pin,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+        ],
       ),
     );
 
