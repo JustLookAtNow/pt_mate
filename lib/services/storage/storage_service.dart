@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -76,6 +77,7 @@ class StorageKeys {
 class StorageService {
   StorageService._();
   static final StorageService instance = StorageService._();
+  static final Logger _logger = Logger();
 
   bool _hasPendingConfigUpdates = false;
 
@@ -195,7 +197,7 @@ class StorageService {
       } catch (e) {
          // 迁移失败时记录错误，但不阻塞应用启动
          if (kDebugMode) {
-           print('数据迁移失败: $e');
+           _logger.e('数据迁移失败: $e');
          }
        }
     }
@@ -265,12 +267,12 @@ class StorageService {
     // 这里不需要特殊的数据迁移逻辑
     try {
       if (kDebugMode) {
-        print('数据迁移: 1.1.0 -> 1.2.0 (多URL模板支持)');
+        _logger.i('数据迁移: 1.1.0 -> 1.2.0 (多URL模板支持)');
       }
     } catch (e) {
       // 迁移失败时记录错误，但不阻塞应用启动
       if (kDebugMode) {
-        print('数据迁移失败: $e');
+        _logger.e('数据迁移失败: $e');
       }
     }
   }
@@ -358,7 +360,7 @@ class StorageService {
         final result = await SiteConfig.fromJsonAsync(json);
         swItem.stop();
         if (kDebugMode) {
-          print(
+          _logger.d(
             'StorageService.loadSiteConfigs: 第${idx + 1}个站点 fromJsonAsync 耗时=${swItem.elapsedMilliseconds}ms，templateId=${result.config.templateId}，needsUpdate=${result.needsUpdate}',
           );
         }
@@ -369,7 +371,7 @@ class StorageService {
           final apiKey = await _loadSiteApiKey(result.config.id);
           swKey.stop();
           if (kDebugMode) {
-            print(
+            _logger.d(
               'StorageService.loadSiteConfigs: 第${idx + 1}个站点 加载API密钥耗时=${swKey.elapsedMilliseconds}ms',
             );
           }
@@ -394,14 +396,14 @@ class StorageService {
         await saveSiteConfigs(configs);
         swSave.stop();
         if (kDebugMode) {
-          print(
+          _logger.d(
             'StorageService.loadSiteConfigs: 保存更新耗时=${swSave.elapsedMilliseconds}ms',
           );
         }
       } else if (hasUpdates && !includeApiKeys) {
         _hasPendingConfigUpdates = true;
         if (kDebugMode) {
-          print(
+          _logger.i(
             'StorageService.loadSiteConfigs: 检测到配置需要更新，但已跳过保存以避免清除API密钥（稍后持久化）',
           );
         }
@@ -409,7 +411,7 @@ class StorageService {
 
       swTotal.stop();
       if (kDebugMode) {
-        print(
+        _logger.d(
           'StorageService.loadSiteConfigs: 总耗时=${swTotal.elapsedMilliseconds}ms',
         );
       }
@@ -853,13 +855,13 @@ class StorageService {
   Future<void> persistPendingConfigUpdates() async {
     if (_hasPendingConfigUpdates) {
       if (kDebugMode) {
-        print('StorageService: 开始持久化待处理的站点配置更新...');
+        _logger.i('StorageService: 开始持久化待处理的站点配置更新...');
       }
       // 通过全量加载（包含API密钥）来触发保存逻辑
       await loadSiteConfigs(includeApiKeys: true);
       _hasPendingConfigUpdates = false;
       if (kDebugMode) {
-        print('StorageService: 待处理的站点配置更新已持久化。');
+        _logger.i('StorageService: 待处理的站点配置更新已持久化。');
       }
     }
   }

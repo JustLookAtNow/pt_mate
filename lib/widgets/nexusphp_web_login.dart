@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 class NexusPhpWebLogin extends StatefulWidget {
@@ -21,6 +23,7 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
   InAppWebViewController? _controller;
   bool _isLoading = true;
   String? _errorMessage;
+  final Logger _logger = Logger();
 
   @override
   void initState() {
@@ -28,7 +31,9 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
   }
 
   Future<void> _checkLoginStatus(String url) async {
-    debugPrint('当前页面URL: $url'); // 调试信息
+    if (kDebugMode) {
+      _logger.d('当前页面URL: $url'); // 调试信息
+    }
 
     // 检查是否已经登录成功（通常登录成功后会跳转到首页或其他页面）
     if (url.contains('/index.php') ||
@@ -40,7 +45,9 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
             !url.contains('/signup.php') &&
             !url.contains('/recover.php') &&
             url.contains(widget.baseUrl))) {
-      debugPrint('检测到登录成功，开始获取cookie'); // 调试信息
+      if (kDebugMode) {
+        _logger.i('检测到登录成功，开始获取cookie'); // 调试信息
+      }
       // 获取cookie
       await _extractCookie();
     }
@@ -48,10 +55,14 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
 
   Future<void> _extractCookie() async {
     try {
-      debugPrint('开始提取cookie...');
+      if (kDebugMode) {
+        _logger.i('开始提取cookie...');
+      }
 
       if (_controller == null) {
-        debugPrint('WebView控制器未初始化');
+        if (kDebugMode) {
+          _logger.e('WebView控制器未初始化');
+        }
         return;
       }
 
@@ -64,7 +75,9 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
         url: WebUri(widget.baseUrl),
       );
 
-      debugPrint('通过CookieManager获取到 ${cookies.length} 个cookie');
+      if (kDebugMode) {
+        _logger.i('通过CookieManager获取到 ${cookies.length} 个cookie');
+      }
 
       if (cookies.isNotEmpty) {
         // 检查是否有c_lang_folder cookie，没有则添加，有则更新为chs
@@ -83,7 +96,9 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
                 path: cookie.path,
               ),
             );
-            debugPrint('更新c_lang_folder cookie为chs');
+            if (kDebugMode) {
+              _logger.i('更新c_lang_folder cookie为chs');
+            }
           } else {
             updatedCookies.add(cookie);
           }
@@ -108,7 +123,9 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
             domain: Uri.parse(widget.baseUrl).host,
             path: '/',
           );
-          debugPrint('添加c_lang_folder cookie为chs');
+          if (kDebugMode) {
+            _logger.i('添加c_lang_folder cookie为chs');
+          }
         }
 
         // 将cookie转换为标准格式
@@ -117,7 +134,9 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
             .toList();
         final cookieString = cookieStrings.join('; ');
 
-        debugPrint('获取到的cookie: $cookieString');
+        if (kDebugMode) {
+          _logger.d('获取到的cookie: $cookieString');
+        }
 
         // 创建包含所有cookie信息的JSON
         final cookieData = {
@@ -128,7 +147,9 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
         };
 
         final cookieJson = cookieData.toString();
-        debugPrint('Cookie数据: $cookieJson');
+        if (kDebugMode) {
+          _logger.d('Cookie数据: $cookieJson');
+        }
 
         widget.onCookieReceived(cookieString);
         if (mounted) {
@@ -137,23 +158,49 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
         return;
       }
 
-      debugPrint('CookieManager未获取到cookie');
+      if (kDebugMode) {
+        _logger.w('CookieManager未获取到cookie');
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('无法获取cookie，请检查登录状态'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 3),
+          SnackBar(
+            content: Text(
+              '无法获取cookie，请检查登录状态',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+            duration: const Duration(seconds: 3),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: '知道了',
+              textColor: Theme.of(context).colorScheme.onPrimaryContainer,
+              onPressed: () {},
+            ),
           ),
         );
       }
     } catch (e) {
-      debugPrint('提取cookie时出错: $e');
+      if (kDebugMode) {
+        _logger.e('提取cookie时出错: $e');
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Cookie提取失败: $e'),
-            backgroundColor: Colors.red,
+            content: Text(
+              'Cookie提取失败: $e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: '关闭',
+              textColor: Theme.of(context).colorScheme.onErrorContainer,
+              onPressed: () {},
+            ),
           ),
         );
       }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 
 import 'downloader_config.dart';
 import 'downloader_factory.dart';
@@ -12,6 +13,7 @@ import '../storage/storage_service.dart';
 class DownloaderService {
   DownloaderService._();
   static final DownloaderService instance = DownloaderService._();
+  static final Logger _logger = Logger();
   
   /// 配置变更通知流
   final StreamController<String> _configChangeController = StreamController<String>.broadcast();
@@ -65,12 +67,12 @@ class DownloaderService {
             );
             
             if (kDebugMode) {
-              print('配置已更新并持久化: ${updatedConfig.id}, 版本: ${updatedConfig is QbittorrentConfig ? updatedConfig.version : 'N/A'}');
+              _logger.i('配置已更新并持久化: ${updatedConfig.id}, 版本: ${updatedConfig is QbittorrentConfig ? updatedConfig.version : 'N/A'}');
             }
           }
         } catch (e) {
           if (kDebugMode) {
-            print('保存配置更新失败: $e');
+            _logger.e('保存配置更新失败: $e');
           }
         }
       },

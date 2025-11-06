@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'device_id_service.dart';
@@ -16,6 +17,8 @@ class UpdateService {
   static UpdateService get instance => _instance ??= UpdateService._();
 
   UpdateService._();
+
+  static final Logger _logger = Logger();
 
   final Dio _dio = Dio(
     BaseOptions(
@@ -65,7 +68,7 @@ class UpdateService {
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Update check failed: $e');
+        _logger.e('Update check failed: $e');
       }
       // 网络错误时静默失败，不影响应用正常使用
     }

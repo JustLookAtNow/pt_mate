@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 import 'package:flutter/services.dart';
 import '../models/app_models.dart';
 
@@ -18,6 +19,7 @@ class SiteConfigService {
 
   /// 模板缓存：按模板ID和站点类型缓存已解析的模板，避免重复IO与合并
   static final Map<String, SiteConfigTemplate?> _templateCache = {};
+  static final Logger _logger = Logger();
 
   /// 默认模板配置缓存
   static Map<String, dynamic>? _defaultTemplatesCache;
@@ -35,7 +37,7 @@ class SiteConfigService {
       final List<dynamic> siteFiles = manifest['sites'] ?? [];
       swManifest.stop();
       if (kDebugMode) {
-        print('SiteConfigService._getPresetSiteFiles: 清单加载耗时=${swManifest.elapsedMilliseconds}ms');
+        _logger.d('SiteConfigService._getPresetSiteFiles: 清单加载耗时=${swManifest.elapsedMilliseconds}ms');
       }
       return siteFiles
           .map((file) => '$_sitesBasePath$file')
@@ -64,7 +66,7 @@ class SiteConfigService {
     final presetSiteFiles = await _getPresetSiteFiles();
     swList.stop();
     if (kDebugMode) {
-      print('SiteConfigService.loadPresetSiteTemplates: 站点清单获取耗时=${swList.elapsedMilliseconds}ms, 文件数=${presetSiteFiles.length}');
+      _logger.d('SiteConfigService.loadPresetSiteTemplates: 站点清单获取耗时=${swList.elapsedMilliseconds}ms, 文件数=${presetSiteFiles.length}');
     }
 
     for (final filePath in presetSiteFiles) {
@@ -87,7 +89,7 @@ class SiteConfigService {
         }
         swFile.stop();
         if (kDebugMode) {
-          print('SiteConfigService.loadPresetSiteTemplates: 解析模板 $filePath 耗时=${swFile.elapsedMilliseconds}ms');
+          _logger.d('SiteConfigService.loadPresetSiteTemplates: 解析模板 $filePath 耗时=${swFile.elapsedMilliseconds}ms');
         }
       } catch (e) {
         // 如果某个文件加载失败，跳过该文件继续加载其他文件
@@ -101,7 +103,7 @@ class SiteConfigService {
     _urlToTemplateIdMapping = urlMapping;
     swTotal.stop();
     if (kDebugMode) {
-      print('SiteConfigService.loadPresetSiteTemplates: 加载模板数量=${presetTemplates.length}, 总耗时=${swTotal.elapsedMilliseconds}ms');
+      _logger.d('SiteConfigService.loadPresetSiteTemplates: 加载模板数量=${presetTemplates.length}, 总耗时=${swTotal.elapsedMilliseconds}ms');
     }
     
     return presetTemplates;
@@ -137,7 +139,7 @@ class SiteConfigService {
     if (_templateCache.containsKey(cacheKey)) {
       swTotal.stop();
       if (kDebugMode) {
-        print('SiteConfigService.getTemplateById: 命中缓存($cacheKey), 耗时=${swTotal.elapsedMilliseconds}ms');
+        _logger.d('SiteConfigService.getTemplateById: 命中缓存($cacheKey), 耗时=${swTotal.elapsedMilliseconds}ms');
       }
       return _templateCache[cacheKey];
     }
@@ -153,7 +155,7 @@ class SiteConfigService {
         );
         swSearch.stop();
         if (kDebugMode) {
-          print('SiteConfigService.getTemplateById: 搜索模板ID=$templateId 耗时=${swSearch.elapsedMilliseconds}ms');
+          _logger.d('SiteConfigService.getTemplateById: 搜索模板ID=$templateId 耗时=${swSearch.elapsedMilliseconds}ms');
         }
 
         // 如果模板没有 infoFinder 或 request 配置，尝试从默认模板中获取
@@ -165,7 +167,7 @@ class SiteConfigService {
           final defaultTemplate = await _getDefaultTemplateConfig(siteType);
           swDefault.stop();
           if (kDebugMode) {
-            print('SiteConfigService.getTemplateById: 加载默认模板(${siteType.id})耗时=${swDefault.elapsedMilliseconds}ms');
+            _logger.d('SiteConfigService.getTemplateById: 加载默认模板(${siteType.id})耗时=${swDefault.elapsedMilliseconds}ms');
           }
           if (defaultTemplate != null) {
             Map<String, dynamic>? infoFinder = template.infoFinder;
@@ -202,7 +204,7 @@ class SiteConfigService {
         }
       } catch (e) {
         if (kDebugMode) {
-          print('Failed to find template with ID $templateId: $e');
+          _logger.e('Failed to find template with ID $templateId: $e');
         }
       }
     }
@@ -213,7 +215,7 @@ class SiteConfigService {
       final defaultTemplate = await _getDefaultTemplateConfig(siteType);
       swDefault2.stop();
       if (kDebugMode) {
-        print('SiteConfigService.getTemplateById: 备用默认模板(${siteType.id})加载耗时=${swDefault2.elapsedMilliseconds}ms');
+        _logger.d('SiteConfigService.getTemplateById: 备用默认模板(${siteType.id})加载耗时=${swDefault2.elapsedMilliseconds}ms');
       }
       if (defaultTemplate != null) {
         // 将默认模板配置转换为 SiteConfigTemplate
@@ -230,7 +232,7 @@ class SiteConfigService {
       swTotal.stop();
     }
     if (kDebugMode) {
-      print('SiteConfigService.getTemplateById: 模板ID=$templateId, 站点类型=${siteType.id}, 总耗时=${swTotal.elapsedMilliseconds}ms');
+      _logger.d('SiteConfigService.getTemplateById: 模板ID=$templateId, 站点类型=${siteType.id}, 总耗时=${swTotal.elapsedMilliseconds}ms');
     }
     return result;
   }
@@ -320,7 +322,7 @@ class SiteConfigService {
         _defaultTemplatesCache = jsonData['defaultTemplates'] as Map<String, dynamic>?;
         swLoad.stop();
         if (kDebugMode) {
-          print('SiteConfigService._getDefaultTemplateConfig: 首次加载默认模板耗时=${swLoad.elapsedMilliseconds}ms');
+          _logger.d('SiteConfigService._getDefaultTemplateConfig: 首次加载默认模板耗时=${swLoad.elapsedMilliseconds}ms');
         }
       }
 
@@ -328,20 +330,20 @@ class SiteConfigService {
       if (_defaultTemplatesCache != null && _defaultTemplatesCache!.containsKey(siteType.id)) {
         swTotal.stop();
         if (kDebugMode) {
-          print('SiteConfigService._getDefaultTemplateConfig: 命中 ${siteType.id}, 总耗时=${swTotal.elapsedMilliseconds}ms');
+          _logger.d('SiteConfigService._getDefaultTemplateConfig: 命中 ${siteType.id}, 总耗时=${swTotal.elapsedMilliseconds}ms');
         }
         return _defaultTemplatesCache![siteType.id] as Map<String, dynamic>;
       }
 
       swTotal.stop();
       if (kDebugMode) {
-        print('SiteConfigService._getDefaultTemplateConfig: 未找到 ${siteType.id}, 总耗时=${swTotal.elapsedMilliseconds}ms');
+        _logger.d('SiteConfigService._getDefaultTemplateConfig: 未找到 ${siteType.id}, 总耗时=${swTotal.elapsedMilliseconds}ms');
       }
       return null;
     } catch (e) {
       // 如果加载失败，返回null
       if (kDebugMode) {
-        print('SiteConfigService._getDefaultTemplateConfig: 加载失败 ${siteType.id}, 错误=$e');
+        _logger.e('SiteConfigService._getDefaultTemplateConfig: 加载失败 ${siteType.id}, 错误=$e');
       }
       return null;
     }
@@ -378,7 +380,7 @@ class SiteConfigService {
           // 找到匹配的站点，返回discountMapping
           swTotal.stop();
           if (kDebugMode) {
-            print('SiteConfigService.getDiscountMapping: 命中 $normalizedBaseUrl, 模板=${template.id}, 耗时=${swTotal.elapsedMilliseconds}ms');
+            _logger.d('SiteConfigService.getDiscountMapping: 命中 $normalizedBaseUrl, 模板=${template.id}, 耗时=${swTotal.elapsedMilliseconds}ms');
           }
           return template.discountMapping;
         }
@@ -387,13 +389,13 @@ class SiteConfigService {
       // 如果没有找到匹配的站点，返回空映射
       swTotal.stop();
       if (kDebugMode) {
-        print('SiteConfigService.getDiscountMapping: 未命中 $normalizedBaseUrl, 耗时=${swTotal.elapsedMilliseconds}ms');
+        _logger.d('SiteConfigService.getDiscountMapping: 未命中 $normalizedBaseUrl, 耗时=${swTotal.elapsedMilliseconds}ms');
       }
       return {};
     } catch (e) {
       // 如果加载失败，返回空对象
       if (kDebugMode) {
-        print('SiteConfigService.getDiscountMapping: 加载失败 baseUrl=$baseUrl, 错误=$e');
+        _logger.e('SiteConfigService.getDiscountMapping: 加载失败 baseUrl=$baseUrl, 错误=$e');
       }
       return {};
     }
@@ -427,7 +429,7 @@ class SiteConfigService {
           // 找到匹配的站点，返回searchCategories
            swTotal.stop();
            if (kDebugMode) {
-             print('SiteConfigService.getDefaultSearchCategories: 命中 $normalizedBaseUrl, 模板=${template.id}, 耗时=${swTotal.elapsedMilliseconds}ms');
+             _logger.d('SiteConfigService.getDefaultSearchCategories: 命中 $normalizedBaseUrl, 模板=${template.id}, 耗时=${swTotal.elapsedMilliseconds}ms');
            }
           return template.searchCategories;
         }
@@ -436,13 +438,13 @@ class SiteConfigService {
       // 如果没有找到匹配的站点，返回空列表
       swTotal.stop();
       if (kDebugMode) {
-        print('SiteConfigService.getDefaultSearchCategories: 未命中 $normalizedBaseUrl, 耗时=${swTotal.elapsedMilliseconds}ms');
+        _logger.d('SiteConfigService.getDefaultSearchCategories: 未命中 $normalizedBaseUrl, 耗时=${swTotal.elapsedMilliseconds}ms');
       }
       return [];
     } catch (e) {
       // 如果加载失败，返回空列表
       if (kDebugMode) {
-        print('SiteConfigService.getDefaultSearchCategories: 加载失败 baseUrl=$baseUrl, 错误=$e');
+        _logger.e('SiteConfigService.getDefaultSearchCategories: 加载失败 baseUrl=$baseUrl, 错误=$e');
       }
       return [];
     }
@@ -458,7 +460,7 @@ class SiteConfigService {
     }
     swTotal.stop();
     if (kDebugMode) {
-      print('SiteConfigService.getUrlToTemplateIdMapping: 映射数量=${_urlToTemplateIdMapping?.length ?? 0}, 总耗时=${swTotal.elapsedMilliseconds}ms');
+      _logger.d('SiteConfigService.getUrlToTemplateIdMapping: 映射数量=${_urlToTemplateIdMapping?.length ?? 0}, 总耗时=${swTotal.elapsedMilliseconds}ms');
     }
     return _urlToTemplateIdMapping ?? {};
   }

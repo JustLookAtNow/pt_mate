@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 import '../services/site_config_service.dart';
+
+final Logger _logger = Logger();
 
 // 用户资料信息
 class MemberProfile {
@@ -785,7 +788,7 @@ class SiteConfig {
       templateId = await SiteConfig.getTemplateIdByBaseUrlAsync(baseUrl);
       swMap.stop();
       if (kDebugMode) {
-        print(
+        _logger.d(
           'SiteConfig.fromJsonAsync: URL映射耗时=${swMap.elapsedMilliseconds}ms，baseUrl=$baseUrl，templateId=$templateId',
         );
       }
@@ -819,7 +822,7 @@ class SiteConfig {
     );
     swTotal.stop();
     if (kDebugMode) {
-      print(
+      _logger.d(
         'SiteConfig.fromJsonAsync: 总耗时=${swTotal.elapsedMilliseconds}ms，siteId=${config.id}',
       );
     }

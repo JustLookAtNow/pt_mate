@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
+import 'package:logger/logger.dart';
 
 import 'models/app_models.dart';
 import 'pages/torrent_detail_page.dart';
@@ -26,6 +27,9 @@ import 'widgets/torrent_download_dialog.dart';
 import 'widgets/torrent_list_item.dart';
 import 'services/update_service.dart';
 import 'widgets/update_notification_dialog.dart';
+
+// 全局日志实例，供本文件内多个类使用
+final Logger _logger = Logger();
 
 /// 判断最后访问时间是否超过一个月
 bool _isLastAccessOverMonth(String? lastAccess) {
@@ -106,7 +110,7 @@ class AppState extends ChangeNotifier {
     try {
       final swTotal = Stopwatch()..start();
       if (kDebugMode) {
-        print('AppState: _performInitialLoad开始，forceReload=$forceReload');
+        _logger.i('AppState: _performInitialLoad开始，forceReload=$forceReload');
       }
 
       // 应用启动时首先检查并执行数据迁移
@@ -114,7 +118,7 @@ class AppState extends ChangeNotifier {
       await StorageService.instance.checkAndMigrate();
       swMigrate.stop();
       if (kDebugMode) {
-        print('AppState: 数据迁移耗时=${swMigrate.elapsedMilliseconds}ms');
+        _logger.d('AppState: 数据迁移耗时=${swMigrate.elapsedMilliseconds}ms');
       }
       
       // 加载活跃站点配置
@@ -122,7 +126,7 @@ class AppState extends ChangeNotifier {
       _site = await StorageService.instance.getActiveSiteConfig();
       swLoadSite.stop();
       if (kDebugMode) {
-        print('AppState: 加载活跃站点耗时=${swLoadSite.elapsedMilliseconds}ms, siteId=${_site?.id}');
+        _logger.d('AppState: 加载活跃站点耗时=${swLoadSite.elapsedMilliseconds}ms, siteId=${_site?.id}');
       }
 
       // 初始化API服务（适配器）
@@ -130,14 +134,14 @@ class AppState extends ChangeNotifier {
       await ApiService.instance.init();
       swApi.stop();
       if (kDebugMode) {
-        print('AppState: ApiService.init耗时=${swApi.elapsedMilliseconds}ms');
+        _logger.d('AppState: ApiService.init耗时=${swApi.elapsedMilliseconds}ms');
       }
 
       _isInitialized = true;
       _configVersion++; // 增加配置版本号
       swTotal.stop();
       if (kDebugMode) {
-        print('AppState: _performInitialLoad完成，总耗时=${swTotal.elapsedMilliseconds}ms，配置版本号: $_configVersion, 强制重新加载: $forceReload');
+        _logger.i('AppState: _performInitialLoad完成，总耗时=${swTotal.elapsedMilliseconds}ms，配置版本号: $_configVersion, 强制重新加载: $forceReload');
       }
       notifyListeners();
 
@@ -194,7 +198,7 @@ class AppState extends ChangeNotifier {
       // 检查是否启用了自动同步
       if (config != null && config.autoSync) {
         if (kDebugMode) {
-          print('AppState: 检测到启用自动同步，开始执行自动同步检查');
+          _logger.i('AppState: 检测到启用自动同步，开始执行自动同步检查');
         }
         
         final backupService = BackupService(StorageService.instance);
@@ -204,10 +208,10 @@ class AppState extends ChangeNotifier {
            try {
              // 检查是否有远程备份可以下载
              final remoteBackups = await backupService.listWebDAVBackups();
-             if (remoteBackups.isNotEmpty) {
-               if (kDebugMode) {
-                 print('AppState: 发现${remoteBackups.length}个远程备份，准备自动同步最新的');
-               }
+               if (remoteBackups.isNotEmpty) {
+                 if (kDebugMode) {
+                   _logger.i('AppState: 发现${remoteBackups.length}个远程备份，准备自动同步最新的');
+                 }
                
                // 获取最新的备份文件路径
                final latestBackup = remoteBackups.first;
@@ -219,34 +223,34 @@ class AppState extends ChangeNotifier {
                  final result = await backupService.restoreBackup(backupData);
                  if (result.success) {
                    if (kDebugMode) {
-                     print('AppState: 自动同步完成');
+                     _logger.i('AppState: 自动同步完成');
                    }
                  } else {
                    if (kDebugMode) {
-                     print('AppState: 自动同步失败: ${result.message}');
+                     _logger.e('AppState: 自动同步失败: ${result.message}');
                    }
                  }
                }
              } else {
                  if (kDebugMode) {
-                   print('AppState: 未发现远程备份，跳过自动同步');
+                   _logger.i('AppState: 未发现远程备份，跳过自动同步');
                  }
                }
              } catch (e) {
                if (kDebugMode) {
-                 print('AppState: 自动同步失败: $e');
+                 _logger.e('AppState: 自动同步失败: $e');
                }
              // 自动同步失败不影响应用正常启动
            }
          });
       } else {
         if (kDebugMode) {
-          print('AppState: 自动同步未启用或配置不存在');
+          _logger.i('AppState: 自动同步未启用或配置不存在');
         }
       }
     } catch (e) {
       if (kDebugMode) {
-        print('AppState: 检查自动同步配置失败: $e');
+        _logger.e('AppState: 检查自动同步配置失败: $e');
       }
       // 配置检查失败不影响应用正常启动
     }
@@ -511,7 +515,7 @@ class _HomePageState extends State<HomePage> {
         _currentSite = appState.site;
         _lastConfigVersion = appState.configVersion;
         if (kDebugMode) {
-          print('HomePage: didChangeDependencies预同步 - 站点: ${_currentSite?.id}, 版本: $_lastConfigVersion');
+          _logger.d('HomePage: didChangeDependencies预同步 - 站点: ${_currentSite?.id}, 版本: $_lastConfigVersion');
         }
       }
       _didSyncFromAppState = true;
@@ -613,7 +617,7 @@ class _HomePageState extends State<HomePage> {
           : SearchCategoryConfig.getDefaultConfigs();
       
       if (kDebugMode) {
-        print('HomePage: _reloadCategories - 重新加载分类，分类数量: ${categories.length}');
+        _logger.d('HomePage: _reloadCategories - 重新加载分类，分类数量: ${categories.length}');
       }
       
       if (mounted) {
@@ -677,7 +681,7 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       // 更新检查失败时静默处理，不影响用户体验
       if (kDebugMode) {
-        print('Update check failed: $e');
+        _logger.e('Update check failed: $e');
       }
     }
   }
@@ -1433,7 +1437,7 @@ class _HomePageState extends State<HomePage> {
           String reloadReason = '';
           
           if (kDebugMode) {
-            print('HomePage Consumer: 当前站点=${_currentSite?.id}, AppState站点=${appState.site?.id}, 配置版本=${appState.configVersion}, 上次版本=$_lastConfigVersion');
+            _logger.d('HomePage Consumer: 当前站点=${_currentSite?.id}, AppState站点=${appState.site?.id}, 配置版本=${appState.configVersion}, 上次版本=$_lastConfigVersion');
           }
           
           if (appState.site != null) {
@@ -1441,7 +1445,7 @@ class _HomePageState extends State<HomePage> {
             // 首次同步：仅同步站点与版本，不触发重新加载
             if (isFirstSync) {
               if (kDebugMode) {
-                print('HomePage: 首次同步（不重载） - 同步站点: ${appState.site!.id}, 版本: ${appState.configVersion}');
+                _logger.d('HomePage: 首次同步（不重载） - 同步站点: ${appState.site!.id}, 版本: ${appState.configVersion}');
               }
               final currentSite = appState.site;
               final currentConfigVersion = appState.configVersion;
@@ -1463,7 +1467,7 @@ class _HomePageState extends State<HomePage> {
               needsReload = true;
               reloadReason = '站点变化';
               if (kDebugMode) {
-                print('HomePage: 站点变化检测 - 当前站点: ${_currentSite?.id}, 新站点: ${appState.site!.id}');
+                _logger.i('HomePage: 站点变化检测 - 当前站点: ${_currentSite?.id}, 新站点: ${appState.site!.id}');
               }
             }
             // 配置版本变化（排除首次同步情形）
@@ -1471,14 +1475,14 @@ class _HomePageState extends State<HomePage> {
               needsReload = true;
               reloadReason = '配置更新';
               if (kDebugMode) {
-                print('HomePage: 配置更新检测 - 上次版本: $_lastConfigVersion, 当前版本: ${appState.configVersion}');
+                _logger.i('HomePage: 配置更新检测 - 上次版本: $_lastConfigVersion, 当前版本: ${appState.configVersion}');
               }
             }
           }
           
           if (needsReload) {
             if (kDebugMode) {
-              print('HomePage: 检测到$reloadReason，重新初始化 - 配置版本: ${appState.configVersion}, 上次版本: $_lastConfigVersion');
+              _logger.i('HomePage: 检测到$reloadReason，重新初始化 - 配置版本: ${appState.configVersion}, 上次版本: $_lastConfigVersion');
             }
             // 设置标志，防止重复处理
             _isProcessingReload = true;

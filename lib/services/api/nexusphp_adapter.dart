@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
@@ -15,6 +16,7 @@ class NexusPHPAdapter implements SiteAdapter {
   late SiteConfig _siteConfig;
   late Dio _dio;
   Map<String, String>? _discountMapping;
+  static final Logger _logger = Logger();
 
   @override
   SiteConfig get siteConfig => _siteConfig;
@@ -29,7 +31,7 @@ class NexusPHPAdapter implements SiteAdapter {
     await _loadDiscountMapping();
     swDiscount.stop();
     if (kDebugMode) {
-      print('NexusPHPAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms');
+      _logger.d('NexusPHPAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms');
     }
 
     _dio = Dio(
@@ -65,11 +67,11 @@ class NexusPHPAdapter implements SiteAdapter {
     );
     swInterceptors.stop();
     if (kDebugMode) {
-      print('NexusPHPAdapter.init: 配置Dio与拦截器耗时=${swInterceptors.elapsedMilliseconds}ms');
+      _logger.d('NexusPHPAdapter.init: 配置Dio与拦截器耗时=${swInterceptors.elapsedMilliseconds}ms');
     }
     swTotal.stop();
     if (kDebugMode) {
-      print('NexusPHPAdapter.init: 总耗时=${swTotal.elapsedMilliseconds}ms');
+      _logger.d('NexusPHPAdapter.init: 总耗时=${swTotal.elapsedMilliseconds}ms');
     }
   }
 

@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import '../storage/storage_service.dart';
 
@@ -14,6 +16,7 @@ class ThemeManager extends ChangeNotifier {
   Color _seedColor = Colors.deepPurple;
   ColorScheme? _dynamicLightColorScheme;
   ColorScheme? _dynamicDarkColorScheme;
+  static final Logger _logger = Logger();
 
   ThemeManager(this._storageService) {
     _loadThemeSettings();
@@ -200,7 +203,9 @@ class ThemeManager extends ChangeNotifier {
 
       notifyListeners();
     } catch (e) {
-      debugPrint('加载主题设置失败: $e');
+      if (kDebugMode) {
+        _logger.e('加载主题设置失败: $e');
+      }
     }
   }
 }

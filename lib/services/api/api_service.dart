@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 import '../../models/app_models.dart';
 import '../storage/storage_service.dart';
 import 'site_adapter.dart';
@@ -8,6 +9,7 @@ import 'site_adapter.dart';
 class ApiService {
   ApiService._();
   static final ApiService instance = ApiService._();
+  static final Logger _logger = Logger();
 
   final Map<String, SiteAdapter> _adapters = {};
   SiteAdapter? _activeAdapter;
@@ -21,12 +23,12 @@ class ApiService {
       await _initAdapter(activeSite);
       swInitAdapter.stop();
       if (kDebugMode) {
-        print('ApiService.init: 初始化活跃适配器耗时=${swInitAdapter.elapsedMilliseconds}ms');
+        _logger.d('ApiService.init: 初始化活跃适配器耗时=${swInitAdapter.elapsedMilliseconds}ms');
       }
     }
     swTotal.stop();
     if (kDebugMode) {
-      print('ApiService.init: 总耗时=${swTotal.elapsedMilliseconds}ms');
+      _logger.d('ApiService.init: 总耗时=${swTotal.elapsedMilliseconds}ms');
     }
   }
 
@@ -47,7 +49,7 @@ class ApiService {
     await adapter.init(siteConfig);
     swInit.stop();
     if (kDebugMode) {
-      print('ApiService.getAdapter: 适配器(${siteConfig.siteType.id})初始化耗时=${swInit.elapsedMilliseconds}ms');
+      _logger.d('ApiService.getAdapter: 适配器(${siteConfig.siteType.id})初始化耗时=${swInit.elapsedMilliseconds}ms');
     }
     _adapters[adapterId] = adapter;
 

@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 import '../models/app_models.dart';
 import '../utils/format.dart';
 import 'cached_network_image.dart';
+
+// 文件级日志实例
+final Logger _logger = Logger();
 
 /// 种子列表项组件
 ///
@@ -171,7 +176,9 @@ class TorrentListItem extends StatelessWidget {
                                     );
                                   },
                               errorBuilder: (context, error, stackTrace) {
-                                debugPrint('图片加载失败: $error');
+                                if (kDebugMode) {
+                                  _logger.w('图片加载失败: $error');
+                                }
                                 return Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [

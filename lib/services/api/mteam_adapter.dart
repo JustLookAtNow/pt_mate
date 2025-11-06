@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 import '../../models/app_models.dart';
 import '../site_config_service.dart';
 import 'site_adapter.dart';
@@ -10,6 +11,7 @@ class MTeamAdapter extends SiteAdapter {
   late SiteConfig _siteConfig;
   late Dio _dio;
   Map<String, String>? _discountMapping;
+  static final Logger _logger = Logger();
   
   @override
   SiteConfig get siteConfig => _siteConfig;
@@ -24,7 +26,7 @@ class MTeamAdapter extends SiteAdapter {
     await _loadDiscountMapping();
     swDiscount.stop();
     if (kDebugMode) {
-      print('MTeamAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms');
+      _logger.d('MTeamAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms');
     }
     
     _dio = Dio(BaseOptions(
@@ -57,11 +59,11 @@ class MTeamAdapter extends SiteAdapter {
     }));
     swInterceptors.stop();
     if (kDebugMode) {
-      print('MTeamAdapter.init: 配置Dio与拦截器耗时=${swInterceptors.elapsedMilliseconds}ms');
+      _logger.d('MTeamAdapter.init: 配置Dio与拦截器耗时=${swInterceptors.elapsedMilliseconds}ms');
     }
     swTotal.stop();
     if (kDebugMode) {
-      print('MTeamAdapter.init: 总耗时=${swTotal.elapsedMilliseconds}ms');
+      _logger.d('MTeamAdapter.init: 总耗时=${swTotal.elapsedMilliseconds}ms');
     }
   }
   

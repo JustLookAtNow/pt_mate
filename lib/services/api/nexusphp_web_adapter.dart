@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 
 import '../../models/app_models.dart';
 import 'site_adapter.dart';
@@ -25,6 +26,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
   late SiteConfig _siteConfig;
   late Dio _dio;
   Map<String, String>? _discountMapping;
+  static final Logger _logger = Logger();
 
   @override
   SiteConfig get siteConfig => _siteConfig;
@@ -40,7 +42,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
     await _loadDiscountMapping();
     swDiscount.stop();
     if (kDebugMode) {
-      print('NexusPHPWebAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms');
+      _logger.d('NexusPHPWebAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms');
     }
 
     final swDio = Stopwatch()..start();
@@ -57,7 +59,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
     _dio.options.responseType = ResponseType.plain; // 设置为plain避免JSON解析警告
     swDio.stop();
     if (kDebugMode) {
-      print('NexusPHPWebAdapter.init: 创建Dio与基本配置耗时=${swDio.elapsedMilliseconds}ms');
+      _logger.d('NexusPHPWebAdapter.init: 创建Dio与基本配置耗时=${swDio.elapsedMilliseconds}ms');
     }
 
     // 添加响应拦截器处理302重定向
@@ -95,11 +97,11 @@ class NexusPHPWebAdapter extends SiteAdapter {
     );
     swInterceptors.stop();
     if (kDebugMode) {
-      print('NexusPHPWebAdapter.init: 添加拦截器耗时=${swInterceptors.elapsedMilliseconds}ms');
+      _logger.d('NexusPHPWebAdapter.init: 添加拦截器耗时=${swInterceptors.elapsedMilliseconds}ms');
     }
     swTotal.stop();
     if (kDebugMode) {
-      print('NexusPHPWebAdapter.init: 总耗时=${swTotal.elapsedMilliseconds}ms');
+      _logger.d('NexusPHPWebAdapter.init: 总耗时=${swTotal.elapsedMilliseconds}ms');
     }
   }
 
@@ -201,7 +203,9 @@ class NexusPHPWebAdapter extends SiteAdapter {
       } catch (e) {
         // 如果获取模板配置失败，继续使用默认配置
         if (kDebugMode) {
-          print('获取模板配置失败: $e');
+          if (kDebugMode) {
+            _logger.e('获取模板配置失败: $e');
+          }
         }
       }
     }
@@ -712,13 +716,17 @@ class NexusPHPWebAdapter extends SiteAdapter {
       final fieldsConfig = searchConfig['fields'] as Map<String, dynamic>?;
 
       if (rowsConfig == null || fieldsConfig == null) {
-        debugPrint('行配置或字段配置不存在');
+        if (kDebugMode) {
+          _logger.e('行配置或字段配置不存在');
+        }
         return torrents;
       }
 
       final rowSelector = rowsConfig['selector'] as String?;
       if (rowSelector == null) {
-        debugPrint('行选择器不存在');
+        if (kDebugMode) {
+          _logger.e('行选择器不存在');
+        }
         return torrents;
       }
 
@@ -935,12 +943,16 @@ class NexusPHPWebAdapter extends SiteAdapter {
             ),
           );
         } catch (e) {
-          debugPrint('解析种子行失败: $e');
+          if (kDebugMode) {
+            _logger.e('解析种子行失败: $e');
+          }
           continue;
         }
       }
     } catch (e) {
-      debugPrint('获取搜索配置失败: $e');
+      if (kDebugMode) {
+        _logger.e('获取搜索配置失败: $e');
+      }
     }
 
     return torrents;
