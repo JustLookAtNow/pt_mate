@@ -337,7 +337,11 @@ class StorageService {
     
     // 保存每个站点的API密钥
     for (final config in configs) {
-      await _saveSiteApiKey(config.id, config.apiKey);
+      // 仅当传入的 apiKey 非空时才更新安全存储；
+      // 为 null 表示“不修改当前存储的密钥”，避免误删其他站点的密钥。
+      if (config.apiKey != null) {
+        await _saveSiteApiKey(config.id, config.apiKey);
+      }
     }
   }
 
@@ -423,24 +427,38 @@ class StorageService {
   }
 
   Future<void> addSiteConfig(SiteConfig config) async {
-    final configs = await loadSiteConfigs();
-    configs.add(config);
+    final configs = await loadSiteConfigs(includeApiKeys: false);
+    // 新增时，避免触碰其他站点密钥；仅处理当前新增站点的密钥
+    configs.add(config.copyWith(apiKey: null));
     await saveSiteConfigs(configs);
+    // 单独保存新增站点密钥（若提供）
+    if (config.apiKey != null) {
+      await _saveSiteApiKey(config.id, config.apiKey);
+    }
   }
 
   Future<void> updateSiteConfig(SiteConfig config) async {
-    final configs = await loadSiteConfigs();
+    final configs = await loadSiteConfigs(includeApiKeys: false);
     final index = configs.indexWhere((c) => c.id == config.id);
     if (index >= 0) {
-      configs[index] = config;
+      // 更新列表时，将其他站点的 apiKey 保持为 null，避免被 saveSiteConfigs 误操作
+      configs[index] = config.copyWith(apiKey: null);
       await saveSiteConfigs(configs);
+      // 单独更新当前站点密钥（如果提供）
+      if (config.apiKey != null) {
+        await _saveSiteApiKey(config.id, config.apiKey);
+      }
     }
   }
 
   Future<void> deleteSiteConfig(String siteId) async {
     final configs = await loadSiteConfigs();
     configs.removeWhere((c) => c.id == siteId);
-    await saveSiteConfigs(configs);
+    // 删除站点后保存其余站点配置，但不传递 apiKey（保持为 null），
+    // 以避免在未加载密钥的场景下误删其他站点的密钥。
+    await saveSiteConfigs(
+      configs.map((c) => c.copyWith(apiKey: null)).toList(),
+    );
     await _deleteSiteApiKey(siteId);
     
     // 如果删除的是当前活跃站点，清除活跃站点设置
@@ -481,7 +499,12 @@ class StorageService {
 
   // 私有方法：处理单个站点的API密钥
   Future<void> _saveSiteApiKey(String siteId, String? apiKey) async {
-    if (apiKey == null || apiKey.isEmpty) {
+    // 为 null：不触碰现有密钥（用于避免在未加载密钥的情况下误删）
+    if (apiKey == null) {
+      return;
+    }
+    // 为空字符串：明确删除该站点密钥（用户清空字段）
+    if (apiKey.isEmpty) {
       await _deleteSiteApiKey(siteId);
       return;
     }
