@@ -263,6 +263,7 @@ class NexusPHPAdapter implements SiteAdapter {
       }
     }
 
+
     return TorrentItem(
       id: (item['id'] as int).toString(),
       name: item['name'] as String,
@@ -278,6 +279,7 @@ class NexusPHPAdapter implements SiteAdapter {
       imageList: const [], // 暂时没有图片列表
       cover: item['cover'] as String? ?? '',
       createdDate: item['added'] != null ? item['added'] + ':00' : '',
+      isTop: item['pos_state'] != 'normal',
     );
   }
 
