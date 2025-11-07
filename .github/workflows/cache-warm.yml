@@ -1,0 +1,206 @@
+name: Warm Caches
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  warm-caches-linux:
+    name: Warm caches (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter (cached)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.2'
+          channel: 'stable'
+          cache: true
+          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+          cache-path: '${{ runner.tool_cache }}/flutter'
+
+      - name: Flutter precache (Linux)
+        run: |
+          flutter config --enable-linux-desktop
+          flutter precache --linux
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Get dependencies
+        run: |
+          # 如果 pubspec.lock 未变化，actions/cache 会命中，跳过更新
+          # 但需要执行一次 pub get 以确保缓存目录结构存在
+          flutter pub get
+
+      - name: Prepare Gradle caches (Android dependencies only)
+        run: |
+          cd android
+          ./gradlew -v
+          ./gradlew :app:dependencies --no-daemon --stacktrace --refresh-dependencies
+          cd -
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            android/.gradle
+            android/app/.gradle
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Cache CMake
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/linux
+            ~/.cmake
+          key: ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-cmake-
+
+      - name: Configure CMake (Linux, no build)
+        run: |
+          cmake -S linux -B build/linux -DCMAKE_BUILD_TYPE=Release || echo "Skip CMake configure (ephemeral not ready)"
+
+      - name: Cache AppImageTool
+        uses: actions/cache@v4
+        with:
+          path: appimagetool-x86_64.AppImage
+          key: ${{ runner.os }}-appimagetool-continuous
+          restore-keys: |
+            ${{ runner.os }}-appimagetool-
+
+  warm-caches-windows:
+    name: Warm caches (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter (cached)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.2'
+          channel: 'stable'
+          cache: true
+          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+          cache-path: '${{ runner.tool_cache }}/flutter'
+
+      - name: Flutter precache (Windows)
+        run: |
+          flutter config --enable-windows-desktop
+          flutter precache --windows
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Get dependencies
+        run: |
+          flutter pub get
+
+      - name: Cache Visual Studio
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\Users\runneradmin\AppData\Local\Microsoft\VisualStudio
+            build/windows
+          key: ${{ runner.os }}-vs-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-vs-
+
+      - name: Configure CMake (Windows, no build)
+        shell: pwsh
+        run: |
+          cmake -S windows -B build/windows -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release
+          if ($LASTEXITCODE -ne 0) { Write-Host "Skip CMake configure (ephemeral not ready)" }
+
+  warm-caches-macos:
+    name: Warm caches (macOS)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter (cached)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.2'
+          channel: 'stable'
+          cache: true
+          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+          cache-path: '${{ runner.tool_cache }}/flutter'
+
+      - name: Flutter precache (macOS)
+        run: |
+          flutter config --enable-macos-desktop
+          flutter precache --macos
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Get dependencies
+        run: |
+          flutter pub get
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios/Pods
+            ~/.cocoapods
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Install CocoaPods dependencies (no build)
+        run: |
+          cd ios
+          pod install --repo-update
+          cd -
+
+      - name: Cache Xcode DerivedData
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-xcode-${{ hashFiles('**/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-
+
+      - name: Prime Xcode caches (no build)
+        run: |
+          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release -showBuildSettings || true

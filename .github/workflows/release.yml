@@ -67,7 +67,6 @@ jobs:
       with:
         path: |
           ~/.pub-cache
-          ${{ runner.tool_cache }}/flutter
         key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
         restore-keys: |
           ${{ runner.os }}-pub-
@@ -236,7 +235,6 @@ jobs:
       with:
         path: |
           ~/.pub-cache
-          ${{ runner.tool_cache }}/flutter
         key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
         restore-keys: |
           ${{ runner.os }}-pub-
@@ -322,7 +320,6 @@ jobs:
       with:
         path: |
           ~/.pub-cache
-          ${{ runner.tool_cache }}/flutter
         key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
         restore-keys: |
           ${{ runner.os }}-pub-
