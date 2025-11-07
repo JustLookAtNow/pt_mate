@@ -1,11 +1,11 @@
 {
-  "id": "outbits",
-  "name": "我堡",
+  "id": "btschool",
+  "name": "比特校园",
   "isShow": true,
   "baseUrls": [
-    "https://ourbits.club/"
+    "https://pt.btschool.club/"
   ],
-  "primaryUrl": "https://ourbits.club/",
+  "primaryUrl": "https://pt.btschool.club/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
   "features": {
@@ -71,7 +71,7 @@
           "attribute": "text",
           "filter": {
             "name": "regexp",
-            "args": ":\\s*([^\\s]+)\\s*\\(*(签|簽)到",
+            "args": ":\\s*([^\\s]+)\\s*邀请",
             "index": 1
           }
         }
@@ -80,7 +80,7 @@
     "passKey": {
       "path": "usercp.php",
       "rows": {
-        "selector": "#outer > table.main > next > tbody > tr:nth-child(5) > td.rowfollow > p"
+        "selector": "#outer > table.main > next > tbody > tr:nth-child(4) > td.rowfollow"
       },
       "fields": {
         "passKey": {
@@ -151,7 +151,7 @@
           }
         },
         "collection": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(5) > img.bookmark",
+          "selector": "table.torrentname > img.bookmark",
           "attribute": "src"
         },
         "isTop": {
@@ -164,11 +164,11 @@
           "attribute": "title"
         },
         "doubanRating": {
-          "selector": "table.torrentname > img[title==\"douban\"] > next",
+          "selector": "table.torrentname > tr > td:nth-child(2) > div:nth-child(1)",
           "attribute": "text"
         },
         "imdbRating": {
-          "selector": "table.torrentname > img[title==\"imdb\"] > next",
+          "selector": "table.torrentname > tr > td:nth-child(2) > div:nth-child(2)",
           "attribute": "text"
         }
       }
@@ -176,7 +176,7 @@
     "categories": {
       "path": "usercp.php?action=tracker",
       "rows": {
-        "selector": "#outer > table:nth-child(2) > tbody > tr:nth-child(1) > td.rowfollow > table"
+        "selector": "#outer > table.main > next > tbody:nth-child > tr:nth-child(1) > td.rowfollow > table"
       },
       "fields": {
         "categoryId": {
@@ -192,19 +192,6 @@
           "selector": "a[href~=\"(torrents|special)\\.php\"] > img",
           "attribute": "title"
         }
-      }
-    }
-  },
-  "request": {
-    "collect": {
-      "path": "/api.php",
-      "method": "POST",
-      "headers": {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      "params": {
-        "action": "bookmark",
-        "tid": "{torrentId}"
       }
     }
   }

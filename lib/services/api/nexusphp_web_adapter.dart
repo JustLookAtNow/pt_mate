@@ -922,7 +922,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
           // 清理文本字段
           final cleanedDescription = description
               .replaceAll(torrentName, '')
-              .replaceAll(RegExp(r'剩余时间：\d+.*?\d+[分钟|时]'), '')
+              .replaceAll(RegExp(r'\(*剩余时间：\d+.*?\d+[分钟|时]\)*'), '')
               .trim();
 
           torrents.add(
