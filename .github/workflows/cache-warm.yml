@@ -52,12 +52,11 @@ jobs:
           # 但需要执行一次 pub get 以确保缓存目录结构存在
           flutter pub get
 
-      - name: Prepare Gradle caches (Android dependencies only)
+      - name: Warm Android build (Debug)
         run: |
-          cd android
-          ./gradlew -v
-          ./gradlew :app:dependencies --no-daemon --stacktrace --refresh-dependencies
-          cd -
+          # 通过一次 Debug 构建触发 Gradle 依赖解析与下载，以填充缓存。
+          # Debug 构建无需签名配置，避免 release 构建的密钥要求。
+          flutter build apk --debug --target-platform=android-arm64
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -81,9 +80,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cmake-
 
-      - name: Configure CMake (Linux, no build)
+      - name: Install Linux dependencies
         run: |
-          cmake -S linux -B build/linux -DCMAKE_BUILD_TYPE=Release || echo "Skip CMake configure (ephemeral not ready)"
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libblkid-dev libsecret-1-dev file libfuse2
+
+      - name: Build Linux (Debug)
+        run: |
+          flutter build linux --debug
 
       - name: Cache AppImageTool
         uses: actions/cache@v4
@@ -92,6 +96,15 @@ jobs:
           key: ${{ runner.os }}-appimagetool-continuous
           restore-keys: |
             ${{ runner.os }}-appimagetool-
+
+      - name: Download AppImageTool if missing
+        run: |
+          if [ ! -f appimagetool-x86_64.AppImage ]; then
+            wget -O appimagetool-x86_64.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+            chmod +x appimagetool-x86_64.AppImage
+          else
+            echo "AppImageTool present via cache; skip download"
+          fi
 
   warm-caches-windows:
     name: Warm caches (Windows)
@@ -137,11 +150,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-vs-
 
-      - name: Configure CMake (Windows, no build)
-        shell: pwsh
+      - name: Build Windows (Debug)
         run: |
-          cmake -S windows -B build/windows -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release
-          if ($LASTEXITCODE -ne 0) { Write-Host "Skip CMake configure (ephemeral not ready)" }
+          flutter build windows --debug
+
 
   warm-caches-macos:
     name: Warm caches (macOS)
@@ -189,9 +201,13 @@ jobs:
 
       - name: Install CocoaPods dependencies (no build)
         run: |
-          cd ios
-          pod install --repo-update
-          cd -
+          if [ -f ios/Podfile ]; then
+            cd ios
+            pod install --repo-update
+            cd -
+          else
+            echo "No Podfile found; skip CocoaPods"
+          fi
 
       - name: Cache Xcode DerivedData
         uses: actions/cache@v4
@@ -201,6 +217,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-xcode-
 
-      - name: Prime Xcode caches (no build)
+      - name: Build macOS (Debug)
         run: |
-          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release -showBuildSettings || true
+          flutter build macos --debug --no-codesign
