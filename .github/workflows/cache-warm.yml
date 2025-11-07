@@ -219,4 +219,4 @@ jobs:
 
       - name: Build macOS (Debug)
         run: |
-          flutter build macos --debug --no-codesign
+          flutter build macos --debug
