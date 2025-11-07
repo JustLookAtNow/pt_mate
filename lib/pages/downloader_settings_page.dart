@@ -346,21 +346,32 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                       }
                     },
                     child: ListView.builder(
+                      padding: EdgeInsets.zero,
                       itemCount: _downloaderConfigs.length,
                       itemBuilder: (_, i) {
                         final c = _downloaderConfigs[i];
                         String subtitle = c.type.displayName;
                         if (c is QbittorrentConfig) {
-                          subtitle = '${c.host}:${c.port}  ·  ${c.username}';
+                          subtitle = '${c.host}:${c.port} · ${c.username}';
                         } else if (c is TransmissionConfig) {
-                          subtitle = '${c.host}:${c.port}  ·  ${c.username}';
+                          subtitle = '${c.host}:${c.port} · ${c.username}';
                         }
                         return ListTile(
+                          dense: true,
+                          visualDensity: const VisualDensity(
+                            horizontal: -2,
+                            vertical: -2,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 2,
+                            vertical: 2,
+                          ),
+                          minLeadingWidth: 0,
                           leading: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Radio<String>(value: c.id),
-                              const SizedBox(width: 8),
+                              // const SizedBox(width: 8),
                               DownloaderUtils.getDownloaderIcon(c.type),
                             ],
                           ),
@@ -374,11 +385,31 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                                 tooltip: '设置',
                                 onPressed: () => _addOrEdit(existing: c),
                                 icon: const Icon(Icons.settings),
+                                iconSize: 20,
+                                style: IconButton.styleFrom(
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  padding: EdgeInsets.zero,
+                                  visualDensity: const VisualDensity(
+                                    horizontal: -2,
+                                    vertical: -2,
+                                  ),
+                                ),
                               ),
                               IconButton(
                                 tooltip: '删除',
                                 onPressed: () => _delete(c),
                                 icon: const Icon(Icons.delete_outline),
+                                iconSize: 20,
+                                style: IconButton.styleFrom(
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  padding: EdgeInsets.zero,
+                                  visualDensity: const VisualDensity(
+                                    horizontal: -2,
+                                    vertical: -2,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
