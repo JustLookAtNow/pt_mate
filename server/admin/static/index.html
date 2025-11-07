@@ -17,8 +17,9 @@
     .kpi { display:flex; gap:16px; }
     .kpi .item { flex:1; background:#fff; padding:12px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.05); }
     .kpi .num { font-size:22px; font-weight:700; }
-    .filters { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+    .filters { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
     select, input[type=date] { padding:6px 8px; border:1px solid #e2e8f0; border-radius:8px; }
+    input[type="text"], input[placeholder] { padding:6px 8px; border:1px solid #e2e8f0; border-radius:8px; }
     table { width:100%; border-collapse: collapse; }
     th, td { border-bottom:1px solid #e2e8f0; padding:8px; text-align:left; font-size:13px; }
     .pager { display:flex; gap:8px; align-items:center; margin-top:8px; }
@@ -27,6 +28,21 @@
     /* 固定图表容器高度，避免 Chart.js 按父元素高度无限扩展 */
     .chart-box { position: relative; height: 220px; }
     .chart-box canvas { width: 100% !important; height: 100% !important; }
+    .table-responsive { width:100%; overflow-x:auto; }
+
+    /* 响应式：移动端优化 */
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 1fr; }
+      .kpi { flex-direction: column; }
+      .chart-box { height: 180px; }
+      .filters label { margin: 4px 0; }
+      .filters select, .filters input { flex: 1 1 150px; }
+      .pager { flex-wrap: wrap; }
+    }
+    @media (max-width: 600px) {
+      /* 小屏隐藏 IP 列，避免拥挤 */
+      table th:nth-child(7), table td:nth-child(7) { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -57,11 +73,11 @@
     <div class="grid" style="margin-top:16px;">
       <div class="card">
         <h3>平台占比</h3>
-        <canvas id="platformChart" height="200"></canvas>
+        <div class="chart-box"><canvas id="platformChart"></canvas></div>
       </div>
       <div class="card">
         <h3>版本占比</h3>
-        <canvas id="versionChart" height="200"></canvas>
+        <div class="chart-box"><canvas id="versionChart"></canvas></div>
       </div>
     </div>
 
@@ -82,6 +98,7 @@
         <label>搜索</label>
         <input v-model="q" @keyup.enter="applyFilters" placeholder="device id 或 IP" />
       </div>
+      <div class="table-responsive">
       <table>
         <thead>
           <tr>
@@ -100,6 +117,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
       <div class="pager">
         <button @click="prevPage" :disabled="page<=1">上一页</button>
         <span>第 {{page}} 页 / 共 {{Math.ceil(devices.total/pageSize)}} 页</span>
@@ -174,7 +192,7 @@
           const ctx = document.getElementById(id);
           if(this[id+'Instance']) { this[id+'Instance'].destroy(); }
           const colors = ['#3b82f6','#f59e0b','#10b981','#ef4444','#6366f1','#22d3ee','#84cc16','#e11d48'];
-          const chart = new Chart(ctx, { type:'pie', data:{ labels, datasets:[{ data, backgroundColor: colors }] }, options:{ onClick:(evt, elements)=>{
+          const chart = new Chart(ctx, { type:'pie', data:{ labels, datasets:[{ data, backgroundColor: colors }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } }, onClick:(evt, elements)=>{
             if(elements.length>0){ const idx = elements[0].index; const label = labels[idx]; if(kind==='platform') this.filterPlatform=label; if(kind==='version') this.filterVersion=label; this.page=1; this.fetchDevices(); }
           } } });
           this[id+'Instance'] = chart;
