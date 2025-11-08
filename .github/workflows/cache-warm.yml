@@ -24,6 +24,7 @@ jobs:
           java-version: '17'
 
       - name: Setup Flutter (cached)
+        id: cache_flutter_linux
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.35.2'
@@ -57,7 +58,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Warm Android build (Debug)
-        if: ${{ steps.cache_gradle_linux.outputs.cache-hit != 'true' || steps.cache_pub_linux.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache_gradle_linux.outputs.cache-hit != 'true' || steps.cache_flutter_linux.outputs.cache-hit != 'true' }}
         run: |
           # 通过一次 Debug 构建触发 Gradle 依赖解析与下载，以填充缓存。
           # Debug 构建无需签名配置，避免 release 构建的密钥要求。
@@ -74,13 +75,13 @@ jobs:
             ${{ runner.os }}-cmake-
 
       - name: Install Linux dependencies
-        if: ${{ steps.cache_cmake_linux.outputs.cache-hit != 'true' || steps.cache_pub_linux.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache_cmake_linux.outputs.cache-hit != 'true' || steps.cache_flutter_linux.outputs.cache-hit != 'true' }}
         run: |
           sudo apt-get update -y
           sudo apt-get install -y ninja-build libgtk-3-dev libblkid-dev libsecret-1-dev file libfuse2
 
       - name: Build Linux (Debug)
-        if: ${{ steps.cache_cmake_linux.outputs.cache-hit != 'true' || steps.cache_pub_linux.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache_cmake_linux.outputs.cache-hit != 'true' || steps.cache_flutter_linux.outputs.cache-hit != 'true' }}
         run: |
           flutter build linux --debug
 
@@ -109,6 +110,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Flutter (cached)
+        id: cache_flutter_windows
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.35.2'
@@ -138,7 +140,7 @@ jobs:
             ${{ runner.os }}-vs-
 
       - name: Build Windows (Debug)
-        if: ${{ steps.cache_vs_windows.outputs.cache-hit != 'true' || steps.cache_pub_windows.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache_vs_windows.outputs.cache-hit != 'true' || steps.cache_flutter_windows.outputs.cache-hit != 'true' }}
         run: |
           flutter build windows --debug
 
@@ -151,6 +153,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Flutter (cached)
+        id: cache_flutter_macos
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.35.2'
@@ -180,7 +183,7 @@ jobs:
             ${{ runner.os }}-pods-
 
       - name: Install CocoaPods dependencies (no build)
-        if: ${{ steps.cache_pods_macos.outputs.cache-hit != 'true' || steps.cache_pub_macos.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache_pods_macos.outputs.cache-hit != 'true' || steps.cache_flutter_macos.outputs.cache-hit != 'true' }}
         run: |
           if [ -f ios/Podfile ]; then
             cd ios
@@ -200,6 +203,6 @@ jobs:
             ${{ runner.os }}-xcode-
 
       - name: Build macOS (Debug)
-        if: ${{ steps.cache_xcode_macos.outputs.cache-hit != 'true' || steps.cache_pods_macos.outputs.cache-hit != 'true' || steps.cache_pub_macos.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache_xcode_macos.outputs.cache-hit != 'true' || steps.cache_pods_macos.outputs.cache-hit != 'true' || steps.cache_flutter_macos.outputs.cache-hit != 'true' }}
         run: |
           flutter build macos --debug
