@@ -81,6 +81,12 @@ class StorageService {
 
   bool _hasPendingConfigUpdates = false;
 
+  // 站点配置内存缓存（避免重复 JSON 解析与密钥反复读取）
+  List<SiteConfig>? _siteConfigsCache; // 不含 apiKey 的基础配置缓存
+  bool _siteConfigsCacheDirty = true; // 当有增删改或持久化后需要重新解析
+  bool _siteConfigsCacheNeedsUpdate = false; // 最近一次解析是否发现需要更新
+  final Map<String, String?> _siteApiKeysCache = {}; // 站点 id -> apiKey 的缓存
+
   final FlutterSecureStorage _secure = const FlutterSecureStorage(
     aOptions: AndroidOptions(
       encryptedSharedPreferences: true,
@@ -341,8 +347,15 @@ class StorageService {
       // 为 null 表示“不修改当前存储的密钥”，避免误删其他站点的密钥。
       if (config.apiKey != null) {
         await _saveSiteApiKey(config.id, config.apiKey);
+        // 更新内存中的 apiKey 缓存
+        _siteApiKeysCache[config.id] = config.apiKey;
       }
     }
+
+    // 更新基础配置缓存（不含 apiKey），避免下一次再次解析 JSON
+    _siteConfigsCache = configs.map((c) => c.copyWith(apiKey: null)).toList();
+    _siteConfigsCacheDirty = false;
+    _siteConfigsCacheNeedsUpdate = false;
   }
 
   Future<List<SiteConfig>> loadSiteConfigs({
@@ -352,72 +365,97 @@ class StorageService {
     try {
       final prefs = await _prefs;
       final str = prefs.getString(StorageKeys.siteConfigs);
-      if (str == null) return [];
+      if (str == null) {
+        // 清空缓存并返回空
+        _siteConfigsCache = null;
+        _siteConfigsCacheDirty = true;
+        _siteConfigsCacheNeedsUpdate = false;
+        return [];
+      }
 
-      final List<dynamic> jsonList = jsonDecode(str);
-      final configs = <SiteConfig>[];
-      bool hasUpdates = false;
-      int idx = 0;
+      List<SiteConfig> baseConfigs;
+      bool hasUpdates;
 
-      for (final json in jsonList) {
-        final swItem = Stopwatch()..start();
-        final result = await SiteConfig.fromJsonAsync(json);
-        swItem.stop();
+      if (_siteConfigsCache != null && !_siteConfigsCacheDirty) {
+        // 使用缓存的基础配置与更新标记
+        baseConfigs = _siteConfigsCache!;
+        hasUpdates = _siteConfigsCacheNeedsUpdate;
         if (kDebugMode) {
-          _logger.d(
-            'StorageService.loadSiteConfigs: 第${idx + 1}个站点 fromJsonAsync 耗时=${swItem.elapsedMilliseconds}ms，templateId=${result.config.templateId}，needsUpdate=${result.needsUpdate}',
-          );
+          _logger.d('StorageService.loadSiteConfigs: 使用内存缓存，includeApiKeys=$includeApiKeys');
+        }
+      } else {
+        // 重新解析 JSON
+        final List<dynamic> jsonList = jsonDecode(str);
+        baseConfigs = <SiteConfig>[];
+        hasUpdates = false;
+        int idx = 0;
+
+        for (final json in jsonList) {
+          final swItem = Stopwatch()..start();
+          final result = await SiteConfig.fromJsonAsync(json);
+          swItem.stop();
+          if (kDebugMode) {
+            _logger.d(
+              'StorageService.loadSiteConfigs: 第${idx + 1}个站点 fromJsonAsync 耗时=${swItem.elapsedMilliseconds}ms，templateId=${result.config.templateId}，needsUpdate=${result.needsUpdate}',
+            );
+          }
+          baseConfigs.add(result.config);
+          idx++;
+          if (result.needsUpdate) {
+            hasUpdates = true;
+          }
         }
 
+        // 更新缓存
+        _siteConfigsCache = baseConfigs;
+        _siteConfigsCacheDirty = false;
+        _siteConfigsCacheNeedsUpdate = hasUpdates;
+      }
+
+      // 根据 includeApiKeys 构造返回列表
+      final List<SiteConfig> configs = <SiteConfig>[];
+      int idx = 0;
+      for (final cfg in baseConfigs) {
         SiteConfig finalConfig;
         if (includeApiKeys) {
           final swKey = Stopwatch()..start();
-          final apiKey = await _loadSiteApiKey(result.config.id);
+          String? apiKey;
+          if (_siteApiKeysCache.containsKey(cfg.id)) {
+            apiKey = _siteApiKeysCache[cfg.id];
+          } else {
+            apiKey = await _loadSiteApiKey(cfg.id);
+            _siteApiKeysCache[cfg.id] = apiKey; // 缓存读取结果（可为 null）
+          }
           swKey.stop();
           if (kDebugMode) {
-            _logger.d(
-              'StorageService.loadSiteConfigs: 第${idx + 1}个站点 加载API密钥耗时=${swKey.elapsedMilliseconds}ms',
-            );
+            _logger.d('StorageService.loadSiteConfigs: 第${idx + 1}个站点 加载API密钥耗时=${swKey.elapsedMilliseconds}ms');
           }
-          finalConfig = result.config.copyWith(apiKey: apiKey);
+          finalConfig = cfg.copyWith(apiKey: apiKey);
         } else {
-          // 跳过API密钥加载以加速启动流程
-          finalConfig = result.config;
+          finalConfig = cfg;
         }
         configs.add(finalConfig);
         idx++;
-        
-        // 如果templateId被更新了，标记需要重新保存
-        if (result.needsUpdate) {
-          hasUpdates = true;
-        }
       }
 
-      // 当跳过API密钥加载时，如果检测到需要更新（例如模板ID修正），
-      // 为避免清除密钥，这里不立即持久化，改在后续全量加载或设置页中再保存。
+      // 持久化模板更新：仅在 includeApiKeys=true 时执行
       if (hasUpdates && includeApiKeys) {
         final swSave = Stopwatch()..start();
         await saveSiteConfigs(configs);
         swSave.stop();
         if (kDebugMode) {
-          _logger.d(
-            'StorageService.loadSiteConfigs: 保存更新耗时=${swSave.elapsedMilliseconds}ms',
-          );
+          _logger.d('StorageService.loadSiteConfigs: 保存更新耗时=${swSave.elapsedMilliseconds}ms');
         }
       } else if (hasUpdates && !includeApiKeys) {
         _hasPendingConfigUpdates = true;
         if (kDebugMode) {
-          _logger.i(
-            'StorageService.loadSiteConfigs: 检测到配置需要更新，但已跳过保存以避免清除API密钥（稍后持久化）',
-          );
+          _logger.i('StorageService.loadSiteConfigs: 检测到配置需要更新，但已跳过保存以避免清除API密钥（稍后持久化）');
         }
       }
 
       swTotal.stop();
       if (kDebugMode) {
-        _logger.d(
-          'StorageService.loadSiteConfigs: 总耗时=${swTotal.elapsedMilliseconds}ms',
-        );
+        _logger.d('StorageService.loadSiteConfigs: 总耗时=${swTotal.elapsedMilliseconds}ms');
       }
 
       return configs;
@@ -434,7 +472,10 @@ class StorageService {
     // 单独保存新增站点密钥（若提供）
     if (config.apiKey != null) {
       await _saveSiteApiKey(config.id, config.apiKey);
+      _siteApiKeysCache[config.id] = config.apiKey; // 更新缓存
     }
+    // 站点配置已变更，标记缓存需重新解析（下次 loadSiteConfigs ）
+    _siteConfigsCacheDirty = true;
   }
 
   Future<void> updateSiteConfig(SiteConfig config) async {
@@ -447,8 +488,10 @@ class StorageService {
       // 单独更新当前站点密钥（如果提供）
       if (config.apiKey != null) {
         await _saveSiteApiKey(config.id, config.apiKey);
+        _siteApiKeysCache[config.id] = config.apiKey; // 更新缓存
       }
     }
+    _siteConfigsCacheDirty = true; // 标记缓存失效
   }
 
   Future<void> deleteSiteConfig(String siteId) async {
@@ -460,12 +503,14 @@ class StorageService {
       configs.map((c) => c.copyWith(apiKey: null)).toList(),
     );
     await _deleteSiteApiKey(siteId);
+    _siteApiKeysCache.remove(siteId); // 移除缓存中的 apiKey
     
     // 如果删除的是当前活跃站点，清除活跃站点设置
     final activeSiteId = await getActiveSiteId();
     if (activeSiteId == siteId) {
       await setActiveSiteId(null);
     }
+    _siteConfigsCacheDirty = true; // 标记缓存失效
   }
 
   Future<void> setActiveSiteId(String? siteId) async {

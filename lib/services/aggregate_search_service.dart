@@ -73,8 +73,8 @@ class AggregateSearchService {
       orElse: () => throw ArgumentError('搜索配置不存在: $configId'),
     );
 
-    // 获取要搜索的站点列表
-    final allSites = await StorageService.instance.loadSiteConfigs();
+    // 获取要搜索的站点列表（包含 API Key，避免 M-Team 等站点密钥为 null）
+    final allSites = await StorageService.instance.loadSiteConfigs(includeApiKeys: true);
     final activeSites = allSites.where((site) => site.isActive).toList();
     final allSiteIds = activeSites.map((site) => site.id).toList();
     

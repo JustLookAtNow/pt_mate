@@ -221,14 +221,19 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                     icon: Icon(
                                       Icons.sort,
                                       color: provider.sortBy != 'none'
-                                          ? Theme.of(
-                                              context,
-                                            ).colorScheme.primary
+                                          ? Theme.of(context).colorScheme.secondary
                                           : null,
                                     ),
-                                    tooltip: '排序方式',
+                                    tooltip: '排序',
                                     onSelected: (value) {
-                                      provider.setSortBy(value);
+                                      // 与 app.dart 的行为保持一致：
+                                      // 选择相同的排序类型时切换升降序；选择新的类型时默认降序
+                                      if (value == provider.sortBy) {
+                                        provider.setSortAscending(!provider.sortAscending);
+                                      } else {
+                                        provider.setSortBy(value);
+                                        provider.setSortAscending(false);
+                                      }
                                       _resortCurrentResults();
                                     },
                                     itemBuilder: (context) => [
@@ -238,9 +243,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           decoration: BoxDecoration(
                                             color: provider.sortBy == 'none'
                                                 ? Theme.of(context)
-                                                      .colorScheme
-                                                      .primaryContainer
-                                                      .withValues(alpha: 0.3)
+                                                    .colorScheme
+                                                    .primary
+                                                    .withValues(alpha: 0.1)
                                                 : null,
                                             borderRadius: BorderRadius.circular(
                                               4,
@@ -255,9 +260,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                               Icon(
                                                 Icons.clear,
                                                 color: provider.sortBy == 'none'
-                                                    ? Theme.of(
-                                                        context,
-                                                      ).colorScheme.secondary
+                                                    ? Theme.of(context).colorScheme.secondary
                                                     : null,
                                               ),
                                               const SizedBox(width: 8),
@@ -273,9 +276,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           decoration: BoxDecoration(
                                             color: provider.sortBy == 'size'
                                                 ? Theme.of(context)
-                                                      .colorScheme
-                                                      .primaryContainer
-                                                      .withValues(alpha: 0.3)
+                                                    .colorScheme
+                                                    .primary
+                                                    .withValues(alpha: 0.1)
                                                 : null,
                                             borderRadius: BorderRadius.circular(
                                               4,
@@ -288,13 +291,11 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           child: Row(
                                             children: [
                                               Icon(
-                                                provider.sortAscending
+                                                provider.sortBy == 'size' && provider.sortAscending
                                                     ? Icons.arrow_upward
                                                     : Icons.arrow_downward,
                                                 color: provider.sortBy == 'size'
-                                                    ? Theme.of(
-                                                        context,
-                                                      ).colorScheme.secondary
+                                                    ? Theme.of(context).colorScheme.secondary
                                                     : null,
                                               ),
                                               const SizedBox(width: 8),
@@ -305,14 +306,14 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       ),
 
                                       PopupMenuItem(
-                                        value: 'seeders',
+                                        value: 'upload',
                                         child: Container(
                                           decoration: BoxDecoration(
-                                            color: provider.sortBy == 'seeders'
+                                            color: provider.sortBy == 'upload'
                                                 ? Theme.of(context)
-                                                      .colorScheme
-                                                      .primaryContainer
-                                                      .withValues(alpha: 0.3)
+                                                    .colorScheme
+                                                    .primary
+                                                    .withValues(alpha: 0.1)
                                                 : null,
                                             borderRadius: BorderRadius.circular(
                                               4,
@@ -325,45 +326,58 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           child: Row(
                                             children: [
                                               Icon(
-                                                provider.sortAscending
+                                                provider.sortBy == 'upload' && provider.sortAscending
                                                     ? Icons.arrow_upward
                                                     : Icons.arrow_downward,
-                                                color:
-                                                    provider.sortBy == 'seeders'
-                                                    ? Theme.of(
-                                                        context,
-                                                      ).colorScheme.secondary
+                                                color: provider.sortBy == 'upload'
+                                                    ? Theme.of(context).colorScheme.secondary
                                                     : null,
                                               ),
                                               const SizedBox(width: 8),
-                                              const Text('按做种数排序'),
+                                              const Text('按上传量排序'),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+
+                                      PopupMenuItem(
+                                        value: 'download',
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: provider.sortBy == 'download'
+                                                ? Theme.of(context)
+                                                    .colorScheme
+                                                    .primary
+                                                    .withValues(alpha: 0.1)
+                                                : null,
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                provider.sortBy == 'download' && provider.sortAscending
+                                                    ? Icons.arrow_upward
+                                                    : Icons.arrow_downward,
+                                                color: provider.sortBy == 'download'
+                                                    ? Theme.of(context).colorScheme.secondary
+                                                    : null,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Text('按下载量排序'),
                                             ],
                                           ),
                                         ),
                                       ),
                                     ],
                                   ),
-                                  // 排序方向切换
-                                  if (provider.sortBy != 'none')
-                                    IconButton(
-                                      icon: Icon(
-                                        provider.sortAscending
-                                            ? Icons.keyboard_arrow_up
-                                            : Icons.keyboard_arrow_down,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.primary,
-                                      ),
-                                      tooltip: provider.sortAscending
-                                          ? '升序'
-                                          : '降序',
-                                      onPressed: () {
-                                        provider.setSortAscending(
-                                          !provider.sortAscending,
-                                        );
-                                        _resortCurrentResults();
-                                      },
-                                    ),
+                               
+                                 
                                 ],
                               ),
                             ],
@@ -621,9 +635,17 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         });
         break;
       case 'seeders':
-        // 按做种数排序
+      case 'upload':
+        // 按做种数排序（与 app.dart 的“上传量”一致，使用 seeders）
         sortedItems.sort((a, b) {
           final comparison = a.torrent.seeders.compareTo(b.torrent.seeders);
+          return sortAscending ? comparison : -comparison;
+        });
+        break;
+      case 'download':
+        // 按下载量排序（使用 leechers）
+        sortedItems.sort((a, b) {
+          final comparison = a.torrent.leechers.compareTo(b.torrent.leechers);
           return sortAscending ? comparison : -comparison;
         });
         break;
