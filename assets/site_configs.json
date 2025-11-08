@@ -240,7 +240,7 @@
               }
             },
             "collection": {
-              "selector": "table.torrentname > tbody > tr > td:nth-child(4) > img.bookmark",
+              "selector": "table.torrentname > img.bookmark",
               "attribute": "src"
             },
             "isTop": {
