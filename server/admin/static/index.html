@@ -174,7 +174,34 @@
         async refreshAll(){ await Promise.all([this.fetchKPI(), this.fetchPlatforms(), this.fetchVersions(), this.fetchDevices(), this.fetchDauTrend()]); },
         async fetchKPI(){ const r = await fetch('/api/v1/admin/stats/overview',{ headers:authHeaders()}); const j = await r.json(); this.kpi = j; },
         async fetchPlatforms(){ const r = await fetch('/api/v1/admin/stats/platforms',{ headers:authHeaders()}); const j = await r.json(); this.renderPie('platformChart', j.items.map(x=>x.platform), j.items.map(x=>x.count), 'platform'); },
-        async fetchVersions(){ const r = await fetch('/api/v1/admin/stats/versions',{ headers:authHeaders()}); const j = await r.json(); this.renderPie('versionChart', j.items.map(x=>x.version), j.items.map(x=>x.count), 'version'); },
+        async fetchVersions(){
+          const r = await fetch('/api/v1/admin/stats/versions',{ headers:authHeaders()});
+          const j = await r.json();
+          const total = (j.items || []).reduce((sum, x) => sum + (x.count || 0), 0);
+          let labels = [];
+          let data = [];
+          if(total > 0){
+            let others = 0;
+            // 将占比 <10% 的版本合并为“其它”
+            for(const it of j.items){
+              const pct = (it.count || 0) / total;
+              if(pct < 0.10){
+                others += it.count || 0;
+              } else {
+                labels.push(it.version);
+                data.push(it.count || 0);
+              }
+            }
+            if(others > 0){
+              labels.push('其它');
+              data.push(others);
+            }
+          } else {
+            labels = (j.items || []).map(x=>x.version);
+            data = (j.items || []).map(x=>x.count || 0);
+          }
+          this.renderPie('versionChart', labels, data, 'version');
+        },
         async fetchDevices(){
           const p = new URLSearchParams(); p.set('page', this.page); p.set('pageSize', this.pageSize);
           if(this.filterPlatform) p.set('platform', this.filterPlatform);
@@ -193,7 +220,18 @@
           if(this[id+'Instance']) { this[id+'Instance'].destroy(); }
           const colors = ['#3b82f6','#f59e0b','#10b981','#ef4444','#6366f1','#22d3ee','#84cc16','#e11d48'];
           const chart = new Chart(ctx, { type:'pie', data:{ labels, datasets:[{ data, backgroundColor: colors }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } }, onClick:(evt, elements)=>{
-            if(elements.length>0){ const idx = elements[0].index; const label = labels[idx]; if(kind==='platform') this.filterPlatform=label; if(kind==='version') this.filterVersion=label; this.page=1; this.fetchDevices(); }
+            if(elements.length>0){
+              const idx = elements[0].index;
+              const label = labels[idx];
+              if(kind==='platform') {
+                this.filterPlatform = label;
+              } else if(kind==='version') {
+                // 点击“其它”不触发版本筛选
+                if(label !== '其它') this.filterVersion = label;
+              }
+              this.page = 1;
+              this.fetchDevices();
+            }
           } } });
           this[id+'Instance'] = chart;
         },
