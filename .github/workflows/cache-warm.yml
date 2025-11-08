@@ -37,16 +37,6 @@ jobs:
           flutter config --enable-linux-desktop
           flutter precache --linux
 
-      - name: Cache pub dependencies
-        id: cache_pub_linux
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
-
       - name: Get dependencies
         run: |
           # 如果 pubspec.lock 未变化，actions/cache 会命中，跳过更新
@@ -132,20 +122,6 @@ jobs:
           flutter config --enable-windows-desktop
           flutter precache --windows
 
-      - name: Define PUB_CACHE (Windows)
-        shell: pwsh
-        run: |
-          echo "PUB_CACHE=$env:LOCALAPPDATA\Pub\Cache" >> $env:GITHUB_ENV
-
-      - name: Cache pub dependencies
-        id: cache_pub_windows
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.PUB_CACHE }}
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
-
       - name: Get dependencies
         run: |
           flutter pub get
@@ -187,16 +163,6 @@ jobs:
         run: |
           flutter config --enable-macos-desktop
           flutter precache --macos
-
-      - name: Cache pub dependencies
-        id: cache_pub_macos
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
 
       - name: Get dependencies
         run: |
