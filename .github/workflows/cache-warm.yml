@@ -132,12 +132,16 @@ jobs:
           flutter config --enable-windows-desktop
           flutter precache --windows
 
+      - name: Define PUB_CACHE (Windows)
+        shell: pwsh
+        run: |
+          echo "PUB_CACHE=$env:LOCALAPPDATA\Pub\Cache" >> $env:GITHUB_ENV
+
       - name: Cache pub dependencies
         id: cache_pub_windows
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.pub-cache
+          path: ${{ env.PUB_CACHE }}
           key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
           restore-keys: |
             ${{ runner.os }}-pub-
