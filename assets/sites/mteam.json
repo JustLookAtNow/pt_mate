@@ -3,9 +3,7 @@
   "name": "M-Team",
   "isShow": true,
   "baseUrls": [
-    "https://api.m-team.cc",
-    "https://kp.m-team.cc",
-    "https://tp.m-team.cc"
+    "https://api.m-team.cc"
   ],
   "primaryUrl": "https://api.m-team.cc",
   "siteType": "M-Team",
