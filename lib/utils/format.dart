@@ -71,7 +71,17 @@ class Formatters {
   }
 
   static String shareRate(num rate) => _num2.format(rate);
-  static String bonus(num bonus) => _num2.format(bonus);
+  static String bonus(num bonus) {
+    final int v = bonus.toInt();
+    final int absV = v.abs();
+    if (absV >= 1000000) {
+      return '${v ~/ 1000000} M';
+    }
+    if (absV >= 1000) {
+      return '${v ~/ 1000} K';
+    }
+    return v.toString();
+  }
 
   // 新增：格式化种子创建时间为距离现在过了多久
   static String formatTorrentCreatedDate(String createdDate) {
@@ -90,35 +100,35 @@ class Formatters {
       // 按优先级返回两段显示
       if (years > 0) {
         if (months > 0) {
-          return '$years 年 $months 月';
+          return '$years 年 $months 月 前';
         }
-        return '$years 年';
+        return '$years 年 前';
       }
       
       if (months > 0) {
         if (days > 0) {
-          return '$months 月 $days 天';
+          return '$months 月 $days 天 前';
         }
-        return '$months 月';
+        return '$months 月 前';
       }
       
       if (days > 0) {
         if (hours > 0) {
-          return '$days 天 $hours 小时';
+          return '$days 天 $hours 小时 前';
         }
-        return '$days 天';
+        return '$days 天 前';
       }
       
       if (hours > 0) {
         if (minutes > 0) {
-          return '$hours 小时 $minutes 分钟';
+          return '$hours 小时 $minutes 分钟 前';
         }
-        return '$hours 小时';
+        return '$hours 小时 前';
       }
       
       // 最小单位为分钟
       if (minutes > 0) {
-        return '$minutes 分钟';
+        return '$minutes 分钟 前';
       }
       
       return '刚刚'; // 不足1分钟显示为刚刚

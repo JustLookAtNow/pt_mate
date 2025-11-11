@@ -13,6 +13,62 @@ import '../widgets/responsive_layout.dart';
 import '../utils/format.dart';
 import '../app.dart';
 
+class _HealthStatus {
+  final bool ok;
+  final String? message;
+  final String? username;
+  final MemberProfile? profile;
+  final DateTime updatedAt;
+  const _HealthStatus({
+    required this.ok,
+    this.message,
+    this.username,
+    this.profile,
+    required this.updatedAt,
+  });
+
+  factory _HealthStatus.fromJson(Map<String, dynamic> json) {
+    final ok = json['ok'] == true || json['ok'] == 'true';
+    final message = json['message']?.toString();
+    final username = json['username']?.toString();
+    final updatedAtStr = json['updatedAt']?.toString();
+    DateTime updatedAt;
+    try {
+      updatedAt = DateTime.parse(
+        updatedAtStr ?? DateTime.now().toIso8601String(),
+      );
+    } catch (_) {
+      updatedAt = DateTime.now();
+    }
+    MemberProfile? profile;
+    final p = json['profile'];
+    if (p is Map<String, dynamic>) {
+      try {
+        profile = MemberProfile.fromJson(p);
+      } catch (_) {
+        profile = null;
+      }
+    }
+    return _HealthStatus(
+      ok: ok,
+      message: message,
+      username: username,
+      profile: profile,
+      updatedAt: updatedAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'ok': ok,
+      'message': message,
+      'username': username,
+      'profile': profile?.toJson(),
+      'updatedAt': updatedAt.toIso8601String(),
+    };
+  }
+}
+
 class ServerSettingsPage extends StatefulWidget {
   const ServerSettingsPage({super.key});
 
@@ -24,12 +80,58 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   List<SiteConfig> _sites = [];
   String? _activeSiteId;
   bool _loading = true;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _healthChecking = false;
+  Map<String, _HealthStatus> _healthStatuses = {}; // siteId -> status
+
+  // 站点图标路径缓存：siteId -> asset path
+  final Map<String, String> _logoPathCache = {};
+
+  Future<String> _resolveLogoPath(SiteConfig site) async {
+    // 命中缓存直接返回
+    final cached = _logoPathCache[site.id];
+    if (cached != null && cached.isNotEmpty) return cached;
+
+    // 默认回退图标
+    String path = 'assets/sites_icon/_default_nexusphp.png';
+    try {
+      // 通过模板ID加载模板以获取可选的 logo 字段
+      final template = await SiteConfigService.getTemplateById(
+        site.templateId,
+        site.siteType,
+      );
+      final logo = template?.logo;
+      if (logo != null && logo.isNotEmpty) {
+        // 统一使用 PNG：如果不是以 .png 结尾，尝试替换为 .png
+        final lower = logo.toLowerCase();
+        path = lower.endsWith('.png')
+            ? logo
+            : (logo.contains('.')
+                ? '${logo.substring(0, logo.lastIndexOf('.'))}.png'
+                : logo);
+      }
+    } catch (_) {
+      // 静默失败，使用默认图标
+    }
+
+    _logoPathCache[site.id] = path;
+    return path;
+  }
 
   @override
   void initState() {
     super.initState();
     _loadSites();
   }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // 简单的健康状态模型
 
   Future<void> _loadSites() async {
     setState(() => _loading = true);
@@ -40,23 +142,186 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         _sites = sites;
         _activeSiteId = activeSiteId;
       });
+      // 加载已缓存的健康检查结果；若无缓存则自动触发一次刷新
+      await _loadCachedHealthStatuses(triggerRefreshWhenEmpty: true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(
-          content: Text(
-            '加载站点配置失败: $e',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onErrorContainer,
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '加载站点配置失败: $e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
             ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+            behavior: SnackBarBehavior.fixed,
           ),
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-          behavior: SnackBarBehavior.fixed,
-        ));
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadCachedHealthStatuses({
+    bool triggerRefreshWhenEmpty = false,
+  }) async {
+    try {
+      final map = await StorageService.instance.loadHealthStatuses();
+      if (mounted) {
+        setState(() {
+          _healthStatuses = map.map(
+            (siteId, json) => MapEntry(siteId, _HealthStatus.fromJson(json)),
+          );
+        });
+      }
+      // 若需要在无缓存时自动刷新，且当前未在刷新过程中
+      if (triggerRefreshWhenEmpty &&
+          _healthStatuses.isEmpty &&
+          !_healthChecking) {
+        // 站点列表为空时不触发，等待站点加载完成再触发
+        if (_sites.isNotEmpty) {
+          _runHealthCheck();
+        }
+      }
+    } catch (_) {
+      // ignore read errors
+    }
+  }
+
+  List<SiteConfig> get _filteredSites {
+    if (_searchQuery.trim().isEmpty) return _sites;
+    final q = _searchQuery.trim().toLowerCase();
+    return _sites.where((s) {
+      return s.name.toLowerCase().contains(q) ||
+          s.baseUrl.toLowerCase().contains(q) ||
+          s.siteType.displayName.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  Future<void> _runHealthCheck() async {
+    if (_healthChecking) return;
+    setState(() {
+      _healthChecking = true;
+      _healthStatuses = {};
+    });
+
+    // 加载包含API Key的站点，以便调用用户资料接口
+    final allSites = await StorageService.instance.loadSiteConfigs(
+      includeApiKeys: true,
+    );
+    final targetSites = _filteredSites.map((s) {
+      final found = allSites.firstWhere((x) => x.id == s.id, orElse: () => s);
+      return found;
+    }).toList();
+
+    // 并发控制：借鉴聚合搜索的思路，按线程数限制并发
+    final settings = await StorageService.instance
+        .loadAggregateSearchSettings();
+    final maxConcurrency = settings.searchThreads;
+
+    int index = 0;
+    int active = 0;
+
+    Future<void> startNext() async {
+      while (active < maxConcurrency && index < targetSites.length) {
+        final site = targetSites[index++];
+        active++;
+        _checkSingleSite(site)
+            .then((status) {
+              if (mounted) {
+                setState(() {
+                  _healthStatuses[site.id] = status;
+                });
+              }
+            })
+            .catchError((error) {
+              if (mounted) {
+                setState(() {
+                  _healthStatuses[site.id] = _HealthStatus(
+                    ok: false,
+                    message: error.toString(),
+                    username: null,
+                    updatedAt: DateTime.now(),
+                  );
+                });
+              }
+            })
+            .whenComplete(() async {
+              active--;
+              // 继续下一个
+              startNext();
+              // 如果全部完成，结束检查
+              if (index >= targetSites.length && active == 0) {
+                if (mounted) {
+                  setState(() {
+                    _healthChecking = false;
+                  });
+                  // 持久化健康检查结果
+                  try {
+                    final jsonMap = _healthStatuses.map(
+                      (siteId, status) => MapEntry(siteId, status.toJson()),
+                    );
+                    await StorageService.instance.saveHealthStatuses(jsonMap);
+                  } catch (_) {
+                    // ignore save errors
+                  }
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        '站点信息获取完成',
+                        style: TextStyle(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.primaryContainer,
+                      behavior: SnackBarBehavior.fixed,
+                    ),
+                  );
+                }
+              }
+            });
+      }
+    }
+
+    await startNext();
+  }
+
+  Future<_HealthStatus> _checkSingleSite(SiteConfig site) async {
+    // 仅在站点支持用户资料时进行检查，其他标记为不支持
+    if (!site.features.supportMemberProfile) {
+      return _HealthStatus(
+        ok: false,
+        message: '站点不支持用户资料接口',
+        username: null,
+        profile: null,
+        updatedAt: DateTime.now(),
+      );
+    }
+    try {
+      final adapter = await ApiService.instance.getAdapter(site);
+      final profile = await adapter.fetchMemberProfile(apiKey: site.apiKey);
+      return _HealthStatus(
+        ok: true,
+        message: '正常',
+        username: profile.username,
+        profile: profile,
+        updatedAt: DateTime.now(),
+      );
+    } catch (e) {
+      return _HealthStatus(
+        ok: false,
+        message: e.toString(),
+        username: null,
+        profile: null,
+        updatedAt: DateTime.now(),
+      );
     }
   }
 
@@ -81,7 +346,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             behavior: SnackBarBehavior.fixed,
           ),
         );
-        
+
         // 切换站点成功后跳转回首页
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
@@ -133,33 +398,33 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         await StorageService.instance.deleteSiteConfig(site.id);
         await _loadSites();
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(
-            content: Text(
-              '站点已删除',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '站点已删除',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
               ),
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              behavior: SnackBarBehavior.fixed,
             ),
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-            behavior: SnackBarBehavior.fixed,
-          ));
+          );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(
-            content: Text(
-              '删除站点失败: $e',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onErrorContainer,
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '删除站点失败: $e',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
               ),
+              backgroundColor: Theme.of(context).colorScheme.errorContainer,
+              behavior: SnackBarBehavior.fixed,
             ),
-            backgroundColor: Theme.of(context).colorScheme.errorContainer,
-            behavior: SnackBarBehavior.fixed,
-          ));
+          );
         }
       }
     }
@@ -177,16 +442,113 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     );
   }
 
-  void _editSite(SiteConfig site) {
+  void _editSite(SiteConfig site) async {
+    // 编辑前加载包含 API Key 的完整站点配置，以便预填充密钥等敏感信息
+    final allSites = await StorageService.instance.loadSiteConfigs(
+      includeApiKeys: true,
+    );
+    final fullSite = allSites.firstWhere(
+      (s) => s.id == site.id,
+      orElse: () => site,
+    );
+
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => SiteEditPage(
-          site: site,
+          site: fullSite,
           onSaved: () {
             _loadSites();
           },
         ),
       ),
+    );
+  }
+
+  // 小屏长按弹菜单；大屏右侧按钮使用此数据源
+  void _showSiteMenu(SiteConfig site, bool isActive) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!isActive)
+                ListTile(
+                  leading: const Icon(Icons.radio_button_checked),
+                  title: const Text('设为当前'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _setActiveSite(site.id);
+                  },
+                ),
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('编辑'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editSite(site);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete),
+                title: const Text('删除'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteSite(site);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 大屏右侧菜单按钮
+  Widget _buildSiteMenuButton(SiteConfig site, bool isActive) {
+    return PopupMenuButton<String>(
+      onSelected: (value) {
+        switch (value) {
+          case 'activate':
+            _setActiveSite(site.id);
+            break;
+          case 'edit':
+            _editSite(site);
+            break;
+          case 'delete':
+            _deleteSite(site);
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        if (!isActive)
+          const PopupMenuItem(
+            value: 'activate',
+            child: ListTile(
+              leading: Icon(Icons.radio_button_checked),
+              title: Text('设为当前'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        const PopupMenuItem(
+          value: 'edit',
+          child: ListTile(
+            leading: Icon(Icons.edit),
+            title: Text('编辑'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'delete',
+          child: ListTile(
+            leading: Icon(Icons.delete),
+            title: Text('删除'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      ],
     );
   }
 
@@ -217,6 +579,35 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                // 顶部工具栏：搜索框 + 健康检查按钮
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: (val) {
+                            setState(() {
+                              _searchQuery = val;
+                            });
+                          },
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.search),
+                            hintText: '搜索站点名称、URL、类型…',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      FilledButton.icon(
+                        onPressed: _healthChecking ? null : _runHealthCheck,
+                        icon: const Icon(Icons.refresh),
+                        label: Text(_healthChecking ? '刷新中…' : '刷新'),
+                      ),
+                    ],
+                  ),
+                ),
                 if (_sites.isEmpty)
                   Expanded(
                     child: Center(
@@ -252,10 +643,11 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                   Expanded(
                     child: ListView.builder(
                       padding: const EdgeInsets.all(16),
-                      itemCount: _sites.length,
+                      itemCount: _filteredSites.length,
                       itemBuilder: (context, index) {
-                        final site = _sites[index];
+                        final site = _filteredSites[index];
                         final isActive = site.id == _activeSiteId;
+                        final hs = _healthStatuses[site.id];
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 8),
@@ -263,135 +655,409 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                               ? Theme.of(context).colorScheme.primaryContainer
                                     .withValues(alpha: 0.3)
                               : null,
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: isActive
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(
-                                      context,
-                                    ).colorScheme.surfaceContainerHighest,
-                              child: Icon(
-                                Icons.dns,
-                                color: isActive
-                                    ? Theme.of(context).colorScheme.onPrimary
-                                    : Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
+                          
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              // 左上角类型角标已移除，改为站点名称后内联徽标
+                              // 右上角当前激活角标
+                              // if (isActive)
+                              //   Positioned(
+                              //     right: 0,
+                              //     top: -3,
+                              //     child: Container(
+                              //       padding: const EdgeInsets.symmetric(
+                              //         horizontal: 8,
+                              //         vertical: 2,
+                              //       ),
+                              //       decoration: BoxDecoration(
+                              //         color: Theme.of(
+                              //           context,
+                              //         ).colorScheme.secondary,
+                              //         borderRadius: const BorderRadius.only(
+                              //           bottomLeft: Radius.circular(6),
+                              //         ),
+                              //       ),
+                              //       child: Text(
+                              //         'active',
+                              //         style: TextStyle(
+                              //           fontSize: 11,
+                              //           color: Theme.of(
+                              //             context,
+                              //           ).colorScheme.onSecondary,
+                              //         ),
+                              //       ),
+                              //     ),
+                              //   ),
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final isLarge = constraints.maxWidth > 768;
+                                  return InkWell(
+                                    onTap: isActive
+                                        ? null
+                                        : () => _setActiveSite(site.id),
+                                    onLongPress: isLarge
+                                        ? null
+                                        : () => _showSiteMenu(site, isActive),
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        12,
+                                        4,
+                                        12,
+                                        4,
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          // 左侧主显示区
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.center,
+                                                  children: [
+                                                    CircleAvatar(
+                                                      radius: 14,
+                                                      backgroundColor: isActive
+                                                          ? Theme.of(context)
+                                                                .colorScheme
+                                                                .primary
+                                                          : Theme.of(context)
+                                                                .colorScheme
+                                                                .surfaceContainerHighest,
+                                                      child: FutureBuilder<String>(
+                                                        future: _resolveLogoPath(site),
+                                                        builder: (context, snapshot) {
+                                                          final Color fgColor = isActive
+                                                              ? Theme.of(context).colorScheme.onPrimary
+                                                              : Theme.of(context).colorScheme.onSurfaceVariant;
+                                                          if (snapshot.connectionState != ConnectionState.done ||
+                                                              (snapshot.data == null || snapshot.data!.isEmpty)) {
+                                                            return Icon(
+                                                              Icons.dns,
+                                                              size: 18,
+                                                              color: fgColor,
+                                                            );
+                                                          }
+
+                                                          final String path = snapshot.data!;
+                                                          return ClipOval(
+                                                            child: Image.asset(
+                                                              path,
+                                                              width: 18,
+                                                              height: 18,
+                                                              fit: BoxFit.cover,
+                                                              errorBuilder: (context, error, stackTrace) {
+                                                                return Image.asset(
+                                                                  'assets/sites_icon/_default_nexusphp.png',
+                                                                  width: 18,
+                                                                  height: 18,
+                                                                  fit: BoxFit.cover,
+                                                                );
+                                                              },
+                                                            ),
+                                                          );
+                                                        },
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Expanded(
+                                                      child: Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Flexible(
+                                                            child: Text(
+                                                              site.name,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              style: TextStyle(
+                                                                fontWeight:
+                                                                    isActive
+                                                                    ? FontWeight
+                                                                          .bold
+                                                                    : FontWeight
+                                                                          .normal,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 6,
+                                                          ),
+                                                          // Container(
+                                                          //   padding:
+                                                          //       const EdgeInsets.symmetric(
+                                                          //         horizontal: 6,
+                                                          //         vertical: 2,
+                                                          //       ),
+                                                          //   decoration: BoxDecoration(
+                                                          //     color:
+                                                          //         Theme.of(
+                                                          //               context,
+                                                          //             )
+                                                          //             .colorScheme
+                                                          //             .primary,
+                                                          //     borderRadius:
+                                                          //         BorderRadius.circular(
+                                                          //           6,
+                                                          //         ),
+                                                          //   ),
+                                                          //   child: Text(
+                                                          //     site
+                                                          //         .siteType
+                                                          //         .displayName,
+                                                          //     style: TextStyle(
+                                                          //       fontSize: 10,
+                                                          //       color: Theme.of(
+                                                          //         context,
+                                                          //       ).colorScheme.onPrimary,
+                                                          //     ),
+                                                          //   ),
+                                                          // ),
+                                                          // active 标签移至右上角角标
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    // 右侧显示用户名（小字体，仍在左侧区域）
+                                                    Text(
+                                                      hs?.username ?? '',
+                                                      style: Theme.of(
+                                                        context,
+                                                      ).textTheme.bodyMedium,
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 6),
+                                                // 健康检查信息：成功时显示 MemberProfile 信息；错误时显示错误
+                                                if (hs != null)
+                                                  Builder(
+                                                    builder: (context) {
+                                                      if (hs.ok &&
+                                                          hs.profile != null) {
+                                                        final p = hs.profile!;
+                                                        Widget buildItem(
+                                                          IconData icon,
+                                                          Color color,
+                                                          String label,
+                                                        ) {
+                                                          return Row(
+                                                            mainAxisSize:
+                                                                MainAxisSize
+                                                                    .min,
+                                                            children: [
+                                                              Icon(
+                                                                icon,
+                                                                size: 14,
+                                                                color: color,
+                                                              ),
+                                                              const SizedBox(
+                                                                width: 4,
+                                                              ),
+                                                              Flexible(
+                                                                child: Text(
+                                                                  label,
+                                                                  maxLines: 1,
+                                                                  softWrap:
+                                                                      false,
+                                                                  overflow:
+                                                                      TextOverflow
+                                                                          .ellipsis,
+                                                                  style:
+                                                                      Theme.of(
+                                                                        context,
+                                                                      ).textTheme.bodySmall?.copyWith(
+                                                                        height:
+                                                                            1.0,
+                                                                      ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          );
+                                                        }
+
+                                                        final items = <Widget>[
+                                                          buildItem(
+                                                            Icons.stars,
+                                                            Theme.of(context)
+                                                                .colorScheme
+                                                                .primary,
+                                                            '魔力值: ${Formatters.bonus(p.bonus)}',
+                                                          ),
+                                                          buildItem(
+                                                            Icons.trending_up,
+                                                            Theme.of(context)
+                                                                .colorScheme
+                                                                .primary,
+                                                            '分享率: ${p.shareRate.toStringAsFixed(2)}',
+                                                          ),
+                                                          buildItem(
+                                                            Icons.upload,
+                                                            Colors.blue,
+                                                            ': ${p.uploadedBytesString}',
+                                                          ),
+                                                          buildItem(
+                                                            Icons.download,
+                                                            Colors.green,
+                                                            ': ${p.downloadedBytesString}',
+                                                          ),
+                                                          if (p.lastAccess !=
+                                                              null)
+                                                            buildItem(
+                                                              Icons.schedule,
+                                                              Theme.of(context)
+                                                                  .colorScheme
+                                                                  .primary,
+                                                              ': ${p.lastAccess?.substring(0, 10)}',
+                                                            ),
+                                                        ];
+                                                        if (isLarge) {
+                                                          return Row(
+                                                            children: [
+                                                              for (
+                                                                int i = 0;
+                                                                i <
+                                                                    items
+                                                                        .length;
+                                                                i++
+                                                              ) ...[
+                                                                items[i],
+                                                                if (i !=
+                                                                    items.length -
+                                                                        1)
+                                                                  Padding(
+                                                                    padding: const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          8.0,
+                                                                    ),
+                                                                    child: Text(
+                                                                      '•',
+                                                                      style: Theme.of(
+                                                                        context,
+                                                                      ).textTheme.bodySmall,
+                                                                    ),
+                                                                  ),
+                                                              ],
+                                                            ],
+                                                          );
+                                                        } else {
+                                                          return GridView.count(
+                                                            crossAxisCount: 3,
+                                                            crossAxisSpacing: 6,
+                                                            mainAxisSpacing: 6,
+                                                            childAspectRatio:
+                                                                8.0,
+                                                            padding:
+                                                                EdgeInsets.zero,
+                                                            shrinkWrap: true,
+                                                            physics:
+                                                                const NeverScrollableScrollPhysics(),
+                                                            children: items,
+                                                          );
+                                                        }
+                                                      } else {
+                                                        return Row(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .center,
+                                                          children: [
+                                                            IconButton(
+                                                              icon: const Icon(
+                                                                Icons
+                                                                    .error_outline,
+                                                                size: 18,
+                                                                color:
+                                                                    Colors.red,
+                                                              ),
+                                                              padding:
+                                                                  EdgeInsets
+                                                                      .zero,
+                                                              constraints:
+                                                                  const BoxConstraints(),
+                                                              onPressed: () {
+                                                                final msg =
+                                                                    hs.message ??
+                                                                    '异常';
+                                                                ScaffoldMessenger.of(
+                                                                  context,
+                                                                ).showSnackBar(
+                                                                  SnackBar(
+                                                                    backgroundColor:
+                                                                        Theme.of(
+                                                                          context,
+                                                                        ).colorScheme.errorContainer,
+                                                                    content: Text(
+                                                                      msg,
+                                                                      style: TextStyle(
+                                                                        color: Theme.of(
+                                                                          context,
+                                                                        ).colorScheme.onErrorContainer,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                );
+                                                              },
+                                                            ),
+                                                            const SizedBox(
+                                                              width: 6,
+                                                            ),
+                                                            Expanded(
+                                                              child: Text(
+                                                                '请求失败，请检查站点状态，点击感叹号查看详情',
+                                                                style: Theme.of(
+                                                                  context,
+                                                                ).textTheme.bodySmall,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        );
+                                                      }
+                                                    },
+                                                  ),
+                                                // const SizedBox(height: 4),
+                                                // 左侧区域右下角更新时间
+                                                Row(
+                                                  children: [
+                                                    const Spacer(),
+                                                    if (hs != null)
+                                                      Text(
+                                                        Formatters.formatTorrentCreatedDate(
+                                                          hs.updatedAt
+                                                              .toIso8601String(),
+                                                        ),
+                                                        style: Theme.of(context)
+                                                            .textTheme
+                                                            .bodySmall
+                                                            ?.copyWith(
+                                                              color: Theme.of(context)
+                                                                  .colorScheme
+                                                                  .onSurfaceVariant,
+                                                            ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          // 右侧菜单按钮（仅大屏显示）
+                                          if (isLarge)
+                                            _buildSiteMenuButton(
+                                              site,
+                                              isActive,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                            ),
-                            title: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    site.name,
-                                    style: TextStyle(
-                                      fontWeight: isActive
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                    ),
-                                  ),
-                                ),
-                                if (isActive)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      'active',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onPrimary,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(site.baseUrl),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.primaryContainer,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        site.siteType.displayName,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.onPrimaryContainer,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            trailing: PopupMenuButton<String>(
-                              onSelected: (value) {
-                                switch (value) {
-                                  case 'activate':
-                                    _setActiveSite(site.id);
-                                    break;
-                                  case 'edit':
-                                    _editSite(site);
-                                    break;
-                                  case 'delete':
-                                    _deleteSite(site);
-                                    break;
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                if (!isActive)
-                                  const PopupMenuItem(
-                                    value: 'activate',
-                                    child: ListTile(
-                                      leading: Icon(Icons.radio_button_checked),
-                                      title: Text('设为当前'),
-                                      contentPadding: EdgeInsets.zero,
-                                    ),
-                                  ),
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: ListTile(
-                                    leading: Icon(Icons.edit),
-                                    title: Text('编辑'),
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: ListTile(
-                                    leading: Icon(Icons.delete),
-                                    title: Text('删除'),
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            onTap: isActive
-                                ? null
-                                : () => _setActiveSite(site.id),
+                            ],
                           ),
                         );
                       },
@@ -490,9 +1156,7 @@ class _CategoryEditDialogState extends State<_CategoryEditDialog> {
             final name = _nameController.text.trim();
             final parameters = _parametersController.text.trim();
             if (name.isEmpty || parameters.isEmpty) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(
+              ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
                     '请填写完整信息',
@@ -556,17 +1220,17 @@ class _SiteEditPageState extends State<SiteEditPage> {
   @override
   void initState() {
     super.initState();
-    
+
     // 如果是编辑模式，默认不展开预设站点列表
     if (widget.site != null) {
       _showPresetList = false;
     }
-    
+
     _loadPresetSites();
-    
+
     // 添加预设站点搜索监听器
     _presetSearchController.addListener(_filterPresetSites);
-    
+
     if (widget.site != null) {
       // 编辑现有站点时，先保存原始数据，但不立即填充到UI字段
       _apiKeyController.text = widget.site!.apiKey ?? '';
@@ -576,7 +1240,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       _searchCategories = List.from(widget.site!.searchCategories);
       _siteFeatures = widget.site!.features;
       _savedCookie = widget.site!.cookie;
-      
+
       // 检查是否是预设站点，这会根据检测结果填充相应字段
       _checkIfPresetSite();
     } else {
@@ -626,7 +1290,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
   void _checkIfPresetSite() {
     if (widget.site != null) {
       bool foundPreset = false;
-      
+
       // 检查模板格式（所有预设站点现在都是模板格式）
       for (final template in _presetTemplates) {
         if (template.baseUrls.contains(widget.site!.baseUrl)) {
@@ -643,7 +1307,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
           break;
         }
       }
-      
+
       // 如果没有找到匹配的预设站点，则设为自定义，填充原始站点信息
       if (!foundPreset) {
         setState(() {
@@ -675,14 +1339,14 @@ class _SiteEditPageState extends State<SiteEditPage> {
       _searchCategories = [];
       _hasUserMadeSelection = true; // 用户已做出选择
       _loadDefaultFeatures(_selectedSiteType!);
-      
+
       // 清空自定义字段
       _nameController.clear();
       _baseUrlController.clear();
-      
+
       // 清空搜索框
       _presetSearchController.clear();
-      
+
       // 清空之前的错误和用户信息
       _error = null;
       _profile = null;
@@ -698,14 +1362,14 @@ class _SiteEditPageState extends State<SiteEditPage> {
       _searchCategories = [];
       _siteFeatures = template.features;
       _hasUserMadeSelection = true; // 用户已做出选择
-      
+
       // 填充模板站点信息到字段中
       _nameController.text = template.name;
       _baseUrlController.text = selectedUrl;
-      
+
       // 清空搜索框
       _presetSearchController.clear();
-      
+
       // 清空之前的错误和用户信息
       _error = null;
       _profile = null;
@@ -716,7 +1380,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
     try {
       final defaultTemplate = await SiteConfigService.getTemplateById(
         "",
-        siteType
+        siteType,
       );
       if (defaultTemplate?.features != null) {
         setState(() {
@@ -772,15 +1436,16 @@ class _SiteEditPageState extends State<SiteEditPage> {
   SiteConfig _composeCurrentSite() {
     String id;
     String templateId;
-    
+
     if (widget.site != null) {
       // 编辑现有站点时，保持原有的 id 和 templateId
       id = widget.site!.id;
       templateId = widget.site!.templateId;
     } else {
       // 新建站点时，生成新的 id 和设置 templateId
-      id = 'site-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1000)}';
-      
+      id =
+          'site-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1000)}';
+
       // 根据是否选择预设站点来设置 templateId
       if (!_isCustomSite && _selectedTemplateUrl != null) {
         // 使用模板的 id 作为 templateId
@@ -879,18 +1544,18 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // nexusphpweb类型需要cookie
       if (_savedCookie == null || _savedCookie!.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(
-            content: Text(
-              '请先完成登录获取Cookie',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onErrorContainer,
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '请先完成登录获取Cookie',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
               ),
+              backgroundColor: Theme.of(context).colorScheme.errorContainer,
+              behavior: SnackBarBehavior.fixed,
             ),
-            backgroundColor: Theme.of(context).colorScheme.errorContainer,
-            behavior: SnackBarBehavior.fixed,
-          ));
+          );
         }
         return;
       }
@@ -898,18 +1563,18 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // 其他类型需要API Key
       if (_apiKeyController.text.trim().isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(
-            content: Text(
-              '请先填写API Key',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onErrorContainer,
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '请先填写API Key',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
               ),
+              backgroundColor: Theme.of(context).colorScheme.errorContainer,
+              behavior: SnackBarBehavior.fixed,
             ),
-            backgroundColor: Theme.of(context).colorScheme.errorContainer,
-            behavior: SnackBarBehavior.fixed,
-          ));
+          );
         }
         return;
       }
@@ -952,18 +1617,18 @@ class _SiteEditPageState extends State<SiteEditPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(
-          content: Text(
-            '获取分类配置失败，已使用默认配置: $e',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onErrorContainer,
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '获取分类配置失败，已使用默认配置: $e',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
             ),
+            backgroundColor: Theme.of(context).colorScheme.errorContainer,
+            behavior: SnackBarBehavior.fixed,
           ),
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-          behavior: SnackBarBehavior.fixed,
-        ));
+        );
       }
     }
   }
@@ -1107,9 +1772,11 @@ class _SiteEditPageState extends State<SiteEditPage> {
   }
 
   Widget _buildTemplateListTile(SiteConfigTemplate template) {
-    final isSelected = !_isCustomSite && _selectedTemplateUrl != null && 
-                      template.baseUrls.contains(_selectedTemplateUrl);
-    
+    final isSelected =
+        !_isCustomSite &&
+        _selectedTemplateUrl != null &&
+        template.baseUrls.contains(_selectedTemplateUrl);
+
     return ExpansionTile(
       leading: Icon(
         Icons.public,
@@ -1122,9 +1789,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
         style: const TextStyle(fontSize: 12),
       ),
       initiallyExpanded: isSelected,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       dense: true,
       visualDensity: VisualDensity.compact,
       tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
@@ -1134,7 +1799,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
         return ListTile(
           leading: Icon(
             url == template.primaryUrl ? Icons.star : Icons.link,
-            color: url == template.primaryUrl 
+            color: url == template.primaryUrl
                 ? Theme.of(context).colorScheme.primary
                 : Theme.of(context).colorScheme.onSurfaceVariant,
             size: 16,
@@ -1161,9 +1826,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
             top: 2,
             bottom: 2,
           ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           dense: true,
           visualDensity: VisualDensity.compact,
         );
@@ -1245,14 +1908,13 @@ class _SiteEditPageState extends State<SiteEditPage> {
                           const SizedBox(width: 8),
                           Text(
                             '选择站点',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // 搜索框
                       TextField(
                         controller: _presetSearchController,
@@ -1285,7 +1947,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         },
                       ),
                       const SizedBox(height: 12),
-                      
+
                       // 预设站点列表（只在_showPresetList为true时显示）
                       if (_showPresetList)
                         Container(
@@ -1385,15 +2047,17 @@ class _SiteEditPageState extends State<SiteEditPage> {
                     }
                     return null;
                   },
-                  onChanged: !_isCustomSite ? null : (value) {
-                    if (value != null) {
-                      setState(() {
-                        _selectedSiteType = value;
-                        _searchCategories = []; // 分类配置保持为空
-                        _loadDefaultFeatures(value);
-                      });
-                    }
-                  },
+                  onChanged: !_isCustomSite
+                      ? null
+                      : (value) {
+                          if (value != null) {
+                            setState(() {
+                              _selectedSiteType = value;
+                              _searchCategories = []; // 分类配置保持为空
+                              _loadDefaultFeatures(value);
+                            });
+                          }
+                        },
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -1403,7 +2067,10 @@ class _SiteEditPageState extends State<SiteEditPage> {
                     labelText: '站点名称',
                     border: const OutlineInputBorder(),
                     filled: !_isCustomSite,
-                    fillColor: !_isCustomSite ? Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : null,
+                    fillColor: !_isCustomSite
+                        ? Theme.of(context).colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.3)
+                        : null,
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -1440,16 +2107,21 @@ class _SiteEditPageState extends State<SiteEditPage> {
                     () {
                       final template = _presetTemplates.firstWhere(
                         (t) => t.baseUrls.contains(_selectedTemplateUrl),
-                        orElse: () => throw StateError('Template not found for selected URL'),
+                        orElse: () => throw StateError(
+                          'Template not found for selected URL',
+                        ),
                       );
-                      
+
                       return DropdownButtonFormField<String>(
-                         initialValue: _selectedTemplateUrl,
+                        initialValue: _selectedTemplateUrl,
                         decoration: InputDecoration(
                           labelText: 'Base URL',
                           border: const OutlineInputBorder(),
                           filled: true,
-                          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                          fillColor: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest
+                              .withValues(alpha: 0.3),
                         ),
                         items: template.baseUrls.map((url) {
                           return DropdownMenuItem<String>(
@@ -1458,10 +2130,14 @@ class _SiteEditPageState extends State<SiteEditPage> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  url == template.primaryUrl ? Icons.star : Icons.link,
-                                  color: url == template.primaryUrl 
+                                  url == template.primaryUrl
+                                      ? Icons.star
+                                      : Icons.link,
+                                  color: url == template.primaryUrl
                                       ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                                      : Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
                                   size: 16,
                                 ),
                                 const SizedBox(width: 8),
@@ -1477,7 +2153,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
                                     '主要',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Theme.of(context).colorScheme.primary,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
                                     ),
                                   ),
                                 ],
@@ -1506,7 +2184,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Theme.of(context).colorScheme.outline),
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -1522,7 +2202,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
               ],
 
               // API Key输入或登录按钮（只有在用户做出选择时才显示）
-              if (_hasUserMadeSelection && _selectedSiteType != SiteType.nexusphpweb) ...[
+              if (_hasUserMadeSelection &&
+                  _selectedSiteType != SiteType.nexusphpweb) ...[
                 TextFormField(
                   controller: _apiKeyController,
                   decoration: InputDecoration(
@@ -1561,7 +2242,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        
+
                         // 根据平台显示不同的认证方式
                         if (Platform.isAndroid) ...[
                           const Text(
@@ -1606,7 +2287,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                             },
                           ),
                         ],
-                        
+
                         if (_cookieStatus != null) ...[
                           const SizedBox(height: 12),
                           Container(
@@ -1656,7 +2337,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
               ],
 
               // Pass Key输入（仅NexusPHP类型显示，且用户已做出选择）
-              if (_hasUserMadeSelection && _selectedSiteType?.requiresPassKey == true) ...[
+              if (_hasUserMadeSelection &&
+                  _selectedSiteType?.requiresPassKey == true) ...[
                 TextFormField(
                   controller: _passKeyController,
                   decoration: InputDecoration(
@@ -1678,201 +2360,206 @@ class _SiteEditPageState extends State<SiteEditPage> {
               const SizedBox(height: 8),
 
               // 查询分类配置（只有在用户做出选择时才显示）
-              if (_hasUserMadeSelection) Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.category),
-                          const SizedBox(width: 8),
-                          const Text(
-                            '查询分类配置',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+              if (_hasUserMadeSelection)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.category),
+                            const SizedBox(width: 8),
+                            const Text(
+                              '查询分类配置',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                          const Spacer(),
-                          TextButton.icon(
-                            icon: const Icon(Icons.add),
-                            label: const Text('添加'),
-                            onPressed: _addSearchCategory,
-                          ),
-                          TextButton.icon(
-                            icon: const Icon(Icons.download),
-                            label: const Text('获取'),
-                            onPressed: _resetSearchCategories,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      if (_searchCategories.isEmpty)
-                        const Text(
-                          '暂无查询分类配置',
-                          style: TextStyle(color: Colors.grey),
-                        )
-                      else
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _searchCategories.length,
-                          separatorBuilder: (context, index) => const Divider(),
-                          itemBuilder: (context, index) {
-                            final category = _searchCategories[index];
-                            return ListTile(
-                              title: Text(category.displayName),
-                              subtitle: Text(
-                                category.parameters.isEmpty
-                                    ? '无参数'
-                                    : category.parameters,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit),
-                                    onPressed: () => _editSearchCategory(index),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete),
-                                    onPressed: () =>
-                                        _deleteSearchCategory(index),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
+                            const Spacer(),
+                            TextButton.icon(
+                              icon: const Icon(Icons.add),
+                              label: const Text('添加'),
+                              onPressed: _addSearchCategory,
+                            ),
+                            TextButton.icon(
+                              icon: const Icon(Icons.download),
+                              label: const Text('获取'),
+                              onPressed: _resetSearchCategories,
+                            ),
+                          ],
                         ),
-                    ],
+                        const SizedBox(height: 12),
+                        if (_searchCategories.isEmpty)
+                          const Text(
+                            '暂无查询分类配置',
+                            style: TextStyle(color: Colors.grey),
+                          )
+                        else
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _searchCategories.length,
+                            separatorBuilder: (context, index) =>
+                                const Divider(),
+                            itemBuilder: (context, index) {
+                              final category = _searchCategories[index];
+                              return ListTile(
+                                title: Text(category.displayName),
+                                subtitle: Text(
+                                  category.parameters.isEmpty
+                                      ? '无参数'
+                                      : category.parameters,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit),
+                                      onPressed: () =>
+                                          _editSearchCategory(index),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete),
+                                      onPressed: () =>
+                                          _deleteSearchCategory(index),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(height: 24),
 
               // 功能配置（只有在用户做出选择时才显示）
-              if (_hasUserMadeSelection) Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '功能配置',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '配置此站点支持的功能',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildFeatureSwitch(
-                        '用户资料',
-                        '获取用户个人信息和统计数据',
-                        _siteFeatures.supportMemberProfile,
-                        (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(
-                            supportMemberProfile: value,
-                          );
-                        }),
-                      ),
-                      _buildFeatureSwitch(
-                        '种子搜索',
-                        '搜索和浏览种子资源',
-                        _siteFeatures.supportTorrentSearch,
-                        (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(
-                            supportTorrentSearch: value,
-                          );
-                        }),
-                      ),
-                      _buildFeatureSwitch(
-                        '种子详情',
-                        '查看种子的详细信息',
-                        _siteFeatures.supportTorrentDetail,
-                        (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(
-                            supportTorrentDetail: value,
-                          );
-                        }),
-                      ),
-                      _buildFeatureSwitch(
-                        '下载功能',
-                        '生成下载链接和下载种子',
-                        _siteFeatures.supportDownload,
-                        (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(
-                            supportDownload: value,
-                          );
-                        }),
-                      ),
-                      _buildFeatureSwitch(
-                        '收藏功能',
-                        '收藏和取消收藏种子',
-                        _siteFeatures.supportCollection,
-                        (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(
-                            supportCollection: value,
-                          );
-                        }),
-                      ),
-                      _buildFeatureSwitch(
-                        '下载历史',
-                        '查看种子下载历史记录',
-                        _siteFeatures.supportHistory,
-                        (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(
-                            supportHistory: value,
-                          );
-                        }),
-                      ),
-                      _buildFeatureSwitch(
-                        '分类搜索',
-                        '按分类筛选搜索结果',
-                        _siteFeatures.supportCategories,
-                        (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(
-                            supportCategories: value,
-                          );
-                        }),
-                      ),
-                      _buildFeatureSwitch(
-                        '高级搜索',
-                        '使用高级搜索参数和过滤器',
-                        _siteFeatures.supportAdvancedSearch,
-                        (value) => setState(() {
-                          _siteFeatures = _siteFeatures.copyWith(
-                            supportAdvancedSearch: value,
-                          );
-                        }),
-                      ),
-                    ],
+              if (_hasUserMadeSelection)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '功能配置',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '配置此站点支持的功能',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildFeatureSwitch(
+                          '用户资料',
+                          '获取用户个人信息和统计数据',
+                          _siteFeatures.supportMemberProfile,
+                          (value) => setState(() {
+                            _siteFeatures = _siteFeatures.copyWith(
+                              supportMemberProfile: value,
+                            );
+                          }),
+                        ),
+                        _buildFeatureSwitch(
+                          '种子搜索',
+                          '搜索和浏览种子资源',
+                          _siteFeatures.supportTorrentSearch,
+                          (value) => setState(() {
+                            _siteFeatures = _siteFeatures.copyWith(
+                              supportTorrentSearch: value,
+                            );
+                          }),
+                        ),
+                        _buildFeatureSwitch(
+                          '种子详情',
+                          '查看种子的详细信息',
+                          _siteFeatures.supportTorrentDetail,
+                          (value) => setState(() {
+                            _siteFeatures = _siteFeatures.copyWith(
+                              supportTorrentDetail: value,
+                            );
+                          }),
+                        ),
+                        _buildFeatureSwitch(
+                          '下载功能',
+                          '生成下载链接和下载种子',
+                          _siteFeatures.supportDownload,
+                          (value) => setState(() {
+                            _siteFeatures = _siteFeatures.copyWith(
+                              supportDownload: value,
+                            );
+                          }),
+                        ),
+                        _buildFeatureSwitch(
+                          '收藏功能',
+                          '收藏和取消收藏种子',
+                          _siteFeatures.supportCollection,
+                          (value) => setState(() {
+                            _siteFeatures = _siteFeatures.copyWith(
+                              supportCollection: value,
+                            );
+                          }),
+                        ),
+                        _buildFeatureSwitch(
+                          '下载历史',
+                          '查看种子下载历史记录',
+                          _siteFeatures.supportHistory,
+                          (value) => setState(() {
+                            _siteFeatures = _siteFeatures.copyWith(
+                              supportHistory: value,
+                            );
+                          }),
+                        ),
+                        _buildFeatureSwitch(
+                          '分类搜索',
+                          '按分类筛选搜索结果',
+                          _siteFeatures.supportCategories,
+                          (value) => setState(() {
+                            _siteFeatures = _siteFeatures.copyWith(
+                              supportCategories: value,
+                            );
+                          }),
+                        ),
+                        _buildFeatureSwitch(
+                          '高级搜索',
+                          '使用高级搜索参数和过滤器',
+                          _siteFeatures.supportAdvancedSearch,
+                          (value) => setState(() {
+                            _siteFeatures = _siteFeatures.copyWith(
+                              supportAdvancedSearch: value,
+                            );
+                          }),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(height: 24),
 
               // 操作按钮（只有在用户做出选择时才显示）
-              if (_hasUserMadeSelection) Row(
-                children: [
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('测试连接'),
-                    onPressed: _loading ? null : _testConnection,
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.save),
-                    label: Text(widget.site != null ? '更新' : '保存'),
-                    onPressed: _loading ? null : _save,
-                  ),
-                ],
-              ),
+              if (_hasUserMadeSelection)
+                Row(
+                  children: [
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.play_arrow),
+                      label: const Text('测试连接'),
+                      onPressed: _loading ? null : _testConnection,
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.save),
+                      label: Text(widget.site != null ? '更新' : '保存'),
+                      onPressed: _loading ? null : _save,
+                    ),
+                  ],
+                ),
               const SizedBox(height: 16),
 
               // 加载指示器
@@ -1960,7 +2647,7 @@ class _ProfileView extends StatelessWidget {
           Text('上传: ${profile.uploadedBytesString}'),
           Text('下载: ${profile.downloadedBytesString}'),
           Text('分享率: ${Formatters.shareRate(profile.shareRate)}'),
-          Text('passKey: ${profile.passKey}')
+          Text('passKey: ${profile.passKey}'),
         ],
       ),
     );
@@ -1975,16 +2662,18 @@ class _CustomFloatingActionButtonLocation extends FloatingActionButtonLocation {
   Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
     // 1.5cm ≈ 57像素，1cm ≈ 38像素
     const double bottomMargin = 80.0; // 1.5cm
-    const double rightMargin = 50.0;  // 1cm
-    
+    const double rightMargin = 50.0; // 1cm
+
     // 计算FloatingActionButton的位置
-    final double fabX = scaffoldGeometry.scaffoldSize.width - 
-                       scaffoldGeometry.floatingActionButtonSize.width - 
-                       rightMargin;
-    final double fabY = scaffoldGeometry.scaffoldSize.height - 
-                       scaffoldGeometry.floatingActionButtonSize.height - 
-                       bottomMargin;
-    
+    final double fabX =
+        scaffoldGeometry.scaffoldSize.width -
+        scaffoldGeometry.floatingActionButtonSize.width -
+        rightMargin;
+    final double fabY =
+        scaffoldGeometry.scaffoldSize.height -
+        scaffoldGeometry.floatingActionButtonSize.height -
+        bottomMargin;
+
     return Offset(fabX, fabY);
   }
 }

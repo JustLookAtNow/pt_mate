@@ -31,6 +31,60 @@ class MemberProfile {
     this.passKey,
     this.lastAccess,
   });
+
+  // 序列化方法，支持持久化缓存与向后兼容解析
+  factory MemberProfile.fromJson(Map<String, dynamic> json) {
+    final username = (json['username'] ?? json['name'] ?? '').toString();
+    final bonusVal = json['bonus'];
+    final shareVal = json['shareRate'] ?? json['share_rate'];
+    final uploadedVal = json['uploadedBytes'] ?? json['uploaded_bytes'];
+    final downloadedVal = json['downloadedBytes'] ?? json['downloaded_bytes'];
+    final uploadedStr =
+        json['uploadedBytesString'] ?? json['uploaded_str'] ?? '';
+    final downloadedStr =
+        json['downloadedBytesString'] ?? json['downloaded_str'] ?? '';
+
+    double parseDouble(dynamic v) {
+      if (v is num) return v.toDouble();
+      if (v is String) return double.tryParse(v) ?? 0.0;
+      return 0.0;
+    }
+
+    int parseInt(dynamic v) {
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      if (v is String) return int.tryParse(v) ?? 0;
+      return 0;
+    }
+
+    return MemberProfile(
+      username: username,
+      bonus: parseDouble(bonusVal),
+      shareRate: parseDouble(shareVal),
+      uploadedBytes: parseInt(uploadedVal),
+      downloadedBytes: parseInt(downloadedVal),
+      uploadedBytesString: uploadedStr.toString(),
+      downloadedBytesString: downloadedStr.toString(),
+      userId: json['userId']?.toString(),
+      passKey: json['passKey']?.toString(),
+      lastAccess: json['lastAccess']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'username': username,
+      'bonus': bonus,
+      'shareRate': shareRate,
+      'uploadedBytes': uploadedBytes,
+      'downloadedBytes': downloadedBytes,
+      'uploadedBytesString': uploadedBytesString,
+      'downloadedBytesString': downloadedBytesString,
+      'userId': userId,
+      'passKey': passKey,
+      'lastAccess': lastAccess,
+    };
+  }
 }
 
 // 种子详情
@@ -257,7 +311,7 @@ enum SiteType {
   mteam('M-Team', 'M-Team 站点', 'API Key (x-api-key)', '从 控制台-实验室-存储令牌 获取并粘贴此处'),
   nexusphp(
     'NexusPHP',
-    'NexusPHP(1.9+ with api)',
+    'NexusPHP(api)',
     'API Key (访问令牌)',
     '控制面板-设定首页-访问令牌（权限都勾上）',
   ),
@@ -911,6 +965,7 @@ class SiteConfigTemplate {
   final Map<String, String> discountMapping; // 优惠映射配置
   final Map<String, dynamic>? infoFinder; // 信息提取器配置
   final Map<String, dynamic>? request; // 请求配置
+  final String? logo; // 可选的 logo 资源路径（assets/sites_icon/...）
 
   const SiteConfigTemplate({
     required this.id,
@@ -924,6 +979,7 @@ class SiteConfigTemplate {
     this.discountMapping = const {},
     this.infoFinder,
     this.request,
+    this.logo,
   });
 
   SiteConfigTemplate copyWith({
@@ -938,6 +994,7 @@ class SiteConfigTemplate {
     Map<String, String>? discountMapping,
     Map<String, dynamic>? infoFinder,
     Map<String, dynamic>? request,
+    String? logo,
   }) => SiteConfigTemplate(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -950,6 +1007,7 @@ class SiteConfigTemplate {
     discountMapping: discountMapping ?? this.discountMapping,
     infoFinder: infoFinder ?? this.infoFinder,
     request: request ?? this.request,
+    logo: logo ?? this.logo,
   );
 
   Map<String, dynamic> toJson() => {
@@ -964,6 +1022,7 @@ class SiteConfigTemplate {
     'discountMapping': discountMapping,
     'infoFinder': infoFinder,
     'request': request,
+    if (logo != null) 'logo': logo,
   };
 
   factory SiteConfigTemplate.fromJson(Map<String, dynamic> json) {
@@ -1046,6 +1105,7 @@ class SiteConfigTemplate {
       discountMapping: discountMapping,
       infoFinder: infoFinder,
       request: json['request'] as Map<String, dynamic>?,
+      logo: json['logo'] as String?, // 兼容旧版：没有该字段则为 null
     );
   }
 

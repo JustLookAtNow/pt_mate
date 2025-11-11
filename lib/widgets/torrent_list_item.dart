@@ -434,7 +434,7 @@ class TorrentListItem extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '发布于 ${Formatters.formatTorrentCreatedDate(torrent.createdDate)} 前',
+                            '发布于 ${Formatters.formatTorrentCreatedDate(torrent.createdDate)}',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 10,

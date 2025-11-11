@@ -71,6 +71,9 @@ class StorageKeys {
   // 聚合搜索设置
   static const String aggregateSearchSettings = 'aggregateSearch.settings';
   
+  // 健康检查结果缓存（站点ID -> 状态JSON）
+  static const String healthStatuses = 'app.healthStatuses';
+  
   // 查询条件配置已移至站点配置中，不再需要全局键
 }
 
@@ -932,5 +935,35 @@ class StorageService {
         _logger.i('StorageService: 待处理的站点配置更新已持久化。');
       }
     }
+  }
+
+  // 健康检查结果缓存：保存与读取
+  Future<void> saveHealthStatuses(Map<String, Map<String, dynamic>> statuses) async {
+    final prefs = await _prefs;
+    try {
+      await prefs.setString(StorageKeys.healthStatuses, jsonEncode(statuses));
+    } catch (_) {
+      // ignore parse/store errors
+    }
+  }
+
+  Future<Map<String, Map<String, dynamic>>> loadHealthStatuses() async {
+    final prefs = await _prefs;
+    final str = prefs.getString(StorageKeys.healthStatuses);
+    if (str == null) return <String, Map<String, dynamic>>{};
+    try {
+      final decoded = jsonDecode(str);
+      if (decoded is Map) {
+        // 强制转换为 Map<String, Map<String, dynamic>>
+        return decoded.map((key, value) {
+          final k = key.toString();
+          final v = (value is Map) ? value.cast<String, dynamic>() : <String, dynamic>{};
+          return MapEntry(k, v);
+        });
+      }
+    } catch (_) {
+      // ignore decode errors
+    }
+    return <String, Map<String, dynamic>>{};
   }
 }

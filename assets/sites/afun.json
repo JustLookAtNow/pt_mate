@@ -2,7 +2,9 @@
   "id": "afun",
   "name": "AFUN",
   "isShow": true,
-  "baseUrls": ["https://www.ptlover.cc/"],
+  "baseUrls": [
+    "https://www.ptlover.cc/"
+  ],
   "primaryUrl": "https://www.ptlover.cc/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
@@ -16,5 +18,6 @@
     "categorySearch": true,
     "advancedSearch": true
   },
-  "discountMapping": {}
+  "discountMapping": {},
+  "logo": "assets/sites_icon/afun.png"
 }

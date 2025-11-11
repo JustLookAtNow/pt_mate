@@ -66,6 +66,7 @@ dependencies:
   flutter_markdown: ^0.7.2
   logger: ^2.6.2
   get_it: ^9.0.5
+  image: ^4.1.7
 
 
 dev_dependencies:
@@ -97,6 +98,7 @@ flutter:
     - assets/
     - assets/logo/
     - assets/sites/
+    - assets/sites_icon/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
