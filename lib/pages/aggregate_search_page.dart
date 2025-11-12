@@ -184,7 +184,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 4),
                                   // 搜索输入框
                                   Expanded(
                                     flex: 3,
@@ -193,8 +193,14 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       decoration: InputDecoration(
                                         hintText: '输入搜索关键词',
                                         border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            4,
+                                          borderRadius: const BorderRadius.all(
+                                            Radius.circular(25),
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary
+                                                .withValues(alpha: 0.3),
                                           ),
                                         ),
                                         contentPadding:

@@ -108,8 +108,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         path = lower.endsWith('.png')
             ? logo
             : (logo.contains('.')
-                ? '${logo.substring(0, logo.lastIndexOf('.'))}.png'
-                : logo);
+                  ? '${logo.substring(0, logo.lastIndexOf('.'))}.png'
+                  : logo);
       }
     } catch (_) {
       // 静默失败，使用默认图标
@@ -592,10 +592,19 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                               _searchQuery = val;
                             });
                           },
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             prefixIcon: Icon(Icons.search),
                             hintText: '搜索站点名称、URL、类型…',
-                            border: OutlineInputBorder(),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(25),
+                              ),
+                              borderSide: BorderSide(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.primary.withValues(alpha: 0.3),
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -655,7 +664,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                               ? Theme.of(context).colorScheme.primaryContainer
                                     .withValues(alpha: 0.3)
                               : null,
-                          
+
                           child: Stack(
                             clipBehavior: Clip.none,
                             children: [
@@ -730,13 +739,31 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                                                 .colorScheme
                                                                 .surfaceContainerHighest,
                                                       child: FutureBuilder<String>(
-                                                        future: _resolveLogoPath(site),
+                                                        future:
+                                                            _resolveLogoPath(
+                                                              site,
+                                                            ),
                                                         builder: (context, snapshot) {
-                                                          final Color fgColor = isActive
-                                                              ? Theme.of(context).colorScheme.onPrimary
-                                                              : Theme.of(context).colorScheme.onSurfaceVariant;
-                                                          if (snapshot.connectionState != ConnectionState.done ||
-                                                              (snapshot.data == null || snapshot.data!.isEmpty)) {
+                                                          final Color fgColor =
+                                                              isActive
+                                                              ? Theme.of(
+                                                                      context,
+                                                                    )
+                                                                    .colorScheme
+                                                                    .onPrimary
+                                                              : Theme.of(
+                                                                      context,
+                                                                    )
+                                                                    .colorScheme
+                                                                    .onSurfaceVariant;
+                                                          if (snapshot.connectionState !=
+                                                                  ConnectionState
+                                                                      .done ||
+                                                              (snapshot.data ==
+                                                                      null ||
+                                                                  snapshot
+                                                                      .data!
+                                                                      .isEmpty)) {
                                                             return Icon(
                                                               Icons.dns,
                                                               size: 18,
@@ -744,21 +771,29 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                                             );
                                                           }
 
-                                                          final String path = snapshot.data!;
+                                                          final String path =
+                                                              snapshot.data!;
                                                           return ClipOval(
                                                             child: Image.asset(
                                                               path,
                                                               width: 18,
                                                               height: 18,
                                                               fit: BoxFit.cover,
-                                                              errorBuilder: (context, error, stackTrace) {
-                                                                return Image.asset(
-                                                                  'assets/sites_icon/_default_nexusphp.png',
-                                                                  width: 18,
-                                                                  height: 18,
-                                                                  fit: BoxFit.cover,
-                                                                );
-                                                              },
+                                                              errorBuilder:
+                                                                  (
+                                                                    context,
+                                                                    error,
+                                                                    stackTrace,
+                                                                  ) {
+                                                                    return Image.asset(
+                                                                      'assets/sites_icon/_default_nexusphp.png',
+                                                                      width: 18,
+                                                                      height:
+                                                                          18,
+                                                                      fit: BoxFit
+                                                                          .cover,
+                                                                    );
+                                                                  },
                                                             ),
                                                           );
                                                         },
@@ -779,17 +814,12 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                                                       .ellipsis,
                                                               style: TextStyle(
                                                                 fontWeight:
-                                                                    isActive
-                                                                    ? FontWeight
-                                                                          .bold
-                                                                    : FontWeight
-                                                                          .normal,
+                                                                    FontWeight
+                                                                        .bold,
                                                               ),
                                                             ),
                                                           ),
-                                                          const SizedBox(
-                                                            width: 6,
-                                                          ),
+                                                
                                                           // Container(
                                                           //   padding:
                                                           //       const EdgeInsets.symmetric(
@@ -824,14 +854,36 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                                         ],
                                                       ),
                                                     ),
-                                                    const SizedBox(width: 8),
-                                                    // 右侧显示用户名（小字体，仍在左侧区域）
                                                     Text(
                                                       hs?.username ?? '',
                                                       style: Theme.of(
                                                         context,
-                                                      ).textTheme.bodyMedium,
+                                                      )
+                                                          .textTheme
+                                                          .bodyMedium
+                                                          ?.copyWith(
+                                                            color:
+                                                                Theme.of(
+                                                                      context,
+                                                                    )
+                                                                    .colorScheme
+                                                                    .primary,
+                                                          ),
                                                     ),
+                                                    // SizedBox(width: 4),
+                                                    if (hs != null)
+                                                      Text(
+                                                        '(${Formatters.formatTorrentCreatedDate(hs.updatedAt.toIso8601String())})',
+                                                        style: Theme.of(context)
+                                                            .textTheme
+                                                            .bodySmall
+                                                            ?.copyWith(
+                                                              color: Theme.of(context)
+                                                                  .colorScheme
+                                                                  .onSurfaceVariant,
+                                                            ),
+                                                      )
+                                                      
                                                   ],
                                                 ),
                                                 const SizedBox(height: 6),
@@ -888,25 +940,36 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                                             Theme.of(context)
                                                                 .colorScheme
                                                                 .primary,
-                                                            '魔力值: ${Formatters.bonus(p.bonus)}',
+                                                            ': ${Formatters.bonus(p.bonus)}${p.bonusPerHour != null ? '(${p.bonusPerHour!})' : ''}',
+                                                          ),
+
+                                                          buildItem(
+                                                            Icons.upload,
+                                                            Colors.green,
+                                                            ': ${p.uploadedBytesString}',
+                                                          ),
+                                                          buildItem(
+                                                            Icons.download,
+                                                            Colors.red,
+                                                            ': ${p.downloadedBytesString}',
                                                           ),
                                                           buildItem(
                                                             Icons.trending_up,
                                                             Theme.of(context)
                                                                 .colorScheme
                                                                 .primary,
-                                                            '分享率: ${p.shareRate.toStringAsFixed(2)}',
+                                                            ': ${p.shareRate.toStringAsFixed(2)}',
                                                           ),
-                                                          buildItem(
-                                                            Icons.upload,
-                                                            Colors.blue,
-                                                            ': ${p.uploadedBytesString}',
-                                                          ),
-                                                          buildItem(
-                                                            Icons.download,
-                                                            Colors.green,
-                                                            ': ${p.downloadedBytesString}',
-                                                          ),
+                                                          if (p.seedingSizeBytes !=
+                                                              null)
+                                                            buildItem(
+                                                              Icons
+                                                                  .cloud_upload,
+                                                              Theme.of(context)
+                                                                  .colorScheme
+                                                                  .primary,
+                                                              ': ${Formatters.dataFromBytes(p.seedingSizeBytes!)}',
+                                                            ),
                                                           if (p.lastAccess !=
                                                               null)
                                                             buildItem(
@@ -1020,28 +1083,6 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                                       }
                                                     },
                                                   ),
-                                                // const SizedBox(height: 4),
-                                                // 左侧区域右下角更新时间
-                                                Row(
-                                                  children: [
-                                                    const Spacer(),
-                                                    if (hs != null)
-                                                      Text(
-                                                        Formatters.formatTorrentCreatedDate(
-                                                          hs.updatedAt
-                                                              .toIso8601String(),
-                                                        ),
-                                                        style: Theme.of(context)
-                                                            .textTheme
-                                                            .bodySmall
-                                                            ?.copyWith(
-                                                              color: Theme.of(context)
-                                                                  .colorScheme
-                                                                  .onSurfaceVariant,
-                                                            ),
-                                                      ),
-                                                  ],
-                                                ),
                                               ],
                                             ),
                                           ),
@@ -2643,9 +2684,16 @@ class _ProfileView extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text('用户名: ${profile.username}'),
-          Text('魔力值: ${Formatters.bonus(profile.bonus)}'),
+          Text(
+            '魔力值: ${Formatters.bonus(profile.bonus)}'
+            '${profile.bonusPerHour != null ? '(${profile.bonusPerHour})' : ''}',
+          ),
           Text('上传: ${profile.uploadedBytesString}'),
           Text('下载: ${profile.downloadedBytesString}'),
+          if (profile.seedingSizeBytes != null)
+            Text(
+              '做种体积: ${Formatters.dataFromBytes(profile.seedingSizeBytes!)}',
+            ),
           Text('分享率: ${Formatters.shareRate(profile.shareRate)}'),
           Text('passKey: ${profile.passKey}'),
         ],

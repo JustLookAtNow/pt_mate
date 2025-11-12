@@ -848,7 +848,17 @@ class _HomePageState extends State<HomePage> {
                                     _buildStatChip(context, '↑ ${_profile!.uploadedBytesString}', Colors.green),
                                     _buildStatChip(context, '↓ ${_profile!.downloadedBytesString}', Colors.blue),
                                     _buildStatChip(context, '比率 ${Formatters.shareRate(_profile!.shareRate)}', Colors.orange),
-                                    _buildStatChip(context, '魔力 ${Formatters.bonus(_profile!.bonus)}', Colors.purple),
+                                    _buildStatChip(
+                                      context,
+                                      '魔力 ${Formatters.bonus(_profile!.bonus)}${_profile!.bonusPerHour != null ? '(${_profile!.bonusPerHour!})' : ''}',
+                                      Colors.purple,
+                                    ),
+                                    if (_profile!.seedingSizeBytes != null)
+                                      _buildStatChip(
+                                        context,
+                                        '做种体积 ${Formatters.dataFromBytes(_profile!.seedingSizeBytes!)}',
+                                        Colors.teal,
+                                      ),
                                     if (_profile!.lastAccess != null && _profile!.lastAccess!.trim().isNotEmpty)
                                       _buildStatChip(context, '最后访问 ${_profile!.lastAccess!}', Colors.grey),
                                   ],

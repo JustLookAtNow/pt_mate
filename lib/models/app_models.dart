@@ -18,6 +18,9 @@ class MemberProfile {
   final String? userId; // 用户ID，NexusPHP类型从data.data.id获取
   final String? passKey; // Pass Key，nexusphpweb类型从usercp.php获取
   final String? lastAccess; // 最后访问时间，来自 API data['last_access']
+  // 额外信息（可选）：时魔与做种体积，仅部分站点提供
+  final double? bonusPerHour; // 时魔：每小时魔力增长值
+  final int? seedingSizeBytes; // 做种体积（字节）
 
   MemberProfile({
     required this.username,
@@ -30,6 +33,8 @@ class MemberProfile {
     this.userId,
     this.passKey,
     this.lastAccess,
+    this.bonusPerHour,
+    this.seedingSizeBytes,
   });
 
   // 序列化方法，支持持久化缓存与向后兼容解析
@@ -43,6 +48,9 @@ class MemberProfile {
         json['uploadedBytesString'] ?? json['uploaded_str'] ?? '';
     final downloadedStr =
         json['downloadedBytesString'] ?? json['downloaded_str'] ?? '';
+    // 新增字段兼容旧版本与不同命名
+    final bonusPerHourVal = json['bonusPerHour'] ?? json['bonus_per_hour'];
+    final seedingSizeVal = json['seedingSizeBytes'] ?? json['seedingSize'] ?? json['seederSize'];
 
     double parseDouble(dynamic v) {
       if (v is num) return v.toDouble();
@@ -68,6 +76,8 @@ class MemberProfile {
       userId: json['userId']?.toString(),
       passKey: json['passKey']?.toString(),
       lastAccess: json['lastAccess']?.toString(),
+      bonusPerHour: bonusPerHourVal == null ? null : parseDouble(bonusPerHourVal),
+      seedingSizeBytes: seedingSizeVal == null ? null : parseInt(seedingSizeVal),
     );
   }
 
@@ -83,6 +93,8 @@ class MemberProfile {
       'userId': userId,
       'passKey': passKey,
       'lastAccess': lastAccess,
+      if (bonusPerHour != null) 'bonusPerHour': bonusPerHour,
+      if (seedingSizeBytes != null) 'seedingSizeBytes': seedingSizeBytes,
     };
   }
 }

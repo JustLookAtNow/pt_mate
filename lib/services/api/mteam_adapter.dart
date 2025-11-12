@@ -121,11 +121,6 @@ class MTeamAdapter extends SiteAdapter {
   Future<MemberProfile> fetchMemberProfile({String? apiKey}) async {
     final resp = await _dio.post(
       '/api/member/profile',
-      options: Options(
-        headers: (apiKey != null && apiKey.isNotEmpty)
-            ? {'x-api-key': apiKey}
-            : null,
-      ),
     );
 
     final data = resp.data as Map<String, dynamic>;
@@ -136,7 +131,54 @@ class MTeamAdapter extends SiteAdapter {
         error: data['message'] ?? 'Profile fetch failed',
       );
     }
-    return _parseMemberProfile(data['data'] as Map<String, dynamic>);
+    // 先解析基础资料
+    final baseProfile = _parseMemberProfile(data['data'] as Map<String, dynamic>);
+
+    // 追加获取时魔（每小时魔力增长）与做种体积（字节）
+    double? bonusPerHour;
+    int? seedingSizeBytes;
+
+    try {
+      final bonusResp = await _dio.post('/api/tracker/mybonus');
+      final bonusData = bonusResp.data as Map<String, dynamic>;
+      if (bonusData['code']?.toString() == '0') {
+        final formulaParams = (bonusData['data'] as Map<String, dynamic>?)?['formulaParams'] as Map<String, dynamic>?;
+        final finalBs = formulaParams?['finalBs'];
+        if (finalBs != null) {
+          bonusPerHour = double.tryParse(finalBs.toString());
+        }
+      }
+    } catch (_) {
+      // 忽略错误，保持为null
+    }
+
+    try {
+      final seedResp = await _dio.post('/api/tracker/myPeerStatistics');
+      final seedData = seedResp.data as Map<String, dynamic>;
+      if (seedData['code']?.toString() == '0') {
+        final seederSize = (seedData['data'] as Map<String, dynamic>?)?['seederSize'];
+        if (seederSize != null) {
+          seedingSizeBytes = int.tryParse(seederSize.toString());
+        }
+      }
+    } catch (_) {
+      // 忽略错误，保持为null
+    }
+
+    return MemberProfile(
+      username: baseProfile.username,
+      bonus: baseProfile.bonus,
+      shareRate: baseProfile.shareRate,
+      uploadedBytes: baseProfile.uploadedBytes,
+      downloadedBytes: baseProfile.downloadedBytes,
+      uploadedBytesString: baseProfile.uploadedBytesString,
+      downloadedBytesString: baseProfile.downloadedBytesString,
+      userId: baseProfile.userId,
+      passKey: baseProfile.passKey,
+      lastAccess: baseProfile.lastAccess,
+      bonusPerHour: bonusPerHour,
+      seedingSizeBytes: seedingSizeBytes,
+    );
   }
 
   /// 解析 M-Team 站点的用户资料数据
