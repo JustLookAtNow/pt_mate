@@ -67,6 +67,10 @@ class TorrentListItem extends StatelessWidget {
     // 检测是否为移动设备（屏幕宽度小于600px）
     final isMobile = MediaQuery.of(context).size.width < 600;
 
+    // 统一计算标签与清理后的描述，避免重复调用
+    final descrRef = TextRef('${torrent.name}#@${torrent.smallDescr}');
+    final tags = TagType.matchTags(descrRef);
+
     // 构建主要内容
     Widget mainContent = Container(
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -303,52 +307,44 @@ class TorrentListItem extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // 标签行
-                  Builder(
-                    builder: (context) {
-                      final tags = TagType.matchTags(
-                        '${torrent.name} ${torrent.smallDescr}',
-                      );
-                      if (tags.isEmpty) return const SizedBox.shrink();
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: SizedBox(
-                          height: 16,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: tags.length,
-                            separatorBuilder: (context, index) =>
-                                const SizedBox(width: 4),
-                            itemBuilder: (context, index) {
-                              final tag = tags[index];
-                              return Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 1,
+                          // 标签行（仅当存在标签）
+                          if (tags.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: SizedBox(
+                                height: 16,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: tags.length,
+                                  separatorBuilder: (context, index) =>
+                                      const SizedBox(width: 4),
+                                  itemBuilder: (context, index) {
+                                    final tag = tags[index];
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                        vertical: 1,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: tag.color,
+                                        borderRadius: BorderRadius.circular(3),
+                                      ),
+                                      child: Text(
+                                        tag.content,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 ),
-                                decoration: BoxDecoration(
-                                  color: tag.color,
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                                child: Text(
-                                  tag.content,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                              ),
+                            ),
                   // 种子名称（聚合搜索模式下包含站点名称）
                   if (isAggregateMode && siteName != null)
                     Tooltip(
@@ -439,9 +435,9 @@ class TorrentListItem extends StatelessWidget {
                       ),
                     ),
                   const SizedBox(height: 4),
-                  // 种子描述
+                          // 种子描述（使用清理后的描述）
                   Text(
-                    torrent.smallDescr,
+                            descrRef.value,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(

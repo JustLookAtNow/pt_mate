@@ -276,17 +276,33 @@ enum DiscountType {
 enum DiscountColorType { none, green, yellow }
 
 // 标签类型枚举
+class TextRef {
+  String value;
+  TextRef(this.value);
+}
+
 enum TagType {
+  hot('hot', Color.fromARGB(255, 255, 128, 59), r'\[热门\]|\[熱門\]'),
+  official('官方', Color.fromARGB(255, 76, 130, 175), r'官方'),
   chinese('中字', Colors.green, r'中字|中文|简体'),
   chineseTraditional('繁体', Colors.green, r'繁体'),
   mandarin('国语', Colors.blue, r'国语|国配|普通话|中配'),
   fourK('4K', Colors.orange, r'\b4K\b|\b2160p\b'),
   resolution1080('1080p', Colors.blue, r'\b1080p\b'),
   hdr('HDR', Colors.purple, r'\bHDR\b|\bHDR10\b|Dolby Vision|\bDV\b'),
-  h265('H265', Color.fromARGB(255, 51, 162, 217), r'\bH\.?265\b|\bHEVC\b|\bx265\b'),
-  webDl('WEB-DL', Color.fromARGB(255, 162, 41, 178), r'\bWEB-DL\b|\bWEBDL\b|\bWEB\.DL\b'),
-  dovi('DOVI', Colors.pink, r'\bDOVI\b|Dolby Vision|\bDV\b'),
-  blueRay('Blu-ray', Colors.red, r'\bblu-ray\b|\bbluray\b');
+  h265(
+    'H265',
+    Color.fromARGB(255, 51, 162, 217),
+    r'\bH\.?265\b|\bHEVC\b|\bx265\b',
+  ),
+  webDl(
+    'WEB-DL',
+    Color.fromARGB(255, 162, 41, 178),
+    r'\bWEB-DL\b|\bWEBDL\b|\bWEB\.DL\b',
+  ),
+  dovi('DOVI', Colors.pink, r'\bDOVI\b|Dolby Vision|\bDV\b|杜比(视界)*'),
+  blueRay('Blu-ray', Colors.red, r'\bblu-ray\b|\bbluray\b'),
+  diy('DIY', Colors.brown, r'DIY|自定义');
 
   const TagType(this.content, this.color, this.regex);
   final String content;
@@ -294,14 +310,22 @@ enum TagType {
   final String regex;
 
   // 从字符串中匹配所有标签
-  static List<TagType> matchTags(String text) {
+  static List<TagType> matchTags(TextRef textRef) {
     List<TagType> matchedTags = [];
     for (TagType tag in TagType.values) {
       RegExp regExp = RegExp(tag.regex, caseSensitive: false);
-      if (regExp.hasMatch(text)) {
+      if (regExp.hasMatch(textRef.value)) {
         matchedTags.add(tag);
+        // 匹配成功后，直接将关键字从文本中移除
+        textRef.value = textRef.value.replaceAll(regExp, '');
       }
     }
+    // 清理多余空白并修剪
+    textRef.value = textRef.value
+        .replaceAll(RegExp(r"\s{2,}"), ' ')
+        .trim()
+        .split('#@')
+        .last;
     return matchedTags;
   }
 }
@@ -446,10 +470,6 @@ class SiteFeatures {
     supportAdvancedSearch: true,
   );
 
-
-
-
-
   @override
   String toString() => jsonEncode(toJson());
 }
@@ -559,8 +579,6 @@ class AggregateSearchConfig {
     );
   }
 
-
-
   @override
   String toString() => jsonEncode(toJson());
 
@@ -580,7 +598,7 @@ class AggregateSearchConfig {
 
   // 判断是否可以编辑或删除
   bool get canEdit => type != 'all'; // 允许编辑所有配置，包括"所有站点"配置
-  
+
   // 判断是否可以删除
   bool get canDelete => type != 'all';
 
@@ -600,7 +618,7 @@ class AggregateSearchConfig {
       for (final site in enabledSites) {
         configuredSites[site.id] = site;
       }
-      
+
       return allSiteIds.map((id) {
         // 如果该站点已有配置（包含分类等参数），使用已配置的版本
         if (configuredSites.containsKey(id)) {
@@ -656,8 +674,6 @@ class AggregateSearchSettings {
     );
   }
 
-
-
   @override
   String toString() => jsonEncode(toJson());
 }
@@ -667,10 +683,7 @@ class SiteConfigLoadResult {
   final SiteConfig config;
   final bool needsUpdate; // 是否需要更新持久化数据
 
-  const SiteConfigLoadResult({
-    required this.config,
-    required this.needsUpdate,
-  });
+  const SiteConfigLoadResult({required this.config, required this.needsUpdate});
 }
 
 class SiteConfig {
@@ -686,7 +699,6 @@ class SiteConfig {
   final List<SearchCategoryConfig> searchCategories; // 查询分类配置
   final SiteFeatures features; // 功能支持配置
   final String templateId; // 模板ID，记录创建时的模板，自定义为-1
-  
 
   const SiteConfig({
     required this.id,
@@ -805,7 +817,9 @@ class SiteConfig {
   }
 
   /// 异步版本的fromJson方法，使用配置文件中的URL映射
-  static Future<SiteConfigLoadResult> fromJsonAsync(Map<String, dynamic> json) async {
+  static Future<SiteConfigLoadResult> fromJsonAsync(
+    Map<String, dynamic> json,
+  ) async {
     final swTotal = Stopwatch()..start();
     List<SearchCategoryConfig> categories = [];
     if (json['searchCategories'] != null) {
@@ -838,7 +852,7 @@ class SiteConfig {
     // 处理 templateId 字段的兼容性（异步版本）
     String templateId = json['templateId'] as String? ?? '';
     bool needsUpdate = false;
-    
+
     if (templateId.isEmpty || templateId == '-1') {
       // 如果没有 templateId，根据 baseUrl 匹配预设站点（使用异步方法）
       final baseUrl = json['baseUrl'] as String;
@@ -899,10 +913,10 @@ class SiteConfig {
     final normalizedBaseUrl = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
-    
+
     // 注意：这个方法保留硬编码映射作为后备方案
     // 主要的URL映射现在从配置文件中读取，请使用 getTemplateIdByBaseUrlAsync 方法
-    
+
     // 兼容性映射（后备方案）
     final Map<String, String> fallbackMapping = {
       'https://api.m-team.cc': 'mteam',
@@ -915,7 +929,7 @@ class SiteConfig {
       'https://ptfans.org': 'ptfans',
       'https://xingyunge.org': 'xingyunge',
     };
-    
+
     return fallbackMapping[normalizedBaseUrl] ?? '-1';
   }
 
@@ -925,7 +939,7 @@ class SiteConfig {
     final normalizedBaseUrl = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
-    
+
     // 优先使用快速映射（同步后备方案），避免首帧阻塞读取资产
     final quick = _getTemplateIdByBaseUrl(normalizedBaseUrl);
     if (quick != '-1') {
