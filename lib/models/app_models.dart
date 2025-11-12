@@ -853,7 +853,13 @@ class SiteConfig {
       // 如果成功获取到了有效的templateId，标记需要更新持久化数据
       needsUpdate = templateId.isNotEmpty && templateId != '-1';
     }
-
+    // 迁移老馒头数据
+    if (templateId == 'mteam-api') {
+      // 如果没有 templateId，根据 baseUrl 匹配预设站点（使用异步方法）
+      templateId = 'mteam';
+      // 如果成功获取到了有效的templateId，标记需要更新持久化数据
+      needsUpdate = true;
+    }
     final config = SiteConfig(
       id:
           json['id'] as String? ??
@@ -899,13 +905,7 @@ class SiteConfig {
     
     // 兼容性映射（后备方案）
     final Map<String, String> fallbackMapping = {
-      'https://api.m-team.cc': 'mteam-api',
-      'https://kp.m-team.cc': 'mteam-kp',
-      'https://kp.m-team.io': 'mteam-kp',
-      'https://kp.m-team.org': 'mteam-kp',
-      'https://tp.m-team.cc': 'mteam-tp',
-      'https://tp.m-team.io': 'mteam-tp',
-      'https://tp.m-team.org': 'mteam-tp',
+      'https://api.m-team.cc': 'mteam',
       'https://www.ptskit.org': 'ptskit',
       'https://www.hxpt.org': 'hxpt',
       'https://zmpt.cc': 'zmpt',
