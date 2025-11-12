@@ -315,110 +315,127 @@ class TorrentListItem extends StatelessWidget {
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 4),
-                        child: Wrap(
-                          spacing: 4,
-                          runSpacing: 2,
-                          children: tags
-                              .map(
-                                (tag) => Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                    vertical: 1,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: tag.color,
-                                    borderRadius: BorderRadius.circular(3),
-                                  ),
-                                  child: Text(
-                                    tag.content,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                        child: SizedBox(
+                          height: 16,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: tags.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(width: 4),
+                            itemBuilder: (context, index) {
+                              final tag = tags[index];
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: tag.color,
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: Text(
+                                  tag.content,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                              )
-                              .toList(),
+                              );
+                            },
+                          ),
                         ),
                       );
                     },
                   ),
                   // 种子名称（聚合搜索模式下包含站点名称）
                   if (isAggregateMode && siteName != null)
-                    RichText(
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: ' $siteName ',
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimary,
-                                  backgroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.primary,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                          ),
-                          TextSpan(
-                            text: ' ${torrent.name}',
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).textTheme.titleMedium?.color,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                    Tooltip(
+                      message: '$siteName ${torrent.name}',
+                      // 默认触发：桌面/网页为悬停，移动端为长按
+                      waitDuration: const Duration(milliseconds: 400),
+                      showDuration: const Duration(seconds: 5),
+                      child: RichText(
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: ' $siteName ',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimary,
+                                    backgroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
                             ),
-                          ),
-                          // 移动设备上显示收藏状态小红心
-                          if (isMobile && torrent.collection)
-                            WidgetSpan(
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 4),
-                                child: Icon(
-                                  Icons.favorite,
-                                  color: Colors.red,
-                                  size: 15,
-                                ),
+                            TextSpan(
+                              text: ' ${torrent.name}',
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.titleMedium?.color,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
                               ),
                             ),
-                        ],
+                            // 移动设备上显示收藏状态小红心
+                            if (isMobile && torrent.collection)
+                              WidgetSpan(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 4),
+                                  child: Icon(
+                                    Icons.favorite,
+                                    color: Colors.red,
+                                    size: 15,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     )
                   else
-                    RichText(
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: torrent.name,
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).textTheme.titleMedium?.color,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          ),
-                          // 移动设备上显示收藏状态小红心
-                          if (isMobile && torrent.collection)
-                            WidgetSpan(
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 4),
-                                child: Icon(
-                                  Icons.favorite,
-                                  color: Colors.red,
-                                  size: 15,
-                                ),
+                    Tooltip(
+                      message: torrent.name,
+                      // 默认触发：桌面/网页为悬停，移动端为长按
+                      waitDuration: const Duration(milliseconds: 400),
+                      showDuration: const Duration(seconds: 5),
+                      child: RichText(
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: torrent.name,
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.titleMedium?.color,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
                               ),
                             ),
-                        ],
+                            // 移动设备上显示收藏状态小红心
+                            if (isMobile && torrent.collection)
+                              WidgetSpan(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 4),
+                                  child: Icon(
+                                    Icons.favorite,
+                                    color: Colors.red,
+                                    size: 15,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   const SizedBox(height: 4),
