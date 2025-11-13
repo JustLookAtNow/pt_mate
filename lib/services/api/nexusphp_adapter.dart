@@ -4,7 +4,6 @@ import 'package:logger/logger.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
-import 'package:pt_mate/services/storage/storage_service.dart';
 import '../../models/app_models.dart';
 import 'site_adapter.dart';
 import 'package:pt_mate/services/site_config_service.dart';
@@ -47,10 +46,6 @@ class NexusPHPAdapter implements SiteAdapter {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // 重新加载最新的站点配置，确保apiKey是最新的
-          final allSites = await StorageService.instance.loadSiteConfigs(includeApiKeys: true);
-          final latestConfig = allSites.firstWhere((site) => site.id == _siteConfig.id, orElse: () => _siteConfig);
-          _siteConfig = latestConfig;
           // 设置baseUrl
           if (options.baseUrl.isEmpty || options.baseUrl == '/') {
             var base = _siteConfig.baseUrl.trim();
