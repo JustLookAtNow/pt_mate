@@ -484,6 +484,14 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                   },
                 ),
               ListTile(
+                leading: const Icon(Icons.refresh),
+                title: const Text('刷新站点'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _refreshSingleSite(site);
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.edit),
                 title: const Text('编辑'),
                 onTap: () {
@@ -509,10 +517,13 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   // 大屏右侧菜单按钮
   Widget _buildSiteMenuButton(SiteConfig site, bool isActive) {
     return PopupMenuButton<String>(
-      onSelected: (value) {
+      onSelected: (value) async {
         switch (value) {
           case 'activate':
             _setActiveSite(site.id);
+            break;
+          case 'refresh':
+            await _refreshSingleSite(site);
             break;
           case 'edit':
             _editSite(site);
@@ -533,6 +544,14 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             ),
           ),
         const PopupMenuItem(
+          value: 'refresh',
+          child: ListTile(
+            leading: Icon(Icons.refresh),
+            title: Text('刷新站点'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
           value: 'edit',
           child: ListTile(
             leading: Icon(Icons.edit),
@@ -550,6 +569,54 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _refreshSingleSite(SiteConfig site) async {
+    if (!mounted) return;
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    try {
+      final activeId = await StorageService.instance.getActiveSiteId();
+      if (activeId == site.id) {
+        ApiService.instance.removeAdapter(site.id);
+        final appState = context.read<AppState>();
+        await appState.setActiveSite(site.id);
+      } else {
+        final status = await _checkSingleSite(site);
+        setState(() {
+          _healthStatuses[site.id] = status;
+        });
+        await StorageService.instance.saveHealthStatuses(
+          _healthStatuses.map((k, v) => MapEntry(k, v.toJson())),
+        );
+      }
+
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '站点已刷新',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
+            ),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          behavior: SnackBarBehavior.fixed,
+        ),
+      );
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '刷新失败: $e',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          behavior: SnackBarBehavior.fixed,
+        ),
+      );
+    }
   }
 
   @override
