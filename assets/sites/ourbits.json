@@ -16,7 +16,8 @@
     "favorites": true,
     "downloadHistory": true,
     "categorySearch": true,
-    "advancedSearch": true
+    "advancedSearch": true,
+    "showCover": false
   },
   "discountMapping": {},
   "infoFinder": {

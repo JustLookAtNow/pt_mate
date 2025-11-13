@@ -407,6 +407,7 @@ class SiteFeatures {
   final bool supportHistory; // 支持下载历史
   final bool supportCategories; // 支持分类搜索
   final bool supportAdvancedSearch; // 支持高级搜索
+  final bool showCover; // 列表显示封面与评分
 
   const SiteFeatures({
     this.supportMemberProfile = true,
@@ -417,6 +418,7 @@ class SiteFeatures {
     this.supportHistory = true,
     this.supportCategories = true,
     this.supportAdvancedSearch = true,
+    this.showCover = true,
   });
 
   SiteFeatures copyWith({
@@ -428,6 +430,7 @@ class SiteFeatures {
     bool? supportHistory,
     bool? supportCategories,
     bool? supportAdvancedSearch,
+    bool? showCover,
   }) => SiteFeatures(
     supportMemberProfile: supportMemberProfile ?? this.supportMemberProfile,
     supportTorrentSearch: supportTorrentSearch ?? this.supportTorrentSearch,
@@ -437,6 +440,7 @@ class SiteFeatures {
     supportHistory: supportHistory ?? this.supportHistory,
     supportCategories: supportCategories ?? this.supportCategories,
     supportAdvancedSearch: supportAdvancedSearch ?? this.supportAdvancedSearch,
+    showCover: showCover ?? this.showCover,
   );
 
   Map<String, dynamic> toJson() => {
@@ -448,6 +452,7 @@ class SiteFeatures {
     'supportHistory': supportHistory,
     'supportCategories': supportCategories,
     'supportAdvancedSearch': supportAdvancedSearch,
+    'showCover': showCover,
   };
 
   factory SiteFeatures.fromJson(Map<String, dynamic> json) => SiteFeatures(
@@ -469,6 +474,7 @@ class SiteFeatures {
         json['advancedSearch'] ??
         json['supportAdvancedSearch'] as bool? ??
         true,
+    showCover: json['showCover'] as bool? ?? true,
   );
 
   // M-Team 站点的默认功能配置
@@ -481,6 +487,7 @@ class SiteFeatures {
     supportHistory: true,
     supportCategories: true,
     supportAdvancedSearch: true,
+    showCover: true,
   );
 
   @override

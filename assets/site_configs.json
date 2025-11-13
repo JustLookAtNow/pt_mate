@@ -33,7 +33,8 @@
         "favorites": true,
         "downloadHistory": true,
         "categorySearch": true,
-        "advancedSearch": true
+        "advancedSearch": true,
+        "showCover": true
       },
       "discountMapping": {
         "FREE": "FREE",
@@ -61,7 +62,8 @@
         "favorites": false,
         "downloadHistory": false,
         "categorySearch": true,
-        "advancedSearch": true
+        "advancedSearch": true,
+        "showCover": true
       },
       "discountMapping": {
         "Free": "FREE",
@@ -91,7 +93,8 @@
         "favorites": true,
         "downloadHistory": true,
         "categorySearch": true,
-        "advancedSearch": true
+        "advancedSearch": true,
+        "showCover": true
       },
       "discountMapping": {
         "Free": "FREE",

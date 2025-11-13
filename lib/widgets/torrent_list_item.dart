@@ -102,6 +102,7 @@ class TorrentListItem extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
             // 封面截图和创建时间
+                  if (currentSite?.features.showCover ?? true)
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -308,11 +309,70 @@ class TorrentListItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                          // 标签行（仅当存在标签）
-                          if (tags.isNotEmpty)
+                        // 标签与评分行（当关闭封面时，评分移至标签末尾）
+                        if (tags.isNotEmpty ||
+                            (!(currentSite?.features.showCover ?? true) &&
+                                ((torrent.doubanRating != null &&
+                                        torrent.doubanRating != 'N/A') ||
+                                    (torrent.imdbRating != null &&
+                                        torrent.imdbRating != 'N/A'))))
                             Padding(
                               padding: const EdgeInsets.only(bottom: 4),
-                            child: _TagsView(tags: tags),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(child: _TagsView(tags: tags)),
+                                if (!(currentSite?.features.showCover ??
+                                    true)) ...[
+                                  if (torrent.doubanRating != null &&
+                                      torrent.doubanRating != 'N/A')
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      margin: const EdgeInsets.only(left: 6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF007711),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        '豆 ${torrent.doubanRating}',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  if (torrent.imdbRating != null &&
+                                      torrent.imdbRating != 'N/A')
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      margin: const EdgeInsets.only(left: 6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF5C518),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        'IMDB ${torrent.imdbRating}',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.black,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                ],
+                              ],
+                            ),
                             ),
                   // 种子名称（聚合搜索模式下包含站点名称）
                   if (isAggregateMode && siteName != null)

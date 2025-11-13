@@ -2402,7 +2402,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         const SizedBox(height: 12),
 
                         // 根据平台显示不同的认证方式
-                        if (Platform.isAndroid) ...[
+                        if (Platform.isAndroid || Platform.isIOS) ...[
                           const Text(
                             '此类型站点需要通过网页登录获取认证信息',
                             style: TextStyle(color: Colors.grey),
@@ -2692,6 +2692,16 @@ class _SiteEditPageState extends State<SiteEditPage> {
                           (value) => setState(() {
                             _siteFeatures = _siteFeatures.copyWith(
                               supportAdvancedSearch: value,
+                            );
+                          }),
+                        ),
+                        _buildFeatureSwitch(
+                          '显示封面',
+                          '在列表左侧显示封面和评分',
+                          _siteFeatures.showCover,
+                          (value) => setState(() {
+                            _siteFeatures = _siteFeatures.copyWith(
+                              showCover: value,
                             );
                           }),
                         ),
