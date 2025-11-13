@@ -463,53 +463,56 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                               color: Theme.of(
                                 context,
                               ).colorScheme.errorContainer,
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '部分站点搜索失败',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleSmall
-                                          ?.copyWith(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.onErrorContainer,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    ...provider.searchErrors.entries.map((
-                                      entry,
-                                    ) {
-                                      final siteName = sites
-                                          .firstWhere(
-                                            (site) => site.id == entry.key,
-                                            orElse: () => SiteConfig(
-                                              id: '',
-                                              name: '未知站点',
-                                              baseUrl: '',
-                                            ),
-                                          )
-                                          .name;
-
-                                      return Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 4.0,
-                                        ),
-                                        child: Text(
-                                          '$siteName: ${entry.value}',
-                                          style: TextStyle(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.onErrorContainer,
-                                          ),
-                                        ),
-                                      );
-                                    }),
-                                  ],
+                              child: ExpansionTile(
+                                title: Text(
+                                  '部分站点搜索失败',
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onErrorContainer,
+                                      ),
                                 ),
+                                iconColor: Theme.of(
+                                  context,
+                                ).colorScheme.onErrorContainer,
+                                collapsedIconColor: Theme.of(
+                                  context,
+                                ).colorScheme.onErrorContainer,
+                                tilePadding: const EdgeInsets.all(16.0),
+                                childrenPadding: const EdgeInsets.fromLTRB(
+                                  16.0,
+                                  0,
+                                  16.0,
+                                  16.0,
+                                ),
+                                children: [
+                                  ...provider.searchErrors.entries.map((entry) {
+                                    final siteName = sites
+                                        .firstWhere(
+                                          (site) => site.id == entry.key,
+                                          orElse: () => SiteConfig(
+                                            id: '',
+                                            name: '未知站点',
+                                            baseUrl: '',
+                                          ),
+                                        )
+                                        .name;
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 4.0,
+                                      ),
+                                      child: Text(
+                                        '$siteName: ${entry.value}',
+                                        style: TextStyle(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onErrorContainer,
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ],
                               ),
                             );
                           },
