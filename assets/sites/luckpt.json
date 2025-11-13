@@ -13,8 +13,8 @@
     "torrentSearch": true,
     "torrentDetail": true,
     "download": true,
-    "favorites": false,
-    "downloadHistory": false,
+    "favorites": true,
+    "downloadHistory": true,
     "categorySearch": true,
     "advancedSearch": true
   },
