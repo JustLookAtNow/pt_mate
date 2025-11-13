@@ -155,7 +155,7 @@
           "attribute": "src"
         },
         "isTop": {
-          "selector": "table.torrentname > img[alt=\"Sticky\"]",
+          "selector": "table.torrentname > img[title~=\"置顶|置頂\"]",
           "attribute": "src"
         },
         "cover": {},

@@ -294,11 +294,11 @@ class TextRef {
 }
 
 enum TagType {
-  hot('hot', Color.fromARGB(255, 255, 128, 59), r'\[热门\]|\[熱門\]'),
+  hot('HOT', Color.fromARGB(255, 255, 128, 59), r'\[热门\]|\[熱門\]'),
   official('官方', Color.fromARGB(255, 76, 130, 175), r'官方'),
   chinese('中字', Colors.green, r'中字|中文|简体'),
   chineseTraditional('繁体', Colors.green, r'繁体'),
-  mandarin('国语', Colors.blue, r'国语|国配|普通话|中配'),
+  mandarin('国语', Colors.blue, r'国语|国配|普通话|中配|國語'),
   fourK('4K', Colors.orange, r'\b4K\b|\b2160p\b'),
   resolution1080('1080p', Colors.blue, r'\b1080p\b'),
   hdr('HDR', Colors.purple, r'\bHDR\b|\bHDR10\b'),
@@ -335,6 +335,7 @@ enum TagType {
     // 清理多余空白并修剪
     textRef.value = textRef.value
         .replaceAll(RegExp(r"\s{2,}"), ' ')
+        .replaceAll('禁轉', '')
         .trim()
         .split('#@')
         .last;
