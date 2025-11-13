@@ -155,6 +155,9 @@ class NexusPHPWebAdapter extends SiteAdapter {
       // 提取PassKey（如果配置了）
       String? passKey = await _extractPassKeyByConfig();
 
+      // 提取每小时魔力（如果配置了）
+      double? bonusPerHour = await _extractBonusPerHourByConfig();
+
       // 将字符串格式的数据转换为数字
       double shareRate =
           double.tryParse(userInfo['ratio']?.replaceAll(',', '') ?? '0') ?? 0.0;
@@ -177,6 +180,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
         downloadedBytesString: userInfo['download'] ?? '0 B',
         userId: userInfo['userId'],
         passKey: passKey,
+        bonusPerHour: bonusPerHour,
         lastAccess: null, // Web版本暂不提供该字段
       );
     } catch (e) {
@@ -272,6 +276,47 @@ class NexusPHPWebAdapter extends SiteAdapter {
     }
 
     return result;
+  }
+
+  /// 根据配置提取每小时魔力（bonusPerHour）
+  Future<double?> _extractBonusPerHourByConfig() async {
+    try {
+      final bonusConfig = await _getFinderConfig('bonusPerHour');
+      final path = bonusConfig['path'] as String? ?? 'mybonus.php';
+
+      final response = await _dio.get('/$path');
+      final soup = BeautifulSoup(response.data);
+
+      final rowsConfig = bonusConfig['rows'] as Map<String, dynamic>?;
+      final fieldsConfig = bonusConfig['fields'] as Map<String, dynamic>?;
+
+      if (rowsConfig == null || fieldsConfig == null) {
+        throw Exception('配置格式错误：缺少 rows 或 fields 配置');
+      }
+
+      final rowSelector = rowsConfig['selector'] as String?;
+      if (rowSelector == null || rowSelector.isEmpty) {
+        throw Exception('配置错误：缺少行选择器');
+      }
+
+      final targetElement = _findFirstElementBySelector(soup, rowSelector);
+      if (targetElement == null) {
+        throw Exception('未找到目标元素：$rowSelector');
+      }
+
+      final field = fieldsConfig['bonusPerHour'] as Map<String, dynamic>?;
+      if (field == null) {
+        throw Exception('配置错误：缺少 bonusPerHour 字段');
+      }
+
+      final value = await _extractFirstFieldValue(targetElement, field);
+      if (value == null || value.isEmpty) return null;
+
+      final parsed = double.tryParse(value.replaceAll(',', ''));
+      return parsed;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 根据配置提取PassKey
