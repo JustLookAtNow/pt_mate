@@ -1857,7 +1857,14 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: InAppWebView(
-                initialUrlRequest: URLRequest(url: WebUri(webviewUrl)),
+                initialUrlRequest: URLRequest(
+                  url: WebUri(webviewUrl),
+                  headers:
+                      widget.siteConfig?.cookie != null &&
+                          widget.siteConfig!.cookie!.isNotEmpty
+                      ? {'Cookie': widget.siteConfig!.cookie!}
+                      : null,
+                ),
                 initialSettings: InAppWebViewSettings(
                   javaScriptEnabled: true,
                   domStorageEnabled: true,
@@ -1866,8 +1873,27 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                   useOnDownloadStart: true,
                   useShouldOverrideUrlLoading: true,
                 ),
-                onWebViewCreated: (controller) {
+                onWebViewCreated: (controller) async {
                   _webViewController = controller;
+                  if (widget.siteConfig?.cookie != null &&
+                      widget.siteConfig!.cookie!.isNotEmpty) {
+                    final cookieManager = CookieManager.instance();
+                    final baseUrl = widget.siteConfig!.baseUrl;
+                    final baseUri = Uri.parse(baseUrl);
+                    final cookiePairs = widget.siteConfig!.cookie!.split(';');
+                    for (final pair in cookiePairs) {
+                      final parts = pair.trim().split('=');
+                      if (parts.length == 2) {
+                        await cookieManager.setCookie(
+                          url: WebUri(baseUrl),
+                          name: parts[0].trim(),
+                          value: parts[1].trim(),
+                          domain: baseUri.host,
+                          isHttpOnly: true,
+                        );
+                      }
+                    }
+                  }
                 },
                 onLoadStart: (controller, url) {
                   setState(() {
