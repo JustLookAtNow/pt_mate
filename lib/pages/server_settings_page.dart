@@ -573,16 +573,54 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
 
   Future<void> _refreshSingleSite(SiteConfig site) async {
     if (!mounted) return;
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-
+    final theme = Theme.of(context);
     try {
       final activeId = await StorageService.instance.getActiveSiteId();
       if (activeId == site.id) {
         ApiService.instance.removeAdapter(site.id);
-        final appState = context.read<AppState>();
-        await appState.setActiveSite(site.id);
+        final activeSite = await StorageService.instance.getActiveSiteConfig();
+        if (activeSite == null) {
+          throw Exception('未找到活跃站点配置');
+        }
+        await ApiService.instance.setActiveSite(activeSite);
+
+        try {
+          final profile = await ApiService.instance.fetchMemberProfile();
+          setState(() {
+            _healthStatuses[site.id] = _HealthStatus(
+              ok: true,
+              message: '正常',
+              username: profile.username,
+              profile: profile,
+              updatedAt: DateTime.now(),
+            );
+          });
+          await StorageService.instance.saveHealthStatuses(
+            _healthStatuses.map((k, v) => MapEntry(k, v.toJson())),
+          );
+        } catch (e) {
+          setState(() {
+            _healthStatuses[site.id] = _HealthStatus(
+              ok: false,
+              message: e.toString(),
+              username: null,
+              profile: null,
+              updatedAt: DateTime.now(),
+            );
+          });
+          await StorageService.instance.saveHealthStatuses(
+            _healthStatuses.map((k, v) => MapEntry(k, v.toJson())),
+          );
+        }
       } else {
-        final status = await _checkSingleSite(site);
+        final allSites = await StorageService.instance.loadSiteConfigs(
+          includeApiKeys: true,
+        );
+        final fullSite = allSites.firstWhere(
+          (s) => s.id == site.id,
+          orElse: () => site,
+        );
+        final status = await _checkSingleSite(fullSite);
         setState(() {
           _healthStatuses[site.id] = status;
         });
@@ -591,28 +629,30 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         );
       }
 
-      scaffoldMessenger.showSnackBar(
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             '站点已刷新',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
+              color: theme.colorScheme.onPrimaryContainer,
             ),
           ),
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          backgroundColor: theme.colorScheme.primaryContainer,
           behavior: SnackBarBehavior.fixed,
         ),
       );
     } catch (e) {
-      scaffoldMessenger.showSnackBar(
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             '刷新失败: $e',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onErrorContainer,
+              color: theme.colorScheme.onErrorContainer,
             ),
           ),
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          backgroundColor: theme.colorScheme.errorContainer,
           behavior: SnackBarBehavior.fixed,
         ),
       );
