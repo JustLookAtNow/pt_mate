@@ -2,7 +2,9 @@
   "id": "ptzone",
   "name": "PTZone",
   "isShow": true,
-  "baseUrls": ["https://ptzone.xyz/"],
+  "baseUrls": [
+    "https://ptzone.xyz/"
+  ],
   "primaryUrl": "https://ptzone.xyz/",
   "siteType": "NexusPHP",
   "searchCategories": [],
@@ -15,5 +17,6 @@
     "downloadHistory": true,
     "categorySearch": true,
     "advancedSearch": true
-  }
+  },
+  "logo": "assets/sites_icon/ptzone.png"
 }

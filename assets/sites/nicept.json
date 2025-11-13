@@ -2,7 +2,9 @@
   "id": "nicept",
   "name": "老师",
   "isShow": false,
-  "baseUrls": ["https://www.nicept.net/"],
+  "baseUrls": [
+    "https://www.nicept.net/"
+  ],
   "primaryUrl": "https://www.nicept.net/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
@@ -51,5 +53,6 @@
         }
       }
     }
-  }
+  },
+  "logo": "assets/sites_icon/nicept.png"
 }

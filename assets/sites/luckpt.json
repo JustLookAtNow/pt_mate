@@ -18,5 +18,6 @@
     "categorySearch": true,
     "advancedSearch": true
   },
-  "discountMapping": {}
+  "discountMapping": {},
+  "logo": "assets/sites_icon/luckpt.png"
 }
