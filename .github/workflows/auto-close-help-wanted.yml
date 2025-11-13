@@ -64,6 +64,7 @@ jobs:
                   repo: context.repo.repo,
                   issue_number: issue.number,
                   state: "closed",
+                  state_reason: "not_planned",
                 });
               }
             }
