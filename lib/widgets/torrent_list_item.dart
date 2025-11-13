@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
@@ -97,9 +98,7 @@ class TorrentListItem extends StatelessWidget {
             ),
             child: Padding(
               padding: const EdgeInsets.all(4),
-              child: SizedBox(
-                height: 142,
-                child: Row(
+              child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
             // 封面截图和创建时间
@@ -313,37 +312,7 @@ class TorrentListItem extends StatelessWidget {
                           if (tags.isNotEmpty)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 4),
-                              child: SizedBox(
-                                height: 16,
-                                child: ListView.separated(
-                                  scrollDirection: Axis.horizontal,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: tags.length,
-                                  separatorBuilder: (context, index) =>
-                                      const SizedBox(width: 4),
-                                  itemBuilder: (context, index) {
-                                    final tag = tags[index];
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                        vertical: 1,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: tag.color,
-                                        borderRadius: BorderRadius.circular(3),
-                                      ),
-                                      child: Text(
-                                        tag.content,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
+                            child: _TagsView(tags: tags),
                             ),
                   // 种子名称（聚合搜索模式下包含站点名称）
                   if (isAggregateMode && siteName != null)
@@ -535,8 +504,7 @@ class TorrentListItem extends StatelessWidget {
                 ],
               ),
             ],
-          ],
-                ),
+                ],
               ),
             ),
           ),
@@ -894,5 +862,143 @@ class _SwipeableItemState extends State<_SwipeableItem>
         ),
       ),
     );
+  }
+}
+
+class _TagsView extends StatefulWidget {
+  final List<TagType> tags;
+  const _TagsView({required this.tags});
+  @override
+  State<_TagsView> createState() => _TagsViewState();
+}
+
+class _TagsViewState extends State<_TagsView> {
+  bool _expanded = false;
+  bool _overflow = false;
+
+  Widget _buildChip(TagType tag) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: tag.color,
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Text(
+        tag.content,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWrap() {
+    return Wrap(
+      spacing: 4,
+      runSpacing: 2,
+      children: widget.tags.map(_buildChip).toList(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final measureChild = Offstage(
+          offstage: true,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+            child: _MeasureSize(
+              onChange: (s) {
+                if (!_expanded) {
+                  final overflow = s.height > 16.0 + 0.1;
+                  if (overflow != _overflow) {
+                    setState(() {
+                      _overflow = overflow;
+                    });
+                  }
+                }
+              },
+              child: _buildWrap(),
+            ),
+          ),
+        );
+
+        if (_expanded) {
+          return _buildWrap();
+        }
+
+        return Row(
+          children: [
+            Expanded(
+              child: SizedBox(height: 16, child: ClipRect(child: _buildWrap())),
+            ),
+            if (_overflow) ...[
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _expanded = true;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: const Icon(
+                    Icons.keyboard_arrow_down,
+                    size: 12,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 9),
+            ],
+            measureChild,
+          ],
+        );
+      },
+    );
+  }
+}
+
+typedef SizeChangedCallback = void Function(Size size);
+
+class _MeasureSize extends SingleChildRenderObjectWidget {
+  final SizeChangedCallback onChange;
+  const _MeasureSize({required this.onChange, super.child});
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderMeasureSize(onChange);
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    covariant _RenderMeasureSize renderObject,
+  ) {
+    renderObject.onChange = onChange;
+  }
+}
+
+class _RenderMeasureSize extends RenderProxyBox {
+  SizeChangedCallback onChange;
+  Size? _prevSize;
+  _RenderMeasureSize(this.onChange);
+  @override
+  void performLayout() {
+    super.performLayout();
+    final newSize = child?.size ?? size;
+    if (_prevSize == null || _prevSize != newSize) {
+      _prevSize = newSize;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        onChange(newSize);
+      });
+    }
   }
 }
