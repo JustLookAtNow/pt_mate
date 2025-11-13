@@ -301,7 +301,7 @@ enum TagType {
   mandarin('国语', Colors.blue, r'国语|国配|普通话|中配'),
   fourK('4K', Colors.orange, r'\b4K\b|\b2160p\b'),
   resolution1080('1080p', Colors.blue, r'\b1080p\b'),
-  hdr('HDR', Colors.purple, r'\bHDR\b|\bHDR10\b|Dolby Vision|\bDV\b'),
+  hdr('HDR', Colors.purple, r'\bHDR\b|\bHDR10\b'),
   h265(
     'H265',
     Color.fromARGB(255, 51, 162, 217),
