@@ -940,25 +940,28 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                                             Theme.of(context)
                                                                 .colorScheme
                                                                 .primary,
-                                                            ': ${Formatters.bonus(p.bonus)}${p.bonusPerHour != null ? '(${p.bonusPerHour!})' : ''}',
+                                                            '${Formatters.bonus(p.bonus)}${p.bonusPerHour != null ? '(${p.bonusPerHour!})' : ''}',
                                                           ),
 
                                                           buildItem(
                                                             Icons.upload,
                                                             Colors.green,
-                                                            ': ${p.uploadedBytesString}',
+                                                            p.uploadedBytesString,
                                                           ),
                                                           buildItem(
                                                             Icons.download,
                                                             Colors.red,
-                                                            ': ${p.downloadedBytesString}',
+                                                            p.downloadedBytesString,
                                                           ),
                                                           buildItem(
                                                             Icons.trending_up,
                                                             Theme.of(context)
                                                                 .colorScheme
                                                                 .primary,
-                                                            ': ${p.shareRate.toStringAsFixed(2)}',
+                                                            p.shareRate
+                                                                .toStringAsFixed(
+                                                                  2,
+                                                                ),
                                                           ),
                                                           if (p.seedingSizeBytes !=
                                                               null)
@@ -968,7 +971,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                                               Theme.of(context)
                                                                   .colorScheme
                                                                   .primary,
-                                                              ': ${Formatters.dataFromBytes(p.seedingSizeBytes!)}',
+                                                              Formatters.dataFromBytes(
+                                                                p.seedingSizeBytes!,
+                                                              ),
                                                             ),
                                                           if (p.lastAccess !=
                                                               null)
@@ -977,7 +982,12 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                                               Theme.of(context)
                                                                   .colorScheme
                                                                   .primary,
-                                                              ': ${p.lastAccess?.substring(0, 10)}',
+                                                              p.lastAccess
+                                                                      ?.substring(
+                                                                        0,
+                                                                        10,
+                                                                      ) ??
+                                                                  '',
                                                             ),
                                                         ];
                                                         if (isLarge) {

@@ -22,6 +22,7 @@
     "advancedSearch": true
   },
   "discountMapping": {},
+  "logo": "assets/sites_icon/qingwapt.png",
   "infoFinder": {
     "passKey": {
       "path": "usercp.php",

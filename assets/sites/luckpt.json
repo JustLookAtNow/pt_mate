@@ -1,11 +1,11 @@
 {
-  "id": "hxpt",
-  "name": "好学",
+  "id": "luckpt",
+  "name": "幸运",
   "isShow": true,
   "baseUrls": [
-    "https://www.hxpt.org/"
+    "https://pt.luckpt.de/"
   ],
-  "primaryUrl": "https://www.hxpt.org/",
+  "primaryUrl": "https://pt.luckpt.de/",
   "siteType": "NexusPHP",
   "searchCategories": [],
   "features": {
@@ -18,6 +18,5 @@
     "categorySearch": true,
     "advancedSearch": true
   },
-  "discountMapping": {},
-  "logo": "assets/sites_icon/hxpt.png"
+  "discountMapping": {}
 }

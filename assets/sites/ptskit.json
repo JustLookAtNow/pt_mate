@@ -2,7 +2,9 @@
   "id": "ptskit",
   "name": "PTSKit",
   "isShow": true,
-  "baseUrls": ["https://www.ptskit.org/"],
+  "baseUrls": [
+    "https://www.ptskit.org/"
+  ],
   "primaryUrl": "https://www.ptskit.org/",
   "siteType": "NexusPHP",
   "searchCategories": [
@@ -37,5 +39,6 @@
     "categorySearch": true,
     "advancedSearch": true
   },
-  "discountMapping": {}
+  "discountMapping": {},
+  "logo": "assets/sites_icon/ptskit.png"
 }
