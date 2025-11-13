@@ -103,6 +103,7 @@ Future<void> main() async {
   int converted = 0;
   final List<String> skipped = [];
   final Set<String> matchedStems = {};
+  final Set<String> createdStems = {};
 
   for (final item in iconFiles) {
     final name = item['name'] as String?;
@@ -142,6 +143,7 @@ Future<void> main() async {
           await pngOutFile.writeAsBytes(bytes);
           downloaded++;
           stdout.writeln('Downloaded $name -> ${pngOutFile.path}');
+          createdStems.add(stem);
         } else if (isIco) {
           final img.Image? image = img.decodeIco(Uint8List.fromList(bytes)) ?? img.decodeImage(Uint8List.fromList(bytes));
           if (image == null) {
@@ -152,6 +154,7 @@ Future<void> main() async {
           await pngOutFile.writeAsBytes(pngBytes);
           converted++;
           stdout.writeln('Converted ICO $name -> ${pngOutFile.path}');
+          createdStems.add(stem);
         } else {
           // 非预期格式，跳过
           stderr.writeln('Unexpected format: $name');
@@ -172,8 +175,81 @@ Future<void> main() async {
   }
   stdout.writeln('Output dir: ${outDir.path}');
 
+  final Set<String> missingStems = siteKeys.difference(matchedStems);
+  final siteDio = Dio();
+  for (final stem in missingStems) {
+    final pngOutFile = File('${outDir.path}/$stem.png');
+    if (pngOutFile.existsSync()) {
+      continue;
+    }
+
+    final siteJsonPath = 'assets/sites/$stem.json';
+    final siteFile = File(siteJsonPath);
+    if (!siteFile.existsSync()) {
+      continue;
+    }
+
+    try {
+      final content = await siteFile.readAsString();
+      final Map<String, dynamic> data = jsonDecode(content);
+      final primaryUrl = (data['primaryUrl'] as String?)?.trim();
+      if (primaryUrl == null || primaryUrl.isEmpty) {
+        continue;
+      }
+
+      Uri u;
+      try {
+        u = Uri.parse(primaryUrl);
+      } catch (_) {
+        continue;
+      }
+      final faviconUri = Uri(
+        scheme: u.scheme,
+        host: u.host,
+        port: u.hasPort ? u.port : null,
+        path: '/favicon.ico',
+      );
+
+      try {
+        final res = await siteDio.get<List<int>>(
+          faviconUri.toString(),
+          options: Options(
+            responseType: ResponseType.bytes,
+            followRedirects: true,
+            validateStatus: (code) => code != null && code >= 200 && code < 400,
+          ),
+        );
+        if (res.data == null) {
+          continue;
+        }
+        final bytes = res.data!;
+        img.Image? image = img.decodeIco(Uint8List.fromList(bytes));
+        if (image != null) {
+          final pngBytes = img.encodePng(image);
+          await pngOutFile.writeAsBytes(pngBytes);
+          converted++;
+          createdStems.add(stem);
+          stdout.writeln('Converted favicon ICO for $stem -> ${pngOutFile.path}');
+          continue;
+        }
+        image = img.decodeImage(Uint8List.fromList(bytes));
+        if (image != null) {
+          final pngBytes = img.encodePng(image);
+          await pngOutFile.writeAsBytes(pngBytes);
+          downloaded++;
+          createdStems.add(stem);
+          stdout.writeln('Downloaded favicon for $stem -> ${pngOutFile.path}');
+        }
+      } catch (_) {
+        continue;
+      }
+    } catch (_) {
+      continue;
+    }
+  }
+  
   // 更新对应站点 JSON，logo 字段统一指向 PNG 资源
-  for (final stem in matchedStems) {
+  for (final stem in createdStems) {
     final pngFile = File('${outDir.path}/$stem.png');
     if (!pngFile.existsSync()) {
       // 没有任何已下载或已存在的图标，跳过
