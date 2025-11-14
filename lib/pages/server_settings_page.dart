@@ -1374,6 +1374,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
   bool _hasUserMadeSelection = false; // 用户是否已经做出选择（预设或自定义）
   String? _selectedTemplateUrl; // 从多URL模板中选择的URL
   bool _showPresetList = true; // 控制预设站点列表的显示/隐藏
+  bool _showManualCookieInput = false; // 是否展示手动输入cookie框
 
   @override
   void initState() {
@@ -2008,6 +2009,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
           onCookieReceived: (cookie) {
             setState(() {
               _savedCookie = cookie;
+              _cookieController.text = cookie;
               _cookieStatus = '登录成功，已获取认证信息';
             });
           },
@@ -2416,7 +2418,28 @@ class _SiteEditPageState extends State<SiteEditPage> {
                               label: const Text('打开登录页面'),
                             ),
                           ),
-                        ] else ...[
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _showManualCookieInput =
+                                      !_showManualCookieInput;
+                                });
+                              },
+                              icon: const Icon(Icons.edit),
+                              label: Text(
+                                _showManualCookieInput
+                                    ? '收起手动输入'
+                                    : '我要手动输入cookie',
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (!Platform.isAndroid && !Platform.isIOS ||
+                            _showManualCookieInput) ...[
+                          const SizedBox(height: 16),
                           const Text(
                             '请手动输入从浏览器获取的Cookie字符串',
                             style: TextStyle(color: Colors.grey),
@@ -2431,7 +2454,6 @@ class _SiteEditPageState extends State<SiteEditPage> {
                             ),
                             maxLines: 3,
                             onChanged: (value) {
-                              // 当用户输入cookie时，更新保存的cookie
                               _savedCookie = value.trim();
                               if (_savedCookie!.isNotEmpty) {
                                 setState(() {
