@@ -371,7 +371,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
           return value.trim();
         } else {
           throw Exception(
-            '提取PassKey失败：未匹配到目标元素${passKeyField['rows']['selector']}',
+            '提取PassKey失败：未匹配到目标元素${rowSelector}',
           );
         }
       }

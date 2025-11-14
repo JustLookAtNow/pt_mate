@@ -67,6 +67,7 @@ dependencies:
   logger: ^2.6.2
   get_it: ^9.0.5
   image: ^4.1.7
+  share_plus: ^10.1.2
 
 
 dev_dependencies:

@@ -63,14 +63,31 @@ class TorrentListItem extends StatelessWidget {
     this.onDownload,
   });
 
+  bool _hasRatingValue(String? r) {
+    if (r == null) return false;
+    final t = r.trim();
+    if (t.isEmpty || t == 'N/A') return false;
+    final m = RegExp(r'([0-9]+(?:\.[0-9]+)?)').firstMatch(t);
+    if (m == null) return false;
+    final v = double.tryParse(m.group(1)!);
+    return v != null && v > 0;
+  }
+
   @override
   Widget build(BuildContext context) {
     // 检测是否为移动设备（屏幕宽度小于600px）
     final isMobile = MediaQuery.of(context).size.width < 600;
+    final showCover = currentSite?.features.showCover ?? true;
 
     // 统一计算标签与清理后的描述，避免重复调用
     final descrRef = TextRef('${torrent.name}#@${torrent.smallDescr}');
     final tags = TagType.matchTags(descrRef);
+    final hasDouban = _hasRatingValue(torrent.doubanRating);
+    final hasImdb = _hasRatingValue(torrent.imdbRating);
+    final hasAnyRating = hasDouban || hasImdb;
+    final double rightMinHeight = showCover
+        ? (isMobile && hasAnyRating ? 130.0 : 100.0)
+        : 70.0;
 
     // 构建主要内容
     Widget mainContent = Container(
@@ -101,8 +118,8 @@ class TorrentListItem extends StatelessWidget {
               child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-            // 封面截图和创建时间
-                  if (currentSite?.features.showCover ?? true)
+                  // 封面截图和创建时间（在 showCover 为 true 时显示）
+                  if (showCover)
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -240,16 +257,16 @@ class TorrentListItem extends StatelessWidget {
                     ),
                   ),
                 ),
-                // 评分模块
+                        // 评分模块（仅移动端左列显示；桌面端在右侧标签后显示）
                 const SizedBox(height: 8),
+                        if (isMobile)
                 Container(
                   width: 70,
                   margin: const EdgeInsets.only(right: 8),
                   child: Column(
                     children: [
                       // 豆瓣评分
-                      if (torrent.doubanRating != null &&
-                          torrent.doubanRating != 'N/A')
+                      if (hasDouban)
                         Container(
                           width: 70,
                           padding: const EdgeInsets.symmetric(
@@ -274,8 +291,7 @@ class TorrentListItem extends StatelessWidget {
                           ),
                         ),
                       // IMDB评分
-                      if (torrent.imdbRating != null &&
-                          torrent.imdbRating != 'N/A')
+                      if (hasImdb)
                         Container(
                           width: 70,
                           padding: const EdgeInsets.symmetric(
@@ -305,27 +321,22 @@ class TorrentListItem extends StatelessWidget {
             ),
 
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                        // 标签与评分行（当关闭封面时，评分移至标签末尾）
-                        if (tags.isNotEmpty ||
-                            (!(currentSite?.features.showCover ?? true) &&
-                                ((torrent.doubanRating != null &&
-                                        torrent.doubanRating != 'N/A') ||
-                                    (torrent.imdbRating != null &&
-                                        torrent.imdbRating != 'N/A'))))
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: rightMinHeight),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                        // 标签与评分行（桌面端统一追加评分；移动端在关闭封面时追加）
+                        if (tags.isNotEmpty || (!isMobile && hasAnyRating) || (isMobile && !showCover && hasAnyRating))
                             Padding(
                               padding: const EdgeInsets.only(bottom: 4),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 Expanded(child: _TagsView(tags: tags)),
-                                if (!(currentSite?.features.showCover ??
-                                    true)) ...[
-                                  if (torrent.doubanRating != null &&
-                                      torrent.doubanRating != 'N/A')
+                                if (!isMobile || !showCover) ...[
+                                  if (hasDouban)
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 6,
@@ -347,8 +358,7 @@ class TorrentListItem extends StatelessWidget {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                  if (torrent.imdbRating != null &&
-                                      torrent.imdbRating != 'N/A')
+                                  if (hasImdb)
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 6,
@@ -522,7 +532,8 @@ class TorrentListItem extends StatelessWidget {
                         _buildDownloadStatusIcon(torrent.downloadStatus),
                     ],
                   ),
-                ],
+                  ],
+                ),
               ),
             ),
             // 桌面端显示操作按钮
@@ -543,7 +554,7 @@ class TorrentListItem extends StatelessWidget {
                         color: torrent.collection ? Colors.red : null,
                       ),
                       tooltip: torrent.collection ? '取消收藏' : '收藏',
-                        padding: EdgeInsets.all(20),
+                            padding: EdgeInsets.all(10),
                       constraints: const BoxConstraints(
                         minWidth: 40,
                         minHeight: 40,
@@ -555,7 +566,7 @@ class TorrentListItem extends StatelessWidget {
                       onPressed: onDownload,
                       icon: const Icon(Icons.download_outlined),
                       tooltip: '下载',
-                        padding: EdgeInsets.all(20),
+                            padding: EdgeInsets.all(10),
                       constraints: const BoxConstraints(
                         minWidth: 40,
                         minHeight: 40,

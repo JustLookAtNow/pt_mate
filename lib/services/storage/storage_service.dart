@@ -67,6 +67,8 @@ class StorageKeys {
   
   // 图片设置
   static const String autoLoadImages = 'images.autoLoad'; // bool
+  // 日志设置
+  static const String logToFileEnabled = 'logging.toFile'; // bool
   
   // 聚合搜索设置
   static const String aggregateSearchSettings = 'aggregateSearch.settings';
@@ -633,6 +635,16 @@ class StorageService {
   Future<bool> loadAutoLoadImages() async {
     final prefs = await _prefs;
     return prefs.getBool(StorageKeys.autoLoadImages) ?? true; // 默认自动加载
+  }
+
+  Future<void> saveLogToFileEnabled(bool enabled) async {
+    final prefs = await _prefs;
+    await prefs.setBool(StorageKeys.logToFileEnabled, enabled);
+  }
+
+  Future<bool> loadLogToFileEnabled() async {
+    final prefs = await _prefs;
+    return prefs.getBool(StorageKeys.logToFileEnabled) ?? false;
   }
 
   // 默认下载设置相关

@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
 
 import '../services/storage/storage_service.dart';
 import '../services/theme/theme_manager.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/responsive_layout.dart';
+import '../services/logging/log_file_service.dart';
 import 'backup_restore_page.dart';
 import 'aggregate_search_settings_page.dart';
 import 'downloader_settings_page.dart';
@@ -131,7 +135,7 @@ class _SettingsBody extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        
         
         // 下载器设置
         Text(
@@ -222,6 +226,25 @@ class _SettingsBody extends StatelessWidget {
         const SizedBox(height: 16),
         
         // 查询条件配置已移至站点配置中，可在站点配置页面管理
+        // 日志与诊断（底部）
+        const SizedBox(height: 8),
+        Text(
+          '日志与诊断',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        Card(
+          child: Column(
+            children: const [
+              _LogToFileTile(),
+              Divider(height: 1),
+              _ExportLogsTile(),
+              Divider(height: 1),
+              _ClearLogsTile(),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
       ],
     );
   }
@@ -536,6 +559,298 @@ class _AutoLoadImagesTileState extends State<_AutoLoadImagesTile> {
       subtitle: const Text('在种子详情页面自动显示图片'),
       value: _autoLoad,
       onChanged: _saveSetting,
+    );
+  }
+}
+
+class _LogToFileTile extends StatefulWidget {
+  const _LogToFileTile();
+
+  @override
+  State<_LogToFileTile> createState() => _LogToFileTileState();
+}
+
+class _LogToFileTileState extends State<_LogToFileTile> {
+  bool _enabled = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final enabled = await StorageService.instance.loadLogToFileEnabled();
+      if (mounted) {
+        setState(() {
+          _enabled = enabled;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _set(bool value) async {
+    try {
+      final messenger = ScaffoldMessenger.of(context);
+      final scheme = Theme.of(context).colorScheme;
+      final onPrimaryContainer = scheme.onPrimaryContainer;
+      final primaryContainer = scheme.primaryContainer;
+
+      await StorageService.instance.saveLogToFileEnabled(value);
+      await LogFileService.instance.setEnabled(value);
+      if (!mounted) return;
+      setState(() => _enabled = value);
+
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            value ? '已开启本地日志记录' : '已关闭本地日志记录',
+            style: TextStyle(color: onPrimaryContainer),
+          ),
+          backgroundColor: primaryContainer,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      final messenger = ScaffoldMessenger.of(context);
+      final scheme = Theme.of(context).colorScheme;
+      final onErrorContainer = scheme.onErrorContainer;
+      final errorContainer = scheme.errorContainer;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '操作失败: $e',
+            style: TextStyle(color: onErrorContainer),
+          ),
+          backgroundColor: errorContainer,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const ListTile(
+        leading: Icon(Icons.bug_report),
+        title: Text('记录日志到本地文件'),
+        trailing: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    return SwitchListTile(
+      secondary: const Icon(Icons.bug_report),
+      title: const Text('记录日志到本地文件'),
+      subtitle: const Text('用于问题定位与反馈（Web 不支持）'),
+      value: _enabled,
+      onChanged: kIsWeb ? null : _set,
+    );
+  }
+}
+
+class _ExportLogsTile extends StatelessWidget {
+  const _ExportLogsTile();
+
+  Future<void> _shareLatest(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final onErrorContainer = scheme.onErrorContainer;
+    final errorContainer = scheme.errorContainer;
+    try {
+      if (kIsWeb) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Web 平台不支持文件落盘', style: TextStyle(color: onErrorContainer)),
+            backgroundColor: errorContainer,
+          ),
+        );
+        return;
+      }
+
+      final path = await LogFileService.instance.currentLogFilePath();
+      if (!context.mounted) return;
+      if (path == null || !(await File(path).exists())) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('暂无日志文件或未开启记录', style: TextStyle(color: onErrorContainer)),
+            backgroundColor: errorContainer,
+          ),
+        );
+        return;
+      }
+      await Share.shareXFiles([XFile(path)], text: 'PT Mate 日志');
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('分享失败: $e', style: TextStyle(color: onErrorContainer)),
+          backgroundColor: errorContainer,
+        ),
+      );
+    }
+  }
+
+  Future<void> _openDir(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final onErrorContainer = scheme.onErrorContainer;
+    final errorContainer = scheme.errorContainer;
+    final onPrimaryContainer = scheme.onPrimaryContainer;
+    final primaryContainer = scheme.primaryContainer;
+    try {
+      if (kIsWeb) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Web 平台不支持文件落盘', style: TextStyle(color: onErrorContainer)),
+            backgroundColor: errorContainer,
+          ),
+        );
+        return;
+      }
+      final dir = await LogFileService.instance.logsDirectoryPath();
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('日志目录: $dir', style: TextStyle(color: onPrimaryContainer)),
+          backgroundColor: primaryContainer,
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('打开目录失败: $e', style: TextStyle(color: onErrorContainer)),
+          backgroundColor: errorContainer,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: const Icon(Icons.share),
+      title: const Text('导出日志'),
+      subtitle: const Text('通过系统分享面板发送日志给开发者'),
+      onTap: () async {
+        await showModalBottomSheet<void>(
+          context: context,
+          builder: (ctx) {
+            return SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.ios_share),
+                    title: const Text('分享最新日志文件'),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _shareLatest(context);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.folder_open),
+                    title: const Text('显示日志目录路径'),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _openDir(context);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: TextButton.styleFrom(
+                            side: BorderSide(
+                              color: Theme.of(ctx).colorScheme.outline,
+                              width: 1.0,
+                            ),
+                          ),
+                          child: const Text('取消'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ClearLogsTile extends StatelessWidget {
+  const _ClearLogsTile();
+
+  Future<void> _clear(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('清理日志'),
+        content: const Text('确定要删除所有日志文件吗？此操作不可恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(
+              side: BorderSide(
+                color: Theme.of(ctx).colorScheme.outline,
+                width: 1.0,
+              ),
+            ),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final count = await LogFileService.instance.clearLogs();
+      if (!context.mounted) return;
+      final scheme = Theme.of(context).colorScheme;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('已清理日志文件 $count 个', style: TextStyle(color: scheme.onPrimaryContainer)),
+          backgroundColor: scheme.primaryContainer,
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      final scheme = Theme.of(context).colorScheme;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('清理失败: $e', style: TextStyle(color: scheme.onErrorContainer)),
+          backgroundColor: scheme.errorContainer,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: const Icon(Icons.delete_forever),
+      title: const Text('清理日志'),
+      subtitle: const Text('删除应用日志目录下的所有日志文件'),
+      onTap: () => _clear(context),
     );
   }
 }
