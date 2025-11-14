@@ -10,6 +10,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
+import '../logging/log_file_service.dart';
 
 /// Cookie过期异常
 class CookieExpiredException implements Exception {
@@ -27,6 +28,27 @@ class NexusPHPWebAdapter extends SiteAdapter {
   late Dio _dio;
   Map<String, String>? _discountMapping;
   static final Logger _logger = Logger();
+  static const int _maxHtmlDumpLength = 200 * 1024; // 200KB 截断
+
+  void _logRuleAndSoup(String tag, Map<String, dynamic>? rule, dynamic soup) {
+    try {
+      final ruleJson = rule != null ? jsonEncode(rule) : '{}';
+      String html = '';
+      try {
+        html = soup?.toString() ?? '';
+      } catch (_) {}
+      if (html.length > _maxHtmlDumpLength) {
+        html = '${html.substring(0, _maxHtmlDumpLength)}\n... (truncated)';
+      }
+      // todo简单脱敏
+      _logger.e('[$tag] rule=$ruleJson');
+      _logger.e('HTML=$html');
+      LogFileService.instance.append('[$tag] rule=$ruleJson');
+      LogFileService.instance.append('HTML=$html');
+    } catch (_) {
+      // 忽略日志失败
+    }
+  }
 
   @override
   SiteConfig get siteConfig => _siteConfig;
@@ -265,6 +287,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
     final targetElement = _findFirstElementBySelector(soup, rowSelector);
     if (targetElement == null) {
+      _logRuleAndSoup('userInfo.rows.notFound', rowsConfig, soup);
       throw Exception('未找到目标元素：$rowSelector');
     }
 
@@ -278,6 +301,11 @@ class NexusPHPWebAdapter extends SiteAdapter {
         result[fieldName] = value;
       } catch (e) {
         // 如果某个字段提取失败，记录但继续处理其他字段
+        _logRuleAndSoup(
+          'userInfo.field.extractFailed.$fieldName',
+          fieldConfig,
+          targetElement,
+        );
         result[fieldName] = null;
       }
     }
@@ -308,11 +336,13 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
       final targetElement = _findFirstElementBySelector(soup, rowSelector);
       if (targetElement == null) {
+        _logRuleAndSoup('bonus.rows.notFound', rowsConfig, soup);
         throw Exception('未找到目标元素：$rowSelector');
       }
 
       final field = fieldsConfig['bonusPerHour'] as Map<String, dynamic>?;
       if (field == null) {
+        _logRuleAndSoup('bonus.field.missing', fieldsConfig, soup);
         throw Exception('配置错误：缺少 bonusPerHour 字段');
       }
 
@@ -321,7 +351,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
       final parsed = double.tryParse(value.replaceAll(',', ''));
       return parsed;
-    } catch (_) {
+    } catch (e) {
+      _logRuleAndSoup('bonus.extract.failed', null, BeautifulSoup(''));
       return null;
     }
   }
@@ -344,6 +375,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
       final rowsConfig = passKeyConfig['rows'] as Map<String, dynamic>?;
 
       if (rowsConfig == null) {
+        _logRuleAndSoup('passKey.rows.missing', passKeyConfig, soup);
         throw Exception('配置格式错误：缺少 rows 配置');
       }
 
@@ -355,6 +387,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
       final targetElement = _findFirstElementBySelector(soup, rowSelector);
       if (targetElement == null) {
+        _logRuleAndSoup('passKey.rows.notFound', rowsConfig, soup);
         throw Exception('未找到目标元素：$rowSelector');
       }
 
@@ -370,14 +403,21 @@ class NexusPHPWebAdapter extends SiteAdapter {
         if (value != null && value.isNotEmpty) {
           return value.trim();
         } else {
-          throw Exception(
-            '提取PassKey失败：未匹配到目标元素${rowSelector}',
+          _logRuleAndSoup(
+            'passKey.field.extractFailed',
+            passKeyField,
+            targetElement,
           );
+          _logRuleAndSoup('passKey.rows.info', rowsConfig, soup);
+
+          throw Exception('提取PassKey失败：未匹配到目标元素$rowSelector');
         }
       }
 
+      _logRuleAndSoup('passKey.field.undefined', passKeyConfig, soup);
       throw Exception('无法从配置中提取PassKey');
     } catch (e) {
+      _logRuleAndSoup('passKey.extract.failed', null, BeautifulSoup(''));
       throw Exception('提取PassKey失败: $e');
     }
   }
@@ -637,8 +677,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
     if (href.startsWith('http://') || href.startsWith('https://')) {
       final uri = Uri.tryParse(href);
       if (uri != null) {
-        return uri.path.substring(1) +
-            (uri.query.isNotEmpty ? '?${uri.query}' : '');
+        return '${uri.path.substring(1)}${uri.query.isNotEmpty ? '?${uri.query}' : ''}';
       }
     }
     return href;
@@ -772,17 +811,13 @@ class NexusPHPWebAdapter extends SiteAdapter {
       final fieldsConfig = searchConfig['fields'] as Map<String, dynamic>?;
 
       if (rowsConfig == null || fieldsConfig == null) {
-        if (kDebugMode) {
-          _logger.e('行配置或字段配置不存在');
-        }
+        _logRuleAndSoup('search.config.missing', searchConfig, soup);
         return torrents;
       }
 
       final rowSelector = rowsConfig['selector'] as String?;
       if (rowSelector == null) {
-        if (kDebugMode) {
-          _logger.e('行选择器不存在');
-        }
+        _logRuleAndSoup('search.rowSelector.missing', rowsConfig, soup);
         return torrents;
       }
 
@@ -1007,16 +1042,12 @@ class NexusPHPWebAdapter extends SiteAdapter {
             ),
           );
         } catch (e) {
-          if (kDebugMode) {
-            _logger.e('解析种子行失败: $e');
-          }
+          _logRuleAndSoup('search.row.parseFailed', fieldsConfig, row);
           continue;
         }
       }
     } catch (e) {
-      if (kDebugMode) {
-        _logger.e('获取搜索配置失败: $e');
-      }
+      _logRuleAndSoup('search.parse.failed', null, soup);
     }
 
     return torrents;
@@ -1248,6 +1279,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
     final fieldsConfig = categoriesConfig['fields'] as Map<String, dynamic>?;
 
     if (rowsConfig == null || fieldsConfig == null) {
+      _logRuleAndSoup('categories.config.missing', categoriesConfig, soup);
       throw Exception('配置格式错误：缺少 rows 或 fields 配置');
     }
 
@@ -1259,6 +1291,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
     final rowElements = _findElementBySelector(soup, rowSelector);
     if (rowElements.isEmpty) {
+      _logRuleAndSoup('categories.rows.notFound', rowsConfig, soup);
       throw Exception('未找到目标元素：$rowSelector');
     }
 
