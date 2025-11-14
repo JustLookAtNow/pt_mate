@@ -479,7 +479,10 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                 collapsedIconColor: Theme.of(
                                   context,
                                 ).colorScheme.onErrorContainer,
-                                tilePadding: const EdgeInsets.all(16.0),
+                                tilePadding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 2.0,
+                                ),
                                 childrenPadding: const EdgeInsets.fromLTRB(
                                   16.0,
                                   0,
