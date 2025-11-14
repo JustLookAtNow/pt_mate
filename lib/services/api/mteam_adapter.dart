@@ -373,9 +373,13 @@ class MTeamAdapter extends SiteAdapter {
         promotionRule['endTime']?.toString() ??
         status['discountEndTime']?.toString();
     final toppingLevel = int.tryParse(status['toppingLevel']?.toString() ?? '');
+    final toppingEndTime = status['toppingEndTime']?.toString();
     if (toppingLevel != null && toppingLevel > 0) {
       discount = "FREE";
-      discountEndTime = status['toppingEndTime']?.toString() ?? '';
+    }
+    if ((discount ?? '').toUpperCase() == 'FREE') {
+      discountEndTime =
+          Formatters.laterDateTime(discountEndTime, toppingEndTime) ?? '';
     }
 
     return TorrentItem(

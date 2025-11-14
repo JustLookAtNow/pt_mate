@@ -136,4 +136,19 @@ class Formatters {
       return "- -"; // 解析失败时返回原始字符串
     }
   }
+
+  static String? laterDateTime(String? a, String? b) {
+    DateTime? d1;
+    DateTime? d2;
+    try {
+      d1 = a != null && a.isNotEmpty ? DateTime.parse(a) : null;
+    } catch (_) {}
+    try {
+      d2 = b != null && b.isNotEmpty ? DateTime.parse(b) : null;
+    } catch (_) {}
+    if (d1 != null && d2 != null) {
+      return d1.isAfter(d2) ? a : b;
+    }
+    return a ?? b;
+  }
 }
