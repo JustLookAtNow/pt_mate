@@ -31,7 +31,6 @@ class NexusPHPWebAdapter extends SiteAdapter {
   @override
   SiteConfig get siteConfig => _siteConfig;
 
-
   @override
   Future<void> init(SiteConfig config) async {
     final swTotal = Stopwatch()..start();
@@ -42,7 +41,9 @@ class NexusPHPWebAdapter extends SiteAdapter {
     await _loadDiscountMapping();
     swDiscount.stop();
     if (kDebugMode) {
-      _logger.d('NexusPHPWebAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms');
+      _logger.d(
+        'NexusPHPWebAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms',
+      );
     }
 
     final swDio = Stopwatch()..start();
@@ -59,7 +60,9 @@ class NexusPHPWebAdapter extends SiteAdapter {
     _dio.options.responseType = ResponseType.plain; // 设置为plain避免JSON解析警告
     swDio.stop();
     if (kDebugMode) {
-      _logger.d('NexusPHPWebAdapter.init: 创建Dio与基本配置耗时=${swDio.elapsedMilliseconds}ms');
+      _logger.d(
+        'NexusPHPWebAdapter.init: 创建Dio与基本配置耗时=${swDio.elapsedMilliseconds}ms',
+      );
     }
 
     // 添加响应拦截器处理302重定向
@@ -97,11 +100,15 @@ class NexusPHPWebAdapter extends SiteAdapter {
     );
     swInterceptors.stop();
     if (kDebugMode) {
-      _logger.d('NexusPHPWebAdapter.init: 添加拦截器耗时=${swInterceptors.elapsedMilliseconds}ms');
+      _logger.d(
+        'NexusPHPWebAdapter.init: 添加拦截器耗时=${swInterceptors.elapsedMilliseconds}ms',
+      );
     }
     swTotal.stop();
     if (kDebugMode) {
-      _logger.d('NexusPHPWebAdapter.init: 总耗时=${swTotal.elapsedMilliseconds}ms');
+      _logger.d(
+        'NexusPHPWebAdapter.init: 总耗时=${swTotal.elapsedMilliseconds}ms',
+      );
     }
   }
 
@@ -362,6 +369,10 @@ class NexusPHPWebAdapter extends SiteAdapter {
         );
         if (value != null && value.isNotEmpty) {
           return value.trim();
+        } else {
+          throw Exception(
+            '提取PassKey失败：未匹配到目标元素${passKeyField['rows']['selector']}',
+          );
         }
       }
 
@@ -663,11 +674,11 @@ class NexusPHPWebAdapter extends SiteAdapter {
   }) async {
     try {
       // 构建查询参数
-    final queryParams = <String, dynamic>{
-      'page': pageNumber - 1, // 页面从0开始
-      'pageSize': pageSize,
-      'incldead': 1, // 添加默认参数
-    };
+      final queryParams = <String, dynamic>{
+        'page': pageNumber - 1, // 页面从0开始
+        'pageSize': pageSize,
+        'incldead': 1, // 添加默认参数
+      };
 
       // 添加关键词搜索
       if (keyword != null && keyword.isNotEmpty) {
