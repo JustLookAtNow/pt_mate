@@ -117,7 +117,7 @@ abstract class DownloaderConfig {
     constructor,
     int defaultPort,
   ) {
-    // 支持嵌套的config结构和扁平结构（向后兼容）
+    // 支持嵌套的config结构和扁平结构（向前兼容）
     final config = json['config'] as Map<String, dynamic>? ?? json;
     
     return constructor(

@@ -1088,7 +1088,7 @@ class SiteConfigTemplate {
       }
     }
 
-    // 处理baseUrls字段，支持向后兼容
+    // 处理baseUrls字段，支持向前兼容
     List<String> baseUrls = [];
     if (json['baseUrls'] != null) {
       // 新格式：多个URL

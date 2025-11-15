@@ -259,7 +259,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
     throw Exception('未找到 $configType 提取配置');
   }
 
-  /// 获取用户信息配置（保持向后兼容）
+  /// 获取用户信息配置（保持向前兼容）
   Future<Map<String, dynamic>> _getUserInfoConfig() async {
     return _getFinderConfig('userInfo');
   }
@@ -528,6 +528,30 @@ class NexusPHPWebAdapter extends SiteAdapter {
     }
 
     // 处理单个选择器
+    final containsAllMatch = RegExp(r'^([^:]*):contains\((.*)\)$').firstMatch(selector);
+    if (containsAllMatch != null) {
+      final preSelector = (containsAllMatch.group(1) ?? '').trim();
+      final expr = (containsAllMatch.group(2) ?? '').trim();
+      final groups = _parseContainsExpr(expr);
+
+      final candidates = preSelector.isNotEmpty
+          ? _findElementBySelector(soup, preSelector)
+          : soup.findAll('*');
+
+      final results = <dynamic>[];
+      for (final el in candidates) {
+        final t = (el.text ?? '')
+            .replaceAll('\n', ' ')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
+        final ok = groups.any((g) => g.every((n) => t.contains(n)));
+        if (ok) {
+          results.add(el);
+        }
+      }
+      return results;
+    }
+
     if (selector.contains(':nth-child')) {
       // nth-child选择器
       if (selector.contains(':nth-child(')) {
@@ -606,7 +630,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
     return [];
   }
 
-  /// 根据选择器查找第一个匹配的元素（向后兼容）
+  /// 根据选择器查找第一个匹配的元素（向前兼容）
   /// [soup] 可以是 BeautifulSoup 或 Bs4Element 类型
   dynamic _findFirstElementBySelector(dynamic soup, String selector) {
     final elements = _findElementBySelector(soup, selector);
@@ -662,7 +686,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
     return values;
   }
 
-  /// 根据字段配置提取第一个字段值（向后兼容）
+  /// 根据字段配置提取第一个字段值（向前兼容）
   Future<String?> _extractFirstFieldValue(
     dynamic element,
     Map<String, dynamic> fieldConfig,
@@ -1368,3 +1392,54 @@ class NexusPHPWebAdapter extends SiteAdapter {
     return categories;
   }
 }
+  List<String> _splitOutsideQuotes(String input, String op) {
+    final out = <String>[];
+    var buf = StringBuffer();
+    var i = 0;
+    var inS = false;
+    var inD = false;
+    while (i < input.length) {
+      final c = input[i];
+      if (c == '\'' && !inD) {
+        inS = !inS;
+        buf.write(c);
+        i++;
+        continue;
+      }
+      if (c == '"' && !inS) {
+        inD = !inD;
+        buf.write(c);
+        i++;
+        continue;
+      }
+      if (!inS && !inD && input.substring(i).startsWith(op)) {
+        out.add(buf.toString());
+        buf = StringBuffer();
+        i += op.length;
+        continue;
+      }
+      buf.write(c);
+      i++;
+    }
+    out.add(buf.toString());
+    return out;
+  }
+
+  List<List<String>> _parseContainsExpr(String expr) {
+    final orParts = _splitOutsideQuotes(expr, '||');
+    final groups = <List<String>>[];
+    for (final orPart in orParts) {
+      final andParts = _splitOutsideQuotes(orPart, '&&');
+      final needles = <String>[];
+      for (final p in andParts) {
+        final s = p.trim();
+        final m = RegExp(r"^'(.*)'$").firstMatch(s) ?? RegExp(r'^"(.*)"$').firstMatch(s);
+        if (m != null) {
+          final v = (m.group(1) ?? '').trim();
+          if (v.isNotEmpty) needles.add(v);
+        }
+      }
+      if (needles.isNotEmpty) groups.add(needles);
+    }
+    return groups;
+  }

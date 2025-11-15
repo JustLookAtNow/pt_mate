@@ -119,7 +119,7 @@ class BackupMigratorV110To120 implements BackupMigrator {
             if (migratedSiteConfig.containsKey('templateId')) {
               final templateId = migratedSiteConfig['templateId'] as String?;
               if (templateId != null && templateId.isNotEmpty) {
-                // 保持templateId不变，新的多URL模板系统向后兼容
+                // 保持templateId不变，新的多URL模板系统向前兼容
                 // 单URL模板会自动转换为多URL格式
               }
             }

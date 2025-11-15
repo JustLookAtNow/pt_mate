@@ -109,7 +109,7 @@ class SiteConfigService {
     return presetTemplates;
   }
 
-  /// 加载预设站点配置（向后兼容方法）
+  /// 加载预设站点配置（向前兼容方法）
   /// 将模板转换为SiteConfig实例，使用主要URL
   static Future<List<SiteConfig>> loadPresetSites() async {
     final List<SiteConfig> presetSites = [];
@@ -473,7 +473,7 @@ class SiteConfigService {
     _templateCache.clear();
   }
 
-  /// 清空模板缓存（向后兼容方法）
+  /// 清空模板缓存（向前兼容方法）
   static void clearTemplateCache() {
     clearAllCache();
   }

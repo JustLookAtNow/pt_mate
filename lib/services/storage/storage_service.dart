@@ -273,7 +273,7 @@ class StorageService {
   /// 从1.1.0迁移到1.2.0
   Future<void> _migrateFrom110To120() async {
     // 1.2.0版本主要添加了多URL模板支持
-    // 由于SiteConfig.fromJson已经具备向后兼容性，
+    // 由于SiteConfig.fromJson已经具备向前兼容性，
     // 现有的站点配置可以无缝使用新的多URL模板系统
     // 这里不需要特殊的数据迁移逻辑
     try {
