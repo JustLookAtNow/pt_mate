@@ -75,18 +75,7 @@
         }
       }
     },
-    "passKey": {
-      "path": "usercp.php",
-      "rows": {
-        "selector": "#outer > table.main > next > tbody > tr:nth-child(4) > td.rowfollow"
-      },
-      "fields": {
-        "passKey": {
-          "selector": "",
-          "attribute": "text"
-        }
-      }
-    },
+
     "categories": {
       "path": "usercp.php?action=tracker",
       "rows": {
