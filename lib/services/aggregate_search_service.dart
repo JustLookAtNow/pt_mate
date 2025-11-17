@@ -51,9 +51,18 @@ class AggregateSearchProgress {
   double get progress => totalSites > 0 ? completedSites / totalSites : 0.0;
 }
 
+class AggregateSearchCancelToken {
+  bool _cancelled = false;
+  bool get isCancelled => _cancelled;
+  void cancel() {
+    _cancelled = true;
+  }
+}
+
 /// 聚合搜索服务
 class AggregateSearchService {
-  static final AggregateSearchService _instance = AggregateSearchService._internal();
+  static final AggregateSearchService _instance =
+      AggregateSearchService._internal();
   factory AggregateSearchService() => _instance;
   AggregateSearchService._internal();
 
@@ -65,26 +74,30 @@ class AggregateSearchService {
     required String configId,
     required Function(AggregateSearchProgress) onProgress,
     int maxResultsPerSite = 30,
+    AggregateSearchCancelToken? cancelToken,
   }) async {
     // 加载搜索配置
-    final settings = await StorageService.instance.loadAggregateSearchSettings();
+    final settings = await StorageService.instance
+        .loadAggregateSearchSettings();
     final config = settings.searchConfigs.firstWhere(
       (c) => c.id == configId,
       orElse: () => throw ArgumentError('搜索配置不存在: $configId'),
     );
 
     // 获取要搜索的站点列表（包含 API Key，避免 M-Team 等站点密钥为 null）
-    final allSites = await StorageService.instance.loadSiteConfigs(includeApiKeys: true);
+    final allSites = await StorageService.instance.loadSiteConfigs(
+      includeApiKeys: true,
+    );
     final activeSites = allSites.where((site) => site.isActive).toList();
     final allSiteIds = activeSites.map((site) => site.id).toList();
-    
+
     // 获取启用的站点对象列表
     final enabledSiteItems = config.getEnabledSites(allSiteIds);
-    
+
     // 根据站点对象列表获取实际的站点配置
     List<SiteConfig> targetSites = [];
     Map<String, Map<String, dynamic>?> siteAdditionalParams = {};
-    
+
     for (final siteItem in enabledSiteItems) {
       try {
         final siteConfig = activeSites.firstWhere(
@@ -108,10 +121,12 @@ class AggregateSearchService {
     }
 
     // 初始化进度
-    onProgress(AggregateSearchProgress(
-      totalSites: targetSites.length,
-      completedSites: 0,
-    ));
+    onProgress(
+      AggregateSearchProgress(
+        totalSites: targetSites.length,
+        completedSites: 0,
+      ),
+    );
 
     // 使用异步处理，让每个站点独立返回结果
     final maxConcurrency = settings.searchThreads;
@@ -122,55 +137,88 @@ class AggregateSearchService {
 
     // 创建一个 Completer 来控制整个搜索流程的完成
     final completer = Completer<AggregateSearchResult>();
-    
+    bool completed = false;
+
+    void completeNow() {
+      if (completed) return;
+      completed = true;
+      if (!completer.isCompleted) {
+        onProgress(
+          AggregateSearchProgress(
+            totalSites: targetSites.length,
+            completedSites: completedSites,
+            isCompleted: true,
+          ),
+        );
+        completer.complete(
+          AggregateSearchResult(
+            items: results,
+            errors: errors,
+            totalSites: targetSites.length,
+            successSites: completedSites - errors.length,
+          ),
+        );
+      }
+    }
+
     // 处理单个站点搜索完成的回调
-    void handleSiteComplete(SiteConfig site, SearchResult<List<TorrentItem>> result) {
+    void handleSiteComplete(
+      SiteConfig site,
+      SearchResult<List<TorrentItem>> result,
+    ) {
+      if (completed) return;
       completedSites++;
       activeTasks--;
-      
+
       if (result.isSuccess) {
-        final siteResults = result.data!.map((torrent) => 
-          AggregateSearchResultItem(
-            torrent: torrent,
-            siteName: site.name,
-            siteId: site.id,
-          ),
-        ).toList();
+        final siteResults = result.data!
+            .map(
+              (torrent) => AggregateSearchResultItem(
+                torrent: torrent,
+                siteName: site.name,
+                siteId: site.id,
+              ),
+            )
+            .toList();
         results.addAll(siteResults);
       } else {
         errors[site.id] = result.error ?? '搜索失败';
       }
 
       // 更新进度
-      onProgress(AggregateSearchProgress(
-        totalSites: targetSites.length,
-        completedSites: completedSites,
-        currentSite: site.name,
-      ));
+      onProgress(
+        AggregateSearchProgress(
+          totalSites: targetSites.length,
+          completedSites: completedSites,
+          currentSite: site.name,
+        ),
+      );
+
+      if (cancelToken?.isCancelled == true) {
+        completeNow();
+        return;
+      }
 
       // 检查是否所有站点都已完成
       if (completedSites >= targetSites.length) {
-        // 搜索完成
-        onProgress(AggregateSearchProgress(
-          totalSites: targetSites.length,
-          completedSites: completedSites,
-          isCompleted: true,
-        ));
-
-        completer.complete(AggregateSearchResult(
-          items: results,
-          errors: errors,
-          totalSites: targetSites.length,
-          successSites: targetSites.length - errors.length,
-        ));
+        completeNow();
       }
     }
 
     // 启动搜索任务，控制并发数量
     int siteIndex = 0;
-    
+
     void startNextSite() {
+      if (completed) return;
+      if (cancelToken?.isCancelled == true) {
+        completeNow();
+        return;
+      }
       while (activeTasks < maxConcurrency && siteIndex < targetSites.length) {
+        if (cancelToken?.isCancelled == true) {
+          completeNow();
+          return;
+        }
         final site = targetSites[siteIndex];
         final additionalParams = siteAdditionalParams[site.id];
         siteIndex++;
@@ -178,20 +226,22 @@ class AggregateSearchService {
 
         // 异步启动单个站点搜索，不等待结果
         _searchSingleSite(
-          site: site,
-          keyword: keyword,
-          maxResults: maxResultsPerSite,
-          additionalParams: additionalParams,
-        ).then((result) {
-          handleSiteComplete(site, result);
-          // 当前任务完成后，尝试启动下一个任务
-          startNextSite();
-        }).catchError((error) {
-          // 处理异常情况
-          handleSiteComplete(site, SearchResult.error(error.toString()));
-          // 当前任务完成后，尝试启动下一个任务
-          startNextSite();
-        });
+              site: site,
+              keyword: keyword,
+              maxResults: maxResultsPerSite,
+              additionalParams: additionalParams,
+            )
+            .then((result) {
+              handleSiteComplete(site, result);
+              // 当前任务完成后，尝试启动下一个任务
+              startNextSite();
+            })
+            .catchError((error) {
+              // 处理异常情况
+              handleSiteComplete(site, SearchResult.error(error.toString()));
+              // 当前任务完成后，尝试启动下一个任务
+              startNextSite();
+            });
       }
     }
 
@@ -223,24 +273,25 @@ class AggregateSearchService {
       Map<String, dynamic>? processedParams;
       if (additionalParams != null) {
         processedParams = Map<String, dynamic>.from(additionalParams);
-        
+
         // 处理分类参数转换
         if (processedParams.containsKey('selectedCategories')) {
-          final selectedCategoryIds = processedParams['selectedCategories'] as List<dynamic>?;
+          final selectedCategoryIds =
+              processedParams['selectedCategories'] as List<dynamic>?;
           if (selectedCategoryIds != null && selectedCategoryIds.isNotEmpty) {
             // 移除原始的selectedCategories
             processedParams.remove('selectedCategories');
-            
+
             // 获取站点的分类配置
             final categories = site.searchCategories;
-            
+
             // 将分类ID转换为对应的参数
             for (final categoryId in selectedCategoryIds) {
               final category = categories.firstWhere(
                 (cat) => cat.id == categoryId,
                 orElse: () => throw Exception('找不到分类配置: $categoryId'),
               );
-              
+
               // 解析分类参数并合并到请求参数中
               final categoryParams = category.parseParameters();
               categoryParams.forEach((key, value) {
@@ -257,7 +308,7 @@ class AggregateSearchService {
         keyword: keyword.trim().isEmpty ? null : keyword.trim(),
         pageNumber: 1,
         pageSize: maxResults,
-        additionalParams: processedParams, 
+        additionalParams: processedParams,
       );
 
       logger.d('站点 ${site.name} 搜索成功，返回 ${result.items.length} 条结果');
@@ -275,19 +326,11 @@ class SearchResult<T> {
   final String? error;
   final bool isSuccess;
 
-  const SearchResult._({
-    this.data,
-    this.error,
-    required this.isSuccess,
-  });
+  const SearchResult._({this.data, this.error, required this.isSuccess});
 
-  factory SearchResult.success(T data) => SearchResult._(
-    data: data,
-    isSuccess: true,
-  );
+  factory SearchResult.success(T data) =>
+      SearchResult._(data: data, isSuccess: true);
 
-  factory SearchResult.error(String error) => SearchResult._(
-    error: error,
-    isSuccess: false,
-  );
+  factory SearchResult.error(String error) =>
+      SearchResult._(error: error, isSuccess: false);
 }

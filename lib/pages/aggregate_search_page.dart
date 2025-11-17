@@ -417,6 +417,22 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                         context,
                                       ).textTheme.titleSmall,
                                     ),
+                                    const Spacer(),
+                                    TextButton.icon(
+                                      onPressed: () {
+                                        provider.cancelSearch();
+                                      },
+                                      icon: const Icon(Icons.stop, size: 16),
+                                      label: const Text('停止'),
+                                      style: TextButton.styleFrom(
+                                        side: BorderSide(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .outline,
+                                          width: 1.0,
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
                                 if (provider.searchProgress != null) ...[
@@ -705,6 +721,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       return;
     }
 
+    provider.createCancelToken();
     provider.setSearching(true);
     provider.setSearchResults([]);
     provider.setSearchErrors({});
@@ -721,6 +738,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                 provider.setSearchProgress(progress);
               }
             },
+            cancelToken: provider.cancelToken,
           );
 
       if (mounted) {
@@ -735,9 +753,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         provider.setSearchProgress(null);
 
         // 显示搜索结果摘要
-        final message =
-            '搜索完成：共找到 ${result.items.length} 条结果，'
-            '成功搜索 ${result.successSites}/${result.totalSites} 个站点';
+        final message = provider.cancelled
+            ? '已停止搜索：当前返回 ${result.items.length} 条结果，完成 ${result.successSites}/${result.totalSites} 个站点'
+            : '搜索完成：共找到 ${result.items.length} 条结果，成功搜索 ${result.successSites}/${result.totalSites} 个站点';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(

@@ -18,6 +18,8 @@ class AggregateSearchProvider extends ChangeNotifier {
   List<AggregateSearchResultItem> _searchResults = [];
   Map<String, String> _searchErrors = {};
   AggregateSearchProgress? _searchProgress;
+  AggregateSearchCancelToken? _cancelToken;
+  bool _cancelled = false;
 
   // Getters
   String get searchKeyword => _searchKeyword;
@@ -30,6 +32,8 @@ class AggregateSearchProvider extends ChangeNotifier {
   List<AggregateSearchResultItem> get searchResults => _searchResults;
   Map<String, String> get searchErrors => _searchErrors;
   AggregateSearchProgress? get searchProgress => _searchProgress;
+  AggregateSearchCancelToken? get cancelToken => _cancelToken;
+  bool get cancelled => _cancelled;
 
   // Setters
   void setSearchKeyword(String keyword) {
@@ -82,6 +86,19 @@ class AggregateSearchProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void createCancelToken() {
+    _cancelToken = AggregateSearchCancelToken();
+    _cancelled = false;
+  }
+
+  void cancelSearch() {
+    if (_cancelToken != null) {
+      _cancelToken!.cancel();
+      _cancelled = true;
+      notifyListeners();
+    }
+  }
+
   void clearSearchResults() {
     _searchResults.clear();
     _searchErrors.clear();
@@ -101,6 +118,8 @@ class AggregateSearchProvider extends ChangeNotifier {
     _searchResults = [];
     _searchErrors = {};
     _searchProgress = null;
+    _cancelToken = null;
+    _cancelled = false;
     notifyListeners();
   }
 
