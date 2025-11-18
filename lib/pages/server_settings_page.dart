@@ -68,6 +68,7 @@ class _HealthStatus {
     };
   }
 }
+// 站点排序下拉功能已移除
 
 class ServerSettingsPage extends StatefulWidget {
   const ServerSettingsPage({super.key});
@@ -84,6 +85,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   String _searchQuery = '';
   bool _healthChecking = false;
   Map<String, _HealthStatus> _healthStatuses = {}; // siteId -> status
+  // 排序状态已移除
+  bool _reorderMode = false;
+  List<SiteConfig> _sitesBackup = [];
 
   // 站点图标路径缓存：siteId -> asset path
   final Map<String, String> _logoPathCache = {};
@@ -176,6 +180,55 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       }
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _editSiteColor(SiteConfig site) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final theme = Theme.of(context);
+    final initial = site.siteColor != null
+        ? Color(site.siteColor!)
+        : Theme.of(context).colorScheme.primary;
+    final picked = await showDialog<Color>(
+      context: context,
+      builder: (context) => _SiteColorPickerDialog(initialColor: initial),
+    );
+    if (picked == null) return;
+    try {
+      final updated = site.copyWith(siteColor: picked.toARGB32());
+      await StorageService.instance.updateSiteConfig(
+        updated.copyWith(apiKey: null),
+      );
+      if (!mounted) return;
+      setState(() {
+        final idx = _sites.indexWhere((s) => s.id == site.id);
+        if (idx >= 0) _sites[idx] = updated;
+      });
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '站点颜色已更新',
+            style: TextStyle(
+              color: theme.colorScheme.onPrimaryContainer,
+            ),
+          ),
+          backgroundColor: theme.colorScheme.primaryContainer,
+          behavior: SnackBarBehavior.fixed,
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '更新颜色失败: $e',
+            style: TextStyle(
+              color: theme.colorScheme.onErrorContainer,
+            ),
+          ),
+          backgroundColor: theme.colorScheme.errorContainer,
+          behavior: SnackBarBehavior.fixed,
+        ),
+      );
     }
   }
 
@@ -731,6 +784,91 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                         ),
                       ),
                       const SizedBox(width: 12),
+                      // 排序下拉框已移除
+                      if (_reorderMode)
+                        Row(
+                          children: [
+                            FilledButton.icon(
+                              onPressed: () async {
+                                final messenger = ScaffoldMessenger.of(context);
+                                final theme = Theme.of(context);
+                                try {
+                                  await StorageService.instance.saveSiteConfigs(
+                                    _sites.map((c) => c.copyWith(apiKey: null)).toList(),
+                                  );
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '已保存自定义排序',
+                                        style: TextStyle(
+                                          color: theme.colorScheme.onPrimaryContainer,
+                                        ),
+                                      ),
+                                      backgroundColor: theme.colorScheme.primaryContainer,
+                                      behavior: SnackBarBehavior.fixed,
+                                    ),
+                                  );
+                                } catch (e) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '保存失败: $e',
+                                        style: TextStyle(
+                                          color: theme.colorScheme.onErrorContainer,
+                                        ),
+                                      ),
+                                      backgroundColor: theme.colorScheme.errorContainer,
+                                      behavior: SnackBarBehavior.fixed,
+                                    ),
+                                  );
+                                } finally {
+                                  if (mounted) {
+                                    setState(() {
+                                      _reorderMode = false;
+                                      _sitesBackup = [];
+                                    });
+                                  }
+                                }
+                              },
+                              icon: const Icon(Icons.check),
+                              label: const Text('完成排序'),
+                            ),
+                            const SizedBox(width: 8),
+                            TextButton.icon(
+                              onPressed: () {
+                                if (!mounted) return;
+                                setState(() {
+                                  if (_sitesBackup.isNotEmpty) {
+                                    _sites = List<SiteConfig>.from(_sitesBackup);
+                                  }
+                                  _reorderMode = false;
+                                  _sitesBackup = [];
+                                });
+                              },
+                              icon: const Icon(Icons.close),
+                              label: const Text('取消'),
+                              style: TextButton.styleFrom(
+                                side: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline,
+                                  width: 1.0,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        FilledButton.tonalIcon(
+                          onPressed: () {
+                            setState(() {
+                              _sitesBackup = List<SiteConfig>.from(_sites);
+                              _reorderMode = true;
+                            });
+                          },
+                          icon: const Icon(Icons.drag_indicator),
+                          label: const Text('自定义排序'),
+                        ),
+                      
+                      const SizedBox(width: 12),
                       FilledButton.icon(
                         onPressed: _healthChecking ? null : _runHealthCheck,
                         icon: const Icon(Icons.refresh),
@@ -772,18 +910,54 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                   )
                 else
                   Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _filteredSites.length,
-                      itemBuilder: (context, index) {
-                        final site = _filteredSites[index];
-                        final isActive = site.id == _activeSiteId;
-                        final hs = _healthStatuses[site.id];
+                    child: _reorderMode
+                        ? ReorderableListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _sites.length,
+                            onReorder: (oldIndex, newIndex) {
+                              setState(() {
+                                if (newIndex > oldIndex) newIndex -= 1;
+                                final item = _sites.removeAt(oldIndex);
+                                _sites.insert(newIndex, item);
+                              });
+                            },
+                            itemBuilder: (context, index) {
+                              final site = _sites[index];
+                              final isActive = site.id == _activeSiteId;
+                              final Color? siteColor = site.siteColor != null
+                                  ? Color(site.siteColor!)
+                                  : null;
+                              return Container(
+                                key: ValueKey('site_${site.id}'),
+                                margin: const EdgeInsets.only(bottom: 8),
+                                child: Material(
+                                  color: isActive
+                                      ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
+                                      : Theme.of(context).colorScheme.surface,
+                                  shape: RoundedRectangleBorder(
+                                    side: BorderSide(color: siteColor ?? Theme.of(context).colorScheme.outline, width: 2.0),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: ListTile(
+                                    title: Text(site.name, overflow: TextOverflow.ellipsis),
+                                    subtitle: Text(site.baseUrl, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _filteredSites.length,
+                            itemBuilder: (context, index) {
+                              final site = _filteredSites[index];
+                              final isActive = site.id == _activeSiteId;
+                              final hs = _healthStatuses[site.id];
 
-                        final Color? siteColor = site.siteColor != null
-                            ? Color(site.siteColor!)
-                            : null;
-                        return Card(
+                              final Color? siteColor = site.siteColor != null
+                                  ? Color(site.siteColor!)
+                                  : null;
+                              return Card(
                           elevation: 2,
                           shadowColor: (siteColor ?? Theme.of(context).colorScheme.outline)
                               .withValues(alpha: 0.4),
@@ -932,10 +1106,10 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                                                     );
                                                                   },
                                                             ),
-                                                          );
-                                                        },
-                                                      ),
-                                                    ),
+                              );
+                            },
+                          ),
+                  ),
                                                     const SizedBox(width: 8),
                                                     Expanded(
                                                       child: Row(
@@ -946,13 +1120,25 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                                           Flexible(
                                                             child: Text(
                                                               site.name,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              style: TextStyle(
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
+                                                              overflow: TextOverflow.ellipsis,
+                                                              style: const TextStyle(
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          const SizedBox(width: 8),
+                                                          InkWell(
+                                                            onTap: () => _editSiteColor(site),
+                                                            child: Container(
+                                                              width: 18,
+                                                              height: 18,
+                                                              decoration: BoxDecoration(
+                                                                color: siteColor ?? Theme.of(context).colorScheme.primary,
+                                                                shape: BoxShape.circle,
+                                                                border: Border.all(
+                                                                  color: Theme.of(context).colorScheme.outline,
+                                                                  width: 1.0,
+                                                                ),
                                                               ),
                                                             ),
                                                           ),
@@ -1248,8 +1434,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                             ],
                           ),
                         );
-                      },
-                    ),
+                            },
+                          ),
                   ),
               ],
             ),
