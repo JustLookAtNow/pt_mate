@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/app_models.dart';
@@ -29,16 +30,61 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   // 选择模式相关状态
   bool _isSelectionMode = false;
   final Set<String> _selectedItems = <String>{};
+  final ScrollController _listController = ScrollController();
+  List<GlobalKey> _resultItemKeys = [];
+  String? _overlaySiteName;
+  double _overlayOpacity = 0.0;
+  Timer? _overlayTimer;
+  final Map<String, Color> _siteColors = {};
+  double _scrollFraction = 0.0;
+  bool _isFastScrolling = false;
+
+  Color _colorForSite(String siteId) {
+    if (_siteColors.containsKey(siteId)) return _siteColors[siteId]!;
+    Color color;
+    try {
+      final storage = Provider.of<StorageService>(context, listen: false);
+      final sites = storage.siteConfigsCache ?? [];
+      final site = sites.firstWhere(
+        (s) => s.id == siteId,
+        orElse: () => const SiteConfig(id: '', name: '', baseUrl: ''),
+      );
+      if (site.siteColor != null) {
+        color = Color(site.siteColor!);
+      } else {
+        final primaries = Colors.primaries;
+        color = primaries[(siteId.hashCode.abs()) % primaries.length];
+      }
+    } catch (_) {
+      final primaries = Colors.primaries;
+      color = primaries[(siteId.hashCode.abs()) % primaries.length];
+    }
+    _siteColors[siteId] = color;
+    return color;
+  }
 
   @override
   void initState() {
     super.initState();
     _loadSearchConfigs();
+    _listController.addListener(() {
+      if (!_listController.hasClients) return;
+      final max = _listController.position.maxScrollExtent;
+      final px = _listController.position.pixels;
+      final f = max > 0 ? (px / max).clamp(0.0, 1.0) : 0.0;
+      if (f != _scrollFraction) {
+        setState(() {
+          _scrollFraction = f;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _listController.dispose();
+    _overlayTimer?.cancel();
     super.dispose();
   }
 
@@ -227,7 +273,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                     icon: Icon(
                                       Icons.sort,
                                       color: provider.sortBy != 'none'
-                                          ? Theme.of(context).colorScheme.secondary
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.secondary
                                           : null,
                                     ),
                                     tooltip: '排序',
@@ -235,7 +283,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       // 与 app.dart 的行为保持一致：
                                       // 选择相同的排序类型时切换升降序；选择新的类型时默认降序
                                       if (value == provider.sortBy) {
-                                        provider.setSortAscending(!provider.sortAscending);
+                                        provider.setSortAscending(
+                                          !provider.sortAscending,
+                                        );
                                       } else {
                                         provider.setSortBy(value);
                                         provider.setSortAscending(false);
@@ -249,9 +299,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           decoration: BoxDecoration(
                                             color: provider.sortBy == 'none'
                                                 ? Theme.of(context)
-                                                    .colorScheme
-                                                    .primary
-                                                    .withValues(alpha: 0.1)
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.1)
                                                 : null,
                                             borderRadius: BorderRadius.circular(
                                               4,
@@ -266,7 +316,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                               Icon(
                                                 Icons.clear,
                                                 color: provider.sortBy == 'none'
-                                                    ? Theme.of(context).colorScheme.secondary
+                                                    ? Theme.of(
+                                                        context,
+                                                      ).colorScheme.secondary
                                                     : null,
                                               ),
                                               const SizedBox(width: 8),
@@ -282,9 +334,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           decoration: BoxDecoration(
                                             color: provider.sortBy == 'size'
                                                 ? Theme.of(context)
-                                                    .colorScheme
-                                                    .primary
-                                                    .withValues(alpha: 0.1)
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.1)
                                                 : null,
                                             borderRadius: BorderRadius.circular(
                                               4,
@@ -297,11 +349,14 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           child: Row(
                                             children: [
                                               Icon(
-                                                provider.sortBy == 'size' && provider.sortAscending
+                                                provider.sortBy == 'size' &&
+                                                        provider.sortAscending
                                                     ? Icons.arrow_upward
                                                     : Icons.arrow_downward,
                                                 color: provider.sortBy == 'size'
-                                                    ? Theme.of(context).colorScheme.secondary
+                                                    ? Theme.of(
+                                                        context,
+                                                      ).colorScheme.secondary
                                                     : null,
                                               ),
                                               const SizedBox(width: 8),
@@ -317,9 +372,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           decoration: BoxDecoration(
                                             color: provider.sortBy == 'upload'
                                                 ? Theme.of(context)
-                                                    .colorScheme
-                                                    .primary
-                                                    .withValues(alpha: 0.1)
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.1)
                                                 : null,
                                             borderRadius: BorderRadius.circular(
                                               4,
@@ -332,11 +387,15 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           child: Row(
                                             children: [
                                               Icon(
-                                                provider.sortBy == 'upload' && provider.sortAscending
+                                                provider.sortBy == 'upload' &&
+                                                        provider.sortAscending
                                                     ? Icons.arrow_upward
                                                     : Icons.arrow_downward,
-                                                color: provider.sortBy == 'upload'
-                                                    ? Theme.of(context).colorScheme.secondary
+                                                color:
+                                                    provider.sortBy == 'upload'
+                                                    ? Theme.of(
+                                                        context,
+                                                      ).colorScheme.secondary
                                                     : null,
                                               ),
                                               const SizedBox(width: 8),
@@ -352,9 +411,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           decoration: BoxDecoration(
                                             color: provider.sortBy == 'download'
                                                 ? Theme.of(context)
-                                                    .colorScheme
-                                                    .primary
-                                                    .withValues(alpha: 0.1)
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.1)
                                                 : null,
                                             borderRadius: BorderRadius.circular(
                                               4,
@@ -367,11 +426,16 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           child: Row(
                                             children: [
                                               Icon(
-                                                provider.sortBy == 'download' && provider.sortAscending
+                                                provider.sortBy == 'download' &&
+                                                        provider.sortAscending
                                                     ? Icons.arrow_upward
                                                     : Icons.arrow_downward,
-                                                color: provider.sortBy == 'download'
-                                                    ? Theme.of(context).colorScheme.secondary
+                                                color:
+                                                    provider.sortBy ==
+                                                        'download'
+                                                    ? Theme.of(
+                                                        context,
+                                                      ).colorScheme.secondary
                                                     : null,
                                               ),
                                               const SizedBox(width: 8),
@@ -382,8 +446,6 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       ),
                                     ],
                                   ),
-                               
-                                 
                                 ],
                               ),
                             ],
@@ -426,9 +488,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       label: const Text('停止'),
                                       style: TextButton.styleFrom(
                                         side: BorderSide(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .outline,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.outline,
                                           width: 1.0,
                                         ),
                                       ),
@@ -439,10 +501,14 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                   const SizedBox(height: 8),
                                   LinearProgressIndicator(
                                     value:
-                                        provider
-                                            .searchProgress!
-                                            .completedSites /
-                                        provider.searchProgress!.totalSites,
+                                        provider.searchProgress!.totalSites > 0
+                                        ? provider
+                                                  .searchProgress!
+                                                  .completedSites /
+                                              provider
+                                                  .searchProgress!
+                                                  .totalSites
+                                        : 0.0,
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
@@ -568,31 +634,247 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                   ],
                                 ),
                               )
-                            : ListView.builder(
-                                itemCount: provider.searchResults.length,
-                                itemBuilder: (context, index) {
-                                  final item = provider.searchResults[index];
-                                  return Card(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    child: TorrentListItem(
-                                      torrent: item.torrent,
-                                      isSelected: _selectedItems.contains(
-                                        item.torrent.id,
-                                      ),
-                                      isSelectionMode: _isSelectionMode,
-                                      isAggregateMode: true,
-                                      siteName: item.siteName,
-                                      onTap: _isSelectionMode
-                                          ? () => _onToggleSelection(item)
-                                          : () => _onTorrentTap(item),
-                                      onLongPress: () => _onLongPress(item),
-                                      onDownload: () =>
-                                          _showDownloadDialog(item),
-                                      onToggleCollection: () =>
-                                          _onToggleCollection(item),
+                            : Stack(
+                                children: [
+                                  ScrollConfiguration(
+                                    behavior: ScrollConfiguration.of(
+                                      context,
+                                    ).copyWith(scrollbars: false),
+                                    child: ListView.builder(
+                                      controller: _listController,
+                                      itemCount: provider.searchResults.length,
+                                      itemBuilder: (context, index) {
+                                        if (_resultItemKeys.length !=
+                                            provider.searchResults.length) {
+                                          _resultItemKeys = List.generate(
+                                            provider.searchResults.length,
+                                            (i) => i < _resultItemKeys.length
+                                                ? _resultItemKeys[i]
+                                                : GlobalKey(),
+                                          );
+                                        }
+                                        final item =
+                                            provider.searchResults[index];
+                                        // final Color siteColor = _colorForSite(item.siteId);
+                                        return Container(
+                                          key: _resultItemKeys[index],
+                                          padding: EdgeInsets.zero,
+                                          child: TorrentListItem(
+                                            torrent: item.torrent,
+                                            isSelected: _selectedItems.contains(
+                                              item.torrent.id,
+                                            ),
+                                            isSelectionMode: _isSelectionMode,
+                                            isAggregateMode: true,
+                                            siteName: item.siteName,
+                                            suspendImageLoading:
+                                                _isFastScrolling,
+                                            onTap: _isSelectionMode
+                                                ? () => _onToggleSelection(item)
+                                                : () => _onTorrentTap(item),
+                                            onLongPress: () =>
+                                                _onLongPress(item),
+                                            onDownload: () =>
+                                                _showDownloadDialog(item),
+                                            onToggleCollection: () =>
+                                                _onToggleCollection(item),
+                                          ),
+                                        );
+                                      },
                                     ),
-                                  );
-                                },
+                                  ),
+                                  if (provider.searchResults.isNotEmpty)
+                                    Positioned(
+                                      right: 0,
+                                      top: 0,
+                                      bottom: 0,
+                                      child: LayoutBuilder(
+                                        builder: (context, constraints) {
+                                          final totalHeight =
+                                              constraints.maxHeight;
+                                          final results =
+                                              provider.searchResults;
+                                          final counts = <String, int>{};
+                                          final names = <String, String>{};
+                                          for (
+                                            var i = 0;
+                                            i < results.length;
+                                            i++
+                                          ) {
+                                            final id = results[i].siteId;
+                                            counts[id] = (counts[id] ?? 0) + 1;
+                                            names[id] = results[i].siteName;
+                                          }
+                                          final siteIds = counts.keys.toList();
+                                          final totalCount = results.length;
+                                          double acc = 0;
+                                          final sections = <_SiteSection>[];
+                                          final firstIndex = <String, int>{};
+                                          for (
+                                            var i = 0;
+                                            i < results.length;
+                                            i++
+                                          ) {
+                                            final id = results[i].siteId;
+                                            firstIndex[id] ??= i;
+                                          }
+                                          for (final id in siteIds) {
+                                            final ratio =
+                                                (counts[id]! / totalCount);
+                                            final extent = totalHeight * ratio;
+                                            sections.add(
+                                              _SiteSection(
+                                                siteId: id,
+                                                siteName: names[id] ?? id,
+                                                color: _colorForSite(id),
+                                                start: acc,
+                                                extent: extent,
+                                                firstIndex: firstIndex[id] ?? 0,
+                                              ),
+                                            );
+                                            acc += extent;
+                                          }
+                                          return GestureDetector(
+                                            behavior:
+                                                HitTestBehavior.translucent,
+                                            onTapDown: (details) {
+                                              final y =
+                                                  details.localPosition.dy;
+                                              final fraction = (y / totalHeight)
+                                                  .clamp(0.0, 1.0);
+                                              _scrollToFraction(fraction);
+                                              final sec = sections.firstWhere(
+                                                (s) =>
+                                                    y >= s.start &&
+                                                    y <= s.start + s.extent,
+                                                orElse: () =>
+                                                    _SiteSection.empty,
+                                              );
+                                              if (sec != _SiteSection.empty) {
+                                                setState(() {
+                                                  _overlaySiteName =
+                                                      sec.siteName;
+                                                  _overlayOpacity = 1.0;
+                                                });
+                                              }
+                                              _startOverlayFadeOut();
+                                            },
+                                            onPanStart: (details) {
+                                              _setFastScrolling(true);
+                                              _handleScrollbarDrag(
+                                                details.localPosition.dy,
+                                                sections,
+                                                initial: true,
+                                              );
+                                            },
+                                            onPanUpdate: (details) {
+                                              _handleScrollbarDrag(
+                                                details.localPosition.dy,
+                                                sections,
+                                              );
+                                              final y =
+                                                  details.localPosition.dy;
+                                              final sec = sections.firstWhere(
+                                                (s) =>
+                                                    y >= s.start &&
+                                                    y <= s.start + s.extent,
+                                                orElse: () =>
+                                                    _SiteSection.empty,
+                                              );
+                                              if (sec != _SiteSection.empty) {
+                                                final fraction =
+                                                    (y / totalHeight).clamp(
+                                                      0.0,
+                                                      1.0,
+                                                    );
+                                                _scrollToFraction(fraction);
+                                              }
+                                            },
+                                            onPanEnd: (details) {
+                                              _setFastScrolling(false);
+                                              _startOverlayFadeOut();
+                                            },
+                                            child: CustomPaint(
+                                              size: Size(8, totalHeight),
+                                              painter: _SiteScrollbarPainter(
+                                                sections: sections,
+                                                fraction: _scrollFraction,
+                                                knobColor: Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
+                                                knobBorder: Theme.of(
+                                                  context,
+                                                ).colorScheme.onPrimary,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  if (_overlaySiteName != null)
+                                    Positioned.fill(
+                                      child: IgnorePointer(
+                                        ignoring: true,
+                                        child: AnimatedOpacity(
+                                          opacity: _overlayOpacity,
+                                          duration: _overlayOpacity == 1.0
+                                              ? Duration.zero
+                                              : const Duration(seconds: 1),
+                                          child: Container(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .scrim
+                                                .withValues(alpha: 0.35),
+                                            alignment: Alignment.center,
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 24,
+                                                    vertical: 12,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.primaryContainer,
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black
+                                                        .withValues(alpha: 0.2),
+                                                    blurRadius: 8,
+                                                    spreadRadius: 0,
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Text(
+                                                _overlaySiteName!,
+                                                style:
+                                                    Theme.of(context)
+                                                        .textTheme
+                                                        .headlineSmall
+                                                        ?.copyWith(
+                                                          color: Theme.of(context)
+                                                              .colorScheme
+                                                              .onPrimaryContainer,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ) ??
+                                                    TextStyle(
+                                                      fontSize: 28,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onPrimaryContainer,
+                                                    ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                       ),
 
@@ -1194,5 +1476,146 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         );
       }
     }
+  }
+
+  void _handleScrollbarDrag(
+    double dy,
+    List<_SiteSection> sections, {
+    bool initial = false,
+  }) {
+    final section = sections.firstWhere(
+      (s) => dy >= s.start && dy <= s.start + s.extent,
+      orElse: () => sections.isNotEmpty ? sections.last : _SiteSection.empty,
+    );
+    if (section == _SiteSection.empty) return;
+    _overlayTimer?.cancel();
+    setState(() {
+      _overlaySiteName = section.siteName;
+      _overlayOpacity = 1.0;
+    });
+    if (initial) {
+      final key = _resultItemKeys[section.firstIndex];
+      final ctx = key.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOut,
+        );
+      } else if (_listController.hasClients) {
+        final totalHeight =
+            _listController.position.viewportDimension +
+            _listController.position.maxScrollExtent;
+        final fraction = section.start / totalHeight;
+        _listController.jumpTo(
+          _listController.position.maxScrollExtent * fraction,
+        );
+      }
+    }
+  }
+
+  void _startOverlayFadeOut() {
+    _overlayTimer?.cancel();
+    setState(() {
+      _overlayOpacity = 0.0;
+    });
+  }
+
+  void _scrollToFraction(double f) {
+    if (!_listController.hasClients) return;
+    final max = _listController.position.maxScrollExtent;
+    final target = max * f.clamp(0.0, 1.0);
+    _listController.jumpTo(target);
+    setState(() {
+      _scrollFraction = f.clamp(0.0, 1.0);
+    });
+  }
+
+  void _setFastScrolling(bool v) {
+    if (_isFastScrolling == v) return;
+    setState(() {
+      _isFastScrolling = v;
+    });
+  }
+}
+
+class _SiteSection {
+  final String siteId;
+  final String siteName;
+  final Color color;
+  final double start;
+  final double extent;
+  final int firstIndex;
+
+  const _SiteSection({
+    required this.siteId,
+    required this.siteName,
+    required this.color,
+    required this.start,
+    required this.extent,
+    required this.firstIndex,
+  });
+
+  static const empty = _SiteSection(
+    siteId: '',
+    siteName: '',
+    color: Colors.transparent,
+    start: 0,
+    extent: 0,
+    firstIndex: 0,
+  );
+}
+
+class _SiteScrollbarPainter extends CustomPainter {
+  final List<_SiteSection> sections;
+  final double fraction;
+  final Color knobColor;
+  final Color knobBorder;
+
+  _SiteScrollbarPainter({
+    required this.sections,
+    required this.fraction,
+    required this.knobColor,
+    required this.knobBorder,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+    for (final s in sections) {
+      paint.color = s.color.withValues(alpha: 0.8);
+      canvas.drawRect(
+        Rect.fromLTWH(size.width - 4, s.start, 4, s.extent),
+        paint,
+      );
+    }
+
+    final knobSize = 18.0;
+    final y = (size.height - knobSize) * fraction;
+    final knobPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = knobColor;
+    canvas.drawCircle(
+      Offset(size.width - 2, y + knobSize / 2),
+      knobSize / 2,
+      knobPaint,
+    );
+    final borderPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..color = knobBorder
+      ..strokeWidth = 2;
+    canvas.drawCircle(
+      Offset(size.width - 2, y + knobSize / 2),
+      knobSize / 2,
+      borderPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _SiteScrollbarPainter oldDelegate) {
+    return oldDelegate.sections != sections ||
+        oldDelegate.fraction != fraction ||
+        oldDelegate.knobColor != knobColor ||
+        oldDelegate.knobBorder != knobBorder;
   }
 }

@@ -136,7 +136,22 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   Future<void> _loadSites() async {
     setState(() => _loading = true);
     try {
-      final sites = await StorageService.instance.loadSiteConfigs();
+      var sites = await StorageService.instance.loadSiteConfigs();
+      // 若没有配置颜色则生成哈希色并持久化（只持久化颜色，不改其他字段）
+      bool needPersist = false;
+      sites = sites.map((s) {
+        if (s.siteColor == null) {
+          final primaries = Colors.primaries;
+          final color = primaries[(s.id.hashCode.abs()) % primaries.length];
+          needPersist = true;
+          return s.copyWith(siteColor: color.toARGB32());
+        }
+        return s;
+      }).toList();
+      if (needPersist) {
+        // 仅更新颜色，避免覆盖 apiKey：saveSiteConfigs 会正确分离持久化
+        await StorageService.instance.saveSiteConfigs(sites);
+      }
       final activeSiteId = await StorageService.instance.getActiveSiteId();
       setState(() {
         _sites = sites;
@@ -765,7 +780,22 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                         final isActive = site.id == _activeSiteId;
                         final hs = _healthStatuses[site.id];
 
+                        final Color? siteColor = site.siteColor != null
+                            ? Color(site.siteColor!)
+                            : null;
                         return Card(
+                          elevation: 2,
+                          shadowColor: (siteColor ?? Theme.of(context).colorScheme.outline)
+                              .withValues(alpha: 0.4),
+                          shape: RoundedRectangleBorder(
+                            side: BorderSide(
+                              color:
+                                  siteColor ??
+                                  Theme.of(context).colorScheme.outline,
+                              width: 2.0,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           margin: const EdgeInsets.only(bottom: 8),
                           color: isActive
                               ? Theme.of(context).colorScheme.primaryContainer
@@ -1375,6 +1405,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
   String? _selectedTemplateUrl; // 从多URL模板中选择的URL
   bool _showPresetList = true; // 控制预设站点列表的显示/隐藏
   bool _showManualCookieInput = false; // 是否展示手动输入cookie框
+  Color? _siteColor; // 站点颜色（编辑页）
 
   @override
   void initState() {
@@ -1399,6 +1430,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
       _searchCategories = List.from(widget.site!.searchCategories);
       _siteFeatures = widget.site!.features;
       _savedCookie = widget.site!.cookie;
+      _siteColor = widget.site!.siteColor != null
+          ? Color(widget.site!.siteColor!)
+          : null;
 
       // 检查是否是预设站点，这会根据检测结果填充相应字段
       _checkIfPresetSite();
@@ -1407,6 +1441,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       _searchCategories = [];
       _hasUserMadeSelection = false; // 新建站点时用户还未做出选择
       // 不设置默认的 _selectedSiteType，让用户选择后再设置
+      _siteColor = null;
     }
   }
 
@@ -1639,6 +1674,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
         features: _siteFeatures,
         cookie: template.siteType == SiteType.nexusphpweb ? _savedCookie : null,
         templateId: templateId,
+        siteColor: _siteColor?.toARGB32(),
       );
     }
 
@@ -1663,6 +1699,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       features: _siteFeatures,
       cookie: _selectedSiteType == SiteType.nexusphpweb ? _savedCookie : null,
       templateId: templateId,
+      siteColor: _siteColor?.toARGB32(),
     );
   }
 
@@ -2218,6 +2255,55 @@ class _SiteEditPageState extends State<SiteEditPage> {
                             });
                           }
                         },
+                ),
+                const SizedBox(height: 16),
+                // 站点颜色选择
+                Row(
+                  children: [
+                    Text('站点颜色', style: Theme.of(context).textTheme.bodyMedium),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () async {
+                        final picked = await showDialog<Color>(
+                          context: context,
+                          builder: (context) => _SiteColorPickerDialog(
+                            initialColor:
+                                _siteColor ??
+                                Theme.of(context).colorScheme.primary,
+                          ),
+                        );
+                        if (picked != null) {
+                          setState(() => _siteColor = picked);
+                        }
+                      },
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color:
+                              _siteColor ??
+                              Theme.of(context).colorScheme.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _siteColor != null
+                            ? (() {
+                                final argb = _siteColor!.toARGB32();
+                                return '#${argb.toRadixString(16).padLeft(8, '0').toUpperCase()}';
+                              })()
+                            : '未设置（使用默认哈希色）',
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -2799,6 +2885,377 @@ class _SiteEditPageState extends State<SiteEditPage> {
   }
 }
 
+class _SiteColorPickerDialog extends StatefulWidget {
+  final Color initialColor;
+
+  const _SiteColorPickerDialog({required this.initialColor});
+
+  @override
+  State<_SiteColorPickerDialog> createState() => _SiteColorPickerDialogState();
+}
+
+class _SiteColorPickerDialogState extends State<_SiteColorPickerDialog> {
+  late Color _selectedColor;
+  bool _customMode = false;
+  final TextEditingController _hexController = TextEditingController();
+  // 透明度固定为不透明，颜色值仅由矩形与色相条决定
+  double _h = 0.0;
+  double _s = 1.0;
+  double _v = 1.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedColor = widget.initialColor;
+    _hexController.text = '#${_selectedColor.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2)}';
+    final hsv = HSVColor.fromColor(_selectedColor);
+    _h = hsv.hue;
+    _s = hsv.saturation;
+    _v = hsv.value;
+  }
+
+  @override
+  void dispose() {
+    _hexController.dispose();
+    super.dispose();
+  }
+
+  String _toHexRGB(Color c) {
+    final r = c.r.toInt().toRadixString(16).padLeft(2, '0');
+    final g = c.g.toInt().toRadixString(16).padLeft(2, '0');
+    final b = c.b.toInt().toRadixString(16).padLeft(2, '0');
+    return '#${r.toUpperCase()}${g.toUpperCase()}${b.toUpperCase()}';
+  }
+
+  // 已不再需要透明度独立调节函数
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('选择站点颜色'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 调色盘：S-V 二维取值 + H 滑条
+            // 预设色选择区（点击后可直接选择，无需自定义）
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children:
+                  [
+                    Colors.red,
+                    Colors.pink,
+                    Colors.purple,
+                    Colors.deepPurple,
+                    Colors.indigo,
+                    Colors.blue,
+                    Colors.lightBlue,
+                    Colors.cyan,
+                    Colors.teal,
+                    Colors.green,
+                    Colors.lightGreen,
+                    Colors.lime,
+                    Colors.yellow,
+                    Colors.amber,
+                    Colors.orange,
+                    Colors.deepOrange,
+                    Colors.brown,
+                    Colors.grey,
+                    Colors.blueGrey,
+                  ].map((color) {
+                    final sel = _selectedColor.toARGB32() == color.toARGB32();
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedColor = color;
+                          _hexController.text = _toHexRGB(color);
+                          _customMode = false;
+                        });
+                      },
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: sel
+                              ? Border.all(color: Colors.white, width: 3)
+                              : null,
+                          boxShadow: sel
+                              ? [
+                                  BoxShadow(
+                                    color: color.withValues(alpha: 0.5),
+                                    blurRadius: 8,
+                                    spreadRadius: 2,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: sel
+                            ? const Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 18,
+                              )
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.palette_outlined),
+              title: const Text('自定义颜色...'),
+              subtitle: const Text('支持 #RRGGBB 或 #AARRGGBB'),
+              onTap: () => setState(() {
+                _customMode = true;
+                _hexController.text = '#${_selectedColor.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2)}';
+              }),
+            ),
+            if (_customMode) ...[
+              const SizedBox(height: 8),
+              // 上方矩形：固定当前色相，横轴为饱和度，纵轴为明度
+              SizedBox(
+                width: 260,
+                height: 160,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        clipBehavior: Clip.hardEdge,
+                        child: GestureDetector(
+                          onTapDown: (d) {
+                            final b = d.localPosition;
+                            const w = 260.0;
+                            const h = 160.0;
+                            setState(() {
+                              _s = (b.dx / w).clamp(0.0, 1.0);
+                              _v = (1.0 - (b.dy / h)).clamp(0.0, 1.0);
+                              _selectedColor = HSVColor.fromAHSV(
+                                1.0,
+                                _h,
+                                _s,
+                                _v,
+                              ).toColor();
+                              _hexController.text = '#${_selectedColor.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2)}';
+                            });
+                          },
+                          onPanUpdate: (d) {
+                            final b = d.localPosition;
+                            const w = 260.0;
+                            const h = 160.0;
+                            setState(() {
+                              _s = (b.dx / w).clamp(0.0, 1.0);
+                              _v = (1.0 - (b.dy / h)).clamp(0.0, 1.0);
+                              _selectedColor = HSVColor.fromAHSV(
+                                1.0,
+                                _h,
+                                _s,
+                                _v,
+                              ).toColor();
+                              _hexController.text = _toHexRGB(_selectedColor);
+                            });
+                          },
+                          child: CustomPaint(
+                            painter: _SVPalettePainter(hue: _h),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: (_s * 260) - 10,
+                      top: ((1.0 - _v) * 160) - 10,
+                      child: IgnorePointer(
+                        ignoring: true,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: Container(
+                            margin: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: _selectedColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              // 下方色相滑条
+              SizedBox(
+                width: 260,
+                height: 24,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTapDown: (d) {
+                          final x = d.localPosition.dx;
+                          const w = 260.0;
+                          setState(() {
+                            _h = (x / w * 360).clamp(0.0, 360.0);
+                            _selectedColor = HSVColor.fromAHSV(
+                              1.0,
+                              _h,
+                              _s,
+                              _v,
+                            ).toColor();
+                            _hexController.text = '#${_selectedColor.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2)}';
+                          });
+                        },
+                        onPanUpdate: (d) {
+                          final x = d.localPosition.dx;
+                          const w = 260.0;
+                          setState(() {
+                            _h = (x / w * 360).clamp(0.0, 360.0);
+                            _selectedColor = HSVColor.fromAHSV(
+                              1.0,
+                              _h,
+                              _s,
+                              _v,
+                            ).toColor();
+                            _hexController.text = _toHexRGB(_selectedColor);
+                          });
+                        },
+                        child: CustomPaint(painter: _HueBarPainter()),
+                      ),
+                    ),
+                    Positioned(
+                      left: ((_h / 360) * 260) - 10,
+                      top: 2,
+                      child: IgnorePointer(
+                        ignoring: true,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: Container(
+                            margin: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: HSVColor.fromAHSV(
+                                1.0,
+                                _h,
+                                1.0,
+                                1.0,
+                              ).toColor(),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: _selectedColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _hexController,
+                      decoration: const InputDecoration(
+                        labelText: '颜色值',
+                        hintText: '#RRGGBB 或 #AARRGGBB',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (v) {
+                        final val = v.trim();
+                        if (val.startsWith('#')) {
+                          final hex = val.substring(1);
+                          try {
+                            final parsed = int.parse(
+                              hex.length == 6 ? 'FF$hex' : hex,
+                              radix: 16,
+                            );
+                            setState(() {
+                              _selectedColor = Color(parsed);
+                              final hsv = HSVColor.fromColor(_selectedColor);
+                              _h = hsv.hue;
+                              _s = hsv.saturation;
+                              _v = hsv.value;
+                            });
+                          } catch (_) {}
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              // Container(
+              //   width: double.infinity,
+              //   height: 36,
+              //   decoration: BoxDecoration(
+              //     color: _selectedColor,
+              //     borderRadius: BorderRadius.circular(6),
+              //     border: Border.all(color: Theme.of(context).colorScheme.outline),
+              //   ),
+              // ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.outline,
+              width: 1.0,
+            ),
+          ),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _selectedColor),
+          child: const Text('确定'),
+        ),
+      ],
+    );
+  }
+}
+
 class _ProfileView extends StatelessWidget {
   final MemberProfile profile;
 
@@ -2873,4 +3330,62 @@ class _CustomFloatingActionButtonLocation extends FloatingActionButtonLocation {
 
     return Offset(fabX, fabY);
   }
+}
+// 移除未使用的旧调色盘实现，统一使用 _HueValuePalettePainter
+class _SVPalettePainter extends CustomPainter {
+  final double hue;
+  _SVPalettePainter({required this.hue});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final baseColor = HSVColor.fromAHSV(1.0, hue, 1.0, 1.0).toColor();
+    final satShader = LinearGradient(
+      colors: [Colors.white, baseColor],
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+    ).createShader(rect);
+    final valShader = LinearGradient(
+      colors: [Colors.transparent, Colors.black],
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+    ).createShader(rect);
+    final p1 = Paint()..shader = satShader;
+    final p2 = Paint()..shader = valShader;
+    canvas.drawRect(rect, p1);
+    canvas.drawRect(rect, p2);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SVPalettePainter oldDelegate) {
+    return oldDelegate.hue != hue;
+  }
+}
+
+class _HueBarPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final shader = LinearGradient(
+      colors: [
+        HSVColor.fromAHSV(1, 0, 1, 1).toColor(),
+        HSVColor.fromAHSV(1, 60, 1, 1).toColor(),
+        HSVColor.fromAHSV(1, 120, 1, 1).toColor(),
+        HSVColor.fromAHSV(1, 180, 1, 1).toColor(),
+        HSVColor.fromAHSV(1, 240, 1, 1).toColor(),
+        HSVColor.fromAHSV(1, 300, 1, 1).toColor(),
+        HSVColor.fromAHSV(1, 360, 1, 1).toColor(),
+      ],
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+    ).createShader(rect);
+    final p = Paint()..shader = shader;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(12)),
+      p,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

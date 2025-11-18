@@ -373,12 +373,37 @@ class _ColorPickerDialog extends StatefulWidget {
 
 class _ColorPickerDialogState extends State<_ColorPickerDialog> {
   late Color _selectedColor;
+  bool _customMode = false;
+  final TextEditingController _hexController = TextEditingController();
+  double _h = 0.0;
+  double _s = 1.0;
+  double _v = 1.0;
   
   @override
   void initState() {
     super.initState();
     _selectedColor = widget.initialColor;
+    _hexController.text = '#${_selectedColor.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2)}';
+    final hsv = HSVColor.fromColor(_selectedColor);
+    _h = hsv.hue;
+    _s = hsv.saturation;
+    _v = hsv.value;
   }
+
+  @override
+  void dispose() {
+    _hexController.dispose();
+    super.dispose();
+  }
+
+  String _toHexRGB(Color c) {
+    final r = c.r.toInt().toRadixString(16).padLeft(2, '0');
+    final g = c.g.toInt().toRadixString(16).padLeft(2, '0');
+    final b = c.b.toInt().toRadixString(16).padLeft(2, '0');
+    return '#${r.toUpperCase()}${g.toUpperCase()}${b.toUpperCase()}';
+  }
+
+  // 移除透明度逻辑，使用 HSV 的 h/s/v 构成颜色
 
   @override
   Widget build(BuildContext context) {
@@ -420,9 +445,245 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
               ].map((color) => _ColorCircle(
                 color: color,
                 isSelected: _selectedColor.toARGB32() == color.toARGB32(),
-                onTap: () => setState(() => _selectedColor = color),
+                          onTap: () => setState(() {
+                            _selectedColor = color;
+                            _hexController.text = _toHexRGB(color);
+                            _customMode = false;
+                          }),
               )).toList(),
             ),
+            const SizedBox(height: 12),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.palette_outlined),
+              title: const Text('自定义颜色...'),
+              subtitle: const Text('支持 #RRGGBB 或 #AARRGGBB'),
+              onTap: () => setState(() => _customMode = true),
+            ),
+            if (_customMode) ...[
+              const SizedBox(height: 8),
+              // 上方矩形：固定色相，调饱和度/明度
+              SizedBox(
+                width: 260,
+                height: 160,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        clipBehavior: Clip.hardEdge,
+                        child: GestureDetector(
+                          onTapDown: (d) {
+                            final b = d.localPosition;
+                            const w = 260.0;
+                            const h = 160.0;
+                            setState(() {
+                              _s = (b.dx / w).clamp(0.0, 1.0);
+                              _v = (1.0 - (b.dy / h)).clamp(0.0, 1.0);
+                              _selectedColor = HSVColor.fromAHSV(
+                                1.0,
+                                _h,
+                                _s,
+                                _v,
+                              ).toColor();
+                              _hexController.text =
+                                  '#${_selectedColor.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2)}';
+                            });
+                          },
+                          onPanUpdate: (d) {
+                            final b = d.localPosition;
+                            const w = 260.0;
+                            const h = 160.0;
+                            setState(() {
+                              _s = (b.dx / w).clamp(0.0, 1.0);
+                              _v = (1.0 - (b.dy / h)).clamp(0.0, 1.0);
+                              _selectedColor = HSVColor.fromAHSV(
+                                1.0,
+                                _h,
+                                _s,
+                                _v,
+                              ).toColor();
+                              _hexController.text =
+                                  '#${_selectedColor.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2)}';
+                            });
+                          },
+                          child: CustomPaint(
+                            painter: _SVPalettePainter(hue: _h),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: (_s * 260) - 10,
+                      top: ((1.0 - _v) * 160) - 10,
+                      child: IgnorePointer(
+                        ignoring: true,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: Container(
+                            margin: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: _selectedColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              // 下方色相条
+              SizedBox(
+                width: 260,
+                height: 24,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTapDown: (d) {
+                          final x = d.localPosition.dx;
+                          const w = 260.0;
+                          setState(() {
+                            _h = (x / w * 360).clamp(0.0, 360.0);
+                            _selectedColor = HSVColor.fromAHSV(
+                              1.0,
+                              _h,
+                              _s,
+                              _v,
+                            ).toColor();
+                            _hexController.text =
+                                '#${_selectedColor.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2)}';
+                          });
+                        },
+                        onPanUpdate: (d) {
+                          final x = d.localPosition.dx;
+                          const w = 260.0;
+                          setState(() {
+                            _h = (x / w * 360).clamp(0.0, 360.0);
+                            _selectedColor = HSVColor.fromAHSV(
+                              1.0,
+                              _h,
+                              _s,
+                              _v,
+                            ).toColor();
+                            _hexController.text =
+                                '#${_selectedColor.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2)}';
+                          });
+                        },
+                        child: CustomPaint(painter: _HueBarPainter()),
+                      ),
+                    ),
+                    Positioned(
+                      left: ((_h / 360) * 260) - 10,
+                      top: 2,
+                      child: IgnorePointer(
+                        ignoring: true,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: Container(
+                            margin: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: HSVColor.fromAHSV(
+                                1.0,
+                                _h,
+                                1.0,
+                                1.0,
+                              ).toColor(),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: _selectedColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _hexController,
+                      decoration: const InputDecoration(
+                        labelText: '颜色值',
+                        hintText: '#RRGGBB 或 #AARRGGBB',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (v) {
+                        final val = v.trim();
+                        if (val.startsWith('#')) {
+                          final hex = val.substring(1);
+                          try {
+                            final parsed = int.parse(
+                              hex.length == 6 ? 'FF$hex' : hex,
+                              radix: 16,
+                            );
+                            setState(() {
+                              _selectedColor = Color(parsed);
+                              final hsv = HSVColor.fromColor(_selectedColor);
+                              _h = hsv.hue;
+                              _s = hsv.saturation;
+                              _v = hsv.value;
+                            });
+                          } catch (_) {}
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              // const SizedBox(height: 8),
+              // Container(
+              //   width: double.infinity,
+              //   height: 36,
+              //   decoration: BoxDecoration(
+              //     color: _selectedColor,
+              //     borderRadius: BorderRadius.circular(6),
+              //     border: Border.all(color: Theme.of(context).colorScheme.outline),
+              //   ),
+              // ),
+            ],
           ],
         ),
       ),
@@ -490,6 +751,64 @@ class _ColorCircle extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SVPalettePainter extends CustomPainter {
+  final double hue;
+  _SVPalettePainter({required this.hue});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final baseColor = HSVColor.fromAHSV(1.0, hue, 1.0, 1.0).toColor();
+    final satShader = LinearGradient(
+      colors: [Colors.white, baseColor],
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+    ).createShader(rect);
+    final valShader = LinearGradient(
+      colors: [Colors.transparent, Colors.black],
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+    ).createShader(rect);
+    final p1 = Paint()..shader = satShader;
+    final p2 = Paint()..shader = valShader;
+    canvas.drawRect(rect, p1);
+    canvas.drawRect(rect, p2);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SVPalettePainter oldDelegate) {
+    return oldDelegate.hue != hue;
+  }
+}
+
+class _HueBarPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final shader = LinearGradient(
+      colors: [
+        HSVColor.fromAHSV(1, 0, 1, 1).toColor(),
+        HSVColor.fromAHSV(1, 60, 1, 1).toColor(),
+        HSVColor.fromAHSV(1, 120, 1, 1).toColor(),
+        HSVColor.fromAHSV(1, 180, 1, 1).toColor(),
+        HSVColor.fromAHSV(1, 240, 1, 1).toColor(),
+        HSVColor.fromAHSV(1, 300, 1, 1).toColor(),
+        HSVColor.fromAHSV(1, 360, 1, 1).toColor(),
+      ],
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+    ).createShader(rect);
+    final p = Paint()..shader = shader;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(12)),
+      p,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _AutoLoadImagesTile extends StatefulWidget {

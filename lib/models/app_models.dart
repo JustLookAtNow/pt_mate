@@ -719,6 +719,7 @@ class SiteConfig {
   final List<SearchCategoryConfig> searchCategories; // 查询分类配置
   final SiteFeatures features; // 功能支持配置
   final String templateId; // 模板ID，记录创建时的模板，自定义为-1
+  final int? siteColor; // 站点颜色（ARGB int），可选，缺失时使用哈希色
 
   const SiteConfig({
     required this.id,
@@ -733,6 +734,7 @@ class SiteConfig {
     this.searchCategories = const [],
     this.features = SiteFeatures.mteamDefault,
     this.templateId = '',
+    this.siteColor,
   });
 
   SiteConfig copyWith({
@@ -748,6 +750,7 @@ class SiteConfig {
     List<SearchCategoryConfig>? searchCategories,
     SiteFeatures? features,
     String? templateId,
+    int? siteColor,
   }) => SiteConfig(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -761,6 +764,7 @@ class SiteConfig {
     searchCategories: searchCategories ?? this.searchCategories,
     features: features ?? this.features,
     templateId: templateId ?? this.templateId,
+    siteColor: siteColor ?? this.siteColor,
   );
 
   Map<String, dynamic> toJson() => {
@@ -776,6 +780,7 @@ class SiteConfig {
     'searchCategories': searchCategories.map((e) => e.toJson()).toList(),
     'features': features.toJson(),
     'templateId': templateId,
+    'siteColor': siteColor,
   };
 
   factory SiteConfig.fromJson(Map<String, dynamic> json) {
@@ -815,6 +820,25 @@ class SiteConfig {
       templateId = SiteConfig._getTemplateIdByBaseUrl(baseUrl);
     }
 
+    // 兼容解析站点颜色：支持 int 或字符串 #RRGGBB/#AARRGGBB
+    int? siteColor;
+    try {
+      final colorJson = json['siteColor'];
+      if (colorJson is int) {
+        siteColor = colorJson;
+      } else if (colorJson is String) {
+        final v = colorJson.trim();
+        if (v.startsWith('#')) {
+          final hex = v.substring(1);
+          final parsed = int.parse(
+            hex.length == 6 ? 'FF$hex' : hex,
+            radix: 16,
+          );
+          siteColor = parsed;
+        }
+      }
+    } catch (_) {}
+
     return SiteConfig(
       id:
           json['id'] as String? ??
@@ -833,6 +857,7 @@ class SiteConfig {
       searchCategories: categories,
       features: features,
       templateId: templateId,
+      siteColor: siteColor,
     );
   }
 
@@ -894,6 +919,25 @@ class SiteConfig {
       // 如果成功获取到了有效的templateId，标记需要更新持久化数据
       needsUpdate = true;
     }
+    // 兼容解析站点颜色：支持 int 或字符串 #RRGGBB/#AARRGGBB
+    int? siteColor;
+    try {
+      final colorJson = json['siteColor'];
+      if (colorJson is int) {
+        siteColor = colorJson;
+      } else if (colorJson is String) {
+        final v = colorJson.trim();
+        if (v.startsWith('#')) {
+          final hex = v.substring(1);
+          final parsed = int.parse(
+            hex.length == 6 ? 'FF$hex' : hex,
+            radix: 16,
+          );
+          siteColor = parsed;
+        }
+      }
+    } catch (_) {}
+
     final config = SiteConfig(
       id:
           json['id'] as String? ??
@@ -912,6 +956,7 @@ class SiteConfig {
       searchCategories: categories,
       features: features,
       templateId: templateId,
+      siteColor: siteColor,
     );
 
     final result = SiteConfigLoadResult(

@@ -91,6 +91,7 @@ class StorageService {
   bool _siteConfigsCacheDirty = true; // 当有增删改或持久化后需要重新解析
   bool _siteConfigsCacheNeedsUpdate = false; // 最近一次解析是否发现需要更新
   final Map<String, String?> _siteApiKeysCache = {}; // 站点 id -> apiKey 的缓存
+  List<SiteConfig>? get siteConfigsCache => _siteConfigsCache; // 只读访问器
 
   final FlutterSecureStorage _secure = const FlutterSecureStorage(
     aOptions: AndroidOptions(
