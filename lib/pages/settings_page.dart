@@ -14,6 +14,7 @@ import 'backup_restore_page.dart';
 import 'aggregate_search_settings_page.dart';
 import 'downloader_settings_page.dart';
 import '../services/update_service.dart';
+import '../services/debug/web_debug_service.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -229,7 +230,7 @@ class _SettingsBody extends StatelessWidget {
         // 日志与诊断（底部）
         const SizedBox(height: 8),
         Text(
-          '日志与诊断',
+          '调试与诊断',
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 8),
@@ -241,6 +242,8 @@ class _SettingsBody extends StatelessWidget {
               _ExportLogsTile(),
               Divider(height: 1),
               _ClearLogsTile(),
+              Divider(height: 1),
+              _WebDebugToggleTile(),
             ],
           ),
         ),
@@ -260,6 +263,107 @@ class _SettingsBody extends StatelessWidget {
     }
   }
 }
+
+class _WebDebugToggleTile extends StatefulWidget {
+  const _WebDebugToggleTile();
+
+  @override
+  State<_WebDebugToggleTile> createState() => _WebDebugToggleTileState();
+}
+
+class _WebDebugToggleTileState extends State<_WebDebugToggleTile> {
+  bool _enabled = false;
+  String _serviceUrl = '';
+
+  Future<void> _toggle(bool value) async {
+    setState(() {
+      _enabled = value;
+    });
+    if (value) {
+      if (kIsWeb) {
+        final messenger = ScaffoldMessenger.of(context);
+        final scheme = Theme.of(context).colorScheme;
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              '当前为 Web 构建，无法启动本地调试服务',
+              style: TextStyle(color: scheme.onErrorContainer),
+            ),
+            backgroundColor: scheme.errorContainer,
+          ),
+        );
+        setState(() {
+          _enabled = false;
+        });
+        return;
+      }
+      try {
+        final messenger = ScaffoldMessenger.of(context);
+        final scheme = Theme.of(context).colorScheme;
+        final ok = await WebDebugService.instance.start();
+        if (!mounted) return;
+        _serviceUrl = WebDebugService.instance.hostUrl;
+        setState(() {});
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              ok ? 'Web 调试服务已启动：$_serviceUrl' : 'Web 调试服务启动失败',
+              style: TextStyle(color: scheme.onPrimaryContainer),
+            ),
+            backgroundColor: scheme.primaryContainer,
+          ),
+        );
+      } catch (e) {
+        final messenger = ScaffoldMessenger.of(context);
+        final scheme = Theme.of(context).colorScheme;
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              '启动失败：$e',
+              style: TextStyle(color: scheme.onErrorContainer),
+            ),
+            backgroundColor: scheme.errorContainer,
+          ),
+        );
+        setState(() {
+          _enabled = false;
+        });
+      }
+    } else {
+      final messenger = ScaffoldMessenger.of(context);
+      final scheme = Theme.of(context).colorScheme;
+      await WebDebugService.instance.stop();
+      if (!mounted) return;
+      _serviceUrl = '';
+      setState(() {});
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Web 调试服务已停止',
+            style: TextStyle(color: scheme.onErrorContainer),
+          ),
+          backgroundColor: scheme.errorContainer,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.bug_report),
+      title: const Text('Web 调试'),
+      subtitle: Text(
+        WebDebugService.instance.isRunning
+            ? '运行中：${_serviceUrl.isNotEmpty ? _serviceUrl : WebDebugService.instance.hostUrl}'
+            : '启用后在局域网使用浏览器访问来调试网站配置',
+      ),
+      value: _enabled && WebDebugService.instance.isRunning,
+      onChanged: _toggle,
+    );
+  }
+}
+
 
 class _BetaUpdateTile extends StatefulWidget {
   const _BetaUpdateTile();

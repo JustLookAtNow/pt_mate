@@ -27,6 +27,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
   late SiteConfig _siteConfig;
   late Dio _dio;
   Map<String, String>? _discountMapping;
+  SiteConfigTemplate? _customTemplate;
   static final Logger _logger = Logger();
   static const int _maxHtmlDumpLength = 200 * 1024; // 200KB 截断
 
@@ -134,9 +135,19 @@ class NexusPHPWebAdapter extends SiteAdapter {
     }
   }
 
+  void setCustomTemplate(SiteConfigTemplate template) {
+    _customTemplate = template;
+  }
+
   /// 加载优惠类型映射配置
   Future<void> _loadDiscountMapping() async {
     try {
+      if (_customTemplate != null) {
+        _discountMapping = Map<String, String>.from(
+          _customTemplate!.discountMapping,
+        );
+        return;
+      }
       final template = await SiteConfigService.getTemplateById(
         _siteConfig.templateId,
         _siteConfig.siteType,
@@ -199,6 +210,19 @@ class NexusPHPWebAdapter extends SiteAdapter {
       int uploadedBytes = 0;
       int downloadedBytes = 0;
 
+      // 更新站点配置中的临时 passKey 和 userId，便于后续下载链接生成等逻辑使用
+      try {
+        final uidStr = (userInfo['userId'] ?? '').toString();
+        if ((passKey != null && passKey.isNotEmpty) &&
+            (_siteConfig.passKey == null || _siteConfig.passKey!.isEmpty)) {
+          _siteConfig = _siteConfig.copyWith(passKey: passKey);
+        }
+        if (uidStr.isNotEmpty &&
+            (_siteConfig.userId == null || _siteConfig.userId!.isEmpty)) {
+          _siteConfig = _siteConfig.copyWith(userId: uidStr);
+        }
+      } catch (_) {}
+
       return MemberProfile(
         username: userInfo['userName'] ?? '',
         bonus: bonusPoints,
@@ -220,6 +244,12 @@ class NexusPHPWebAdapter extends SiteAdapter {
   /// 获取指定类型的配置
   /// [configType] 配置类型，如 'userInfo', 'passKey', 'search', 'categories' 等
   Future<Map<String, dynamic>> _getFinderConfig(String configType) async {
+    if (_customTemplate != null && _customTemplate!.infoFinder != null) {
+      final infoFinder = _customTemplate!.infoFinder!;
+      if (infoFinder[configType] != null) {
+        return infoFinder[configType] as Map<String, dynamic>;
+      }
+    }
     // 优先读取 SiteConfig.templateId 对应的配置
     if (_siteConfig.templateId != '-1') {
       try {
