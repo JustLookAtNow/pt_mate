@@ -183,55 +183,6 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     }
   }
 
-  Future<void> _editSiteColor(SiteConfig site) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final theme = Theme.of(context);
-    final initial = site.siteColor != null
-        ? Color(site.siteColor!)
-        : Theme.of(context).colorScheme.primary;
-    final picked = await showDialog<Color>(
-      context: context,
-      builder: (context) => _SiteColorPickerDialog(initialColor: initial),
-    );
-    if (picked == null) return;
-    try {
-      final updated = site.copyWith(siteColor: picked.toARGB32());
-      await StorageService.instance.updateSiteConfig(
-        updated.copyWith(apiKey: null),
-      );
-      if (!mounted) return;
-      setState(() {
-        final idx = _sites.indexWhere((s) => s.id == site.id);
-        if (idx >= 0) _sites[idx] = updated;
-      });
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            '站点颜色已更新',
-            style: TextStyle(
-              color: theme.colorScheme.onPrimaryContainer,
-            ),
-          ),
-          backgroundColor: theme.colorScheme.primaryContainer,
-          behavior: SnackBarBehavior.fixed,
-        ),
-      );
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            '更新颜色失败: $e',
-            style: TextStyle(
-              color: theme.colorScheme.onErrorContainer,
-            ),
-          ),
-          backgroundColor: theme.colorScheme.errorContainer,
-          behavior: SnackBarBehavior.fixed,
-        ),
-      );
-    }
-  }
-
   Future<void> _loadCachedHealthStatuses({
     bool triggerRefreshWhenEmpty = false,
   }) async {
@@ -1127,21 +1078,21 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                                             ),
                                                           ),
                                                           const SizedBox(width: 8),
-                                                          InkWell(
-                                                            onTap: () => _editSiteColor(site),
-                                                            child: Container(
-                                                              width: 18,
-                                                              height: 18,
-                                                              decoration: BoxDecoration(
-                                                                color: siteColor ?? Theme.of(context).colorScheme.primary,
-                                                                shape: BoxShape.circle,
-                                                                border: Border.all(
-                                                                  color: Theme.of(context).colorScheme.outline,
-                                                                  width: 1.0,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ),
+                                                                // InkWell(
+                                                                //   onTap: () => _editSiteColor(site),
+                                                                //   child: Container(
+                                                                //     width: 18,
+                                                                //     height: 18,
+                                                                //     decoration: BoxDecoration(
+                                                                //       color: siteColor ?? Theme.of(context).colorScheme.primary,
+                                                                //       shape: BoxShape.circle,
+                                                                //       border: Border.all(
+                                                                //         color: Theme.of(context).colorScheme.outline,
+                                                                //         width: 1.0,
+                                                                //       ),
+                                                                //     ),
+                                                                //   ),
+                                                                // ),
                                                 
                                                           // Container(
                                                           //   padding:
@@ -3071,6 +3022,83 @@ class _SiteEditPageState extends State<SiteEditPage> {
   }
 }
 
+class _ProfileView extends StatelessWidget {
+  final MemberProfile profile;
+
+  const _ProfileView({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.check_circle,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '连接成功',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text('用户名: ${profile.username}'),
+          Text(
+            '魔力值: ${Formatters.bonus(profile.bonus)}'
+            '${profile.bonusPerHour != null ? '(${profile.bonusPerHour})' : ''}',
+          ),
+          Text('上传: ${profile.uploadedBytesString}'),
+          Text('下载: ${profile.downloadedBytesString}'),
+          if (profile.seedingSizeBytes != null)
+            Text(
+              '做种体积: ${Formatters.dataFromBytes(profile.seedingSizeBytes!)}',
+            ),
+          Text('分享率: ${Formatters.shareRate(profile.shareRate)}'),
+          Text('passKey: ${profile.passKey}'),
+        ],
+      ),
+    );
+  }
+}
+
+/// 自定义FloatingActionButton位置，远离底边1.5cm，远离右边1cm
+class _CustomFloatingActionButtonLocation extends FloatingActionButtonLocation {
+  const _CustomFloatingActionButtonLocation();
+
+  @override
+  Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
+    // 1.5cm ≈ 57像素，1cm ≈ 38像素
+    const double bottomMargin = 80.0; // 1.5cm
+    const double rightMargin = 50.0; // 1cm
+
+    // 计算FloatingActionButton的位置
+    final double fabX =
+        scaffoldGeometry.scaffoldSize.width -
+        scaffoldGeometry.floatingActionButtonSize.width -
+        rightMargin;
+    final double fabY =
+        scaffoldGeometry.scaffoldSize.height -
+        scaffoldGeometry.floatingActionButtonSize.height -
+        bottomMargin;
+
+    return Offset(fabX, fabY);
+  }
+}
+
+
 class _SiteColorPickerDialog extends StatefulWidget {
   final Color initialColor;
 
@@ -3107,13 +3135,11 @@ class _SiteColorPickerDialogState extends State<_SiteColorPickerDialog> {
   }
 
   String _toHexRGB(Color c) {
-    final r = c.r.toInt().toRadixString(16).padLeft(2, '0');
-    final g = c.g.toInt().toRadixString(16).padLeft(2, '0');
-    final b = c.b.toInt().toRadixString(16).padLeft(2, '0');
+    final r = c.red.toRadixString(16).padLeft(2, '0');
+    final g = c.green.toRadixString(16).padLeft(2, '0');
+    final b = c.blue.toRadixString(16).padLeft(2, '0');
     return '#${r.toUpperCase()}${g.toUpperCase()}${b.toUpperCase()}';
   }
-
-  // 已不再需要透明度独立调节函数
 
   @override
   Widget build(BuildContext context) {
@@ -3409,15 +3435,6 @@ class _SiteColorPickerDialogState extends State<_SiteColorPickerDialog> {
                   ),
                 ],
               ),
-              // Container(
-              //   width: double.infinity,
-              //   height: 36,
-              //   decoration: BoxDecoration(
-              //     color: _selectedColor,
-              //     borderRadius: BorderRadius.circular(6),
-              //     border: Border.all(color: Theme.of(context).colorScheme.outline),
-              //   ),
-              // ),
             ],
           ],
         ),
@@ -3442,82 +3459,6 @@ class _SiteColorPickerDialogState extends State<_SiteColorPickerDialog> {
   }
 }
 
-class _ProfileView extends StatelessWidget {
-  final MemberProfile profile;
-
-  const _ProfileView({required this.profile});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.check_circle,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '连接成功',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text('用户名: ${profile.username}'),
-          Text(
-            '魔力值: ${Formatters.bonus(profile.bonus)}'
-            '${profile.bonusPerHour != null ? '(${profile.bonusPerHour})' : ''}',
-          ),
-          Text('上传: ${profile.uploadedBytesString}'),
-          Text('下载: ${profile.downloadedBytesString}'),
-          if (profile.seedingSizeBytes != null)
-            Text(
-              '做种体积: ${Formatters.dataFromBytes(profile.seedingSizeBytes!)}',
-            ),
-          Text('分享率: ${Formatters.shareRate(profile.shareRate)}'),
-          Text('passKey: ${profile.passKey}'),
-        ],
-      ),
-    );
-  }
-}
-
-/// 自定义FloatingActionButton位置，远离底边1.5cm，远离右边1cm
-class _CustomFloatingActionButtonLocation extends FloatingActionButtonLocation {
-  const _CustomFloatingActionButtonLocation();
-
-  @override
-  Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
-    // 1.5cm ≈ 57像素，1cm ≈ 38像素
-    const double bottomMargin = 80.0; // 1.5cm
-    const double rightMargin = 50.0; // 1cm
-
-    // 计算FloatingActionButton的位置
-    final double fabX =
-        scaffoldGeometry.scaffoldSize.width -
-        scaffoldGeometry.floatingActionButtonSize.width -
-        rightMargin;
-    final double fabY =
-        scaffoldGeometry.scaffoldSize.height -
-        scaffoldGeometry.floatingActionButtonSize.height -
-        bottomMargin;
-
-    return Offset(fabX, fabY);
-  }
-}
-// 移除未使用的旧调色盘实现，统一使用 _HueValuePalettePainter
 class _SVPalettePainter extends CustomPainter {
   final double hue;
   _SVPalettePainter({required this.hue});
