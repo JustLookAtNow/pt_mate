@@ -369,6 +369,23 @@ A:
 3. 在应用中测试各项功能
 4. 查看应用日志获取错误信息
 
+#### 使用 Web 调试（仅 NexusPHPWeb）
+
+当你为 NexusPHP Web 类型站点编写或修改 `infoFinder`/`discountMapping` 等配置时，可通过内置 Web 调试快速验证：
+
+- 打开应用：`设置 → 日志与诊断 → Web 调试` 开关
+- 记录提示的访问地址（例如 `http://<设备IP>:8833/`），在同一局域网浏览器访问
+- 页面输入：
+  - 站点地址：目标站点 `baseUrl`（如 `https://example.com`）
+  - Cookie：登录后的认证 Cookie（`uid=...; pass=...`）
+  - 详细配置：在这里编写你的完整网站提取配置。
+- 点击“测试”，返回：
+  - `profile`：用户资料（包含 `userId`、`bonus` 等）
+  - `categories`：分类列表（`id`、`name`）
+  - `torrentsTop3`：前三条搜索结果（包含 `id`、`title`、`discount`、`sizeBytes`、`seeders`、`leechers` 等）
+
+注意：页面粘贴的模板优先于预置模板，不受缓存影响；Web 构建无法启动本地服务，请在移动或桌面环境调试。
+
 ## 贡献指南
 
 如果您成功适配了新的网站，欢迎提交 Pull Request 分享给其他用户：
