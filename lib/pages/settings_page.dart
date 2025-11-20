@@ -501,9 +501,9 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
   }
 
   String _toHexRGB(Color c) {
-    final r = c.r.toInt().toRadixString(16).padLeft(2, '0');
-    final g = c.g.toInt().toRadixString(16).padLeft(2, '0');
-    final b = c.b.toInt().toRadixString(16).padLeft(2, '0');
+    final r = (c.r * 255).round().toRadixString(16).padLeft(2, '0');
+    final g = (c.g * 255).round().toRadixString(16).padLeft(2, '0');
+    final b = (c.b * 255).round().toRadixString(16).padLeft(2, '0');
     return '#${r.toUpperCase()}${g.toUpperCase()}${b.toUpperCase()}';
   }
 
@@ -1110,7 +1110,9 @@ class _ExportLogsTile extends StatelessWidget {
         );
         return;
       }
-      await Share.shareXFiles([XFile(path)], text: 'PT Mate 日志');
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(path)], text: 'PT Mate 日志'),
+      );
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(
