@@ -1052,9 +1052,11 @@ class _TagsViewState extends State<_TagsView> {
                 if (!_expanded) {
                   final overflow = s.height > 16.0 + 0.1;
                   if (overflow != _overflow) {
-                    setState(() {
-                      _overflow = overflow;
-                    });
+                    if (mounted) {
+                      setState(() {
+                        _overflow = overflow;
+                      });
+                    }
                   }
                 }
               },

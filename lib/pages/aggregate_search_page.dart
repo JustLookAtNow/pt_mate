@@ -31,13 +31,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   bool _isSelectionMode = false;
   final Set<String> _selectedItems = <String>{};
   final ScrollController _listController = ScrollController();
-  List<GlobalKey> _resultItemKeys = [];
-  String? _overlaySiteName;
-  double _overlayOpacity = 0.0;
-  Timer? _overlayTimer;
+
+  // String? _overlaySiteName; // Moved to _AggregateSearchScrollbar
+  // double _overlayOpacity = 0.0; // Moved to _AggregateSearchScrollbar
+  // Timer? _overlayTimer; // Moved to _AggregateSearchScrollbar
   final Map<String, Color> _siteColors = {};
-  double _scrollFraction = 0.0;
   bool _isFastScrolling = false;
+  bool _showErrorWidget = true;
 
   Color _colorForSite(String siteId) {
     if (_siteColors.containsKey(siteId)) return _siteColors[siteId]!;
@@ -69,12 +69,11 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     _loadSearchConfigs();
     _listController.addListener(() {
       if (!_listController.hasClients) return;
-      final max = _listController.position.maxScrollExtent;
-      final px = _listController.position.pixels;
-      final f = max > 0 ? (px / max).clamp(0.0, 1.0) : 0.0;
-      if (f != _scrollFraction) {
+      
+      // 一旦开始滑动，就隐藏错误提示
+      if (_showErrorWidget && _listController.offset > 0) {
         setState(() {
-          _scrollFraction = f;
+          _showErrorWidget = false;
         });
       }
     });
@@ -84,7 +83,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   void dispose() {
     _searchController.dispose();
     _listController.dispose();
-    _overlayTimer?.cancel();
+    // _overlayTimer?.cancel(); // Moved to _AggregateSearchScrollbar
     super.dispose();
   }
 
@@ -526,7 +525,8 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                       ],
 
                       // 搜索结果
-                      if (provider.searchErrors.isNotEmpty) ...[
+                      if (provider.searchErrors.isNotEmpty &&
+                          _showErrorWidget) ...[
                         FutureBuilder<List<SiteConfig>>(
                           future: Provider.of<StorageService>(
                             context,
@@ -644,22 +644,14 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       controller: _listController,
                                       itemCount: provider.searchResults.length,
                                       itemBuilder: (context, index) {
-                                        if (_resultItemKeys.length !=
-                                            provider.searchResults.length) {
-                                          _resultItemKeys = List.generate(
-                                            provider.searchResults.length,
-                                            (i) => i < _resultItemKeys.length
-                                                ? _resultItemKeys[i]
-                                                : GlobalKey(),
-                                          );
-                                        }
                                         final item =
                                             provider.searchResults[index];
                                         // final Color siteColor = _colorForSite(item.siteId);
                                         return Container(
-                                          key: _resultItemKeys[index],
+                                          key: ValueKey(item.torrent.id),
                                           padding: EdgeInsets.zero,
-                                          child: TorrentListItem(
+                                          child: RepaintBoundary(
+                                            child: TorrentListItem(
                                             torrent: item.torrent,
                                             isSelected: _selectedItems.contains(
                                               item.torrent.id,
@@ -679,15 +671,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                             onToggleCollection: () =>
                                                 _onToggleCollection(item),
                                           ),
+                                          ),
                                         );
                                       },
                                     ),
                                   ),
                                   if (provider.searchResults.isNotEmpty)
-                                    Positioned(
-                                      right: 0,
-                                      top: 0,
-                                      bottom: 0,
+                                    Positioned.fill(
                                       child: LayoutBuilder(
                                         builder: (context, constraints) {
                                           final totalHeight =
@@ -734,146 +724,16 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                             );
                                             acc += extent;
                                           }
-                                          return GestureDetector(
-                                            behavior:
-                                                HitTestBehavior.translucent,
-                                            onTapDown: (details) {
-                                              final y =
-                                                  details.localPosition.dy;
-                                              final fraction = (y / totalHeight)
-                                                  .clamp(0.0, 1.0);
-                                              _scrollToFraction(fraction);
-                                              final sec = sections.firstWhere(
-                                                (s) =>
-                                                    y >= s.start &&
-                                                    y <= s.start + s.extent,
-                                                orElse: () =>
-                                                    _SiteSection.empty,
-                                              );
-                                              if (sec != _SiteSection.empty) {
-                                                setState(() {
-                                                  _overlaySiteName =
-                                                      sec.siteName;
-                                                  _overlayOpacity = 1.0;
-                                                });
-                                              }
-                                              _startOverlayFadeOut();
-                                            },
-                                            onPanStart: (details) {
-                                              _setFastScrolling(true);
-                                              _handleScrollbarDrag(
-                                                details.localPosition.dy,
-                                                sections,
-                                                initial: true,
-                                              );
-                                            },
-                                            onPanUpdate: (details) {
-                                              _handleScrollbarDrag(
-                                                details.localPosition.dy,
-                                                sections,
-                                              );
-                                              final y =
-                                                  details.localPosition.dy;
-                                              final sec = sections.firstWhere(
-                                                (s) =>
-                                                    y >= s.start &&
-                                                    y <= s.start + s.extent,
-                                                orElse: () =>
-                                                    _SiteSection.empty,
-                                              );
-                                              if (sec != _SiteSection.empty) {
-                                                final fraction =
-                                                    (y / totalHeight).clamp(
-                                                      0.0,
-                                                      1.0,
-                                                    );
-                                                _scrollToFraction(fraction);
-                                              }
-                                            },
-                                            onPanEnd: (details) {
-                                              _setFastScrolling(false);
-                                              _startOverlayFadeOut();
-                                            },
-                                            child: CustomPaint(
-                                              size: Size(8, totalHeight),
-                                              painter: _SiteScrollbarPainter(
+                                          return _AggregateSearchScrollbar(
+                                            controller: _listController,
                                                 sections: sections,
-                                                fraction: _scrollFraction,
-                                                knobColor: Theme.of(
-                                                  context,
-                                                ).colorScheme.primary,
-                                                knobBorder: Theme.of(
-                                                  context,
-                                                ).colorScheme.onPrimary,
-                                              ),
-                                            ),
+                                            onFastScrollingChanged:
+                                                _setFastScrolling,
                                           );
                                         },
                                       ),
                                     ),
-                                  if (_overlaySiteName != null)
-                                    Positioned.fill(
-                                      child: IgnorePointer(
-                                        ignoring: true,
-                                        child: AnimatedOpacity(
-                                          opacity: _overlayOpacity,
-                                          duration: _overlayOpacity == 1.0
-                                              ? Duration.zero
-                                              : const Duration(seconds: 1),
-                                          child: Container(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .scrim
-                                                .withValues(alpha: 0.35),
-                                            alignment: Alignment.center,
-                                            child: Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 24,
-                                                    vertical: 12,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.primaryContainer,
-                                                borderRadius:
-                                                    BorderRadius.circular(16),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: Colors.black
-                                                        .withValues(alpha: 0.2),
-                                                    blurRadius: 8,
-                                                    spreadRadius: 0,
-                                                  ),
-                                                ],
-                                              ),
-                                              child: Text(
-                                                _overlaySiteName!,
-                                                style:
-                                                    Theme.of(context)
-                                                        .textTheme
-                                                        .headlineSmall
-                                                        ?.copyWith(
-                                                          color: Theme.of(context)
-                                                              .colorScheme
-                                                              .onPrimaryContainer,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                        ) ??
-                                                    TextStyle(
-                                                      fontSize: 28,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .onPrimaryContainer,
-                                                    ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
+
                                 ],
                               ),
                       ),
@@ -1008,6 +868,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     provider.setSearchResults([]);
     provider.setSearchErrors({});
     provider.setSearchProgress(null);
+    setState(() {
+      _showErrorWidget = true;
+    });
 
     try {
       final result = await AggregateSearchService.instance
@@ -1478,11 +1341,67 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     }
   }
 
+  void _setFastScrolling(bool v) {
+    if (_isFastScrolling == v) return;
+    setState(() {
+      _isFastScrolling = v;
+    });
+  }
+}
+
+class _AggregateSearchScrollbar extends StatefulWidget {
+  final ScrollController controller;
+  final List<_SiteSection> sections;
+  final ValueChanged<bool> onFastScrollingChanged;
+
+  const _AggregateSearchScrollbar({
+    required this.controller,
+    required this.sections,
+    required this.onFastScrollingChanged,
+  });
+
+  @override
+  State<_AggregateSearchScrollbar> createState() =>
+      _AggregateSearchScrollbarState();
+}
+
+class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
+  double _scrollFraction = 0.0;
+  String? _overlaySiteName;
+  double _overlayOpacity = 0.0;
+  Timer? _overlayTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_updateScrollFraction);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_updateScrollFraction);
+    _overlayTimer?.cancel();
+    super.dispose();
+  }
+
+  void _updateScrollFraction() {
+    if (!widget.controller.hasClients) return;
+    final max = widget.controller.position.maxScrollExtent;
+    final px = widget.controller.position.pixels;
+    final f = max > 0 ? (px / max).clamp(0.0, 1.0) : 0.0;
+    if (f != _scrollFraction) {
+      setState(() {
+        _scrollFraction = f;
+      });
+    }
+  }
+
   void _handleScrollbarDrag(
     double dy,
-    List<_SiteSection> sections, {
+    double totalHeight, {
     bool initial = false,
   }) {
+    final sections = widget.sections;
     final section = sections.firstWhere(
       (s) => dy >= s.start && dy <= s.start + s.extent,
       orElse: () => sections.isNotEmpty ? sections.last : _SiteSection.empty,
@@ -1494,21 +1413,10 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       _overlayOpacity = 1.0;
     });
     if (initial) {
-      final key = _resultItemKeys[section.firstIndex];
-      final ctx = key.currentContext;
-      if (ctx != null) {
-        Scrollable.ensureVisible(
-          ctx,
-          duration: const Duration(milliseconds: 100),
-          curve: Curves.easeOut,
-        );
-      } else if (_listController.hasClients) {
-        final totalHeight =
-            _listController.position.viewportDimension +
-            _listController.position.maxScrollExtent;
+      if (widget.controller.hasClients) {
         final fraction = section.start / totalHeight;
-        _listController.jumpTo(
-          _listController.position.maxScrollExtent * fraction,
+        widget.controller.jumpTo(
+          widget.controller.position.maxScrollExtent * fraction,
         );
       }
     }
@@ -1516,27 +1424,148 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
   void _startOverlayFadeOut() {
     _overlayTimer?.cancel();
-    setState(() {
-      _overlayOpacity = 0.0;
+    _overlayTimer = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          _overlayOpacity = 0.0;
+        });
+      }
     });
   }
 
   void _scrollToFraction(double f) {
-    if (!_listController.hasClients) return;
-    final max = _listController.position.maxScrollExtent;
+    if (!widget.controller.hasClients) return;
+    final max = widget.controller.position.maxScrollExtent;
     final target = max * f.clamp(0.0, 1.0);
-    _listController.jumpTo(target);
+    widget.controller.jumpTo(target);
     setState(() {
       _scrollFraction = f.clamp(0.0, 1.0);
     });
   }
 
-  void _setFastScrolling(bool v) {
-    if (_isFastScrolling == v) return;
-    setState(() {
-      _isFastScrolling = v;
-    });
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalHeight = constraints.maxHeight;
+        return Stack(
+          children: [
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: 40,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTapDown: (details) {
+                  final y = details.localPosition.dy;
+                  final fraction = (y / totalHeight).clamp(0.0, 1.0);
+                  _scrollToFraction(fraction);
+                  final sec = widget.sections.firstWhere(
+                    (s) => y >= s.start && y <= s.start + s.extent,
+                    orElse: () => _SiteSection.empty,
+                  );
+                  if (sec != _SiteSection.empty) {
+                    setState(() {
+                      _overlaySiteName = sec.siteName;
+                      _overlayOpacity = 1.0;
+                    });
+                  }
+                  _startOverlayFadeOut();
+                },
+                onPanStart: (details) {
+                  widget.onFastScrollingChanged(true);
+                  _handleScrollbarDrag(
+                    details.localPosition.dy,
+                    totalHeight,
+                    initial: true,
+                  );
+                },
+                onPanUpdate: (details) {
+                  _handleScrollbarDrag(details.localPosition.dy, totalHeight);
+                  final y = details.localPosition.dy;
+                  final fraction = (y / totalHeight).clamp(0.0, 1.0);
+                  _scrollToFraction(fraction);
+                },
+                onPanEnd: (details) {
+                  widget.onFastScrollingChanged(false);
+                  _startOverlayFadeOut();
+                },
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: CustomPaint(
+                    size: Size(8, totalHeight),
+                    painter: _SiteScrollbarPainter(
+                      sections: widget.sections,
+                      fraction: _scrollFraction,
+                      knobColor: Theme.of(context).colorScheme.primary,
+                      knobBorder: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (_overlaySiteName != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  ignoring: true,
+                  child: AnimatedOpacity(
+                    opacity: _overlayOpacity,
+                    duration: _overlayOpacity == 1.0
+                        ? Duration.zero
+                        : const Duration(seconds: 1),
+                    child: Container(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.scrim.withValues(alpha: 0.35),
+                      alignment: Alignment.center,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              spreadRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          _overlaySiteName!,
+                          style:
+                              Theme.of(
+                                context,
+                              ).textTheme.headlineSmall?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w600,
+                              ) ??
+                              TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
+                              ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
   }
+
+
 }
 
 class _SiteSection {
@@ -1612,7 +1641,7 @@ class _SiteScrollbarPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _SiteScrollbarPainter oldDelegate) {
+  bool shouldRepaint(_SiteScrollbarPainter oldDelegate) {
     return oldDelegate.sections != sections ||
         oldDelegate.fraction != fraction ||
         oldDelegate.knobColor != knobColor ||
