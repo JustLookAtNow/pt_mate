@@ -1200,7 +1200,7 @@ class SiteConfigTemplate {
   }) {
     // 确定要使用的URL
     String baseUrl;
-    if (selectedUrl != null && baseUrls.contains(selectedUrl)) {
+    if (selectedUrl != null) {
       baseUrl = selectedUrl;
     } else if (primaryUrl != null && baseUrls.contains(primaryUrl)) {
       baseUrl = primaryUrl!;

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:flutter/services.dart';
 import 'dart:io';
 
 import '../services/storage/storage_service.dart';
@@ -273,7 +274,7 @@ class _WebDebugToggleTile extends StatefulWidget {
 
 class _WebDebugToggleTileState extends State<_WebDebugToggleTile> {
   bool _enabled = false;
-  String _serviceUrl = '';
+  List<String> _serviceUrls = [];
 
   Future<void> _toggle(bool value) async {
     setState(() {
@@ -302,12 +303,12 @@ class _WebDebugToggleTileState extends State<_WebDebugToggleTile> {
         final scheme = Theme.of(context).colorScheme;
         final ok = await WebDebugService.instance.start();
         if (!mounted) return;
-        _serviceUrl = WebDebugService.instance.hostUrl;
+        _serviceUrls = WebDebugService.instance.hostUrls;
         setState(() {});
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              ok ? 'Web 调试服务已启动：$_serviceUrl' : 'Web 调试服务启动失败',
+              ok ? 'Web 调试服务已启动' : 'Web 调试服务启动失败',
               style: TextStyle(color: scheme.onPrimaryContainer),
             ),
             backgroundColor: scheme.primaryContainer,
@@ -334,7 +335,7 @@ class _WebDebugToggleTileState extends State<_WebDebugToggleTile> {
       final scheme = Theme.of(context).colorScheme;
       await WebDebugService.instance.stop();
       if (!mounted) return;
-      _serviceUrl = '';
+      _serviceUrls = [];
       setState(() {});
       messenger.showSnackBar(
         SnackBar(
@@ -353,11 +354,41 @@ class _WebDebugToggleTileState extends State<_WebDebugToggleTile> {
     return SwitchListTile(
       secondary: const Icon(Icons.bug_report),
       title: const Text('Web 调试'),
-      subtitle: Text(
-        WebDebugService.instance.isRunning
-            ? '运行中：${_serviceUrl.isNotEmpty ? _serviceUrl : WebDebugService.instance.hostUrl}'
-            : '启用后在局域网使用浏览器访问来调试网站配置',
-      ),
+      subtitle: WebDebugService.instance.isRunning
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('运行中，点击复制地址：'),
+                const SizedBox(height: 4),
+                ...(_serviceUrls.isNotEmpty
+                        ? _serviceUrls
+                        : WebDebugService.instance.hostUrls)
+                    .map(
+                      (url) => InkWell(
+                        onTap: () {
+                          Clipboard.setData(ClipboardData(text: url));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('已复制到剪贴板'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Text(
+                            url,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+              ],
+            )
+          : const Text('启用后在局域网使用浏览器访问来调试网站配置'),
       value: _enabled && WebDebugService.instance.isRunning,
       onChanged: _toggle,
     );

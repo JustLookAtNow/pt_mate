@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/services.dart' show rootBundle;
 
 import '../../models/app_models.dart';
 // import '../site_config_service.dart';
@@ -13,10 +12,11 @@ class WebDebugService {
   static final WebDebugService instance = WebDebugService._();
 
   HttpServer? _server;
-  String _hostUrl = '';
+  List<String> _hostUrls = [];
 
   bool get isRunning => _server != null;
-  String get hostUrl => _hostUrl;
+  List<String> get hostUrls => _hostUrls;
+  String get hostUrl => _hostUrls.isNotEmpty ? _hostUrls.first : '';
 
   Future<bool> start({int port = 8833}) async {
     if (_server != null) return true;
@@ -29,14 +29,17 @@ class WebDebugService {
       }
       _server = server;
 
-      final ip = await _pickLanIPv4();
-      _hostUrl = 'http://$ip:${server.port}/';
+      final ips = await _pickLanIPv4();
+      _hostUrls = ips.map((ip) => 'http://$ip:${server.port}/').toList();
+      if (_hostUrls.isEmpty) {
+        _hostUrls = ['http://127.0.0.1:${server.port}/'];
+      }
 
       _serve(server);
       return true;
     } catch (_) {
       _server = null;
-      _hostUrl = '';
+      _hostUrls = [];
       return false;
     }
   }
@@ -44,20 +47,23 @@ class WebDebugService {
   Future<void> stop() async {
     final s = _server;
     _server = null;
-    _hostUrl = '';
+    _hostUrls = [];
     await s?.close(force: true);
   }
 
-  Future<String> _pickLanIPv4() async {
+  Future<List<String>> _pickLanIPv4() async {
+    final ips = <String>[];
     try {
       final ifs = await NetworkInterface.list(type: InternetAddressType.IPv4);
       for (final ni in ifs) {
         for (final addr in ni.addresses) {
-          if (!addr.isLoopback) return addr.address;
+          if (!addr.isLoopback) {
+            ips.add(addr.address);
+          }
         }
       }
     } catch (_) {}
-    return '127.0.0.1';
+    return ips.isNotEmpty ? ips : ['127.0.0.1'];
   }
 
   void _serve(HttpServer server) {
@@ -105,14 +111,18 @@ class WebDebugService {
     final templateJsonStr = (bodyJson['templateJson'] ?? '').toString();
 
     try {
+      if (templateJsonStr.isEmpty) {
+        throw 'templateJson is empty';
+      }
+
       SiteConfigTemplate tpl;
-      if (templateJsonStr.isNotEmpty) {
+      try {
         final map = jsonDecode(templateJsonStr) as Map<String, dynamic>;
+        map['primaryUrl'] = siteUrl;
+        map['id'] = "templateSite";
         tpl = SiteConfigTemplate.fromJson(map);
-      } else {
-        final raw = await rootBundle.loadString('assets/sites/cspt.json');
-        final map = jsonDecode(raw) as Map<String, dynamic>;
-        tpl = SiteConfigTemplate.fromJson(map);
+      } catch (e) {
+        throw 'Invalid templateJson: $e';
       }
 
       final config = tpl.toSiteConfig(
@@ -133,9 +143,9 @@ class WebDebugService {
       final profile = await adapter.fetchMemberProfile();
       final categories = await adapter.getSearchCategories();
       final search = await adapter.searchTorrents(
-        keyword: 'test',
+        keyword: 'a',
         pageNumber: 1,
-        pageSize: 30,
+        pageSize: 5,
       );
 
       final top3 = search.items
