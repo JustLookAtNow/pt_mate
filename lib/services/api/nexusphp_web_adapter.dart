@@ -43,7 +43,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
       }
       // todo简单脱敏
       _logger.e('[$tag] rule=$ruleJson');
-      _logger.e('HTML=$html');
+      // 使用 debugPrint 输出 HTML，避免 Logger 的格式化（边框等）导致难以复制
+      debugPrint('HTML=$html');
       LogFileService.instance.append('[$tag] rule=$ruleJson');
       LogFileService.instance.append('HTML=$html');
     } catch (_) {

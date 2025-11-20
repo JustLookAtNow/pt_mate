@@ -224,6 +224,7 @@ class WebDebugService {
   <script>
     const el = (id) => document.getElementById(id);
     el('testBtn').onclick = async () => {
+      el('out').textContent = '测试中...';
       const payload = {
         siteUrl: el('siteUrl').value.trim(),
         cookie: el('cookie').value.trim(),
