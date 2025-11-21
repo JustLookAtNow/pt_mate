@@ -150,7 +150,25 @@ Future<void> main() async {
             stderr.writeln('Failed to decode ICO: $name');
             continue;
           }
-          final pngBytes = img.encodePng(image);
+
+          // Find the best frame (largest dimensions)
+          img.Image bestFrame = image;
+          if (image.frames.length > 1) {
+            for (final frame in image.frames) {
+              if (frame.width > bestFrame.width ||
+                  (frame.width == bestFrame.width &&
+                      frame.height > bestFrame.height)) {
+                bestFrame = frame;
+              }
+            }
+            if (bestFrame != image) {
+              stdout.writeln(
+                'Selected best frame ${bestFrame.width}x${bestFrame.height} for $name',
+              );
+            }
+          }
+
+          final pngBytes = img.encodePng(bestFrame);
           await pngOutFile.writeAsBytes(pngBytes);
           converted++;
           stdout.writeln('Converted ICO $name -> ${pngOutFile.path}');
@@ -225,7 +243,19 @@ Future<void> main() async {
         final bytes = res.data!;
         img.Image? image = img.decodeIco(Uint8List.fromList(bytes));
         if (image != null) {
-          final pngBytes = img.encodePng(image);
+          // Find the best frame (largest dimensions)
+          img.Image bestFrame = image;
+          if (image.frames.length > 1) {
+            for (final frame in image.frames) {
+              if (frame.width > bestFrame.width ||
+                  (frame.width == bestFrame.width &&
+                      frame.height > bestFrame.height)) {
+                bestFrame = frame;
+              }
+            }
+          }
+
+          final pngBytes = img.encodePng(bestFrame);
           await pngOutFile.writeAsBytes(pngBytes);
           converted++;
           createdStems.add(stem);
