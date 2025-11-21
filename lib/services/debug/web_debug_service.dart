@@ -143,7 +143,6 @@ class WebDebugService {
       final profile = await adapter.fetchMemberProfile();
       final categories = await adapter.getSearchCategories();
       final search = await adapter.searchTorrents(
-        keyword: 'a',
         pageNumber: 1,
         pageSize: 5,
       );

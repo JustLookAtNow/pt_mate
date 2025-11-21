@@ -1,0 +1,23 @@
+{
+  "id": "rousi",
+  "name": "肉丝",
+  "isShow": true,
+  "baseUrls": [
+    "https://rousi.zip/"
+  ],
+  "primaryUrl": "https://rousi.zip/",
+  "siteType": "NexusPHP",
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": false,
+    "downloadHistory": false,
+    "categorySearch": true,
+    "advancedSearch": true
+  },
+  "discountMapping": {},
+  "logo": "assets/sites_icon/rousi.png"
+}
