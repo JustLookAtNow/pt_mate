@@ -93,7 +93,9 @@ class BackupService {
     final packageInfo = await PackageInfo.fromPlatform();
     
     // 收集站点配置
-    final siteConfigs = await _storageService.loadSiteConfigs();
+    final siteConfigs = await _storageService.loadSiteConfigs(
+      includeApiKeys: true,
+    );
     data['siteConfigs'] = siteConfigs.map((config) => config.toJson()).toList();
     
     // 收集当前激活的站点ID
