@@ -172,8 +172,19 @@ class WebDebugService {
           )
           .toList();
 
+      final profileJson = profile.toJson();
+      profileJson.remove('uploadedBytes');
+      profileJson.remove('downloadedBytes');
+      profileJson.remove('lastAccess');
+      if (profileJson['passKey'] != null) {
+        final pk = profileJson['passKey'].toString();
+        if (pk.length > 6) {
+          profileJson['passKey'] = pk.substring(pk.length - 6);
+        }
+      }
+
       _sendJson(req, {
-        'profile': profile.toJson(),
+        'profile': profileJson,
         'categories': categories
             .map((c) => {'id': c.id, 'name': c.displayName})
             .toList(),
