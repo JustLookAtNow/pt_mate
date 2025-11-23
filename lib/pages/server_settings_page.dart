@@ -5,6 +5,7 @@ import 'dart:math';
 import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
 import '../services/api/api_service.dart';
+import '../utils/screen_utils.dart';
 import '../services/site_config_service.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/nexusphp_web_login.dart';
@@ -794,7 +795,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                 }
                               },
                               icon: const Icon(Icons.check),
-                              label: const Text('完成排序'),
+                              label: const Text('完成'),
                             ),
                             const SizedBox(width: 8),
                             TextButton.icon(
@@ -821,24 +822,52 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                             ),
                           ],
                         )
-                      else
-                        FilledButton.tonalIcon(
-                          onPressed: () {
-                            setState(() {
-                              _sitesBackup = List<SiteConfig>.from(_sites);
-                              _reorderMode = true;
-                            });
-                          },
-                          icon: const Icon(Icons.drag_indicator),
-                          label: const Text('排序'),
+                      else ...[
+                        FilledButton.icon(
+                          onPressed: _addSite,
+                          icon: const Icon(Icons.add),
+                          label: const Text('新增'),
                         ),
-
-                      const SizedBox(width: 12),
-                      FilledButton.icon(
-                        onPressed: _healthChecking ? null : _runHealthCheck,
-                        icon: const Icon(Icons.refresh),
-                        label: Text(_healthChecking ? '刷新中…' : '刷新'),
-                      ),
+                        const SizedBox(width: 12),
+                        FilledButton.icon(
+                          onPressed: _healthChecking ? null : _runHealthCheck,
+                          icon: const Icon(Icons.refresh),
+                          label: Text(_healthChecking ? '刷新中…' : '刷新'),
+                        ),
+                        const SizedBox(width: 12),
+                        Builder(
+                          builder: (context) {
+                            final isLarge = ScreenUtils.isLargeScreen(context);
+                            if (isLarge) {
+                              return FilledButton.tonalIcon(
+                                onPressed: () {
+                                  setState(() {
+                                    _sitesBackup = List<SiteConfig>.from(
+                                      _sites,
+                                    );
+                                    _reorderMode = true;
+                                  });
+                                },
+                                icon: const Icon(Icons.drag_indicator),
+                                label: const Text('排序'),
+                              );
+                            } else {
+                              return IconButton.filledTonal(
+                                onPressed: () {
+                                  setState(() {
+                                    _sitesBackup = List<SiteConfig>.from(
+                                      _sites,
+                                    );
+                                    _reorderMode = true;
+                                  });
+                                },
+                                icon: const Icon(Icons.drag_indicator),
+                                tooltip: '排序',
+                              );
+                            }
+                          },
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -995,10 +1024,11 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                     //       ),
                                     //     ),
                                     //   ),
-                                    LayoutBuilder(
-                                      builder: (context, constraints) {
+                                    // LayoutBuilder removed to use global ScreenUtils
+                                    Builder(
+                                      builder: (context) {
                                         final isLarge =
-                                            constraints.maxWidth > 768;
+                                            ScreenUtils.isLargeScreen(context);
                                         return InkWell(
                                           onTap: isActive
                                               ? null
@@ -1457,11 +1487,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                   ),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addSite,
-        child: const Icon(Icons.add),
-      ),
-      floatingActionButtonLocation: const _CustomFloatingActionButtonLocation(),
+
     );
   }
 }
@@ -3141,29 +3167,7 @@ class _ProfileView extends StatelessWidget {
   }
 }
 
-/// 自定义FloatingActionButton位置，远离底边1.5cm，远离右边1cm
-class _CustomFloatingActionButtonLocation extends FloatingActionButtonLocation {
-  const _CustomFloatingActionButtonLocation();
 
-  @override
-  Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
-    // 1.5cm ≈ 57像素，1cm ≈ 38像素
-    const double bottomMargin = 80.0; // 1.5cm
-    const double rightMargin = 50.0; // 1cm
-
-    // 计算FloatingActionButton的位置
-    final double fabX =
-        scaffoldGeometry.scaffoldSize.width -
-        scaffoldGeometry.floatingActionButtonSize.width -
-        rightMargin;
-    final double fabY =
-        scaffoldGeometry.scaffoldSize.height -
-        scaffoldGeometry.floatingActionButtonSize.height -
-        bottomMargin;
-
-    return Offset(fabX, fabY);
-  }
-}
 
 class _SiteColorPickerDialog extends StatefulWidget {
   final Color initialColor;

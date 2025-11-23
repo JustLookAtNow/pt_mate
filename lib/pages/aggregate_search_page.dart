@@ -155,14 +155,14 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           body: provider.loading
               ? const Center(child: CircularProgressIndicator())
               : Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(4.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // 搜索区域
                       Card(
                         child: Padding(
-                          padding: const EdgeInsets.all(8.0),
+                          padding: const EdgeInsets.all(2.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -171,7 +171,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                 children: [
                                   // 搜索策略选择
                                   Expanded(
-                                    flex: 2,
+                                    flex: 1,
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 8,
@@ -184,7 +184,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                               .primary
                                               .withValues(alpha: 0.3),
                                         ),
-                                        borderRadius: BorderRadius.circular(4),
+                                        borderRadius: BorderRadius.circular(25),
                                       ),
                                       child: DropdownButton<String>(
                                         value: provider.selectedStrategy.isEmpty
@@ -193,6 +193,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                         hint: const Text('选择搜索策略'),
                                         isExpanded: true,
                                         underline: const SizedBox(),
+                                        icon: const SizedBox.shrink(),
                                         items: provider.searchConfigs.map((
                                           config,
                                         ) {
