@@ -374,13 +374,14 @@ class MTeamAdapter extends SiteAdapter {
         status['discountEndTime']?.toString();
     final toppingLevel = int.tryParse(status['toppingLevel']?.toString() ?? '');
     final toppingEndTime = status['toppingEndTime']?.toString();
-    if (toppingLevel != null && toppingLevel > 0) {
+    if (toppingLevel != null && toppingLevel == 1) {
       discount = "FREE";
+      discountEndTime = toppingEndTime;
     }
-    if ((discount ?? '').toUpperCase() == 'FREE') {
-      discountEndTime =
-          Formatters.laterDateTime(discountEndTime, toppingEndTime) ?? '';
-    }
+    // if ((discount ?? '').toUpperCase() == 'FREE') {
+    //   discountEndTime =
+    //       Formatters.laterDateTime(discountEndTime, toppingEndTime) ?? '';
+    // }
 
     return TorrentItem(
       id: (json['id'] ?? '').toString(),
