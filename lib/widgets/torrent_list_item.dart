@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import '../utils/format.dart';
 import 'cached_network_image.dart';
+import '../utils/screen_utils.dart';
 
 // 文件级日志实例
 final Logger _logger = Logger();
@@ -1074,7 +1075,7 @@ class _TagsViewState extends State<_TagsView> {
             Expanded(
               child: SizedBox(height: 16, child: ClipRect(child: _buildWrap())),
             ),
-            if (_overflow) ...[
+            if (_overflow && !ScreenUtils.isLargeScreen(context)) ...[
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: () {

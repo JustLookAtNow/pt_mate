@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app_drawer.dart';
+import '../utils/screen_utils.dart';
 
 class ResponsiveLayout extends StatelessWidget {
   final Widget body;
@@ -24,7 +25,7 @@ class ResponsiveLayout extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         // 判断是否为大屏设备（宽度大于 768px）
-        final isLargeScreen = constraints.maxWidth > 600;
+        final isLargeScreen = ScreenUtils.isLargeScreen(context);
         
         if (isLargeScreen) {
           // 大屏设备：使用固定侧边栏布局
