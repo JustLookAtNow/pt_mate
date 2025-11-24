@@ -159,7 +159,7 @@ jobs:
           flutter-version: '3.38.2'
           channel: 'stable'
           cache: true
-          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+          cache-key: 'flutter-:os:-:channel:-:version:-:arch:'
           cache-path: '${{ runner.tool_cache }}/flutter'
 
       - name: Flutter precache (macOS)
