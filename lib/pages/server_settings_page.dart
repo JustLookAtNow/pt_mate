@@ -906,6 +906,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                   Expanded(
                     child: _reorderMode
                         ? ReorderableListView.builder(
+                            buildDefaultDragHandles: false,
                             padding: const EdgeInsets.all(16),
                             itemCount: _sites.length,
                             onReorder: (oldIndex, newIndex) {
@@ -949,6 +950,10 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                       site.baseUrl,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
+                                    ),
+                                    trailing: ReorderableDragStartListener(
+                                      index: index,
+                                      child: const Icon(Icons.drag_handle),
                                     ),
                                   ),
                                 ),
