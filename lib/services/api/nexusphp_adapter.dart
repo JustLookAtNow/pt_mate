@@ -259,10 +259,19 @@ class NexusPHPAdapter implements SiteAdapter {
     }
 
 
+
+    final name = item['name'] as String;
+    final smallDescr = item['small_descr'] as String? ?? '';
+
+    // 计算标签并清理描述
+    final descrRef = TextRef('$name#@$smallDescr');
+    final tags = TagType.matchTags(descrRef);
+
+
     return TorrentItem(
       id: (item['id'] as int).toString(),
-      name: item['name'] as String,
-      smallDescr: item['small_descr'] as String? ?? '',
+      name: name,
+      smallDescr: smallDescr,
       discount: _parseDiscountType(discountText),
       discountEndTime: null, // 暂时没有
       downloadUrl: item['download_url'] as String?,
@@ -275,6 +284,7 @@ class NexusPHPAdapter implements SiteAdapter {
       cover: item['cover'] as String? ?? '',
       createdDate: item['added'] != null ? item['added'] + ':00' : '',
       isTop: item['pos_state'] != 'normal',
+      tags: tags,
     );
   }
 

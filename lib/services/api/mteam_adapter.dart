@@ -290,6 +290,7 @@ class MTeamAdapter extends SiteAdapter {
             doubanRating: item.doubanRating,
             imdbRating: item.imdbRating,
             isTop: item.isTop,
+            tags: item.tags,
           );
         }).toList();
 
@@ -383,10 +384,33 @@ class MTeamAdapter extends SiteAdapter {
     //       Formatters.laterDateTime(discountEndTime, toppingEndTime) ?? '';
     // }
 
+    final name = (json['name'] ?? '').toString();
+    final smallDescr = (json['smallDescr'] ?? '').toString();
+
+    // 1. 从 name 中提取标签
+    final nameRef = TextRef(name);
+    final nameTags = TagType.matchTags(nameRef);
+
+    // 2. 从 labelsNew 中提取标签
+    final List<TagType> labelTags = [];
+    final labelsNew = json['labelsNew'];
+    if (labelsNew is List) {
+      for (var label in labelsNew) {
+        final labelStr = label.toString();
+        // 使用 matchTags 来匹配标签，因为它包含了正则逻辑
+        final labelRef = TextRef(labelStr);
+        final matches = TagType.matchTags(labelRef);
+        labelTags.addAll(matches);
+      }
+    }
+
+    // 合并去重
+    final tags = {...nameTags, ...labelTags}.toList();
+
     return TorrentItem(
       id: (json['id'] ?? '').toString(),
-      name: (json['name'] ?? '').toString(),
-      smallDescr: (json['smallDescr'] ?? '').toString(),
+      name: name,
+      smallDescr: smallDescr, // 使用原始描述
       discount: _parseDiscountType(discount),
       discountEndTime: discountEndTime,
       downloadUrl: null,
@@ -401,6 +425,7 @@ class MTeamAdapter extends SiteAdapter {
       doubanRating: (json['doubanRating'] ?? 'N/A').toString(),
       imdbRating: (json['imdbRating'] ?? 'N/A').toString(),
       isTop: (toppingLevel ?? 0) > 0,
+      tags: tags,
     );
   }
 

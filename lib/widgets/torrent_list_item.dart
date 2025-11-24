@@ -85,8 +85,11 @@ class TorrentListItem extends StatelessWidget {
     final showCover = currentSite?.features.showCover ?? true;
 
     // 统一计算标签与清理后的描述，避免重复调用
-    final descrRef = TextRef('${torrent.name}#@${torrent.smallDescr}');
-    final tags = TagType.matchTags(descrRef);
+
+    // final tags = TagType.matchTags(descrRef);
+    // 这里的tags已经在adapter中计算好了，直接使用
+    final tags = torrent.tags;
+
     final hasDouban = _hasRatingValue(torrent.doubanRating);
     final hasImdb = _hasRatingValue(torrent.imdbRating);
     final hasAnyRating = hasDouban || hasImdb;
@@ -488,7 +491,7 @@ class TorrentListItem extends StatelessWidget {
                           const SizedBox(height: 4),
                           // 种子描述（使用清理后的描述）
                           Text(
-                            descrRef.value,
+                            torrent.smallDescr,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodyMedium

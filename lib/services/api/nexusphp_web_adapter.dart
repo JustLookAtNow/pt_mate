@@ -1066,16 +1066,21 @@ class NexusPHPWebAdapter extends SiteAdapter {
           }
 
           // 清理文本字段
-          final cleanedDescription = description
+          var finalSmallDescr = description
               .replaceAll(torrentName, '')
               .replaceAll(RegExp(r'\(*(剩余时间|剩餘時間)：\s*\d+.*?\d+[分钟|时|天]\)*'), '')
               .trim();
+
+          // 计算标签并清理描述
+          final descrRef = TextRef('$torrentName#@$finalSmallDescr');
+          final tags = TagType.matchTags(descrRef);
+          finalSmallDescr = descrRef.value;
 
           torrents.add(
             TorrentItem(
               id: torrentId,
               name: torrentName,
-              smallDescr: cleanedDescription,
+              smallDescr: finalSmallDescr,
               discount: _parseDiscountType(
                 discount.isNotEmpty ? discount : null,
               ),
@@ -1094,6 +1099,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
               doubanRating: doubanRating.isNotEmpty ? doubanRating : 'N/A',
               imdbRating: imdbRating.isNotEmpty ? imdbRating : 'N/A',
               isTop: isTop,
+              tags: tags,
             ),
           );
         } catch (e) {

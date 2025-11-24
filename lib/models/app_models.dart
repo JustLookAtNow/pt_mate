@@ -134,6 +134,7 @@ class TorrentItem {
   final String? doubanRating; // 豆瓣评分
   final String? imdbRating; // IMDB评分
   final bool isTop; // 是否置顶（M-Team：toppingLevel>0）
+  final List<TagType> tags; // 种子标签
 
   TorrentItem({
     required this.id,
@@ -153,6 +154,7 @@ class TorrentItem {
     this.doubanRating = 'N/A',
     this.imdbRating = 'N/A',
     this.isTop = false,
+    this.tags = const [],
   });
 
   TorrentItem copyWith({
@@ -171,6 +173,7 @@ class TorrentItem {
     bool? collection,
     String? createdDate,
     bool? isTop,
+    List<TagType>? tags,
   }) {
     return TorrentItem(
       id: id ?? this.id,
@@ -188,6 +191,7 @@ class TorrentItem {
       collection: collection ?? this.collection,
       createdDate: createdDate ?? this.createdDate,
       isTop: isTop ?? this.isTop,
+      tags: tags ?? this.tags,
     );
   }
 }
