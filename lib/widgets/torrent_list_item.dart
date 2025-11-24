@@ -268,7 +268,7 @@ class TorrentListItem extends StatelessWidget {
                           ),
                         ),
                         // 评分模块（仅移动端左列显示；桌面端在右侧标签后显示）
-                        const SizedBox(height: 8),
+                        // const SizedBox(height: 8),
                         if (isMobile)
                           Container(
                             width: 70,
@@ -342,7 +342,7 @@ class TorrentListItem extends StatelessWidget {
                               (!isMobile && hasAnyRating) ||
                               (isMobile && !showCover && hasAnyRating))
                             Padding(
-                              padding: const EdgeInsets.only(bottom: 4),
+                              padding: const EdgeInsets.only(bottom: 2),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
@@ -516,8 +516,8 @@ class TorrentListItem extends StatelessWidget {
                               if (torrent.discount != DiscountType.normal)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
+                                    horizontal: 4,
+                                    vertical: 1,
                                   ),
                                   decoration: BoxDecoration(
                                     color: _discountColor(torrent.discount),
@@ -1051,7 +1051,7 @@ class _TagsViewState extends State<_TagsView> {
             child: _MeasureSize(
               onChange: (s) {
                 if (!_expanded) {
-                  final overflow = s.height > 16.0 + 0.1;
+                  final overflow = s.height > 18.0 + 0.1;
                   if (overflow != _overflow) {
                     if (mounted) {
                       setState(() {
@@ -1073,7 +1073,7 @@ class _TagsViewState extends State<_TagsView> {
         return Row(
           children: [
             Expanded(
-              child: SizedBox(height: 16, child: ClipRect(child: _buildWrap())),
+              child: SizedBox(height: 18, child: ClipRect(child: _buildWrap())),
             ),
             if (_overflow && !ScreenUtils.isLargeScreen(context)) ...[
               const SizedBox(width: 8),
