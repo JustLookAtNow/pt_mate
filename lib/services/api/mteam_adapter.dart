@@ -244,70 +244,29 @@ class MTeamAdapter extends SiteAdapter {
       );
     }
 
-    final searchResult = _parseTorrentSearchResult(
-      data['data'] as Map<String, dynamic>,
-    );
+    final searchData = data['data'] as Map<String, dynamic>;
+    final rawList = (searchData['data'] as List? ?? []);
+
+    Map<String, dynamic> historyMap = {};
+    Map<String, dynamic> peerMap = {};
 
     // Query download history for all torrent IDs
-    if (searchResult.items.isNotEmpty) {
+    if (rawList.isNotEmpty) {
       try {
-        final tids = searchResult.items.map((item) => item.id).toList();
+        final tids = rawList.map((e) => (e['id'] ?? '').toString()).toList();
         final historyData = await queryHistory(tids: tids);
-        final historyMap =
-            historyData['historyMap'] as Map<String, dynamic>? ?? {};
-        final peerMap = historyData['peerMap'] as Map<String, dynamic>? ?? {};
-
-        // Update items with download status
-        final updatedItems = searchResult.items.map((item) {
-          DownloadStatus status = DownloadStatus.none;
-          if (historyMap.containsKey(item.id)) {
-            final history = historyMap[item.id] as Map<String, dynamic>;
-            final timesCompleted =
-                int.tryParse(history['timesCompleted']?.toString() ?? '0') ?? 0;
-            if (timesCompleted > 0) {
-              status = DownloadStatus.completed;
-            } else if (peerMap.containsKey(item.id)) {
-              status = DownloadStatus.downloading;
-            } else {
-              status = DownloadStatus.none;
-            }
-          }
-          return TorrentItem(
-            id: item.id,
-            name: item.name,
-            smallDescr: item.smallDescr,
-            discount: item.discount,
-            discountEndTime: item.discountEndTime,
-            downloadUrl: item.downloadUrl,
-            seeders: item.seeders,
-            leechers: item.leechers,
-            sizeBytes: item.sizeBytes,
-            imageList: item.imageList,
-            cover: item.imageList.isNotEmpty ? item.imageList.first : '',
-            downloadStatus: status,
-            collection: item.collection,
-            createdDate: item.createdDate,
-            doubanRating: item.doubanRating,
-            imdbRating: item.imdbRating,
-            isTop: item.isTop,
-            tags: item.tags,
-          );
-        }).toList();
-
-        return TorrentSearchResult(
-          pageNumber: searchResult.pageNumber,
-          pageSize: searchResult.pageSize,
-          total: searchResult.total,
-          totalPages: searchResult.totalPages,
-          items: updatedItems,
-        );
+        historyMap = historyData['historyMap'] as Map<String, dynamic>? ?? {};
+        peerMap = historyData['peerMap'] as Map<String, dynamic>? ?? {};
       } catch (e) {
-        // If history query fails, return original result without download status
-        return searchResult;
+        // If history query fails, continue with empty history
       }
     }
 
-    return searchResult;
+    return _parseTorrentSearchResult(
+      searchData,
+      historyMap: historyMap,
+      peerMap: peerMap,
+    );
   }
 
   @override
@@ -338,7 +297,11 @@ class MTeamAdapter extends SiteAdapter {
   }
 
   /// 解析 M-Team 站点的种子搜索结果数据
-  TorrentSearchResult _parseTorrentSearchResult(Map<String, dynamic> json) {
+  TorrentSearchResult _parseTorrentSearchResult(
+    Map<String, dynamic> json, {
+    Map<String, dynamic>? historyMap,
+    Map<String, dynamic>? peerMap,
+  }) {
     int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
     final list = (json['data'] as List? ?? const []).cast<dynamic>();
     return TorrentSearchResult(
@@ -347,7 +310,13 @@ class MTeamAdapter extends SiteAdapter {
       total: parseInt(json['total']),
       totalPages: parseInt(json['totalPages']),
       items: list
-          .map((e) => _parseTorrentItem(e as Map<String, dynamic>))
+          .map(
+            (e) => _parseTorrentItem(
+              e as Map<String, dynamic>,
+              historyMap: historyMap,
+              peerMap: peerMap,
+            ),
+          )
           .toList(),
     );
   }
@@ -355,7 +324,8 @@ class MTeamAdapter extends SiteAdapter {
   /// 解析 M-Team 站点的种子项目数据
   TorrentItem _parseTorrentItem(
     Map<String, dynamic> json, {
-    DownloadStatus? downloadStatus,
+    Map<String, dynamic>? historyMap,
+    Map<String, dynamic>? peerMap,
   }) {
     int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
     bool parseBool(dynamic v) =>
@@ -407,8 +377,21 @@ class MTeamAdapter extends SiteAdapter {
     // 合并去重
     final tags = {...nameTags, ...labelTags}.toList();
 
+    final id = (json['id'] ?? '').toString();
+    DownloadStatus downloadStatus = DownloadStatus.none;
+    if (historyMap != null && historyMap.containsKey(id)) {
+      final history = historyMap[id] as Map<String, dynamic>;
+      final timesCompleted =
+          int.tryParse(history['timesCompleted']?.toString() ?? '0') ?? 0;
+      if (timesCompleted > 0) {
+        downloadStatus = DownloadStatus.completed;
+      } else if (peerMap != null && peerMap.containsKey(id)) {
+        downloadStatus = DownloadStatus.downloading;
+      }
+    }
+
     return TorrentItem(
-      id: (json['id'] ?? '').toString(),
+      id: id,
       name: name,
       smallDescr: smallDescr, // 使用原始描述
       discount: _parseDiscountType(discount),
@@ -419,7 +402,7 @@ class MTeamAdapter extends SiteAdapter {
       sizeBytes: parseInt(json['size']),
       imageList: imgs,
       cover: imgs.isNotEmpty ? imgs.first : '',
-      downloadStatus: downloadStatus ?? DownloadStatus.none,
+      downloadStatus: downloadStatus,
       collection: parseBool(json['collection']),
       createdDate: json['createdDate'] ?? '',
       doubanRating: (json['doubanRating'] ?? 'N/A').toString(),
