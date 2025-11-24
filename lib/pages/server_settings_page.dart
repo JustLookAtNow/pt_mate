@@ -83,6 +83,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   String? _activeSiteId;
   bool _loading = true;
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   bool _healthChecking = false;
   Map<String, _HealthStatus> _healthStatuses = {}; // siteId -> status
@@ -128,11 +129,18 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   void initState() {
     super.initState();
     _loadSites();
+    _searchFocusNode.addListener(_onSearchFocusChange);
+  }
+
+  void _onSearchFocusChange() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.removeListener(_onSearchFocusChange);
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -675,824 +683,570 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     }
   }
 
+  Widget _buildEmptyState() {
+    return Expanded(
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.dns_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '暂无站点配置',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '点击右下角按钮添加第一个服务器',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSiteList() {
+    return Expanded(
+      child: _reorderMode
+          ? ReorderableListView.builder(
+              buildDefaultDragHandles: false,
+              padding: const EdgeInsets.all(16),
+              itemCount: _sites.length,
+              onReorder: (oldIndex, newIndex) {
+                setState(() {
+                  if (newIndex > oldIndex) newIndex -= 1;
+                  final item = _sites.removeAt(oldIndex);
+                  _sites.insert(newIndex, item);
+                });
+              },
+              itemBuilder: (context, index) => _buildSiteItem(index),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _filteredSites.length,
+              itemBuilder: (context, index) {
+                final site = _filteredSites[index];
+                final isActive = site.id == _activeSiteId;
+                return _buildSiteCard(site, isActive);
+              },
+            ),
+    );
+  }
+
+  Widget _buildSiteItem(int index) {
+    final site = _sites[index];
+    final isActive = site.id == _activeSiteId;
+    final Color? siteColor = site.siteColor != null
+        ? Color(site.siteColor!)
+        : null;
+    return Container(
+      key: ValueKey('site_${site.id}'),
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: isActive
+            ? Theme.of(
+                context,
+              ).colorScheme.primaryContainer.withValues(alpha: 0.3)
+            : Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          side: BorderSide(
+            color: siteColor ?? Theme.of(context).colorScheme.outline,
+            width: 2.0,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ListTile(
+          title: Text(site.name, overflow: TextOverflow.ellipsis),
+          subtitle: Text(
+            site.baseUrl,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: ReorderableDragStartListener(
+            index: index,
+            child: const Icon(Icons.drag_handle),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSiteCard(SiteConfig site, bool isActive) {
+    final Color? siteColor = site.siteColor != null
+        ? Color(site.siteColor!)
+        : null;
+    final hs = _healthStatuses[site.id];
+
+    return Card(
+      elevation: 2,
+      shadowColor: (siteColor ?? Theme.of(context).colorScheme.outline)
+          .withValues(alpha: 0.4),
+      shape: RoundedRectangleBorder(
+        side: BorderSide(
+          color: siteColor ?? Theme.of(context).colorScheme.outline,
+          width: 2.0,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      margin: const EdgeInsets.only(bottom: 8),
+      color: isActive
+          ? Theme.of(
+              context,
+            ).colorScheme.primaryContainer.withValues(alpha: 0.3)
+          : null,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Builder(
+            builder: (context) {
+              final isLarge = ScreenUtils.isLargeScreen(context);
+              return InkWell(
+                onTap: isActive ? null : () => _setActiveSite(site.id),
+                onLongPress: isLarge
+                    ? null
+                    : () => _showSiteMenu(site, isActive),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: isActive
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(
+                                          context,
+                                        ).colorScheme.surfaceContainerHighest,
+                                  child: FutureBuilder<String>(
+                                    future: _resolveLogoPath(site),
+                                    builder: (context, snapshot) {
+                                      final Color fgColor = isActive
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.onPrimary
+                                          : Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant;
+                                      if (snapshot.connectionState !=
+                                              ConnectionState.done ||
+                                          (snapshot.data == null ||
+                                              snapshot.data!.isEmpty)) {
+                                        return Icon(
+                                          Icons.dns,
+                                          size: 24,
+                                          color: fgColor,
+                                        );
+                                      }
+
+                                      final String path = snapshot.data!;
+                                      return ClipOval(
+                                        child: Image.asset(
+                                          path,
+                                          width: 24,
+                                          height: 24,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                                return Image.asset(
+                                                  'assets/sites_icon/_default_nexusphp.png',
+                                                  width: 24,
+                                                  height: 24,
+                                                  fit: BoxFit.cover,
+                                                );
+                                              },
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.start,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          site.name,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  hs?.username ?? '',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                      ),
+                                ),
+                                if (hs != null)
+                                  Text(
+                                    '(${Formatters.formatTorrentCreatedDate(hs.updatedAt.toIso8601String())})',
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            if (hs != null) _buildHealthStatus(site, hs),
+                          ],
+                        ),
+                      ),
+                      if (isLarge) _buildSiteMenuButton(site, isActive),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHealthStatus(SiteConfig site, _HealthStatus hs) {
+    return Builder(
+      builder: (context) {
+        if (hs.ok && hs.profile != null) {
+          final p = hs.profile!;
+          Widget buildItem(IconData icon, Color color, String label) {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 14, color: color),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(height: 1.0),
+                  ),
+                ),
+              ],
+            );
+          }
+
+          final items = <Widget>[
+            buildItem(
+              Icons.stars,
+              Theme.of(context).colorScheme.primary,
+              '${Formatters.bonus(p.bonus)}${p.bonusPerHour != null ? '(${ScreenUtils.isLargeScreen(context) ? p.bonusPerHour! : p.bonusPerHour!.toInt()})' : ''}',
+            ),
+            buildItem(Icons.upload, Colors.green, p.uploadedBytesString),
+            buildItem(Icons.download, Colors.red, p.downloadedBytesString),
+            buildItem(
+              Icons.trending_up,
+              Theme.of(context).colorScheme.primary,
+              p.shareRate.toStringAsFixed(2),
+            ),
+            if (p.seedingSizeBytes != null)
+              buildItem(
+                Icons.cloud_upload,
+                Theme.of(context).colorScheme.primary,
+                Formatters.dataFromBytes(p.seedingSizeBytes!),
+              ),
+            if (p.lastAccess != null)
+              buildItem(
+                Icons.schedule,
+                Theme.of(context).colorScheme.primary,
+                p.lastAccess?.substring(0, 10) ?? '',
+              ),
+          ];
+
+          final isLarge = ScreenUtils.isLargeScreen(context);
+          if (isLarge) {
+            return Row(
+              children: [
+                for (int i = 0; i < items.length; i++) ...[
+                  items[i],
+                  if (i != items.length - 1)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Text(
+                        '•',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                ],
+              ],
+            );
+          } else {
+            return GridView.count(
+              crossAxisCount: 3,
+              crossAxisSpacing: 6,
+              mainAxisSpacing: 6,
+              childAspectRatio: 8.0,
+              padding: EdgeInsets.zero,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              children: items,
+            );
+          }
+        } else {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.error_outline,
+                  size: 18,
+                  color: Colors.red,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () {
+                  final msg = hs.message ?? '异常';
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.errorContainer,
+                      content: Text(
+                        msg,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '请求失败，请检查站点状态，点击感叹号查看详情',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              onChanged: (val) {
+                setState(() {
+                  _searchQuery = val;
+                });
+              },
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search, size: 20),
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 36,
+                  minHeight: 36,
+                ),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(25)),
+                  borderSide: BorderSide(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.3),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (_reorderMode)
+            Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    final theme = Theme.of(context);
+                    try {
+                      await StorageService.instance.saveSiteConfigs(
+                        _sites.map((c) => c.copyWith(apiKey: null)).toList(),
+                      );
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '已保存自定义排序',
+                            style: TextStyle(
+                              color: theme.colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                          backgroundColor: theme.colorScheme.primaryContainer,
+                          behavior: SnackBarBehavior.fixed,
+                        ),
+                      );
+                    } catch (e) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '保存失败: $e',
+                            style: TextStyle(
+                              color: theme.colorScheme.onErrorContainer,
+                            ),
+                          ),
+                          backgroundColor: theme.colorScheme.errorContainer,
+                          behavior: SnackBarBehavior.fixed,
+                        ),
+                      );
+                    } finally {
+                      if (mounted) {
+                        setState(() {
+                          _reorderMode = false;
+                          _sitesBackup = [];
+                        });
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.check),
+                  label: const Text('完成'),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () {
+                    if (!mounted) return;
+                    setState(() {
+                      if (_sitesBackup.isNotEmpty) {
+                        _sites = List<SiteConfig>.from(_sitesBackup);
+                      }
+                      _reorderMode = false;
+                      _sitesBackup = [];
+                    });
+                  },
+                  icon: const Icon(Icons.close),
+                  label: const Text('取消'),
+                  style: TextButton.styleFrom(
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.outline,
+                      width: 1.0,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else if (ScreenUtils.isLargeScreen(context) ||
+              !_searchFocusNode.hasFocus) ...[
+            FilledButton.icon(
+              onPressed: _addSite,
+              icon: const Icon(Icons.add),
+              label: const Text('新增'),
+            ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              onPressed: _healthChecking ? null : _runHealthCheck,
+              icon: const Icon(Icons.refresh),
+              label: Text(_healthChecking ? '刷新中…' : '刷新'),
+            ),
+            const SizedBox(width: 12),
+            Builder(
+              builder: (context) {
+                final isLarge = ScreenUtils.isLargeScreen(context);
+                if (isLarge) {
+                  return FilledButton.tonalIcon(
+                    onPressed: () {
+                      setState(() {
+                        _sitesBackup = List<SiteConfig>.from(_sites);
+                        _reorderMode = true;
+                      });
+                    },
+                    icon: const Icon(Icons.drag_indicator),
+                    label: const Text('排序'),
+                  );
+                } else {
+                  return IconButton.filledTonal(
+                    onPressed: () {
+                      setState(() {
+                        _sitesBackup = List<SiteConfig>.from(_sites);
+                        _reorderMode = true;
+                      });
+                    },
+                    icon: const Icon(Icons.drag_indicator),
+                    tooltip: '排序',
+                  );
+                }
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    return AppBar(
+      title: const Text('站点配置'),
+      actions: const [QbSpeedIndicator()],
+      backgroundColor: Theme.of(context).brightness == Brightness.light
+          ? Theme.of(context).colorScheme.primary
+          : Theme.of(context).colorScheme.surface,
+      iconTheme: IconThemeData(
+        color: Theme.of(context).brightness == Brightness.light
+            ? Theme.of(context).colorScheme.onPrimary
+            : Theme.of(context).colorScheme.onSurface,
+      ),
+      titleTextStyle: TextStyle(
+        color: Theme.of(context).brightness == Brightness.light
+            ? Theme.of(context).colorScheme.onPrimary
+            : Theme.of(context).colorScheme.onSurface,
+        fontSize: 20,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ResponsiveLayout(
       currentRoute: '/server_settings',
-      appBar: AppBar(
-        title: const Text('站点配置'),
-        actions: const [QbSpeedIndicator()],
-        backgroundColor: Theme.of(context).brightness == Brightness.light
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.surface,
-        iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.light
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
-        ),
-        titleTextStyle: TextStyle(
-          color: Theme.of(context).brightness == Brightness.light
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
-          fontSize: 20,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
+      appBar: _buildAppBar(context),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // 顶部工具栏：搜索框 + 健康检查按钮
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (val) {
-                            setState(() {
-                              _searchQuery = val;
-                            });
-                          },
-                          decoration: InputDecoration(
-                            prefixIcon: const Icon(Icons.search, size: 20),
-                            prefixIconConstraints: const BoxConstraints(
-                              minWidth: 36,
-                              minHeight: 36,
-                            ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(
-                                Radius.circular(25),
-                              ),
-                              borderSide: BorderSide(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.primary.withValues(alpha: 0.3),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // 排序下拉框已移除
-                      if (_reorderMode)
-                        Row(
-                          children: [
-                            FilledButton.icon(
-                              onPressed: () async {
-                                final messenger = ScaffoldMessenger.of(context);
-                                final theme = Theme.of(context);
-                                try {
-                                  await StorageService.instance.saveSiteConfigs(
-                                    _sites
-                                        .map((c) => c.copyWith(apiKey: null))
-                                        .toList(),
-                                  );
-                                  messenger.showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        '已保存自定义排序',
-                                        style: TextStyle(
-                                          color: theme
-                                              .colorScheme
-                                              .onPrimaryContainer,
-                                        ),
-                                      ),
-                                      backgroundColor:
-                                          theme.colorScheme.primaryContainer,
-                                      behavior: SnackBarBehavior.fixed,
-                                    ),
-                                  );
-                                } catch (e) {
-                                  messenger.showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        '保存失败: $e',
-                                        style: TextStyle(
-                                          color: theme
-                                              .colorScheme
-                                              .onErrorContainer,
-                                        ),
-                                      ),
-                                      backgroundColor:
-                                          theme.colorScheme.errorContainer,
-                                      behavior: SnackBarBehavior.fixed,
-                                    ),
-                                  );
-                                } finally {
-                                  if (mounted) {
-                                    setState(() {
-                                      _reorderMode = false;
-                                      _sitesBackup = [];
-                                    });
-                                  }
-                                }
-                              },
-                              icon: const Icon(Icons.check),
-                              label: const Text('完成'),
-                            ),
-                            const SizedBox(width: 8),
-                            TextButton.icon(
-                              onPressed: () {
-                                if (!mounted) return;
-                                setState(() {
-                                  if (_sitesBackup.isNotEmpty) {
-                                    _sites = List<SiteConfig>.from(
-                                      _sitesBackup,
-                                    );
-                                  }
-                                  _reorderMode = false;
-                                  _sitesBackup = [];
-                                });
-                              },
-                              icon: const Icon(Icons.close),
-                              label: const Text('取消'),
-                              style: TextButton.styleFrom(
-                                side: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline,
-                                  width: 1.0,
-                                ),
-                              ),
-                            ),
-                          ],
-                        )
-                      else ...[
-                        FilledButton.icon(
-                          onPressed: _addSite,
-                          icon: const Icon(Icons.add),
-                          label: const Text('新增'),
-                        ),
-                        const SizedBox(width: 12),
-                        FilledButton.icon(
-                          onPressed: _healthChecking ? null : _runHealthCheck,
-                          icon: const Icon(Icons.refresh),
-                          label: Text(_healthChecking ? '刷新中…' : '刷新'),
-                        ),
-                        const SizedBox(width: 12),
-                        Builder(
-                          builder: (context) {
-                            final isLarge = ScreenUtils.isLargeScreen(context);
-                            if (isLarge) {
-                              return FilledButton.tonalIcon(
-                                onPressed: () {
-                                  setState(() {
-                                    _sitesBackup = List<SiteConfig>.from(
-                                      _sites,
-                                    );
-                                    _reorderMode = true;
-                                  });
-                                },
-                                icon: const Icon(Icons.drag_indicator),
-                                label: const Text('排序'),
-                              );
-                            } else {
-                              return IconButton.filledTonal(
-                                onPressed: () {
-                                  setState(() {
-                                    _sitesBackup = List<SiteConfig>.from(
-                                      _sites,
-                                    );
-                                    _reorderMode = true;
-                                  });
-                                },
-                                icon: const Icon(Icons.drag_indicator),
-                                tooltip: '排序',
-                              );
-                            }
-                          },
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                if (_sites.isEmpty)
-                  Expanded(
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.dns_outlined,
-                            size: 64,
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            '暂无站点配置',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.outline,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '点击右下角按钮添加第一个服务器',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.outline,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  Expanded(
-                    child: _reorderMode
-                        ? ReorderableListView.builder(
-                            buildDefaultDragHandles: false,
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _sites.length,
-                            onReorder: (oldIndex, newIndex) {
-                              setState(() {
-                                if (newIndex > oldIndex) newIndex -= 1;
-                                final item = _sites.removeAt(oldIndex);
-                                _sites.insert(newIndex, item);
-                              });
-                            },
-                            itemBuilder: (context, index) {
-                              final site = _sites[index];
-                              final isActive = site.id == _activeSiteId;
-                              final Color? siteColor = site.siteColor != null
-                                  ? Color(site.siteColor!)
-                                  : null;
-                              return Container(
-                                key: ValueKey('site_${site.id}'),
-                                margin: const EdgeInsets.only(bottom: 8),
-                                child: Material(
-                                  color: isActive
-                                      ? Theme.of(context)
-                                            .colorScheme
-                                            .primaryContainer
-                                            .withValues(alpha: 0.3)
-                                      : Theme.of(context).colorScheme.surface,
-                                  shape: RoundedRectangleBorder(
-                                    side: BorderSide(
-                                      color:
-                                          siteColor ??
-                                          Theme.of(context).colorScheme.outline,
-                                      width: 2.0,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: ListTile(
-                                    title: Text(
-                                      site.name,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    subtitle: Text(
-                                      site.baseUrl,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    trailing: ReorderableDragStartListener(
-                                      index: index,
-                                      child: const Icon(Icons.drag_handle),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _filteredSites.length,
-                            itemBuilder: (context, index) {
-                              final site = _filteredSites[index];
-                              final isActive = site.id == _activeSiteId;
-                              final hs = _healthStatuses[site.id];
-
-                              final Color? siteColor = site.siteColor != null
-                                  ? Color(site.siteColor!)
-                                  : null;
-                              return Card(
-                                elevation: 2,
-                                shadowColor:
-                                    (siteColor ??
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.outline)
-                                        .withValues(alpha: 0.4),
-                                shape: RoundedRectangleBorder(
-                                  side: BorderSide(
-                                    color:
-                                        siteColor ??
-                                        Theme.of(context).colorScheme.outline,
-                                    width: 2.0,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                margin: const EdgeInsets.only(bottom: 8),
-                                color: isActive
-                                    ? Theme.of(context)
-                                          .colorScheme
-                                          .primaryContainer
-                                          .withValues(alpha: 0.3)
-                                    : null,
-
-                                child: Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    // 左上角类型角标已移除，改为站点名称后内联徽标
-                                    // 右上角当前激活角标
-                                    // if (isActive)
-                                    //   Positioned(
-                                    //     right: 0,
-                                    //     top: -3,
-                                    //     child: Container(
-                                    //       padding: const EdgeInsets.symmetric(
-                                    //         horizontal: 8,
-                                    //         vertical: 2,
-                                    //       ),
-                                    //       decoration: BoxDecoration(
-                                    //         color: Theme.of(
-                                    //           context,
-                                    //         ).colorScheme.secondary,
-                                    //         borderRadius: const BorderRadius.only(
-                                    //           bottomLeft: Radius.circular(6),
-                                    //         ),
-                                    //       ),
-                                    //       child: Text(
-                                    //         'active',
-                                    //         style: TextStyle(
-                                    //           fontSize: 11,
-                                    //           color: Theme.of(
-                                    //             context,
-                                    //           ).colorScheme.onSecondary,
-                                    //         ),
-                                    //       ),
-                                    //     ),
-                                    //   ),
-                                    // LayoutBuilder removed to use global ScreenUtils
-                                    Builder(
-                                      builder: (context) {
-                                        final isLarge =
-                                            ScreenUtils.isLargeScreen(context);
-                                        return InkWell(
-                                          onTap: isActive
-                                              ? null
-                                              : () => _setActiveSite(site.id),
-                                          onLongPress: isLarge
-                                              ? null
-                                              : () => _showSiteMenu(
-                                                  site,
-                                                  isActive,
-                                                ),
-                                          child: Padding(
-                                            padding: const EdgeInsets.fromLTRB(
-                                              12,
-                                              4,
-                                              12,
-                                              4,
-                                            ),
-                                            child: Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                // 左侧主显示区
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Row(
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .center,
-                                                        children: [
-                                                          CircleAvatar(
-                                                            radius: 14,
-                                                            backgroundColor:
-                                                                isActive
-                                                                ? Theme.of(
-                                                                        context,
-                                                                      )
-                                                                      .colorScheme
-                                                                      .primary
-                                                                : Theme.of(
-                                                                        context,
-                                                                      )
-                                                                      .colorScheme
-                                                                      .surfaceContainerHighest,
-                                                            child: FutureBuilder<String>(
-                                                              future:
-                                                                  _resolveLogoPath(
-                                                                    site,
-                                                                  ),
-                                                              builder: (context, snapshot) {
-                                                                final Color
-                                                                fgColor =
-                                                                    isActive
-                                                                    ? Theme.of(
-                                                                        context,
-                                                                      ).colorScheme.onPrimary
-                                                                    : Theme.of(
-                                                                        context,
-                                                                      ).colorScheme.onSurfaceVariant;
-                                                                if (snapshot.connectionState !=
-                                                                        ConnectionState
-                                                                            .done ||
-                                                                    (snapshot.data ==
-                                                                            null ||
-                                                                        snapshot
-                                                                            .data!
-                                                                            .isEmpty)) {
-                                                                  return Icon(
-                                                                    Icons.dns,
-                                                                    size: 24,
-                                                                    color:
-                                                                        fgColor,
-                                                                  );
-                                                                }
-
-                                                                final String
-                                                                path = snapshot
-                                                                    .data!;
-                                                                return ClipOval(
-                                                                  child: Image.asset(
-                                                                    path,
-                                                                    width: 24,
-                                                                    height: 24,
-                                                                    fit: BoxFit
-                                                                        .cover,
-                                                                    errorBuilder:
-                                                                        (
-                                                                          context,
-                                                                          error,
-                                                                          stackTrace,
-                                                                        ) {
-                                                                          return Image.asset(
-                                                                            'assets/sites_icon/_default_nexusphp.png',
-                                                                            width:
-                                                                                24,
-                                                                            height:
-                                                                                24,
-                                                                            fit:
-                                                                                BoxFit.cover,
-                                                                          );
-                                                                        },
-                                                                  ),
-                                                                );
-                                                              },
-                                                            ),
-                                                          ),
-                                                          const SizedBox(
-                                                            width: 8,
-                                                          ),
-                                                          Expanded(
-                                                            child: Row(
-                                                              mainAxisAlignment:
-                                                                  MainAxisAlignment
-                                                                      .start,
-                                                              children: [
-                                                                Flexible(
-                                                                  child: Text(
-                                                                    site.name,
-                                                                    overflow:
-                                                                        TextOverflow
-                                                                            .ellipsis,
-                                                                    style: const TextStyle(
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .bold,
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                                const SizedBox(
-                                                                  width: 8,
-                                                                ),
-                                                                // InkWell(
-                                                                //   onTap: () => _editSiteColor(site),
-                                                                //   child: Container(
-                                                                //     width: 18,
-                                                                //     height: 18,
-                                                                //     decoration: BoxDecoration(
-                                                                //       color: siteColor ?? Theme.of(context).colorScheme.primary,
-                                                                //       shape: BoxShape.circle,
-                                                                //       border: Border.all(
-                                                                //         color: Theme.of(context).colorScheme.outline,
-                                                                //         width: 1.0,
-                                                                //       ),
-                                                                //     ),
-                                                                //   ),
-                                                                // ),
-
-                                                                // Container(
-                                                                //   padding:
-                                                                //       const EdgeInsets.symmetric(
-                                                                //         horizontal: 6,
-                                                                //         vertical: 2,
-                                                                //       ),
-                                                                //   decoration: BoxDecoration(
-                                                                //     color:
-                                                                //         Theme.of(
-                                                                //               context,
-                                                                //             )
-                                                                //             .colorScheme
-                                                                //             .primary,
-                                                                //     borderRadius:
-                                                                //         BorderRadius.circular(
-                                                                //           6,
-                                                                //         ),
-                                                                //   ),
-                                                                //   child: Text(
-                                                                //     site
-                                                                //         .siteType
-                                                                //         .displayName,
-                                                                //     style: TextStyle(
-                                                                //       fontSize: 10,
-                                                                //       color: Theme.of(
-                                                                //         context,
-                                                                //       ).colorScheme.onPrimary,
-                                                                //     ),
-                                                                //   ),
-                                                                // ),
-                                                                // active 标签移至右上角角标
-                                                              ],
-                                                            ),
-                                                          ),
-                                                          Text(
-                                                            hs?.username ?? '',
-                                                            style: Theme.of(context)
-                                                                .textTheme
-                                                                .bodyMedium
-                                                                ?.copyWith(
-                                                                  color: Theme.of(
-                                                                    context,
-                                                                  ).colorScheme.primary,
-                                                                ),
-                                                          ),
-                                                          // SizedBox(width: 4),
-                                                          if (hs != null)
-                                                            Text(
-                                                              '(${Formatters.formatTorrentCreatedDate(hs.updatedAt.toIso8601String())})',
-                                                              style: Theme.of(context)
-                                                                  .textTheme
-                                                                  .bodySmall
-                                                                  ?.copyWith(
-                                                                    color: Theme.of(
-                                                                      context,
-                                                                    ).colorScheme.onSurfaceVariant,
-                                                                  ),
-                                                            ),
-                                                        ],
-                                                      ),
-                                                      const SizedBox(height: 6),
-                                                      // 健康检查信息：成功时显示 MemberProfile 信息；错误时显示错误
-                                                      if (hs != null)
-                                                        Builder(
-                                                          builder: (context) {
-                                                            if (hs.ok &&
-                                                                hs.profile !=
-                                                                    null) {
-                                                              final p =
-                                                                  hs.profile!;
-                                                              Widget buildItem(
-                                                                IconData icon,
-                                                                Color color,
-                                                                String label,
-                                                              ) {
-                                                                return Row(
-                                                                  mainAxisSize:
-                                                                      MainAxisSize
-                                                                          .min,
-                                                                  children: [
-                                                                    Icon(
-                                                                      icon,
-                                                                      size: 14,
-                                                                      color:
-                                                                          color,
-                                                                    ),
-                                                                    const SizedBox(
-                                                                      width: 4,
-                                                                    ),
-                                                                    Flexible(
-                                                                      child: Text(
-                                                                        label,
-                                                                        maxLines:
-                                                                            1,
-                                                                        softWrap:
-                                                                            false,
-                                                                        overflow:
-                                                                            TextOverflow.ellipsis,
-                                                                        style:
-                                                                            Theme.of(
-                                                                              context,
-                                                                            ).textTheme.bodySmall?.copyWith(
-                                                                              height: 1.0,
-                                                                            ),
-                                                                      ),
-                                                                    ),
-                                                                  ],
-                                                                );
-                                                              }
-
-                                                              final items = <Widget>[
-                                                                buildItem(
-                                                                  Icons.stars,
-                                                                  Theme.of(
-                                                                        context,
-                                                                      )
-                                                                      .colorScheme
-                                                                      .primary,
-                                                                  '${Formatters.bonus(p.bonus)}${p.bonusPerHour != null ? '(${p.bonusPerHour!})' : ''}',
-                                                                ),
-
-                                                                buildItem(
-                                                                  Icons.upload,
-                                                                  Colors.green,
-                                                                  p.uploadedBytesString,
-                                                                ),
-                                                                buildItem(
-                                                                  Icons
-                                                                      .download,
-                                                                  Colors.red,
-                                                                  p.downloadedBytesString,
-                                                                ),
-                                                                buildItem(
-                                                                  Icons
-                                                                      .trending_up,
-                                                                  Theme.of(
-                                                                        context,
-                                                                      )
-                                                                      .colorScheme
-                                                                      .primary,
-                                                                  p.shareRate
-                                                                      .toStringAsFixed(
-                                                                        2,
-                                                                      ),
-                                                                ),
-                                                                if (p.seedingSizeBytes !=
-                                                                    null)
-                                                                  buildItem(
-                                                                    Icons
-                                                                        .cloud_upload,
-                                                                    Theme.of(
-                                                                          context,
-                                                                        )
-                                                                        .colorScheme
-                                                                        .primary,
-                                                                    Formatters.dataFromBytes(
-                                                                      p.seedingSizeBytes!,
-                                                                    ),
-                                                                  ),
-                                                                if (p.lastAccess !=
-                                                                    null)
-                                                                  buildItem(
-                                                                    Icons
-                                                                        .schedule,
-                                                                    Theme.of(
-                                                                          context,
-                                                                        )
-                                                                        .colorScheme
-                                                                        .primary,
-                                                                    p.lastAccess
-                                                                            ?.substring(
-                                                                              0,
-                                                                              10,
-                                                                            ) ??
-                                                                        '',
-                                                                  ),
-                                                              ];
-                                                              if (isLarge) {
-                                                                return Row(
-                                                                  children: [
-                                                                    for (
-                                                                      int i = 0;
-                                                                      i <
-                                                                          items
-                                                                              .length;
-                                                                      i++
-                                                                    ) ...[
-                                                                      items[i],
-                                                                      if (i !=
-                                                                          items.length -
-                                                                              1)
-                                                                        Padding(
-                                                                          padding: const EdgeInsets.symmetric(
-                                                                            horizontal:
-                                                                                8.0,
-                                                                          ),
-                                                                          child: Text(
-                                                                            '•',
-                                                                            style: Theme.of(
-                                                                              context,
-                                                                            ).textTheme.bodySmall,
-                                                                          ),
-                                                                        ),
-                                                                    ],
-                                                                  ],
-                                                                );
-                                                              } else {
-                                                                return GridView.count(
-                                                                  crossAxisCount:
-                                                                      3,
-                                                                  crossAxisSpacing:
-                                                                      6,
-                                                                  mainAxisSpacing:
-                                                                      6,
-                                                                  childAspectRatio:
-                                                                      8.0,
-                                                                  padding:
-                                                                      EdgeInsets
-                                                                          .zero,
-                                                                  shrinkWrap:
-                                                                      true,
-                                                                  physics:
-                                                                      const NeverScrollableScrollPhysics(),
-                                                                  children:
-                                                                      items,
-                                                                );
-                                                              }
-                                                            } else {
-                                                              return Row(
-                                                                crossAxisAlignment:
-                                                                    CrossAxisAlignment
-                                                                        .center,
-                                                                children: [
-                                                                  IconButton(
-                                                                    icon: const Icon(
-                                                                      Icons
-                                                                          .error_outline,
-                                                                      size: 18,
-                                                                      color: Colors
-                                                                          .red,
-                                                                    ),
-                                                                    padding:
-                                                                        EdgeInsets
-                                                                            .zero,
-                                                                    constraints:
-                                                                        const BoxConstraints(),
-                                                                    onPressed: () {
-                                                                      final msg =
-                                                                          hs.message ??
-                                                                          '异常';
-                                                                      ScaffoldMessenger.of(
-                                                                        context,
-                                                                      ).showSnackBar(
-                                                                        SnackBar(
-                                                                          backgroundColor: Theme.of(
-                                                                            context,
-                                                                          ).colorScheme.errorContainer,
-                                                                          content: Text(
-                                                                            msg,
-                                                                            style: TextStyle(
-                                                                              color: Theme.of(
-                                                                                context,
-                                                                              ).colorScheme.onErrorContainer,
-                                                                            ),
-                                                                          ),
-                                                                        ),
-                                                                      );
-                                                                    },
-                                                                  ),
-                                                                  const SizedBox(
-                                                                    width: 6,
-                                                                  ),
-                                                                  Expanded(
-                                                                    child: Text(
-                                                                      '请求失败，请检查站点状态，点击感叹号查看详情',
-                                                                      style: Theme.of(
-                                                                        context,
-                                                                      ).textTheme.bodySmall,
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              );
-                                                            }
-                                                          },
-                                                        ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                // 右侧菜单按钮（仅大屏显示）
-                                                if (isLarge)
-                                                  _buildSiteMenuButton(
-                                                    site,
-                                                    isActive,
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                  ),
+                _buildTopBar(),
+                if (_sites.isEmpty) _buildEmptyState() else _buildSiteList(),
               ],
             ),
-
     );
   }
 }
@@ -3156,7 +2910,7 @@ class _ProfileView extends StatelessWidget {
           Text('用户名: ${profile.username}'),
           Text(
             '魔力值: ${Formatters.bonus(profile.bonus)}'
-            '${profile.bonusPerHour != null ? '(${profile.bonusPerHour})' : ''}',
+            '${profile.bonusPerHour != null ? '(${ScreenUtils.isLargeScreen(context) ? profile.bonusPerHour! : profile.bonusPerHour!.toInt()})' : ''}',
           ),
           Text('上传: ${profile.uploadedBytesString}'),
           Text('下载: ${profile.downloadedBytesString}'),
@@ -3171,8 +2925,6 @@ class _ProfileView extends StatelessWidget {
     );
   }
 }
-
-
 
 class _SiteColorPickerDialog extends StatefulWidget {
   final Color initialColor;
