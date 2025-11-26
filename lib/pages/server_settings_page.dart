@@ -1241,11 +1241,20 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       appBar: _buildAppBar(context),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                _buildTopBar(),
-                if (_sites.isEmpty) _buildEmptyState() else _buildSiteList(),
-              ],
+          : PopScope(
+              canPop: !_searchFocusNode.hasFocus,
+              onPopInvokedWithResult: (didPop, result) {
+                if (didPop) return;
+                if (_searchFocusNode.hasFocus) {
+                  _searchFocusNode.unfocus();
+                }
+              },
+              child: Column(
+                children: [
+                  _buildTopBar(),
+                  if (_sites.isEmpty) _buildEmptyState() else _buildSiteList(),
+                ],
+              ),
             ),
     );
   }
