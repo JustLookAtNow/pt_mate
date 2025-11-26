@@ -165,7 +165,7 @@
     "categories": {
       "path": "usercp.php?action=tracker",
       "rows": {
-        "selector": "#outer > table:nth-child(2) > tbody > tr:nth-child(1) > td.rowfollow > table"
+        "selector": "#outer > table.main > next > tbody > tr:nth-child(1) > td.rowfollow > table"
       },
       "fields": {
         "categoryId": {

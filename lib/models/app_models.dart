@@ -915,6 +915,52 @@ class SiteConfig {
       }
       // 如果成功获取到了有效的templateId，标记需要更新持久化数据
       needsUpdate = templateId.isNotEmpty && templateId != '-1';
+    } else {
+      // 校验 templateId 的合法性：检查是否存在对应的模板配置
+      try {
+        final swValidate = Stopwatch()..start();
+        final templates = await SiteConfigService.loadPresetSiteTemplates();
+        final templateExists = templates.any(
+          (template) => template.id == templateId,
+        );
+        swValidate.stop();
+
+        if (!templateExists) {
+          // 如果找不到对应的模板配置，重新通过 baseUrl 匹配
+          if (kDebugMode) {
+            _logger.w(
+              'SiteConfig.fromJsonAsync: templateId=$templateId 无效(校验耗时=${swValidate.elapsedMilliseconds}ms)，尝试重新匹配',
+            );
+          }
+          final baseUrl = json['baseUrl'] as String;
+          final swRemap = Stopwatch()..start();
+          final newTemplateId = await SiteConfig.getTemplateIdByBaseUrlAsync(
+            baseUrl,
+          );
+          swRemap.stop();
+          if (kDebugMode) {
+            _logger.d(
+              'SiteConfig.fromJsonAsync: 重新映射耗时=${swRemap.elapsedMilliseconds}ms，baseUrl=$baseUrl，旧templateId=$templateId，新templateId=$newTemplateId',
+            );
+          }
+          // 如果成功获取到了有效的templateId，更新并标记需要持久化
+          if (newTemplateId.isNotEmpty && newTemplateId != '-1') {
+            templateId = newTemplateId;
+            needsUpdate = true;
+          }
+        } else {
+          if (kDebugMode) {
+            _logger.d(
+              'SiteConfig.fromJsonAsync: templateId=$templateId 有效(校验耗时=${swValidate.elapsedMilliseconds}ms)',
+            );
+          }
+        }
+      } catch (e) {
+        // 校验失败时记录错误但不影响流程，保留原 templateId
+        if (kDebugMode) {
+          _logger.e('SiteConfig.fromJsonAsync: templateId校验失败: $e');
+        }
+      }
     }
     // 迁移老馒头数据
     if (templateId == 'mteam-api') {
@@ -1027,7 +1073,7 @@ class SiteConfig {
     }
 
     // 最终后备：仍未命中则返回同步方法的结果（可能为'-1'）
-    return _getTemplateIdByBaseUrl(normalizedBaseUrl);
+    return '-1';
   }
 
   @override

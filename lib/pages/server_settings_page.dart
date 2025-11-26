@@ -1919,6 +1919,65 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
       if (widget.site != null) {
         await StorageService.instance.updateSiteConfig(finalSite);
+        
+        // 同步更新聚合搜索配置，移除已删除的分类
+        final storage = StorageService.instance;
+        final aggregateSettings = await storage.loadAggregateSearchSettings();
+        bool settingsChanged = false;
+
+        final updatedConfigs = aggregateSettings.searchConfigs.map((config) {
+          // 检查该配置是否包含当前站点
+          final siteIndex = config.enabledSites.indexWhere(
+            (s) => s.id == finalSite.id,
+          );
+          if (siteIndex == -1) return config;
+
+          final siteItem = config.enabledSites[siteIndex];
+          final selectedCategories =
+              siteItem.additionalParams?['selectedCategories'] as List?;
+
+          if (selectedCategories != null && selectedCategories.isNotEmpty) {
+            // 获取当前站点所有有效的分类ID
+            final validCategoryIds = finalSite.searchCategories
+                .map((c) => c.id)
+                .toSet();
+            // 过滤掉不存在的分类
+            final validSelectedCategories = selectedCategories
+                .where((c) => validCategoryIds.contains(c))
+                .toList();
+
+            // 如果分类数量发生了变化，说明有分类被删除了
+            if (validSelectedCategories.length != selectedCategories.length) {
+              settingsChanged = true;
+
+              final Map<String, dynamic>? newParams;
+              if (validSelectedCategories.isNotEmpty) {
+                newParams = {'selectedCategories': validSelectedCategories};
+              } else {
+                newParams = null;
+              }
+
+              final newSiteItem = siteItem.copyWith(
+                additionalParams: newParams,
+              );
+              final newEnabledSites = List<SiteSearchItem>.from(
+                config.enabledSites,
+              );
+              newEnabledSites[siteIndex] = newSiteItem;
+
+              return config.copyWith(enabledSites: newEnabledSites);
+            }
+          }
+
+          return config;
+        }).toList();
+
+        if (settingsChanged) {
+          await storage.saveAggregateSearchSettings(
+            aggregateSettings.copyWith(searchConfigs: updatedConfigs),
+          );
+        }
+
         // 更新现有站点后，如果是当前活跃站点，需要重新初始化适配器
         final activeSiteId = await StorageService.instance.getActiveSiteId();
         if (activeSiteId == finalSite.id) {

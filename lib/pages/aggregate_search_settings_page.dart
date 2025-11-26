@@ -578,9 +578,22 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
         
         // 只有当用户选择了特定分类时才保存分类信息
         if (selectedCategories != null && selectedCategories.isNotEmpty) {
-          additionalParams = {
-            'selectedCategories': selectedCategories.toList(),
-          };
+          // 过滤掉不存在的分类ID
+          final site = _allSites.firstWhere(
+            (s) => s.id == id,
+            orElse: () => const SiteConfig(id: '', name: '', baseUrl: ''),
+          );
+          final validCategoryIds = site.searchCategories
+              .map((c) => c.id)
+              .toSet();
+          final validSelectedCategories = selectedCategories
+              .where((c) => validCategoryIds.contains(c))
+              .toList();
+
+          if (validSelectedCategories.isNotEmpty) {
+            additionalParams = {
+              'selectedCategories': validSelectedCategories};
+          }
         }
         
         return SiteSearchItem(
