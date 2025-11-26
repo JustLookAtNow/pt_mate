@@ -81,7 +81,7 @@
         "passKey": {
           "path": "usercp.php",
           "rows": {
-          "selector": "div#outer > div.main > next > tbody >td:contains('密匙'||'密钥'|| 'Passkey') > next"
+          "selector": "div#outer > div.main > next > tbody >td:contains('密匙' || '密钥' || 'Passkey') > next"
           },
           "fields": {
             "passKey": {
