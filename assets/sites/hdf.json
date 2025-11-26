@@ -1,11 +1,11 @@
-{
-  "id": "ourbits",
-  "name": "OurBits",
+﻿{
+  "id": "hdfans",
+  "name": "HDFans",
   "isShow": true,
   "baseUrls": [
-    "https://ourbits.club/"
+    "https://hdfans.org/"
   ],
-  "primaryUrl": "https://ourbits.club/",
+  "primaryUrl": "https://hdfans.org/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
   "features": {
@@ -45,7 +45,7 @@
           "attribute": "text",
           "filter": {
             "name": "regexp",
-            "args": "分享率：\\s*([^\\s]+)",
+            "args": "分享率:\\s*([^\\s]+)",
             "index": 1
           }
         },
@@ -54,7 +54,7 @@
           "attribute": "text",
           "filter": {
             "name": "regexp",
-            "args": "(上传|上傳)量：\\s*(.*?B)",
+            "args": "(上传|上傳)量:\\s*(.*?B)",
             "index": 2
           }
         },
@@ -63,7 +63,7 @@
           "attribute": "text",
           "filter": {
             "name": "regexp",
-            "args": "(下载|下載)量：\\s*(.*?B)",
+            "args": "(下载|下載)量:\\s*(.*?B)",
             "index": 2
           }
         },
@@ -72,7 +72,7 @@
           "attribute": "text",
           "filter": {
             "name": "regexp",
-            "args": ":\\s*([^\\s]+)\\s*\\(*(签|簽)到",
+            "args": ":\\s*([^\\s]+)\\s*\\[*(签|簽)到",
             "index": 1
           }
         }
@@ -147,7 +147,6 @@
           "selector": "table.torrentname > img[title~=\"置顶|置頂\"]",
           "attribute": "src"
         },
-        "cover": {},
         "createData": {
           "selector": "td:nth-child(4) > span[title]",
           "attribute": "title"
@@ -165,11 +164,11 @@
     "categories": {
       "path": "usercp.php?action=tracker",
       "rows": {
-        "selector": "#outer > table:nth-child(2) > tbody > tr:nth-child(1) > td.rowfollow > table"
+        "selector": "#outer > tbody > tr:nth-child(1) > td.rowfollow > table:nth-child(1) > tbody > tr:nth-child(2)"
       },
       "fields": {
         "categoryId": {
-          "selector": "a[href~=\"(torrents|special)\\.php\"]",
+          "selector": "a[href~=\"(torrents|special)\\.php.*\"]",
           "attribute": "href",
           "filter": {
             "name": "regexp",
@@ -197,5 +196,5 @@
       }
     }
   },
-  "logo": "assets/sites_icon/ourbits.png"
+  "logo": "assets/sites_icon/hdfans.png"
 }

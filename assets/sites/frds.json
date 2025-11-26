@@ -1,11 +1,11 @@
-{
-  "id": "ourbits",
-  "name": "OurBits",
+﻿{
+  "id": "frds",
+  "name": "FRDS",
   "isShow": true,
   "baseUrls": [
-    "https://ourbits.club/"
+    "https://pt.keepfrds.com/"
   ],
-  "primaryUrl": "https://ourbits.club/",
+  "primaryUrl": "https://pt.keepfrds.com/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
   "features": {
@@ -21,63 +21,75 @@
   },
   "discountMapping": {},
   "infoFinder": {
-    "userInfo": {
-      "path": "usercp.php",
-      "rows": {
-        "selector": "table#info_block > span.medium"
-      },
-      "fields": {
-        "userId": {
-          "selector": "a[href^=\"userdetails.php?id=\"]",
-          "attribute": "href",
-          "filter": {
-            "name": "regexp",
-            "args": "id=(\\d+)",
-            "index": 1
+     "userInfo": {
+          "path": "usercp.php",
+          "rows": {
+            "selector": "table#info_block > td.bottom"
+          },
+          "fields": {
+            "userId": {
+              "selector": "a[href^=\"/userdetails.php?id=\"]",
+              "attribute": "href",
+              "filter": {
+                "name": "regexp",
+                "args": "id=(\\d+)",
+                "index": 1
+              }
+            },
+            "userName": {
+              "selector": "a[href^=\"/userdetails.php?id=\"] > b",
+              "attribute": "text"
+            },
+            "ratio": {
+              "selector": "",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": "分享率(:|：)\\s*([^\\s]+)",
+                "index": 2
+              }
+            },
+            "upload": {
+              "selector": "",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": "(上传|上傳)量(:|：)\\s*(.*?B)",
+                "index": 3
+              }
+            },
+            "download": {
+              "selector": "",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": "(下载|下載)量(:|：)\\s*(.*?B)",
+                "index": 3
+              }
+            },
+            "bonus": {
+              "selector": "",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": "]: \\s*([^\\s]+)\\s*\\[",
+                "index": 1
+              }
+            }
           }
         },
-        "userName": {
-          "selector": "a[href^=\"userdetails.php?id=\"] > b",
-          "attribute": "text"
-        },
-        "ratio": {
-          "selector": "",
-          "attribute": "text",
-          "filter": {
-            "name": "regexp",
-            "args": "分享率：\\s*([^\\s]+)",
-            "index": 1
+        "passKey": {
+          "path": "usercp.php",
+          "rows": {
+            "selector": "#outer > table.main > next > tbody > td:contains('密匙' || '密钥' || 'Passkey') > next"
+          },
+          "fields": {
+            "passKey": {
+              "selector": "",
+              "attribute": "text"
+            }
           }
         },
-        "upload": {
-          "selector": "",
-          "attribute": "text",
-          "filter": {
-            "name": "regexp",
-            "args": "(上传|上傳)量：\\s*(.*?B)",
-            "index": 2
-          }
-        },
-        "download": {
-          "selector": "",
-          "attribute": "text",
-          "filter": {
-            "name": "regexp",
-            "args": "(下载|下載)量：\\s*(.*?B)",
-            "index": 2
-          }
-        },
-        "bonus": {
-          "selector": "",
-          "attribute": "text",
-          "filter": {
-            "name": "regexp",
-            "args": ":\\s*([^\\s]+)\\s*\\(*(签|簽)到",
-            "index": 1
-          }
-        }
-      }
-    },
     "search": {
       "torrentPath": "torrents.php",
       "specialPath": "special.php",
@@ -147,7 +159,6 @@
           "selector": "table.torrentname > img[title~=\"置顶|置頂\"]",
           "attribute": "src"
         },
-        "cover": {},
         "createData": {
           "selector": "td:nth-child(4) > span[title]",
           "attribute": "title"
@@ -165,11 +176,11 @@
     "categories": {
       "path": "usercp.php?action=tracker",
       "rows": {
-        "selector": "#outer > table:nth-child(2) > tbody > tr:nth-child(1) > td.rowfollow > table"
+        "selector": "#outer > tbody > tr:nth-child(1) > td.rowfollow > table:nth-child(1) > tbody > tr:nth-child(2)"
       },
       "fields": {
         "categoryId": {
-          "selector": "a[href~=\"(torrents|special)\\.php\"]",
+          "selector": "a[href~=\"(torrents|special)\\.php.*\"]",
           "attribute": "href",
           "filter": {
             "name": "regexp",
@@ -197,5 +208,5 @@
       }
     }
   },
-  "logo": "assets/sites_icon/ourbits.png"
+  "logo": "assets/sites_icon/frds.png"
 }

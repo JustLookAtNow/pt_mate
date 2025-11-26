@@ -4,6 +4,11 @@
     "btschool.json",
     "cbg.json",
     "cspt.json",
+    "ade.json",
+    "hdf.json",
+    "ssd.json",
+    "frds.json",
+    "ubits.json",
     "freefarm.json",
     "hdkyl.json",
     "hxpt.json",
@@ -16,7 +21,6 @@
     "ptskit.json",
     "ptzone.json",
     "qingwapt.json",
-    "rousi.json",
     "xingyunge.json",
     "zmpt.json"
   ]
