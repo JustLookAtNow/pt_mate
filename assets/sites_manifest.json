@@ -1,15 +1,13 @@
 {
   "sites": [
     "afun.json",
+    "audiences.json",
     "btschool.json",
     "cbg.json",
     "cspt.json",
-    "ade.json",
-    "hdf.json",
-    "ssd.json",
     "frds.json",
-    "ubits.json",
     "freefarm.json",
+    "hdfans.json",
     "hdkyl.json",
     "hxpt.json",
     "lajidui.json",
@@ -21,6 +19,9 @@
     "ptskit.json",
     "ptzone.json",
     "qingwapt.json",
+    "rousi.json",
+    "ssd.json",
+    "ubits.json",
     "xingyunge.json",
     "zmpt.json"
   ]

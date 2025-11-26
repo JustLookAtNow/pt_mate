@@ -1,4 +1,4 @@
-﻿{
+{
   "id": "audiences",
   "name": "Audiences",
   "isShow": true,
@@ -21,80 +21,80 @@
   },
   "discountMapping": {},
   "infoFinder": {
-     "userInfo": {
-          "path": "usercp.php",
-          "rows": {
-            "selector": "table#info_block > td.bottom"
-          },
-          "fields": {
-            "userId": {
-              "selector": "a[href^=\"userdetails.php?id=\"]",
-              "attribute": "href",
-              "filter": {
-                "name": "regexp",
-                "args": "id=(\\d+)",
-                "index": 1
-              }
-            },
-            "userName": {
-              "selector": "a[href^=\"userdetails.php?id=\"] > b",
-              "attribute": "text"
-            },
-            "ratio": {
-              "selector": "",
-              "attribute": "text",
-              "filter": {
-                "name": "regexp",
-                "args": "分享率(:|：)\\s*([^\\s]+)",
-                "index": 2
-              }
-            },
-            "upload": {
-              "selector": "",
-              "attribute": "text",
-              "filter": {
-                "name": "regexp",
-                "args": "(上传|上傳)量(:|：)\\s*(.*?B)",
-                "index": 3
-              }
-            },
-            "download": {
-              "selector": "",
-              "attribute": "text",
-              "filter": {
-                "name": "regexp",
-                "args": "(下载|下載)量(:|：)\\s*(.*?B)",
-                "index": 3
-              }
-            },
-            "bonus": {
-              "selector": "",
-              "attribute": "text",
-              "filter": {
-                "name": "regexp",
-                "args": "做种积分：\\s*([^\\s]+)\\s+",
-                "index": 1
-              }
-            }
+    "userInfo": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "table#info_block > td.bottom"
+      },
+      "fields": {
+        "userId": {
+          "selector": "a[href^=\"userdetails.php?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "index": 1
           }
         },
+        "userName": {
+          "selector": "a[href^=\"userdetails.php?id=\"] > b",
+          "attribute": "text"
+        },
+        "ratio": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "分享率(:|：)\\s*([^\\s]+)",
+            "index": 2
+          }
+        },
+        "upload": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(上传|上傳)量(:|：)\\s*(.*?B)",
+            "index": 3
+          }
+        },
+        "download": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(下载|下載)量(:|：)\\s*(.*?B)",
+            "index": 3
+          }
+        },
+        "bonus": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "做种积分：\\s*([^\\s]+)\\s+",
+            "index": 1
+          }
+        }
+      }
+    },
+    "passKey": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "#outer > td.rowfollow > span#passkey"
+      },
+      "fields": {
         "passKey": {
-          "path": "usercp.php",
-          "rows": {
-            "selector": "#outer > td.rowfollow > span#passkey"
-          },
-          "fields": {
-            "passKey": {
-              "selector": "",
-              "attribute": "text",
-		"filter": {
-                "name": "regexp",
-                "args": "([^\\s]+)\\s*（妥善保管，请勿泄露）",
-                "index": 1
-              }
-            }
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "([^\\s]+)\\s*（妥善保管，请勿泄露）",
+            "index": 1
           }
-        },
+        }
+      }
+    },
     "search": {
       "torrentPath": "torrents.php",
       "specialPath": "special.php",

@@ -1,4 +1,4 @@
-﻿{
+{
   "id": "ssd",
   "name": "SSD",
   "isShow": true,
@@ -68,7 +68,7 @@
               }
             },
             "bonus": {
-              "selector": "a[href^=\"mybonus.php\"] ",
+              "selector": "a[href^=\"mybonus.php\"]",
               "attribute": "title",
               "filter": {
                 "name": "regexp",
@@ -107,7 +107,7 @@
           }
         },
         "torrentName": {
-          "selector": "a[href^=\"details.php?id=\"] ",
+          "selector": "a[href^=\"details.php?id=\"]",
           "attribute": "text"
         },
         "description": {

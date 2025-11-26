@@ -1048,15 +1048,19 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
               switch (unit) {
                 case 'KB':
+                case 'KIB':
                   sizeInBytes = (sizeValue * 1024).round();
                   break;
                 case 'MB':
+                case 'MIB':
                   sizeInBytes = (sizeValue * 1024 * 1024).round();
                   break;
                 case 'GB':
+                case 'GIB':
                   sizeInBytes = (sizeValue * 1024 * 1024 * 1024).round();
                   break;
                 case 'TB':
+                case 'TIB':
                   sizeInBytes = (sizeValue * 1024 * 1024 * 1024 * 1024).round();
                   break;
                 default:
