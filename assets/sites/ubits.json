@@ -1,4 +1,4 @@
-﻿{
+{
   "id": "ubits",
   "name": "UBits",
   "isShow": true,
@@ -164,11 +164,11 @@
           "attribute": "title"
         },
         "doubanRating": {
-          "selector": "table.torrentname > img[title==\"douban\"] > next",
+          "selector": "table.torrentname > img[title==\"douban\"] > parent > next",
           "attribute": "text"
         },
         "imdbRating": {
-          "selector": "table.torrentname > img[title==\"imdb\"] > next",
+          "selector": "table.torrentname > img[title==\"imdb\"] > parent > next",
           "attribute": "text"
         }
       }
@@ -192,19 +192,6 @@
           "selector": "a[href~=\"(torrents|special)\\.php\"] > img",
           "attribute": "title"
         }
-      }
-    }
-  },
-  "request": {
-    "collect": {
-      "path": "/api.php",
-      "method": "POST",
-      "headers": {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      "params": {
-        "action": "bookmark",
-        "tid": "{torrentId}"
       }
     }
   },
