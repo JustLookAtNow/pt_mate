@@ -90,6 +90,18 @@
             }
           }
         },
+        "bonusPerHour": {
+          "path": "mybonus.php",
+          "rows": {
+            "selector": "#outer"
+          },
+          "fields": {
+            "bonusPerHour": {
+              "selector": "div.main > div:nth-child(4) > div.section-text > table:nth-child(4) > tbody > tr.nowrap:nth-child(1) > td.rowfollow:nth-child(11)",
+              "attribute": "text"
+            }
+          }
+        },
     "search": {
       "torrentPath": "torrents.php",
       "specialPath": "special.php",
@@ -115,11 +127,11 @@
           "attribute": "text"
         },
         "discount": {
-          "selector": "table.torrentname > img[class^=\"pro_free\"]",
-          "attribute": "alt"
+          "selector": "table.torrentname > span[class~=\"pro\"]",
+          "attribute": "text"
         },
         "discountEndTime": {
-          "selector": "table.torrentname > img[class^=\"pro_free\"]",
+          "selector": "table.torrentname > span[class~=\"pro\"] > next > span",
           "attribute": "onmouseover",
           "filter": {
             "name": "regexp",
@@ -156,19 +168,19 @@
           "attribute": "src"
         },
         "isTop": {
-          "selector": "table.torrentname > img[title~=\"置顶|置頂\"]",
-          "attribute": "src"
+          "selector": "table.torrentname > span[title~=\"置顶|置頂\"]",
+          "attribute": "title"
         },
         "createData": {
           "selector": "td:nth-child(4) > span[title]",
           "attribute": "title"
         },
         "doubanRating": {
-          "selector": "table.torrentname > img[title==\"douban\"] > next",
+          "selector": "table.torrentname > img[alt==\"douban\"] > next",
           "attribute": "text"
         },
         "imdbRating": {
-          "selector": "table.torrentname > img[title==\"imdb\"] > next",
+          "selector": "table.torrentname > img[alt==\"imdb\"] > next",
           "attribute": "text"
         }
       }
@@ -192,19 +204,6 @@
           "selector": "a[href~=\"(torrents|special)\\.php\"] > img",
           "attribute": "title"
         }
-      }
-    }
-  },
-  "request": {
-    "collect": {
-      "path": "/api.php",
-      "method": "POST",
-      "headers": {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      "params": {
-        "action": "bookmark",
-        "tid": "{torrentId}"
       }
     }
   },
