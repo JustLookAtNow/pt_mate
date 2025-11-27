@@ -468,6 +468,7 @@ jobs:
       env:
         TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
         TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        COMMIT_MSG: ${{ steps.commit_message.outputs.message }}
       run: |
         # Function to escape MarkdownV2 special characters (preserve formatting chars)
         escape_tg() {
@@ -492,11 +493,11 @@ jobs:
         }
     
         # Extract and process commit message
-        RAW_COMMIT_MESSAGE="${{ steps.commit_message.outputs.message }}"
+        RAW_COMMIT_MESSAGE="$COMMIT_MSG"
         
         # Process the commit message: convert ## titles to *title* and - to •
         PROCESSED_MESSAGE=$(echo "$RAW_COMMIT_MESSAGE" | \
-          sed 's/^[[:space:]]*## \(.*\)/*\1*/' | \
+          sed 's/^[[:space:]]*#+ \(.*\)/*\1*/' | \
           sed 's/^- /• /')
         
         # Escape the processed message
