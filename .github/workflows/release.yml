@@ -465,103 +465,101 @@ jobs:
         fail_on_unmatched_files: true
         
     - name: Send Telegram notification
+      continue-on-error: true
       env:
         TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
         TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         COMMIT_MSG: ${{ steps.commit_message.outputs.message }}
+        VERSION: ${{ steps.version.outputs.tag }}
+        REPO: ${{ github.repository }}
       run: |
-        # Function to escape MarkdownV2 special characters (preserve formatting chars)
-        escape_tg() {
-          echo "$1" | \
-            sed 's/_/\\_/g' | \
-            sed 's/\[/\\[/g' | \
-            sed 's/\]/\\]/g' | \
-            sed 's/(/\\(/g' | \
-            sed 's/)/\\)/g' | \
-            sed 's/~/\\~/g' | \
-            sed 's/`/\\`/g' | \
-            sed 's/>/\\>/g' | \
-            sed 's/+/\\+/g' | \
-            sed 's/=/\\=/g' | \
-            sed 's/|/\\|/g' | \
-            sed 's/{/\\{/g' | \
-            sed 's/}/\\}/g' | \
-            sed 's/\./\\./g' | \
-            sed 's/!/\\!/g' | \
-            sed 's/-/\\-/g' | \
-            sed 's/\//\\\//g'
-        }
-    
-        # Extract and process commit message
-        RAW_COMMIT_MESSAGE="$COMMIT_MSG"
+        npm install telegramify-markdown
         
-        # Process the commit message: convert ## titles to *title* and - to •
-        PROCESSED_MESSAGE=$(echo "$RAW_COMMIT_MESSAGE" | \
-          sed 's/^[[:space:]]*#+ \(.*\)/*\1*/' | \
-          sed 's/^- /• /')
+        node <<EOF
+        const https = require('https');
         
-        # Escape the processed message
-        COMMIT_MESSAGE=$(escape_tg "$PROCESSED_MESSAGE")
-    
-        # Create Telegram message
-        VERSION="${{ steps.version.outputs.tag }}"
-        RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}"
-        
-        MESSAGE=$(printf '%s\n' \
-          "*🎉 PT Mate $(escape_tg "$VERSION") 发布了！*" \
-          "" \
-          "$COMMIT_MESSAGE" \
-          "" \
-          "📱 [GitHub Release]($(escape_tg "$RELEASE_URL"))")
-    
-        echo "Final message to send:"
-        echo "$MESSAGE"
-    
-        # Send message to Telegram using jq to properly escape JSON
-        JSON_PAYLOAD=$(printf '%s\n' "$MESSAGE" | jq -Rs \
-          --arg chat_id "${TG_CHAT_ID}" \
-          '{
-            chat_id: $chat_id,
-            text: .,
-            parse_mode: "MarkdownV2",
-            disable_web_page_preview: false
-          }')
-        
-        echo "JSON payload:"
-        echo "$JSON_PAYLOAD"
-        
-        RESPONSE=$(echo "$JSON_PAYLOAD" | curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-          -H "Content-Type: application/json" \
-          -d @-)
-    
-        # Extract message_id from response
-        MESSAGE_ID=$(echo "$RESPONSE" | jq -r '.result.message_id')
-    
-        if [ "$MESSAGE_ID" != "null" ] && [ "$MESSAGE_ID" != "" ]; then
-          echo "Message sent successfully with ID: $MESSAGE_ID"
-          curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/unpinAllChatMessages" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"chat_id\": \"${TG_CHAT_ID}\"
-            }"
-          # Pin the message
-          curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/pinChatMessage" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"chat_id\": \"${TG_CHAT_ID}\",
-              \"message_id\": ${MESSAGE_ID},
-              \"disable_notification\": false
-            }"
+        // Async wrapper to allow using await and dynamic imports
+        (async () => {
+          // Dynamically import telegramify-markdown (it might be an ES module)
+          const module = await import('telegramify-markdown');
+          const telegramify = module.default || module;
+
+          const commitMsg = process.env.COMMIT_MSG;
+          const version = process.env.VERSION;
+          const repo = process.env.REPO;
+          const releaseUrl = \`https://github.com/\${repo}/releases/tag/\${version}\`;
           
-          echo "Message pinned successfully"
-        else
-          echo "Failed to send message"
-          echo "Response: $RESPONSE"
-          exit 1
-        fi
+          // Construct the full message in Standard Markdown
+          const fullMarkdown = \`# 🎉 PT Mate \${version} 发布了！\n\n\${commitMsg}\n\n📱 [GitHub Release](\${releaseUrl})\`;
+          
+          // Convert to MarkdownV2
+          const escapedMessage = telegramify(fullMarkdown);
+          
+          console.log('Processed Message:', escapedMessage);
+
+          const payload = {
+            chat_id: process.env.TG_CHAT_ID,
+            text: escapedMessage,
+            parse_mode: 'MarkdownV2',
+            disable_web_page_preview: false
+          };
+
+          // Helper function to send requests
+          function sendRequest(method, endpoint, data) {
+            return new Promise((resolve, reject) => {
+              const url = \`https://api.telegram.org/bot\${process.env.TG_BOT_TOKEN}/\${endpoint}\`;
+              const req = https.request(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' }
+              }, (res) => {
+                let body = '';
+                res.on('data', (chunk) => body += chunk);
+                res.on('end', () => {
+                  try {
+                    const json = JSON.parse(body);
+                    resolve(json);
+                  } catch (e) {
+                    reject(e);
+                  }
+                });
+              });
+              req.on('error', reject);
+              if (data) req.write(JSON.stringify(data));
+              req.end();
+            });
+          }
+
+          try {
+            console.log('Sending message...');
+            const sendRes = await sendRequest('POST', 'sendMessage', payload);
+            
+            if (!sendRes.ok) {
+              console.error('Failed to send message:', JSON.stringify(sendRes));
+              process.exit(1);
+            }
+            
+            const messageId = sendRes.result.message_id;
+            console.log('Message sent successfully with ID:', messageId);
+            
+            // Unpin all messages
+            await sendRequest('POST', 'unpinAllChatMessages', { chat_id: process.env.TG_CHAT_ID });
+            
+            // Pin the new message
+            await sendRequest('POST', 'pinChatMessage', {
+              chat_id: process.env.TG_CHAT_ID,
+              message_id: messageId,
+              disable_notification: false
+            });
+            
+            console.log('Message pinned successfully');
+          } catch (error) {
+            console.error('Error:', error);
+            process.exit(1);
+          }
+        })();
+        EOF
 
     - name: Notify Update Server (POST /api/v1/github/version-update)
-      if: ${{ success() }}
       env:
         UPDATE_SERVER_URL: ${{ vars.UPDATE_SERVER_URL }}
         GITHUB_WEBHOOK_SECRET: ${{ secrets.UPDATE_WEBHOOK_SECRET }}
