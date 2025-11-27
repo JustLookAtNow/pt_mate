@@ -97,7 +97,7 @@
           },
           "fields": {
             "bonusPerHour": {
-              "selector": "div.main > div:nth-child(4) > div.section-text > table:nth-child(4) > tbody > tr.nowrap:nth-child(1) > td.rowfollow:nth-child(11)",
+              "selector": "div.main > div:nth-child(4) > div.section-text > table:nth-child(4) > tbody > tr:nth-child(1) > td:nth-child(11)",
               "attribute": "text"
             }
           }
