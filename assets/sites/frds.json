@@ -152,7 +152,7 @@
           }
         },
         "collection": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(5) > img.bookmark",
+          "selector": "table.torrentname >  img[alt==\"Bookmarked\"]",
           "attribute": "src"
         },
         "isTop": {
@@ -164,11 +164,11 @@
           "attribute": "title"
         },
         "doubanRating": {
-          "selector": "table.torrentname > img[title==\"douban\"] > next",
+          "selector": "table.torrentname > img[src~=\"douban\"] > nextParsed",
           "attribute": "text"
         },
         "imdbRating": {
-          "selector": "table.torrentname > img[title==\"imdb\"] > next",
+          "selector": "table.torrentname > img[src~=\"imdb\"] > nextParsed",
           "attribute": "text"
         }
       }
@@ -192,19 +192,6 @@
           "selector": "a[href~=\"(torrents|special)\\.php\"] > img",
           "attribute": "title"
         }
-      }
-    }
-  },
-  "request": {
-    "collect": {
-      "path": "/api.php",
-      "method": "POST",
-      "headers": {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      "params": {
-        "action": "bookmark",
-        "tid": "{torrentId}"
       }
     }
   },

@@ -480,6 +480,30 @@ class NexusPHPWebAdapter extends SiteAdapter {
             if (nextSibling != null) {
               next.add(nextSibling);
             }
+          } else if (part == 'prev') {
+            // 处理 prev 关键字，获取上一个兄弟元素
+            final previousSibling = element.previousSibling;
+            if (previousSibling != null) {
+              next.add(previousSibling);
+            }
+          } else if(part == 'nextParsed'){
+            // 处理 nextParsed 关键字，获取下一个兄弟元素(包括非标签)
+            final nextParsed = element.nextParsed;
+            if (nextParsed != null) {
+              next.add(nextParsed);
+            }
+          } else if(part == 'previousParsed'){
+            // 处理 prevParsed 关键字，获取上一个兄弟元素(包括非标签)
+            final prevParsed = element.previousParsed;
+            if (prevParsed != null) {
+              next.add(prevParsed);
+            }
+          } else if(part == 'parent') {
+            // 处理 parent 关键字，获取父元素
+            final parent = element.parent;
+            if (parent != null) {
+              next.add(parent);
+            }
           } else {
             next.addAll(_findElementBySelector(element, part));
           }
