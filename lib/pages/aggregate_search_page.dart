@@ -1455,7 +1455,7 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
               right: 0,
               top: 0,
               bottom: 0,
-              width: 40,
+              width: 20,
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onTapDown: (details) {
