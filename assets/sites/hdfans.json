@@ -183,18 +183,5 @@
       }
     }
   },
-  "request": {
-    "collect": {
-      "path": "/api.php",
-      "method": "POST",
-      "headers": {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      "params": {
-        "action": "bookmark",
-        "tid": "{torrentId}"
-      }
-    }
-  },
   "logo": "assets/sites_icon/hdfans.png"
 }
