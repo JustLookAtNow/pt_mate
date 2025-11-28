@@ -15,7 +15,6 @@ import 'services/backup_service.dart';
 import 'services/webdav_service.dart';
 import 'providers/aggregate_search_provider.dart';
 
-import 'utils/format.dart';
 import 'services/downloader/downloader_config.dart';
 import 'services/downloader/downloader_service.dart';
 import 'services/downloader/downloader_models.dart';
@@ -25,55 +24,12 @@ import 'widgets/qb_speed_indicator.dart';
 import 'widgets/responsive_layout.dart';
 import 'widgets/torrent_download_dialog.dart';
 import 'widgets/torrent_list_item.dart';
+import 'widgets/tag_filter_bar.dart';
 import 'services/update_service.dart';
 import 'widgets/update_notification_dialog.dart';
 
 // 全局日志实例，供本文件内多个类使用
 final Logger _logger = Logger();
-
-/// 判断最后访问时间是否超过一个月
-bool _isLastAccessOverMonth(String? lastAccess) {
-  final dt = _parseLastAccess(lastAccess);
-  if (dt == null) return false;
-  final now = DateTime.now();
-  return now.difference(dt).inDays >= 30;
-}
-
-/// 解析 "yyyy-MM-dd HH:mm:ss" 格式的时间字符串
-DateTime? _parseLastAccess(String? lastAccess) {
-  if (lastAccess == null) return null;
-  final raw = lastAccess.trim();
-  if (raw.isEmpty) return null;
-
-  // 期望格式：2025-10-30 11:09:04
-  final parts = raw.split(' ');
-  if (parts.length != 2) return null;
-  final dateParts = parts[0].split('-');
-  final timeParts = parts[1].split(':');
-  if (dateParts.length != 3 || timeParts.length < 2) return null;
-
-  final year = int.tryParse(dateParts[0]);
-  final month = int.tryParse(dateParts[1]);
-  final day = int.tryParse(dateParts[2]);
-  final hour = int.tryParse(timeParts[0]);
-  final minute = int.tryParse(timeParts[1]);
-  final second = timeParts.length > 2 ? int.tryParse(timeParts[2]) : 0;
-
-  if (year == null ||
-      month == null ||
-      day == null ||
-      hour == null ||
-      minute == null ||
-      second == null) {
-    return null;
-  }
-
-  try {
-    return DateTime(year, month, day, hour, minute, second);
-  } catch (_) {
-    return null;
-  }
-}
 
 class AppState extends ChangeNotifier {
   SiteConfig? _site;
@@ -452,14 +408,34 @@ class _HomePageState extends State<HomePage> {
   DateTime? _lastPressedAt;
 
   // 用户信息与搜索结果分页状态
-  MemberProfile? _profile;
   // 下载器配置
   List<DownloaderConfig> _downloaderConfigs = [];
-  // 用户信息展开状态
-  bool _userInfoExpanded = false;
   final List<TorrentItem> _items = [];
   int _pageNumber = 1;
   final int _pageSize = 30;
+  
+  // 标签筛选状态
+  final Set<TagType> _includedTags = {};
+  final Set<TagType> _excludedTags = {};
+
+  // 获取经过筛选的列表
+  List<TorrentItem> get _filteredItems {
+    if (_includedTags.isEmpty && _excludedTags.isEmpty) {
+      return _items;
+    }
+    return _items.where((item) {
+      // 包含筛选：必须包含所有选中的标签
+      for (final tag in _includedTags) {
+        if (!item.tags.contains(tag)) return false;
+      }
+      // 排除筛选：不能包含任何选中的标签
+      for (final tag in _excludedTags) {
+        if (item.tags.contains(tag)) return false;
+      }
+      return true;
+    }).toList();
+  }
+
   int _totalPages = 1;
   bool _hasMore = true;
 
@@ -585,8 +561,8 @@ class _HomePageState extends State<HomePage> {
       if (mounted) setState(() => _downloaderConfigs = downloaderConfigs);
 
       // 拉取用户基础信息
-      final prof = await ApiService.instance.fetchMemberProfile();
-      if (mounted) setState(() => _profile = prof);
+      await ApiService.instance.fetchMemberProfile();
+      if (mounted) setState(() {});
     } catch (e) {
       if (e.toString().contains('CookieExpiredException')) {
         _showCookieExpiredDialog();
@@ -650,19 +626,6 @@ class _HomePageState extends State<HomePage> {
         );
       }
     }
-  }
-
-  Future<void> _refresh() async {
-    try {
-      final prof = await ApiService.instance.fetchMemberProfile();
-      if (mounted) setState(() => _profile = prof);
-    } catch (e) {
-      if (e.toString().contains('CookieExpiredException')) {
-        _showCookieExpiredDialog();
-      }
-      // 忽略其他用户信息失败
-    }
-    await _search(reset: true);
   }
 
   /// 检查应用更新
@@ -743,136 +706,18 @@ class _HomePageState extends State<HomePage> {
 
     // 原有的分页加载逻辑
     if (!_hasMore || _loading) return;
+    // 使用筛选后的列表长度来判断是否触底加载可能不太准确，但通常加载更多是基于原始列表
+    // 这里保持原逻辑，只要滚动到底部就加载更多
     if (currentOffset >= _scrollCtrl.position.maxScrollExtent - 200) {
       _loadMore();
     }
   }
 
-  /// 统一头部组件（用户信息卡片 + 搜索栏）
+  /// 统一头部组件（搜索栏 + 标签筛选）
   Widget _buildHeaderPanel(BuildContext context, AppState appState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 顶部用户基础信息 - 仅在站点支持用户资料功能时显示
-        if (appState.site?.features.supportMemberProfile ?? true)
-          (_profile != null
-              ? Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                  child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          _userInfoExpanded = !_userInfoExpanded;
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.1),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                                    child: Text(
-                                      _profile!.username.isNotEmpty ? _profile!.username[0].toUpperCase() : 'U',
-                                      style: TextStyle(
-                                        color: Theme.of(context).colorScheme.primary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      _profile!.username,
-                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                            color: Theme.of(context).colorScheme.primary,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                  ),
-                                  if (_profile!.lastAccess != null &&
-                                      _profile!.lastAccess!.trim().isNotEmpty &&
-                                      _isLastAccessOverMonth(_profile!.lastAccess))
-                                    IconButton(
-                                      onPressed: () {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              '已经超过一个月没登陆网站了',
-                                              style: TextStyle(
-                                                color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                              ),
-                                            ),
-                                            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                            behavior: SnackBarBehavior.floating,
-                                          ),
-                                        );
-                                      },
-                                      icon: Icon(
-                                        Icons.priority_high,
-                                        color: Theme.of(context).colorScheme.error,
-                                        size: 20,
-                                      ),
-                                      tooltip: '超过一个月未登录',
-                                    ),
-                                  Icon(
-                                    _userInfoExpanded ? Icons.expand_less : Icons.expand_more,
-                                    color: Theme.of(context).colorScheme.primary,
-                                    size: 20,
-                                  ),
-                                ],
-                              ),
-                              if (_userInfoExpanded) ...[
-                                const SizedBox(height: 12),
-                                Wrap(
-                                  spacing: 12,
-                                  runSpacing: 4,
-                                  children: [
-                                    _buildStatChip(context, '↑ ${_profile!.uploadedBytesString}', Colors.green),
-                                    _buildStatChip(context, '↓ ${_profile!.downloadedBytesString}', Colors.blue),
-                                    _buildStatChip(context, '比率 ${Formatters.shareRate(_profile!.shareRate)}', Colors.orange),
-                                    _buildStatChip(
-                                      context,
-                                      '魔力 ${Formatters.bonus(_profile!.bonus)}${_profile!.bonusPerHour != null ? '(${_profile!.bonusPerHour!})' : ''}',
-                                      Colors.purple,
-                                    ),
-                                    if (_profile!.seedingSizeBytes != null)
-                                      _buildStatChip(
-                                        context,
-                                        '做种体积 ${Formatters.dataFromBytes(_profile!.seedingSizeBytes!)}',
-                                        Colors.teal,
-                                      ),
-                                    if (_profile!.lastAccess != null && _profile!.lastAccess!.trim().isNotEmpty)
-                                      _buildStatChip(context, '最后访问 ${_profile!.lastAccess!}', Colors.grey),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-              : const _UserInfoSkeleton()),
-
         // 搜索栏与筛选、排序行
         Padding(
           padding: const EdgeInsets.all(12),
@@ -1090,6 +935,22 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         ),
+        TagFilterBar(
+          includedTags: _includedTags,
+          excludedTags: _excludedTags,
+          onIncludedChanged: (tags) {
+            setState(() {
+              _includedTags.clear();
+              _includedTags.addAll(tags);
+            });
+          },
+          onExcludedChanged: (tags) {
+            setState(() {
+              _excludedTags.clear();
+              _excludedTags.addAll(tags);
+            });
+          },
+        ),
       ],
     );
   }
@@ -1109,6 +970,9 @@ class _HomePageState extends State<HomePage> {
       // 重置排序状态
       _sortBy = 'none';
       _sortAscending = false;
+      // 重置标签筛选
+      // _includedTags.clear(); // 标签筛选由用户手动控制，不随搜索重置
+      // _excludedTags.clear();
     }
     if (mounted) {
       setState(() {
@@ -1659,42 +1523,80 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       )
-                    : RefreshIndicator(
-                        onRefresh: _refresh,
-                        child: ListView.builder(
-                          controller: _scrollCtrl,
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          itemCount: _items.length + (_hasMore ? 1 : 0),
-                          itemBuilder: (_, i) {
-                            if (i >= _items.length) {
-                              return const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 16),
-                                child: Center(
-                                  child: SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  ),
+                      : Builder(
+                          builder: (context) {
+                            final filteredItems = _filteredItems;
+                            if (filteredItems.isEmpty) {
+                              return Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.search_off,
+                                      size: 64,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.outline,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      _items.isEmpty
+                                          ? '未找到相关种子'
+                                          : '没有符合筛选条件的种子',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.outline,
+                                          ),
+                                    ),
+                                  ],
                                 ),
                               );
                             }
-                      final t = _items[i];
-                      final isSelected = _selectedItems.contains(t.id);
+                            return ListView.builder(
+                              controller: _scrollCtrl,
+                              padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
+                              itemCount:
+                                  filteredItems.length + (_hasMore ? 1 : 0),
+                              itemBuilder: (context, index) {
+                                if (index == filteredItems.length) {
+                                  return const Padding(
+                                    padding: EdgeInsets.all(16.0),
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                final item = filteredItems[index];
+                                final isSelected = _selectedItems.contains(
+                                  item.id,
+                                );
                       return TorrentListItem(
-                        torrent: t,
+                                  torrent: item,
                         isSelected: isSelected,
                         isSelectionMode: _isSelectionMode,
                         currentSite: _currentSite,
                         onTap: () => _isSelectionMode
-                            ? _onToggleSelection(t)
-                            : _onTorrentTap(t),
-                        onLongPress: () => _onLongPress(t),
-                        onToggleCollection: () => _onToggleCollection(t),
-                        onDownload: () => _onDownload(t),
-                      );
-                    },
-                  ),
-                ),
+                                      ? _onToggleSelection(item)
+                                      : _onTorrentTap(item),
+                                  onLongPress: () => _onLongPress(item),
+                                  onToggleCollection: () =>
+                                      _onToggleCollection(item),
+                                  onDownload: () => _onDownload(item),
+                                );
+                              },
+                            );
+                          },
+                        ),
               ),
               // 选中模式下的操作栏
               if (_isSelectionMode)
@@ -2034,136 +1936,6 @@ class _HomePageState extends State<HomePage> {
       );
     }
   }
-
-
-
-  Widget _buildStatChip(BuildContext context, String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: color.withValues(alpha: 0.8),
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
 }
 
 /// 用户信息骨架屏组件
-class _UserInfoSkeleton extends StatefulWidget {
-  const _UserInfoSkeleton();
-
-  @override
-  State<_UserInfoSkeleton> createState() => _UserInfoSkeletonState();
-}
-
-class _UserInfoSkeletonState extends State<_UserInfoSkeleton>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-    _animation = Tween<double>(
-      begin: 0.3,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-    _animationController.repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                width: 1,
-              ),
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.1),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Row(
-                  children: [
-                    // 头像骨架
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.1 * _animation.value),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    // 用户名骨架
-                    Expanded(
-                      child: Container(
-                        height: 16,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withValues(alpha: 0.1 * _animation.value),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    // 展开图标骨架
-                    Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(4),
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.1 * _animation.value),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}

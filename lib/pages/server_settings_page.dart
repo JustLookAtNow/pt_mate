@@ -69,6 +69,51 @@ class _HealthStatus {
     };
   }
 }
+
+/// 解析 "yyyy-MM-dd HH:mm:ss" 格式的时间字符串
+DateTime? _parseLastAccess(String? lastAccess) {
+  if (lastAccess == null) return null;
+  final raw = lastAccess.trim();
+  if (raw.isEmpty) return null;
+
+  // 期望格式:2025-10-30 11:09:04
+  final parts = raw.split(' ');
+  if (parts.length != 2) return null;
+  final dateParts = parts[0].split('-');
+  final timeParts = parts[1].split(':');
+  if (dateParts.length != 3 || timeParts.length < 2) return null;
+
+  final year = int.tryParse(dateParts[0]);
+  final month = int.tryParse(dateParts[1]);
+  final day = int.tryParse(dateParts[2]);
+  final hour = int.tryParse(timeParts[0]);
+  final minute = int.tryParse(timeParts[1]);
+  final second = timeParts.length > 2 ? int.tryParse(timeParts[2]) : 0;
+
+  if (year == null ||
+      month == null ||
+      day == null ||
+      hour == null ||
+      minute == null ||
+      second == null) {
+    return null;
+  }
+
+  try {
+    return DateTime(year, month, day, hour, minute, second);
+  } catch (_) {
+    return null;
+  }
+}
+
+/// 判断最后访问时间是否超过一个月
+bool _isLastAccessOverMonth(String? lastAccess) {
+  final dt = _parseLastAccess(lastAccess);
+  if (dt == null) return false;
+  final now = DateTime.now();
+  return now.difference(dt).inDays >= 30;
+}
+
 // 站点排序下拉功能已移除
 
 class ServerSettingsPage extends StatefulWidget {
@@ -889,6 +934,29 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                           ),
                                         ),
                                       ),
+                                      // 一个月未登录提醒图标
+                                      if (hs?.profile?.lastAccess != null &&
+                                          hs!.profile!.lastAccess!
+                                              .trim()
+                                              .isNotEmpty &&
+                                          _isLastAccessOverMonth(
+                                            hs.profile!.lastAccess,
+                                          ))
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            left: 6,
+                                          ),
+                                          child: Tooltip(
+                                            message: '超过一个月未登录',
+                                            child: Icon(
+                                              Icons.priority_high,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.error,
+                                              size: 18,
+                                            ),
+                                          ),
+                                        ),
                                       const SizedBox(width: 8),
                                     ],
                                   ),
