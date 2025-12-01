@@ -135,6 +135,7 @@ dependency_overrides:
   flutter_secure_storage_windows: ^4.0.0
 
 flutter_launcher_icons:
+  remove_alpha_ios: true
   android: "launcher_icon"
   ios: true
   image_path: "mt.png"  # 使用项目根目录的 mt.png 作为图标源
@@ -153,11 +154,13 @@ flutter_launcher_icons:
     image_path: "mt.png"
 
 flutter_native_splash:
-  color: "#ffffff"
-  image: mt.png
+  color: "#CDEAFF"
+  color_dark: "#CDEAFF"
+  image: assets/logo/splash.png
   android: true
   ios: true
-  web: true
+  web: false
   android_12:
-    image: mt.png
-    color: "#ffffff"
+    image: assets/logo/splash.png
+    color: "#CDEAFF"
+    color_dark: "#CDEAFF"
