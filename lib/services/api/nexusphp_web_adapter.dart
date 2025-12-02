@@ -1192,7 +1192,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
     // https://www.ptskit.org/download.php?downhash={userId}.{jwt}
     final jwt = getDownLoadHash(_siteConfig.passKey!, id, _siteConfig.userId!);
     if (url != null && url.isNotEmpty) {
-      return url.replaceAll('{jwt}', jwt);
+      return url.replaceAll('{jwt}', jwt).replaceAll('{userId}', _siteConfig.userId!);
     }
     return '${_siteConfig.baseUrl}download.php?downhash=${_siteConfig.userId!}.$jwt';
   }
