@@ -32,6 +32,8 @@ class TransmissionClient implements DownloaderClient {
         'User-Agent': 'PT Mate',
         'Content-Type': 'application/json',
       },
+        followRedirects: true,
+        maxRedirects: 5,
     ));
   }
   
@@ -40,27 +42,29 @@ class TransmissionClient implements DownloaderClient {
   
   /// 构建基础URL，处理各种格式的主机地址
   String _buildBase(TransmissionConfig c) { 
-    var h = c.host.trim(); 
-    if (h.endsWith('/')) h = h.substring(0, h.length - 1); 
-    
-    // 判断端口是否有效，如果没填或者为0，使用协议默认端口
-    final port = (c.port <= 0) ? null : c.port;
-    
-    final hasScheme = h.startsWith('http://') || h.startsWith('https://'); 
-    if (!hasScheme) { 
-      // 使用http协议，如果没有指定端口则使用默认的80
-      return port == null ? 'http://$h' : 'http://$h:$port'; 
-    } 
-    
-    try { 
-      final u = Uri.parse(h); 
-      // 如果URL已经包含端口或者没有指定端口（使用默认端口），直接返回
-      if (u.hasPort || port == null) return h; 
-      // 否则添加指定的端口
-      return '$h:$port'; 
-    } catch (_) { 
-      return h; 
-    } 
+    var urlStr = c.host.trim();
+    // 补全协议
+    if (!urlStr.startsWith(RegExp(r'https?://'))) {
+      urlStr = 'http://$urlStr';
+    }
+
+    try {
+      final uri = Uri.parse(urlStr);
+      // 优先使用配置中的端口，如果配置为0且URL中包含端口则使用URL中的端口
+      final port = (c.port > 0) ? c.port : (uri.hasPort ? uri.port : null);
+
+      // 构建新的URI，保留原有的path
+      final newUri = uri.replace(port: port);
+      var result = newUri.toString();
+
+      // 移除末尾的斜杠，因为API路径通常以斜杠开头
+      if (result.endsWith('/')) {
+        result = result.substring(0, result.length - 1);
+      }
+      return result;
+    } catch (e) {
+      return urlStr;
+    }
   }
   
   /// 获取RPC路径
