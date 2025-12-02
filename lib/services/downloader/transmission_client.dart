@@ -241,12 +241,17 @@ class TransmissionClient implements DownloaderClient {
     
     // Transmission 不支持通过 URL 下载种子文件，只支持磁力链接
     // 对于种子文件，必须先下载并转换为 base64 格式
-    if (params.url.startsWith('magnet:')) {
+    var url = params.url;
+    if (url.startsWith('##')) {
+      url = url.substring(2);
+    }
+
+    if (url.startsWith('magnet:')) {
       // 磁力链接可以直接传递
-      arguments['filename'] = params.url;
+      arguments['filename'] = url;
     } else {
       // 种子文件 URL，需要下载并转换为 base64
-      final torrentData = await _downloadTorrentFile(params.url);
+      final torrentData = await _downloadTorrentFile(url);
       arguments['metainfo'] = base64Encode(torrentData);
     }
     

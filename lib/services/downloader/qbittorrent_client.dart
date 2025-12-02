@@ -274,11 +274,19 @@ class QbittorrentClient implements DownloaderClient {
     final body = <String, dynamic>{};
 
     // 本地中转支持：当启用且为种子URL时，先在本地下载种子并以文件上传
-    final useRelay = config.useLocalRelay;
+    // 如果URL以 ## 开头，强制使用本地中转
+    var url = params.url;
+    var forceRelay = false;
+    if (url.startsWith('##')) {
+      url = url.substring(2);
+      forceRelay = true;
+    }
+
+    final useRelay = config.useLocalRelay || forceRelay;
     if (!useRelay) {
-      body['urls'] = params.url;
+      body['urls'] = url;
     } else {
-      final torrentData = await _downloadTorrentFile(params.url);
+      final torrentData = await _downloadTorrentFile(url);
       body['torrents'] = MultipartFile.fromBytes(
         torrentData,
         filename: 'ptmate.torrent',
