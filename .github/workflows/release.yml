@@ -563,6 +563,9 @@ jobs:
       env:
         UPDATE_SERVER_URL: ${{ vars.UPDATE_SERVER_URL }}
         GITHUB_WEBHOOK_SECRET: ${{ secrets.UPDATE_WEBHOOK_SECRET }}
+        VERSION_TAG: ${{ steps.version.outputs.tag }}
+        VERSION: ${{ steps.version.outputs.version }}
+        RELEASE_NOTES: ${{ steps.commit_message.outputs.message }}
       run: |
         set -euo pipefail
 
@@ -570,10 +573,6 @@ jobs:
           echo "UPDATE_SERVER_URL is not set. Skipping update server notification."
           exit 0
         fi
-
-        VERSION_TAG="${{ steps.version.outputs.tag }}"
-        VERSION="${{ steps.version.outputs.version }}"
-        RELEASE_NOTES="${{ steps.commit_message.outputs.message }}"
 
         DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/tag/${VERSION_TAG}"
         
