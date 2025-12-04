@@ -1,5 +1,8 @@
 import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
+
 import 'downloader_client.dart';
 import 'downloader_config.dart';
 import 'downloader_models.dart';
@@ -33,6 +36,17 @@ class QbittorrentClient implements DownloaderClient {
         maxRedirects: 5,
       ),
     );
+    // 仅在用户明确允许时才禁用证书验证
+    if (config.allowSelfSignedCert) {
+      _dio.httpClientAdapter = IOHttpClientAdapter(
+        createHttpClient: () {
+          final HttpClient client = HttpClient()
+            ..badCertificateCallback =
+                (X509Certificate cert, String host, int port) => true;
+          return client;
+        },
+      );
+    }
   }
 
   /// 获取基础URL
