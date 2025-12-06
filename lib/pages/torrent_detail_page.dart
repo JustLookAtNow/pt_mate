@@ -1969,9 +1969,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       child: Scaffold(
       appBar: AppBar(
         title: SelectableText(
-          widget.torrentItem.name.length > 50
-              ? '${widget.torrentItem.name.substring(0, 50)}...'
-              : widget.torrentItem.name,
+          widget.torrentItem.name,
           style: TextStyle(
             fontSize: 16,
             color: Theme.of(context).brightness == Brightness.light
@@ -2065,6 +2063,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
             ),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
         children: [
           // 收藏按钮
           FloatingActionButton(
