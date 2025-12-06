@@ -1131,6 +1131,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         savePath,
         autoTMM,
         startPaused,
+        siteConfig,
       );
     } catch (e) {
       if (mounted) {
@@ -1160,6 +1161,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     String? savePath,
     bool? autoTMM,
     bool? startPaused,
+    SiteConfig siteConfig,
   ) async {
     try {
       // 使用统一的下载器服务
@@ -1174,6 +1176,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           autoTMM: autoTMM,
           startPaused: startPaused,
         ),
+        siteConfig: siteConfig,
       );
 
       if (mounted) {
@@ -1328,6 +1331,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
             savePath: savePath,
             autoTMM: autoTMM,
           ),
+          siteConfig: siteConfig,
         );
 
         successCount++;

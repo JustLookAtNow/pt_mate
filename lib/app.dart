@@ -71,7 +71,16 @@ class AppState extends ChangeNotifier {
 
       // 应用启动时首先检查并执行数据迁移
       final swMigrate = Stopwatch()..start();
-      await StorageService.instance.checkAndMigrate();
+      try {
+        await StorageService.instance.checkAndMigrate();
+      } catch (e, s) {
+        _logger.e(
+          'StorageService.checkAndMigrate failed',
+          error: e,
+          stackTrace: s,
+        );
+        rethrow;
+      }
       swMigrate.stop();
       if (kDebugMode) {
         _logger.d('AppState: 数据迁移耗时=${swMigrate.elapsedMilliseconds}ms');
@@ -79,7 +88,16 @@ class AppState extends ChangeNotifier {
       
       // 加载活跃站点配置
       final swLoadSite = Stopwatch()..start();
-      _site = await StorageService.instance.getActiveSiteConfig();
+      try {
+        _site = await StorageService.instance.getActiveSiteConfig();
+      } catch (e, s) {
+        _logger.e(
+          'StorageService.getActiveSiteConfig failed',
+          error: e,
+          stackTrace: s,
+        );
+        rethrow;
+      }
       swLoadSite.stop();
       if (kDebugMode) {
         _logger.d('AppState: 加载活跃站点耗时=${swLoadSite.elapsedMilliseconds}ms, siteId=${_site?.id}');
@@ -87,7 +105,12 @@ class AppState extends ChangeNotifier {
 
       // 初始化API服务（适配器）
       final swApi = Stopwatch()..start();
-      await ApiService.instance.init();
+      try {
+        await ApiService.instance.init();
+      } catch (e, s) {
+        _logger.e('ApiService.init failed', error: e, stackTrace: s);
+        rethrow;
+      }
       swApi.stop();
       if (kDebugMode) {
         _logger.d('AppState: ApiService.init耗时=${swApi.elapsedMilliseconds}ms');
@@ -102,7 +125,16 @@ class AppState extends ChangeNotifier {
       notifyListeners();
 
       // 持久化在迁移过程中更新的配置
-      await StorageService.instance.persistPendingConfigUpdates();
+      try {
+        await StorageService.instance.persistPendingConfigUpdates();
+      } catch (e, s) {
+        _logger.e(
+          'StorageService.persistPendingConfigUpdates failed',
+          error: e,
+          stackTrace: s,
+        );
+        // Don't rethrow here, as it's not critical
+      }
       
       // 应用启动时检查自动同步
       Future.microtask(() => _checkAutoSync());
@@ -1144,6 +1176,7 @@ class _HomePageState extends State<HomePage> {
           autoTMM: autoTMM,
           startPaused: startPaused,
         ),
+        siteConfig: _currentSite,
       );
 
       if (mounted) {

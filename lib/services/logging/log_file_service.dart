@@ -11,6 +11,7 @@ class LogFileService {
   IOSink? _sink;
   DateTime? _currentDate;
   String? _currentPath;
+  final _lock = <void>[]; // Simple lock mechanism
 
   bool get enabled => _enabled;
 
@@ -46,12 +47,22 @@ class LogFileService {
   void append(String line) {
     if (!_enabled || kIsWeb) return;
     final now = DateTime.now();
+    
+    // Check if rotation is needed
     if (_currentDate == null || !_isSameDay(_currentDate!, now)) {
       _rotateTo(now);
     }
+    
+    // If locked (initializing/rotating), we might lose this log or need to buffer.
+    // For simplicity and safety, we just try to write if sink is available.
+    // Ideally we should buffer, but let's first prevent the crash.
     final sink = _sink;
     if (sink != null) {
-      sink.writeln('[${_ts(now)}] $line');
+      try {
+        sink.writeln('[${_ts(now)}] $line');
+      } catch (_) {
+        // Ignore write errors to prevent app crash
+      }
     }
   }
 
@@ -77,16 +88,26 @@ class LogFileService {
   }
 
   Future<void> _ensureSinkForToday() async {
-    final base = await _resolveBaseDir();
-    final logsDir = Directory('${base.path}${Platform.pathSeparator}logs');
-    if (!await logsDir.exists()) {
-      await logsDir.create(recursive: true);
+    // Simple lock check
+    if (_lock.isNotEmpty) return;
+    _lock.add(null); // Acquire lock
+
+    try {
+      final base = await _resolveBaseDir();
+      final logsDir = Directory('${base.path}${Platform.pathSeparator}logs');
+      if (!await logsDir.exists()) {
+        await logsDir.create(recursive: true);
+      }
+      final name = _fileNameFor(DateTime.now());
+      final file = File('${logsDir.path}${Platform.pathSeparator}$name');
+      _currentPath = file.path;
+      await _closeSink();
+      _sink = file.openWrite(mode: FileMode.append);
+    } catch (_) {
+      // Ignore initialization errors
+    } finally {
+      if (_lock.isNotEmpty) _lock.removeLast(); // Release lock
     }
-    final name = _fileNameFor(DateTime.now());
-    final file = File('${logsDir.path}${Platform.pathSeparator}$name');
-    _currentPath = file.path;
-    await _closeSink();
-    _sink = file.openWrite(mode: FileMode.append);
   }
 
   Future<void> _closeSink() async {

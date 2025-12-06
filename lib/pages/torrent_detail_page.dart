@@ -638,6 +638,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
           autoTMM: autoTMM,
           startPaused: startPaused,
         ),
+        siteConfig: widget.siteConfig,
       );
 
       if (mounted) {

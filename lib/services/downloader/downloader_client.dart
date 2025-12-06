@@ -1,3 +1,4 @@
+import '../../models/app_models.dart';
 import 'downloader_models.dart';
 
 /// 抽象下载器客户端接口
@@ -27,7 +28,8 @@ abstract class DownloaderClient {
   /// 添加下载任务
   /// 
   /// [params] 添加任务的参数，包括URL、分类、标签等
-  Future<void> addTask(AddTaskParams params);
+  /// [siteConfig] 站点配置，用于需要Cookie鉴权的下载
+  Future<void> addTask(AddTaskParams params, {SiteConfig? siteConfig});
   
   /// 暂停下载任务
   /// 
