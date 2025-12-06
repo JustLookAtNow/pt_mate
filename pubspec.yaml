@@ -68,6 +68,7 @@ dependencies:
   get_it: ^9.0.5
   image: ^4.1.7
   share_plus: ^12.0.1
+  xml: ^6.5.0
 
 
 dev_dependencies:

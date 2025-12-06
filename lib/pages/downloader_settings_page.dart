@@ -355,6 +355,8 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                           subtitle = '${c.host}:${c.port} · ${c.username}';
                         } else if (c is TransmissionConfig) {
                           subtitle = '${c.host}:${c.port} · ${c.username}';
+                        } else if (c is RuTorrentConfig) {
+                          subtitle = '${c.host}:${c.port} · ${c.username}';
                         }
                         return ListTile(
                           dense: true,
@@ -512,6 +514,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
   String? _testMsg;
   bool? _testOk;
   bool _useLocalRelay = false; // 本地中转选项状态
+  bool _allowSelfSignedCert = false; // 允许自签名证书选项状态
   DownloaderType _selectedType = DownloaderType.qbittorrent; // 选择的下载器类型
 
   @override
@@ -521,7 +524,8 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
     if (e != null) {
       _nameCtrl.text = e.name;
       _selectedType = e.type;
-      
+      _allowSelfSignedCert = e.allowSelfSignedCert;
+
       if (e is QbittorrentConfig) {
         _hostCtrl.text = e.host;
         _portCtrl.text = e.port.toString();
@@ -532,10 +536,16 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
         _portCtrl.text = e.port.toString();
         _userCtrl.text = e.username;
         _useLocalRelay = e.useLocalRelay;
+      } else if (e is RuTorrentConfig) {
+        _hostCtrl.text = e.host;
+        _portCtrl.text = e.port.toString();
+        _userCtrl.text = e.username;
+        _useLocalRelay = e.useLocalRelay;
       }
     } else {
-      // 新建配置时，如果是 Transmission 类型，默认开启本地中转
-      if (_selectedType == DownloaderType.transmission) {
+      // 新建配置时，如果是 Transmission 或 ruTorrent 类型，默认开启本地中转
+      if (_selectedType == DownloaderType.transmission ||
+          _selectedType == DownloaderType.rutorrent) {
         _useLocalRelay = true;
       }
     }
@@ -576,6 +586,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
         'port': port,
         'username': user,
         'useLocalRelay': _useLocalRelay, // 包含本地中转选项
+        'allowSelfSignedCert': _allowSelfSignedCert, // 包含自签名证书选项
       },
     };
     
@@ -649,6 +660,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
           'port': port,
           'username': user,
           'useLocalRelay': _useLocalRelay, // 包含本地中转选项
+          'allowSelfSignedCert': _allowSelfSignedCert, // 包含自签名证书选项
         },
       };
 
@@ -742,8 +754,9 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
                         if (newType != null) {
                           setState(() {
                             _selectedType = newType;
-                            // 当选择 Transmission 时，自动开启本地中转
-                            if (newType == DownloaderType.transmission) {
+                            // 当选择 Transmission 或 ruTorrent 时，自动开启本地中转
+                            if (newType == DownloaderType.transmission ||
+                                newType == DownloaderType.rutorrent) {
                               _useLocalRelay = true;
                             }
                           });
@@ -806,6 +819,8 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
                                 Text(
                                   _selectedType == DownloaderType.transmission
                                       ? 'Transmission 必须启用本地中转（种子文件需要先下载到本地）'
+                                      : _selectedType == DownloaderType.rutorrent
+                                      ? 'ruTorrent 必须启用本地中转（种子文件需要先下载到本地）'
                                       : '启用后先下载种子文件到本地，再提交给下载器',
                                   style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(color: Colors.grey.shade600),
@@ -815,13 +830,62 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
                           ),
                           Switch(
                             value: _useLocalRelay,
-                            onChanged: _selectedType == DownloaderType.transmission
-                                ? null // Transmission 类型时禁用开关
+                            onChanged: (_selectedType == DownloaderType.transmission ||
+                                    _selectedType == DownloaderType.rutorrent)
+                                ? null // Transmission 和 ruTorrent 类型时禁用开关
                                 : (value) {
                                     setState(() {
                                       _useLocalRelay = value;
                                     });
                                   },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // 自签名证书选项
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      '允许自签名证书',
+                                      style: Theme.of(context).textTheme.titleSmall,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Icon(
+                                      Icons.warning_amber_rounded,
+                                      size: 18,
+                                      color: Colors.orange.shade700,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '警告：启用后将禁用 SSL/TLS 证书验证，可能导致中间人攻击风险。仅在使用自签名证书时启用。',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: Colors.orange.shade700),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: _allowSelfSignedCert,
+                            onChanged: (value) {
+                              setState(() {
+                                _allowSelfSignedCert = value;
+                              });
+                            },
                           ),
                         ],
                       ),

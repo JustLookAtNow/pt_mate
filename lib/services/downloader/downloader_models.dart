@@ -6,13 +6,14 @@ library;
 /// 下载器类型枚举
 enum DownloaderType {
   qbittorrent('qbittorrent', 'qBittorrent'),
-  transmission('transmission', 'Transmission');
+  transmission('transmission', 'Transmission'),
+  rutorrent('rutorrent', 'ruTorrent');
 
   const DownloaderType(this.value, this.displayName);
-  
+
   final String value;
   final String displayName;
-  
+
   static DownloaderType fromString(String value) {
     for (final type in DownloaderType.values) {
       if (type.value == value) {
