@@ -30,23 +30,9 @@ jobs:
 
             const now = new Date();
             for (const issue of issues) {
-              let lastActivityTime;
-              
-              // 获取最后一条评论的时间
-              if (issue.comments > 0) {
-                const { data: comments } = await github.rest.issues.listComments({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issue.number,
-                  per_page: 1,
-                  sort: "created",
-                  direction: "desc"
-                });
-                lastActivityTime = new Date(comments[0].created_at);
-              } else {
-                // 如果没有评论，使用 issue 创建时间
-                lastActivityTime = new Date(issue.created_at);
-              }
+              // 使用 updated_at 作为最后活动时间，涵盖评论、修改、标签变动等
+              // 这样可以避免仅检查 issue.comments 导致忽略其他类型活跃（如标签更新、编辑等）的问题
+              const lastActivityTime = new Date(issue.updated_at);
               
               const daysPassed = (now - lastActivityTime) / (1000 * 60 * 60 * 24);
 

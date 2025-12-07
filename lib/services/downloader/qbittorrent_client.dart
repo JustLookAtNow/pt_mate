@@ -1,5 +1,8 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
+import '../../models/app_models.dart';
+import '../api/nexusphp_web_adapter.dart';
 import 'downloader_client.dart';
 import 'downloader_config.dart';
 import 'downloader_models.dart';
@@ -29,6 +32,8 @@ class QbittorrentClient implements DownloaderClient {
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 30),
         headers: {'User-Agent': 'PT Mate'},
+        followRedirects: true,
+        maxRedirects: 5,
       ),
     );
   }
@@ -38,26 +43,28 @@ class QbittorrentClient implements DownloaderClient {
 
   /// 构建基础URL，处理各种格式的主机地址
   String _buildBase(QbittorrentConfig c) {
-    var h = c.host.trim();
-    if (h.endsWith('/')) h = h.substring(0, h.length - 1);
-
-    // 判断端口是否有效，如果没填或者为0，使用协议默认端口
-    final port = (c.port <= 0) ? null : c.port;
-
-    final hasScheme = h.startsWith('http://') || h.startsWith('https://');
-    if (!hasScheme) {
-      // 使用http协议，如果没有指定端口则使用默认的80
-      return port == null ? 'http://$h' : 'http://$h:$port';
+    var urlStr = c.host.trim();
+    // 补全协议
+    if (!urlStr.startsWith(RegExp(r'https?://'))) {
+      urlStr = 'http://$urlStr';
     }
 
     try {
-      final u = Uri.parse(h);
-      // 如果URL已经包含端口或者没有指定端口（使用默认端口），直接返回
-      if (u.hasPort || port == null) return h;
-      // 否则添加指定的端口
-      return '$h:$port';
-    } catch (_) {
-      return h;
+      final uri = Uri.parse(urlStr);
+      // 优先使用配置中的端口，如果配置为0且URL中包含端口则使用URL中的端口
+      final port = (c.port > 0) ? c.port : (uri.hasPort ? uri.port : null);
+
+      // 构建新的URI，保留原有的path
+      final newUri = uri.replace(port: port);
+      var result = newUri.toString();
+
+      // 移除末尾的斜杠，因为API路径通常以斜杠开头
+      if (result.endsWith('/')) {
+        result = result.substring(0, result.length - 1);
+      }
+      return result;
+    } catch (e) {
+      return urlStr;
     }
   }
 
@@ -270,15 +277,27 @@ class QbittorrentClient implements DownloaderClient {
   }
 
   @override
-  Future<void> addTask(AddTaskParams params) async {
+  Future<void> addTask(AddTaskParams params, {SiteConfig? siteConfig}) async {
     final body = <String, dynamic>{};
 
     // 本地中转支持：当启用且为种子URL时，先在本地下载种子并以文件上传
-    final useRelay = config.useLocalRelay;
+    // 如果URL以 ## 开头，强制使用本地中转
+    var url = params.url;
+    var forceRelay = false;
+    if (url.startsWith('##')) {
+      url = url.substring(2);
+      forceRelay = true;
+    }
+
+
+    final useRelay = config.useLocalRelay || forceRelay;
     if (!useRelay) {
-      body['urls'] = params.url;
+      body['urls'] = url;
     } else {
-      final torrentData = await _downloadTorrentFile(params.url);
+      final torrentData = await _downloadTorrentFile(
+        url,
+        siteConfig: siteConfig,
+      );
       body['torrents'] = MultipartFile.fromBytes(
         torrentData,
         filename: 'ptmate.torrent',
@@ -301,38 +320,82 @@ class QbittorrentClient implements DownloaderClient {
   }
 
   /// 下载种子文件并返回字节数据（用于本地中转）
-  Future<List<int>> _downloadTorrentFile(String url) async {
-    try {
-      final response = await _dio.get<List<int>>(
-        url,
-        options: Options(
-          responseType: ResponseType.bytes,
-          followRedirects: true,
-          maxRedirects: 5,
-          validateStatus: (status) => status != null && status < 400,
-        ),
-      );
+  Future<List<int>> _downloadTorrentFile(
+    String url, {
+    SiteConfig? siteConfig,
+  }) async {
+    List<int> result;
 
-      if (response.data != null) {
-        return response.data!;
-      } else {
-        throw Exception('Failed to download torrent file: empty response');
+    // 如果是NexusPHPWeb站点，使用适配器下载
+    if (siteConfig?.siteType == SiteType.nexusphpweb) {
+      try {
+        final adapter = NexusPHPWebAdapter();
+        await adapter.init(siteConfig!);
+        result = await adapter.downloadTorrent(url);
+      } catch (e) {
+        // 如果适配器下载失败，尝试降级到普通下载（虽然可能因为缺Cookie失败）
+        // 或者直接抛出异常
+        throw Exception('NexusPHPWebAdapter下载失败: $e');
       }
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 401) {
-        throw Exception('Authentication failed when downloading torrent file');
-      }
-
-      if (e.response?.statusCode != null && e.response!.statusCode! >= 400) {
-        throw HttpException(
-          'HTTP ${e.response!.statusCode} when downloading torrent file: ${e.response!.data}',
+    } else {
+      try {
+        final response = await _dio.get<List<int>>(
+          url,
+          options: Options(
+            responseType: ResponseType.bytes,
+            followRedirects: true,
+            maxRedirects: 5,
+            validateStatus: (status) => status != null && status < 400,
+          ),
         );
-      }
 
-      throw Exception('Failed to download torrent file: ${e.message}');
-    } catch (e) {
-      throw Exception('Failed to download torrent file: $e');
+        if (response.data != null) {
+          result = response.data!;
+        } else {
+          throw Exception('Failed to download torrent file: empty response');
+        }
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 401) {
+          throw Exception(
+            'Authentication failed when downloading torrent file',
+          );
+        }
+
+        if (e.response?.statusCode != null && e.response!.statusCode! >= 400) {
+          throw HttpException(
+            'HTTP ${e.response!.statusCode} when downloading torrent file: ${e.response!.data}',
+          );
+        }
+
+        throw Exception('Failed to download torrent file: ${e.message}');
+      } catch (e) {
+        throw Exception('Failed to download torrent file: $e');
+      }
     }
+
+    // DEBUG: 保存文件以供检查
+    if (kDebugMode) {
+      try {
+        final debugFile = File('/tmp/debug_ptmate.torrent');
+        await debugFile.writeAsBytes(result);
+        // ignore: avoid_print
+        print(
+          'DEBUG: Torrent file saved to ${debugFile.path}, size: ${result.length} bytes',
+        );
+
+        if (result.isNotEmpty) {
+          // 打印前100个字符，检查是否为HTML
+          final prefix = String.fromCharCodes(result.take(100).toList());
+          // ignore: avoid_print
+          print('DEBUG: File content prefix: $prefix');
+        }
+      } catch (e) {
+        // ignore: avoid_print
+        print('DEBUG: Failed to save debug file: $e');
+      }
+    }
+
+    return result;
   }
 
   /// 根据版本获取暂停任务的 API 路径

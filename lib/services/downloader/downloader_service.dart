@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
+import '../../models/app_models.dart';
 import 'downloader_config.dart';
 import 'downloader_factory.dart';
 import 'downloader_models.dart';
@@ -140,9 +141,10 @@ class DownloaderService {
     required DownloaderConfig config,
     required String password,
     required AddTaskParams params,
+    SiteConfig? siteConfig,
   }) async {
     final client = DownloaderFactory.getClient(config: config, password: password);
-    await client.addTask(params);
+    await client.addTask(params, siteConfig: siteConfig);
   }
   
   /// 暂停下载任务

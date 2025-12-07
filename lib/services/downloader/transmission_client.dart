@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
+import '../../models/app_models.dart';
+import '../api/nexusphp_web_adapter.dart';
 import 'downloader_client.dart';
 import 'downloader_config.dart';
 import 'downloader_models.dart';
@@ -32,6 +35,8 @@ class TransmissionClient implements DownloaderClient {
         'User-Agent': 'PT Mate',
         'Content-Type': 'application/json',
       },
+        followRedirects: true,
+        maxRedirects: 5,
     ));
   }
   
@@ -40,27 +45,29 @@ class TransmissionClient implements DownloaderClient {
   
   /// 构建基础URL，处理各种格式的主机地址
   String _buildBase(TransmissionConfig c) { 
-    var h = c.host.trim(); 
-    if (h.endsWith('/')) h = h.substring(0, h.length - 1); 
-    
-    // 判断端口是否有效，如果没填或者为0，使用协议默认端口
-    final port = (c.port <= 0) ? null : c.port;
-    
-    final hasScheme = h.startsWith('http://') || h.startsWith('https://'); 
-    if (!hasScheme) { 
-      // 使用http协议，如果没有指定端口则使用默认的80
-      return port == null ? 'http://$h' : 'http://$h:$port'; 
-    } 
-    
-    try { 
-      final u = Uri.parse(h); 
-      // 如果URL已经包含端口或者没有指定端口（使用默认端口），直接返回
-      if (u.hasPort || port == null) return h; 
-      // 否则添加指定的端口
-      return '$h:$port'; 
-    } catch (_) { 
-      return h; 
-    } 
+    var urlStr = c.host.trim();
+    // 补全协议
+    if (!urlStr.startsWith(RegExp(r'https?://'))) {
+      urlStr = 'http://$urlStr';
+    }
+
+    try {
+      final uri = Uri.parse(urlStr);
+      // 优先使用配置中的端口，如果配置为0且URL中包含端口则使用URL中的端口
+      final port = (c.port > 0) ? c.port : (uri.hasPort ? uri.port : null);
+
+      // 构建新的URI，保留原有的path
+      final newUri = uri.replace(port: port);
+      var result = newUri.toString();
+
+      // 移除末尾的斜杠，因为API路径通常以斜杠开头
+      if (result.endsWith('/')) {
+        result = result.substring(0, result.length - 1);
+      }
+      return result;
+    } catch (e) {
+      return urlStr;
+    }
   }
   
   /// 获取RPC路径
@@ -137,37 +144,69 @@ class TransmissionClient implements DownloaderClient {
     }
   }
   
-  /// 下载种子文件并返回字节数据
-  Future<List<int>> _downloadTorrentFile(String url) async {
-    try {
-      final response = await _dio.get<List<int>>(
-        url,
-        options: Options(
-          responseType: ResponseType.bytes,
-          followRedirects: true,
-          maxRedirects: 5,
-          validateStatus: (status) => status != null && status < 400,
-        ),
-      );
-      
-      if (response.data != null) {
-        return response.data!;
-      } else {
-        throw Exception('Failed to download torrent file: empty response');
+  /// 下载种子文件并返回字节数据（用于本地中转）
+  Future<List<int>> _downloadTorrentFile(
+    String url, {
+    SiteConfig? siteConfig,
+  }) async {
+    List<int> result;
+
+    // 如果是NexusPHPWeb站点，使用适配器下载
+    if (siteConfig?.siteType == SiteType.nexusphpweb) {
+      try {
+        final adapter = NexusPHPWebAdapter();
+        await adapter.init(siteConfig!);
+        result = await adapter.downloadTorrent(url);
+      } catch (e) {
+        // 如果适配器下载失败，尝试降级到普通下载（虽然可能因为缺Cookie失败）
+        // 或者直接抛出异常
+        throw Exception('NexusPHPWebAdapter下载失败: $e');
       }
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 401) {
-        throw Exception('Authentication failed when downloading torrent file');
+    } else {
+      try {
+        final response = await _dio.get<List<int>>(
+          url,
+          options: Options(
+            responseType: ResponseType.bytes,
+            followRedirects: true,
+            maxRedirects: 5,
+            validateStatus: (status) => status != null && status < 400,
+          ),
+        );
+
+        if (response.data != null) {
+          result = response.data!;
+        } else {
+          throw Exception('Request failed: empty response');
+        }
+      } on DioException catch (e) {
+        throw Exception('Request failed: ${e.message}');
       }
-      
-      if (e.response?.statusCode != null && e.response!.statusCode! >= 400) {
-        throw HttpException('HTTP ${e.response!.statusCode} when downloading torrent file: ${e.response!.data}');
-      }
-      
-      throw Exception('Failed to download torrent file: ${e.message}');
-    } catch (e) {
-      throw Exception('Failed to download torrent file: $e');
     }
+
+    // DEBUG: 保存文件以供检查
+    if (kDebugMode) {
+      try {
+        final debugFile = File('/tmp/debug_ptmate_transmission.torrent');
+        await debugFile.writeAsBytes(result);
+        // ignore: avoid_print
+        print(
+          'DEBUG: Torrent file saved to ${debugFile.path}, size: ${result.length} bytes',
+        );
+
+        if (result.isNotEmpty) {
+          // 打印前100个字符，检查是否为HTML
+          final prefix = String.fromCharCodes(result.take(100).toList());
+          // ignore: avoid_print
+          print('DEBUG: File content prefix: $prefix');
+        }
+      } catch (e) {
+        // ignore: avoid_print
+        print('DEBUG: Failed to save debug file: $e');
+      }
+    }
+
+    return result;
   }
   
   @override
@@ -236,17 +275,25 @@ class TransmissionClient implements DownloaderClient {
   }
   
   @override
-  Future<void> addTask(AddTaskParams params) async {
+  Future<void> addTask(AddTaskParams params, {SiteConfig? siteConfig}) async {
     final arguments = <String, dynamic>{};
     
     // Transmission 不支持通过 URL 下载种子文件，只支持磁力链接
     // 对于种子文件，必须先下载并转换为 base64 格式
-    if (params.url.startsWith('magnet:')) {
+    var url = params.url;
+    if (url.startsWith('##')) {
+      url = url.substring(2);
+    }
+
+    if (url.startsWith('magnet:')) {
       // 磁力链接可以直接传递
-      arguments['filename'] = params.url;
+      arguments['filename'] = url;
     } else {
       // 种子文件 URL，需要下载并转换为 base64
-      final torrentData = await _downloadTorrentFile(params.url);
+      final torrentData = await _downloadTorrentFile(
+        url,
+        siteConfig: siteConfig,
+      );
       arguments['metainfo'] = base64Encode(torrentData);
     }
     

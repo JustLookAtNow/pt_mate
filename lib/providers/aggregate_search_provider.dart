@@ -21,6 +21,10 @@ class AggregateSearchProvider extends ChangeNotifier {
   AggregateSearchCancelToken? _cancelToken;
   bool _cancelled = false;
 
+  // 标签筛选状态
+  final Set<TagType> _includedTags = {};
+  final Set<TagType> _excludedTags = {};
+
   // Getters
   String get searchKeyword => _searchKeyword;
   String get selectedStrategy => _selectedStrategy;
@@ -34,6 +38,26 @@ class AggregateSearchProvider extends ChangeNotifier {
   AggregateSearchProgress? get searchProgress => _searchProgress;
   AggregateSearchCancelToken? get cancelToken => _cancelToken;
   bool get cancelled => _cancelled;
+  Set<TagType> get includedTags => _includedTags;
+  Set<TagType> get excludedTags => _excludedTags;
+
+  // 获取经过标签筛选后的结果
+  List<AggregateSearchResultItem> get filteredResults {
+    if (_includedTags.isEmpty && _excludedTags.isEmpty) {
+      return _searchResults;
+    }
+    return _searchResults.where((item) {
+      // 包含筛选:必须包含所有选中的标签
+      for (final tag in _includedTags) {
+        if (!item.torrent.tags.contains(tag)) return false;
+      }
+      // 排除筛选:不能包含任何选中的标签
+      for (final tag in _excludedTags) {
+        if (item.torrent.tags.contains(tag)) return false;
+      }
+      return true;
+    }).toList();
+  }
 
   // Setters
   void setSearchKeyword(String keyword) {
@@ -120,6 +144,29 @@ class AggregateSearchProvider extends ChangeNotifier {
     _searchProgress = null;
     _cancelToken = null;
     _cancelled = false;
+    _includedTags.clear();
+    _excludedTags.clear();
+    notifyListeners();
+  }
+
+  /// 设置包含标签
+  void setIncludedTags(Set<TagType> tags) {
+    _includedTags.clear();
+    _includedTags.addAll(tags);
+    notifyListeners();
+  }
+
+  /// 设置排除标签
+  void setExcludedTags(Set<TagType> tags) {
+    _excludedTags.clear();
+    _excludedTags.addAll(tags);
+    notifyListeners();
+  }
+
+  /// 清空标签筛选
+  void clearTagFilters() {
+    _includedTags.clear();
+    _excludedTags.clear();
     notifyListeners();
   }
 

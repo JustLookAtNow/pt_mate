@@ -198,6 +198,22 @@
         - `regexp`：正则表达式字符串，用于提取匹配的部分。
       - `index`：如果正则表达式有捕获组，这里可以指定提取哪个组的内容。
 
+##### search模块下的一下特殊字段说明
+- `fields`
+  - `downloadUrl.value`: 下载地址，默认的策略为：`download.php?downhash={userId}.{jwt}`,如果符合默认策略本字段则可以不用配置。
+   可以自定义成别的格式，比如：`{baseUrl}/download.php?id={torrentId}&passkey={passKey}&https=1`。有五个变量可以被自动解析：
+    - `{baseUrl}`：网站基础 URL
+    - `{torrentId}`：种子 ID
+    - `{passKey}`：用户密钥
+    - `{userId}`：用户 ID
+    - `{jwt}`：下载令牌
+  
+    特别注意：这里的地址都是带鉴权的，一般位于种子详情页的'种子链接'条目中，是可以作为独立地址去下载的。
+    
+    最后，如果逻辑比较复杂无法用这些变量拼接出来可以使用`##`开头强制启用本网站本地中转下载，强制启用后将覆盖用户的手动配置，
+    比如：`##{baseUrl}/download.php?id={torrentId}`。本地中转模式下会启用cookie先将torrent下载到本地然后推送到下载器。
+
+
 ## 网站类型说明
 
 ### M-Team 类型

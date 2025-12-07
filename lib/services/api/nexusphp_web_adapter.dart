@@ -486,19 +486,19 @@ class NexusPHPWebAdapter extends SiteAdapter {
             if (previousSibling != null) {
               next.add(previousSibling);
             }
-          } else if(part == 'nextParsed'){
+          } else if (part == 'nextParsed') {
             // 处理 nextParsed 关键字，获取下一个兄弟元素(包括非标签)
             final nextParsed = element.nextParsed;
             if (nextParsed != null) {
               next.add(nextParsed);
             }
-          } else if(part == 'previousParsed'){
+          } else if (part == 'previousParsed') {
             // 处理 prevParsed 关键字，获取上一个兄弟元素(包括非标签)
             final prevParsed = element.previousParsed;
             if (prevParsed != null) {
               next.add(prevParsed);
             }
-          } else if(part == 'parent') {
+          } else if (part == 'parent') {
             // 处理 parent 关键字，获取父元素
             final parent = element.parent;
             if (parent != null) {
@@ -583,7 +583,9 @@ class NexusPHPWebAdapter extends SiteAdapter {
     }
 
     // 处理单个选择器
-    final containsAllMatch = RegExp(r'^([^:]*):contains\((.*)\)$').firstMatch(selector);
+    final containsAllMatch = RegExp(
+      r'^([^:]*):contains\((.*)\)$',
+    ).firstMatch(selector);
     if (containsAllMatch != null) {
       final preSelector = (containsAllMatch.group(1) ?? '').trim();
       final expr = (containsAllMatch.group(2) ?? '').trim();
@@ -858,6 +860,67 @@ class NexusPHPWebAdapter extends SiteAdapter {
       );
     } catch (e) {
       throw Exception('搜索种子失败: $e');
+    }
+  }
+
+  /// 下载种子文件
+  ///
+  /// [url] 种子文件的下载链接（相对路径或绝对路径）
+  /// 返回种子文件的字节数据
+  Future<List<int>> downloadTorrent(String url) async {
+    try {
+      // 确保URL是相对路径或完整的BaseURL路径
+      String downloadUrl = url;
+      if (url.startsWith('http')) {
+        // 如果是完整URL，检查是否属于当前站点
+        if (!url.startsWith(_siteConfig.baseUrl)) {
+          // 如果不属于当前站点，直接使用Dio下载（带Cookie可能会有问题，但尝试一下）
+          // 或者这里应该抛出异常？通常下载链接应该是站内的
+        }
+      }
+
+      _logger.i('NexusPHPWebAdapter: Downloading torrent from $downloadUrl');
+
+      final response = await _dio.get<List<int>>(
+        downloadUrl,
+        options: Options(
+          responseType: ResponseType.bytes,
+          followRedirects: true,
+          maxRedirects: 5,
+          validateStatus: (status) => status != null && status < 400,
+        ),
+      );
+
+      _logger.i(
+        'NexusPHPWebAdapter: Download finished. Status: ${response.statusCode}',
+      );
+      _logger.d('NexusPHPWebAdapter: Response headers: ${response.headers}');
+      _logger.d('NexusPHPWebAdapter: Final URI: ${response.realUri}');
+
+      if (response.realUri.toString().contains('login') ||
+          response.realUri.toString().contains('verify')) {
+        throw Exception(
+          'Download redirected to login/verify page. Check cookies.',
+        );
+      }
+
+      final contentType = response.headers.value('content-type');
+      if (contentType != null &&
+          !contentType.contains('bittorrent') &&
+          !contentType.contains('octet-stream')) {
+        _logger.w(
+          'NexusPHPWebAdapter: Warning - Content-Type is $contentType, might not be a torrent file.',
+        );
+      }
+
+      if (response.data != null) {
+        return response.data!;
+      } else {
+        throw Exception('下载种子文件失败: 响应为空');
+      }
+    } catch (e) {
+      _logger.e('下载种子文件失败: $e');
+      rethrow;
     }
   }
 
@@ -1192,7 +1255,9 @@ class NexusPHPWebAdapter extends SiteAdapter {
     // https://www.ptskit.org/download.php?downhash={userId}.{jwt}
     final jwt = getDownLoadHash(_siteConfig.passKey!, id, _siteConfig.userId!);
     if (url != null && url.isNotEmpty) {
-      return url.replaceAll('{jwt}', jwt);
+      return url
+          .replaceAll('{jwt}', jwt)
+          .replaceAll('{userId}', _siteConfig.userId!);
     }
     return '${_siteConfig.baseUrl}download.php?downhash=${_siteConfig.userId!}.$jwt';
   }
@@ -1457,54 +1522,57 @@ class NexusPHPWebAdapter extends SiteAdapter {
     return categories;
   }
 }
-  List<String> _splitOutsideQuotes(String input, String op) {
-    final out = <String>[];
-    var buf = StringBuffer();
-    var i = 0;
-    var inS = false;
-    var inD = false;
-    while (i < input.length) {
-      final c = input[i];
-      if (c == '\'' && !inD) {
-        inS = !inS;
-        buf.write(c);
-        i++;
-        continue;
-      }
-      if (c == '"' && !inS) {
-        inD = !inD;
-        buf.write(c);
-        i++;
-        continue;
-      }
-      if (!inS && !inD && input.substring(i).startsWith(op)) {
-        out.add(buf.toString());
-        buf = StringBuffer();
-        i += op.length;
-        continue;
-      }
+
+List<String> _splitOutsideQuotes(String input, String op) {
+  final out = <String>[];
+  var buf = StringBuffer();
+  var i = 0;
+  var inS = false;
+  var inD = false;
+  while (i < input.length) {
+    final c = input[i];
+    if (c == '\'' && !inD) {
+      inS = !inS;
       buf.write(c);
       i++;
+      continue;
     }
-    out.add(buf.toString());
-    return out;
+    if (c == '"' && !inS) {
+      inD = !inD;
+      buf.write(c);
+      i++;
+      continue;
+    }
+    if (!inS && !inD && input.substring(i).startsWith(op)) {
+      out.add(buf.toString());
+      buf = StringBuffer();
+      i += op.length;
+      continue;
+    }
+    buf.write(c);
+    i++;
   }
+  out.add(buf.toString());
+  return out;
+}
 
-  List<List<String>> _parseContainsExpr(String expr) {
-    final orParts = _splitOutsideQuotes(expr, '||');
-    final groups = <List<String>>[];
-    for (final orPart in orParts) {
-      final andParts = _splitOutsideQuotes(orPart, '&&');
-      final needles = <String>[];
-      for (final p in andParts) {
-        final s = p.trim();
-        final m = RegExp(r"^'(.*)'$").firstMatch(s) ?? RegExp(r'^"(.*)"$').firstMatch(s);
-        if (m != null) {
-          final v = (m.group(1) ?? '').trim();
-          if (v.isNotEmpty) needles.add(v);
-        }
+List<List<String>> _parseContainsExpr(String expr) {
+  final orParts = _splitOutsideQuotes(expr, '||');
+  final groups = <List<String>>[];
+  for (final orPart in orParts) {
+    final andParts = _splitOutsideQuotes(orPart, '&&');
+    final needles = <String>[];
+    for (final p in andParts) {
+      final s = p.trim();
+      final m =
+          RegExp(r"^'(.*)'$").firstMatch(s) ??
+          RegExp(r'^"(.*)"$').firstMatch(s);
+      if (m != null) {
+        final v = (m.group(1) ?? '').trim();
+        if (v.isNotEmpty) needles.add(v);
       }
-      if (needles.isNotEmpty) groups.add(needles);
     }
-    return groups;
+    if (needles.isNotEmpty) groups.add(needles);
   }
+  return groups;
+}

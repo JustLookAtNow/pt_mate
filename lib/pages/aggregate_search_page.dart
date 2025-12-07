@@ -15,6 +15,7 @@ import '../widgets/responsive_layout.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/torrent_list_item.dart';
 import '../widgets/torrent_download_dialog.dart';
+import '../widgets/tag_filter_bar.dart';
 import 'torrent_detail_page.dart';
 
 class AggregateSearchPage extends StatefulWidget {
@@ -38,6 +39,11 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   final Map<String, Color> _siteColors = {};
   bool _isFastScrolling = false;
   bool _showErrorWidget = true;
+
+  // 头部隐藏动画相关
+  double _headerProgress = 1.0; // 1.0=完全显示, 0.0=完全隐藏
+  double _lastScrollOffset = 0.0;
+  final double _maxHideDistance = 200.0; // 滚动多少距离完全隐藏
 
   Color _colorForSite(String siteId) {
     if (_siteColors.containsKey(siteId)) return _siteColors[siteId]!;
@@ -69,6 +75,38 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     _loadSearchConfigs();
     _listController.addListener(() {
       if (!_listController.hasClients) return;
+      
+      final currentOffset = _listController.offset;
+      final delta = currentOffset - _lastScrollOffset;
+
+      // 计算头部显示进度
+      double newProgress = _headerProgress;
+
+      // 快速滚动时强制隐藏头部
+      if (_isFastScrolling) {
+        newProgress = 0.0;
+      } else {
+        if (delta > 0) {
+          // 向下滚动:隐藏
+          newProgress = (_headerProgress - delta / _maxHideDistance).clamp(
+            0.0,
+            1.0,
+          );
+        } else if (delta < 0) {
+          // 向上滚动:显示
+          newProgress = (_headerProgress + (-delta) / _maxHideDistance).clamp(
+            0.0,
+            1.0,
+          );
+        }
+      }
+
+      if (newProgress != _headerProgress) {
+        setState(() {
+          _headerProgress = newProgress;
+        });
+      }
+      _lastScrollOffset = currentOffset;
       
       // 一旦开始滑动，就隐藏错误提示
       if (_showErrorWidget && _listController.offset > 0) {
@@ -159,296 +197,360 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 搜索区域
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(2.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // 紧凑的搜索控件行
-                              Row(
-                                children: [
-                                  // 搜索策略选择
-                                  Expanded(
-                                    flex: 1,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 0,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary
-                                              .withValues(alpha: 0.3),
+                      // 搜索区域 - 带滚动隐藏动画
+                      ClipRect(
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
+                          heightFactor: _headerProgress,
+                          child: Opacity(
+                            opacity: _headerProgress,
+                            child: Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(2.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // 紧凑的搜索控件行
+                                    Row(
+                                      children: [
+                                        // 搜索策略选择
+                                        Expanded(
+                                          flex: 1,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 0,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              border: Border.all(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary
+                                                    .withValues(alpha: 0.3),
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(25),
+                                            ),
+                                            child: DropdownButton<String>(
+                                              value:
+                                                  provider
+                                                      .selectedStrategy
+                                                      .isEmpty
+                                                  ? null
+                                                  : provider.selectedStrategy,
+                                              hint: const Text('选择搜索策略'),
+                                              isExpanded: true,
+                                              underline: const SizedBox(),
+                                              icon: const SizedBox.shrink(),
+                                              items: provider.searchConfigs.map(
+                                                (config) {
+                                                  return DropdownMenuItem<
+                                                    String
+                                                  >(
+                                                    value: config.id,
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(
+                                                          config.isAllSitesType
+                                                              ? Icons.public
+                                                              : Icons.group,
+                                                          size: 16,
+                                                          color: Theme.of(
+                                                            context,
+                                                          ).colorScheme.primary,
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 8,
+                                                        ),
+                                                        Expanded(
+                                                          child: Text(
+                                                            config.name,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                },
+                                              ).toList(),
+                                              onChanged: (value) {
+                                                if (value != null) {
+                                                  provider.setSelectedStrategy(
+                                                    value,
+                                                  );
+                                                }
+                                              },
+                                            ),
+                                          ),
                                         ),
-                                        borderRadius: BorderRadius.circular(25),
-                                      ),
-                                      child: DropdownButton<String>(
-                                        value: provider.selectedStrategy.isEmpty
-                                            ? null
-                                            : provider.selectedStrategy,
-                                        hint: const Text('选择搜索策略'),
-                                        isExpanded: true,
-                                        underline: const SizedBox(),
-                                        icon: const SizedBox.shrink(),
-                                        items: provider.searchConfigs.map((
-                                          config,
-                                        ) {
-                                          return DropdownMenuItem<String>(
-                                            value: config.id,
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  config.isAllSitesType
-                                                      ? Icons.public
-                                                      : Icons.group,
-                                                  size: 16,
-                                                  color: Theme.of(
-                                                    context,
-                                                  ).colorScheme.primary,
+                                        const SizedBox(width: 4),
+                                        // 搜索输入框
+                                        Expanded(
+                                          flex: 3,
+                                          child: TextField(
+                                            controller: _searchController,
+                                            decoration: InputDecoration(
+                                              hintText: '输入搜索关键词',
+                                              border: OutlineInputBorder(
+                                                borderRadius:
+                                                    const BorderRadius.all(
+                                                      Radius.circular(25),
+                                                    ),
+                                                borderSide: BorderSide(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.3),
                                                 ),
-                                                const SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    config.name,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
+                                              ),
+                                              contentPadding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8,
                                                   ),
+                                              suffixIcon: IconButton(
+                                                icon: const Icon(Icons.search),
+                                                onPressed: () => _performSearch(
+                                                  _searchController.text,
                                                 ),
-                                              ],
+                                              ),
                                             ),
-                                          );
-                                        }).toList(),
-                                        onChanged: (value) {
-                                          if (value != null) {
-                                            provider.setSelectedStrategy(value);
-                                          }
-                                        },
+                                            onSubmitted: _performSearch,
+                                            onChanged: (value) {
+                                              provider.setSearchKeyword(value);
+                                            },
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        // 排序选择
+                                        PopupMenuButton<String>(
+                                          icon: Icon(
+                                            Icons.sort,
+                                            color: provider.sortBy != 'none'
+                                                ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.secondary
+                                                : null,
+                                          ),
+                                          tooltip: '排序',
+                                          onSelected: (value) {
+                                            // 与 app.dart 的行为保持一致：
+                                            // 选择相同的排序类型时切换升降序；选择新的类型时默认降序
+                                            if (value == provider.sortBy) {
+                                              provider.setSortAscending(
+                                                !provider.sortAscending,
+                                              );
+                                            } else {
+                                              provider.setSortBy(value);
+                                              provider.setSortAscending(false);
+                                            }
+                                            _resortCurrentResults();
+                                          },
+                                          itemBuilder: (context) => [
+                                            PopupMenuItem(
+                                              value: 'none',
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      provider.sortBy == 'none'
+                                                      ? Theme.of(context)
+                                                            .colorScheme
+                                                            .primary
+                                                            .withValues(
+                                                              alpha: 0.1,
+                                                            )
+                                                      : null,
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.clear,
+                                                      color:
+                                                          provider.sortBy ==
+                                                              'none'
+                                                          ? Theme.of(context)
+                                                                .colorScheme
+                                                                .secondary
+                                                          : null,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    const Text('默认排序'),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+
+                                            PopupMenuItem(
+                                              value: 'size',
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      provider.sortBy == 'size'
+                                                      ? Theme.of(context)
+                                                            .colorScheme
+                                                            .primary
+                                                            .withValues(
+                                                              alpha: 0.1,
+                                                            )
+                                                      : null,
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      provider.sortBy ==
+                                                                  'size' &&
+                                                              provider
+                                                                  .sortAscending
+                                                          ? Icons.arrow_upward
+                                                          : Icons
+                                                                .arrow_downward,
+                                                      color:
+                                                          provider.sortBy ==
+                                                              'size'
+                                                          ? Theme.of(context)
+                                                                .colorScheme
+                                                                .secondary
+                                                          : null,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    const Text('按大小排序'),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+
+                                            PopupMenuItem(
+                                              value: 'upload',
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      provider.sortBy ==
+                                                          'upload'
+                                                      ? Theme.of(context)
+                                                            .colorScheme
+                                                            .primary
+                                                            .withValues(
+                                                              alpha: 0.1,
+                                                            )
+                                                      : null,
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      provider.sortBy ==
+                                                                  'upload' &&
+                                                              provider
+                                                                  .sortAscending
+                                                          ? Icons.arrow_upward
+                                                          : Icons
+                                                                .arrow_downward,
+                                                      color:
+                                                          provider.sortBy ==
+                                                              'upload'
+                                                          ? Theme.of(context)
+                                                                .colorScheme
+                                                                .secondary
+                                                          : null,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    const Text('按上传量排序'),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+
+                                            PopupMenuItem(
+                                              value: 'download',
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      provider.sortBy ==
+                                                          'download'
+                                                      ? Theme.of(context)
+                                                            .colorScheme
+                                                            .primary
+                                                            .withValues(
+                                                              alpha: 0.1,
+                                                            )
+                                                      : null,
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      provider.sortBy ==
+                                                                  'download' &&
+                                                              provider
+                                                                  .sortAscending
+                                                          ? Icons.arrow_upward
+                                                          : Icons
+                                                                .arrow_downward,
+                                                      color:
+                                                          provider.sortBy ==
+                                                              'download'
+                                                          ? Theme.of(context)
+                                                                .colorScheme
+                                                                .secondary
+                                                          : null,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    const Text('按下载量排序'),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    // 标签筛选栏
+                                    TagFilterBar(
+                                      includedTags: provider.includedTags,
+                                      excludedTags: provider.excludedTags,
+                                      onIncludedChanged:
+                                          provider.setIncludedTags,
+                                      onExcludedChanged:
+                                          provider.setExcludedTags,
+                                      padding: const EdgeInsets.fromLTRB(
+                                        8.0,
+                                        8.0,
+                                        8.0,
+                                        4.0,
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  // 搜索输入框
-                                  Expanded(
-                                    flex: 3,
-                                    child: TextField(
-                                      controller: _searchController,
-                                      decoration: InputDecoration(
-                                        hintText: '输入搜索关键词',
-                                        border: OutlineInputBorder(
-                                          borderRadius: const BorderRadius.all(
-                                            Radius.circular(25),
-                                          ),
-                                          borderSide: BorderSide(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .primary
-                                                .withValues(alpha: 0.3),
-                                          ),
-                                        ),
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 8,
-                                            ),
-                                        suffixIcon: IconButton(
-                                          icon: const Icon(Icons.search),
-                                          onPressed: () => _performSearch(
-                                            _searchController.text,
-                                          ),
-                                        ),
-                                      ),
-                                      onSubmitted: _performSearch,
-                                      onChanged: (value) {
-                                        provider.setSearchKeyword(value);
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  // 排序选择
-                                  PopupMenuButton<String>(
-                                    icon: Icon(
-                                      Icons.sort,
-                                      color: provider.sortBy != 'none'
-                                          ? Theme.of(
-                                              context,
-                                            ).colorScheme.secondary
-                                          : null,
-                                    ),
-                                    tooltip: '排序',
-                                    onSelected: (value) {
-                                      // 与 app.dart 的行为保持一致：
-                                      // 选择相同的排序类型时切换升降序；选择新的类型时默认降序
-                                      if (value == provider.sortBy) {
-                                        provider.setSortAscending(
-                                          !provider.sortAscending,
-                                        );
-                                      } else {
-                                        provider.setSortBy(value);
-                                        provider.setSortAscending(false);
-                                      }
-                                      _resortCurrentResults();
-                                    },
-                                    itemBuilder: (context) => [
-                                      PopupMenuItem(
-                                        value: 'none',
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: provider.sortBy == 'none'
-                                                ? Theme.of(context)
-                                                      .colorScheme
-                                                      .primary
-                                                      .withValues(alpha: 0.1)
-                                                : null,
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                          ),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.clear,
-                                                color: provider.sortBy == 'none'
-                                                    ? Theme.of(
-                                                        context,
-                                                      ).colorScheme.secondary
-                                                    : null,
-                                              ),
-                                              const SizedBox(width: 8),
-                                              const Text('默认排序'),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-
-                                      PopupMenuItem(
-                                        value: 'size',
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: provider.sortBy == 'size'
-                                                ? Theme.of(context)
-                                                      .colorScheme
-                                                      .primary
-                                                      .withValues(alpha: 0.1)
-                                                : null,
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                          ),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                provider.sortBy == 'size' &&
-                                                        provider.sortAscending
-                                                    ? Icons.arrow_upward
-                                                    : Icons.arrow_downward,
-                                                color: provider.sortBy == 'size'
-                                                    ? Theme.of(
-                                                        context,
-                                                      ).colorScheme.secondary
-                                                    : null,
-                                              ),
-                                              const SizedBox(width: 8),
-                                              const Text('按大小排序'),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-
-                                      PopupMenuItem(
-                                        value: 'upload',
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: provider.sortBy == 'upload'
-                                                ? Theme.of(context)
-                                                      .colorScheme
-                                                      .primary
-                                                      .withValues(alpha: 0.1)
-                                                : null,
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                          ),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                provider.sortBy == 'upload' &&
-                                                        provider.sortAscending
-                                                    ? Icons.arrow_upward
-                                                    : Icons.arrow_downward,
-                                                color:
-                                                    provider.sortBy == 'upload'
-                                                    ? Theme.of(
-                                                        context,
-                                                      ).colorScheme.secondary
-                                                    : null,
-                                              ),
-                                              const SizedBox(width: 8),
-                                              const Text('按上传量排序'),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-
-                                      PopupMenuItem(
-                                        value: 'download',
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: provider.sortBy == 'download'
-                                                ? Theme.of(context)
-                                                      .colorScheme
-                                                      .primary
-                                                      .withValues(alpha: 0.1)
-                                                : null,
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                          ),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                provider.sortBy == 'download' &&
-                                                        provider.sortAscending
-                                                    ? Icons.arrow_upward
-                                                    : Icons.arrow_downward,
-                                                color:
-                                                    provider.sortBy ==
-                                                        'download'
-                                                    ? Theme.of(
-                                                        context,
-                                                      ).colorScheme.secondary
-                                                    : null,
-                                              ),
-                                              const SizedBox(width: 8),
-                                              const Text('按下载量排序'),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -643,10 +745,11 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                     ).copyWith(scrollbars: false),
                                     child: ListView.builder(
                                       controller: _listController,
-                                      itemCount: provider.searchResults.length,
+                                      itemCount:
+                                          provider.filteredResults.length,
                                       itemBuilder: (context, index) {
                                         final item =
-                                            provider.searchResults[index];
+                                            provider.filteredResults[index];
                                         // final Color siteColor = _colorForSite(item.siteId);
                                         return Container(
                                           key: ValueKey(item.torrent.id),
@@ -677,14 +780,14 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       },
                                     ),
                                   ),
-                                  if (provider.searchResults.isNotEmpty)
+                                  if (provider.filteredResults.isNotEmpty)
                                     Positioned.fill(
                                       child: LayoutBuilder(
                                         builder: (context, constraints) {
                                           final totalHeight =
                                               constraints.maxHeight;
                                           final results =
-                                              provider.searchResults;
+                                              provider.filteredResults;
                                           final counts = <String, int>{};
                                           final names = <String, String>{};
                                           for (
@@ -1028,6 +1131,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         savePath,
         autoTMM,
         startPaused,
+        siteConfig,
       );
     } catch (e) {
       if (mounted) {
@@ -1057,6 +1161,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     String? savePath,
     bool? autoTMM,
     bool? startPaused,
+    SiteConfig siteConfig,
   ) async {
     try {
       // 使用统一的下载器服务
@@ -1071,6 +1176,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           autoTMM: autoTMM,
           startPaused: startPaused,
         ),
+        siteConfig: siteConfig,
       );
 
       if (mounted) {
@@ -1225,6 +1331,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
             savePath: savePath,
             autoTMM: autoTMM,
           ),
+          siteConfig: siteConfig,
         );
 
         successCount++;
@@ -1371,6 +1478,7 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
   String? _overlaySiteName;
   double _overlayOpacity = 0.0;
   Timer? _overlayTimer;
+  bool _isDragging = false; // 标志是否正在拖动
 
   @override
   void initState() {
@@ -1387,6 +1495,8 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
 
   void _updateScrollFraction() {
     if (!widget.controller.hasClients) return;
+    // 拖动时不更新，避免与手动更新冲突
+    if (_isDragging) return;
     final max = widget.controller.position.maxScrollExtent;
     final px = widget.controller.position.pixels;
     final f = max > 0 ? (px / max).clamp(0.0, 1.0) : 0.0;
@@ -1434,14 +1544,20 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
     });
   }
 
-  void _scrollToFraction(double f) {
+  void _scrollToFraction(double f, {bool updateState = true}) {
     if (!widget.controller.hasClients) return;
     final max = widget.controller.position.maxScrollExtent;
     final target = max * f.clamp(0.0, 1.0);
     widget.controller.jumpTo(target);
-    setState(() {
+    // 只在非拖动状态或明确要求时更新状态
+    if (updateState && !_isDragging) {
+      setState(() {
+        _scrollFraction = f.clamp(0.0, 1.0);
+      });
+    } else {
+      // 拖动时直接更新值，不触发重建
       _scrollFraction = f.clamp(0.0, 1.0);
-    });
+    }
   }
 
   @override
@@ -1475,6 +1591,9 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
                   _startOverlayFadeOut();
                 },
                 onPanStart: (details) {
+                  setState(() {
+                    _isDragging = true;
+                  });
                   widget.onFastScrollingChanged(true);
                   _handleScrollbarDrag(
                     details.localPosition.dy,
@@ -1486,11 +1605,17 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
                   _handleScrollbarDrag(details.localPosition.dy, totalHeight);
                   final y = details.localPosition.dy;
                   final fraction = (y / totalHeight).clamp(0.0, 1.0);
-                  _scrollToFraction(fraction);
+                  // 拖动时不触发 setState，避免频繁重建
+                  _scrollToFraction(fraction, updateState: false);
                 },
                 onPanEnd: (details) {
+                  setState(() {
+                    _isDragging = false;
+                  });
                   widget.onFastScrollingChanged(false);
                   _startOverlayFadeOut();
+                  // 拖动结束后同步最终状态
+                  _updateScrollFraction();
                 },
                 child: Align(
                   alignment: Alignment.centerRight,
