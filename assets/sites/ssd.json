@@ -123,21 +123,16 @@
           "attribute": "text"
         },
         "description": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(1)",
+          "selector": "table.torrentname > tbody > tr > div.torrent-smalldescr > span:nth-child",
           "attribute": "text"
         },
         "discount": {
-          "selector": "table.torrentname > span[class~=\"pro\"]",
+          "selector": "table.torrentname > span[class~=\"torrent-pro\"]",
           "attribute": "text"
         },
         "discountEndTime": {
-          "selector": "table.torrentname > span[class~=\"pro\"] > next > span",
-          "attribute": "onmouseover",
-          "filter": {
-            "name": "regexp",
-            "args": "<span title=\\\"(.*?)\\\"",
-            "index": 1
-          }
+          "selector": "table.torrentname > span[class~=\"torrent-pro\"] > next > span",
+          "attribute": "title"
         },
         "downloadUrl": {
           "value": "{baseUrl}/download.php?id={torrentId}&passkey={passKey}&https=1"
@@ -155,7 +150,7 @@
           "attribute": "text"
         },
         "downloadStatus": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > div[title]",
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > div.progress_bar",
           "attribute": "title",
           "filter": {
             "name": "regexp",
