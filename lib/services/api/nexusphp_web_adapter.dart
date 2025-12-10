@@ -1252,6 +1252,18 @@ class NexusPHPWebAdapter extends SiteAdapter {
   }
 
   @override
+  Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20}) async {
+    // NexusPHP Web 暂时不支持获取评论，返回空列表
+    return TorrentCommentList(
+      pageNumber: pageNumber,
+      pageSize: pageSize,
+      total: 0,
+      totalPages: 0,
+      comments: [],
+    );
+  }
+
+  @override
   Future<String> genDlToken({required String id, String? url}) async {
     // 检查必要的配置参数
     if (_siteConfig.passKey == null || _siteConfig.passKey!.isEmpty) {

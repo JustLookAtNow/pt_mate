@@ -154,6 +154,26 @@ class ApiService {
     return _activeAdapter!.fetchTorrentDetail(id);
   }
 
+  /// 获取种子评论列表
+  Future<TorrentCommentList> fetchComments(
+    String id, {
+    int pageNumber = 1,
+    int pageSize = 20,
+    SiteConfig? siteConfig,
+  }) async {
+    // 如果提供了siteConfig，使用临时适配器
+    if (siteConfig != null) {
+      final adapter = await getAdapter(siteConfig);
+      return adapter.fetchComments(id, pageNumber: pageNumber, pageSize: pageSize);
+    }
+
+    // 否则使用当前活跃适配器
+    if (_activeAdapter == null) {
+      throw StateError('No active site adapter available');
+    }
+    return _activeAdapter!.fetchComments(id, pageNumber: pageNumber, pageSize: pageSize);
+  }
+
   /// 生成下载令牌
   Future<String> genDlToken({
     required String id,

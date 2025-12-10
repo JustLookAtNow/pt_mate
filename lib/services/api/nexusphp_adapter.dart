@@ -318,6 +318,18 @@ class NexusPHPAdapter implements SiteAdapter {
     }
   }
 
+  @override
+  Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20}) async {
+    // NexusPHP API 暂时不支持获取评论，返回空列表
+    return TorrentCommentList(
+      pageNumber: pageNumber,
+      pageSize: pageSize,
+      total: 0,
+      totalPages: 0,
+      comments: [],
+    );
+  }
+
   //实际上调用不到了
   @override
   Future<String> genDlToken({required String id, String? url}) async {
