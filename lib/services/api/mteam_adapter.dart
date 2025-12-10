@@ -235,7 +235,11 @@ class MTeamAdapter extends SiteAdapter {
       options: Options(contentType: 'application/json'),
     );
 
+
     final data = resp.data as Map<String, dynamic>;
+    if (kDebugMode) {
+      _logger.d('MTeamAdapter.searchTorrents raw response: ${resp.data}');
+    }
     if (data['code']?.toString() != '0') {
       throw DioException(
         requestOptions: resp.requestOptions,
@@ -304,6 +308,7 @@ class MTeamAdapter extends SiteAdapter {
   }) {
     int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
     final list = (json['data'] as List? ?? const []).cast<dynamic>();
+    _logger.d('MTeamAdapter._parseTorrentSearchResult comments : ${list[2]["comments"]}');
     return TorrentSearchResult(
       pageNumber: parseInt(json['pageNumber']),
       pageSize: parseInt(json['pageSize']),
@@ -328,6 +333,8 @@ class MTeamAdapter extends SiteAdapter {
     Map<String, dynamic>? peerMap,
   }) {
     int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
+      _logger.d('MTeamAdapter._parseTorrentItem comments :${parseInt(json['status']['comments'])} ${json['status']} ');
+
     bool parseBool(dynamic v) =>
         v == true || v.toString().toLowerCase() == 'true';
     final status = (json['status'] as Map<String, dynamic>?) ?? const {};
@@ -409,6 +416,7 @@ class MTeamAdapter extends SiteAdapter {
       imdbRating: (json['imdbRating'] ?? 'N/A').toString(),
       isTop: (toppingLevel ?? 0) > 0,
       tags: tags,
+      comments: parseInt(json['status']['comments']),
     );
   }
 

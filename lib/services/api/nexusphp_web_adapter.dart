@@ -1093,6 +1093,14 @@ class NexusPHPWebAdapter extends SiteAdapter {
               ? imdbRatingList.first
               : '';
 
+          // 提取评论数
+          final commentsList = await _extractFieldValue(
+            row,
+            fieldsConfig['comments'] as Map<String, dynamic>? ?? {},
+          );
+          final commentsText = commentsList.isNotEmpty ? commentsList.first : '0';
+          final comments = int.tryParse(commentsText) ?? 0;
+
           // 检查收藏状态（布尔字段）
           final collectionConfig =
               fieldsConfig['collection'] as Map<String, dynamic>?;
@@ -1191,6 +1199,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
               imdbRating: imdbRating.isNotEmpty ? imdbRating : 'N/A',
               isTop: isTop,
               tags: tags,
+              comments: comments,
             ),
           );
         } catch (e) {

@@ -547,6 +547,18 @@ class TorrentListItem extends StatelessWidget {
                               const SizedBox(width: 10),
                               // 文件大小
                               Text(Formatters.dataFromBytes(torrent.sizeBytes)),
+                              // 评论数
+                              const SizedBox(width: 10),
+                              Icon(
+                                Icons.comment,
+                                size: 14,
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${torrent.comments}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
                               const Spacer(),
                               // 下载状态图标 - 仅在站点支持下载历史功能时显示
                               if (currentSite?.features.supportHistory ?? true)

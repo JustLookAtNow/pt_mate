@@ -204,6 +204,10 @@ class NexusPHPAdapter implements SiteAdapter {
 
     final response = await _dio.get(url, queryParameters: params);
 
+    if (kDebugMode) {
+      _logger.d('NexusPHPAdapter.searchTorrents raw response: ${response.data}');
+    }
+
     if (response.statusCode == 200) {
       final data = response.data;
       if (data['ret'] == 0) {
@@ -285,6 +289,7 @@ class NexusPHPAdapter implements SiteAdapter {
       createdDate: item['added'] != null ? item['added'] + ':00' : '',
       isTop: item['pos_state'] != 'normal',
       tags: tags,
+      comments: item['comments'] as int? ?? 0,
     );
   }
 
