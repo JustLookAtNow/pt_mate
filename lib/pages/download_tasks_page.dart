@@ -480,9 +480,23 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
     );
   }
 
+  Widget _buildInfoItem(BuildContext context, IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: Theme.of(context).colorScheme.secondary),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: const TextStyle(fontSize: 12),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTaskCard(DownloadTask task) {
-    final bool isDownloading = 
-      task.state == DownloadTaskState.downloading || 
+    final bool isDownloading =
+      task.state == DownloadTaskState.downloading ||
       task.state == DownloadTaskState.stalledDL ||
       task.state == DownloadTaskState.metaDL ||
       task.state == DownloadTaskState.forcedDL ||
@@ -490,14 +504,14 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
       task.state == DownloadTaskState.checkingDL ||
       task.state == DownloadTaskState.allocating ||
       task.state == DownloadTaskState.checkingResumeData;
-    final bool isPaused = 
-      task.state == DownloadTaskState.pausedDL || 
+    final bool isPaused =
+      task.state == DownloadTaskState.pausedDL ||
       task.state == DownloadTaskState.pausedUP ||
       task.state == DownloadTaskState.queuedUP ||
       task.state == DownloadTaskState.error ||
       task.state == DownloadTaskState.stoppedDL ||
       task.state == DownloadTaskState.missingFiles;
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -590,7 +604,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                 ),
               ],
             ),
-            
+
             // 第二排：分类和标签
             if (task.category.isNotEmpty || task.tags.isNotEmpty)
               Row(
@@ -631,42 +645,27 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                   )),
                 ],
               ),
-            
+
             const SizedBox(height: 4),
-            
-            // 第三排：大小和速度
-            Row(
-              children: [
-                Text(
-                  '大小: ${FormatUtil.formatFileSize(task.size)}',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                const SizedBox(width: 16),
-                // 显示下载速度（仅在下载状态时）
-                if (isDownloading && task.dlspeed > 0) ...[                  
-                  Text(
-                    '↓ ${FormatUtil.formatSpeed(task.dlspeed)}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  const SizedBox(width: 8),
+
+            // 第三排：信息展示
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                children: [
+                  _buildInfoItem(context, Icons.data_usage, FormatUtil.formatFileSize(task.size)),
+                  _buildInfoItem(context, Icons.upload, FormatUtil.formatFileSize(task.uploaded)),
+                  _buildInfoItem(context, Icons.compare_arrows, task.ratio.toStringAsFixed(2)),
+                  if (task.dlspeed > 0)
+                    _buildInfoItem(context, Icons.downloading, FormatUtil.formatSpeed(task.dlspeed)),
+                  if (task.upspeed > 0)
+                    _buildInfoItem(context, Icons.upload_file, FormatUtil.formatSpeed(task.upspeed)),
+                  if (isDownloading && task.eta > 0)
+                     _buildInfoItem(context, Icons.timer, FormatUtil.formatEta(task.eta)),
                 ],
-                // 显示上传速度（只要有上传速度就显示）
-                if (task.upspeed > 0) ...[
-                  Text(
-                    '↑ ${FormatUtil.formatSpeed(task.upspeed)}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                const Spacer(),
-                // 显示剩余时间（仅在下载状态时）
-                if (isDownloading && task.eta > 0) ...[
-                  Text(
-                    '剩余: ${FormatUtil.formatEta(task.eta)}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ],
-              ],
+              ),
             ),
             
             const SizedBox(height: 4),

@@ -233,7 +233,7 @@ class QbittorrentClient implements DownloaderClient {
   Future<TransferInfo> getTransferInfo() async {
     final response = await _request('GET', '/transfer/info');
     final data = response.data as Map<String, dynamic>;
-
+    print('DEBUG: /transfer/info response sample (first item): ${data[1]}');
     return TransferInfo(
       upSpeed: data['up_info_speed'] ?? 0,
       dlSpeed: data['dl_info_speed'] ?? 0,
@@ -583,6 +583,7 @@ class QbittorrentClient implements DownloaderClient {
       amountLeft: torrent['amount_left'] ?? 0,
       ratio: (torrent['ratio'] ?? 0.0).toDouble(),
       timeActive: torrent['time_active'] ?? 0,
+      uploaded: torrent['uploaded'] ?? 0,
     );
   }
 
