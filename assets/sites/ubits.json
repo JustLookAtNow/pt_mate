@@ -111,7 +111,7 @@
           "attribute": "text"
         },
         "description": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(1)",
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > *:last-node",
           "attribute": "text"
         },
         "discount": {

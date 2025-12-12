@@ -292,17 +292,15 @@ enum DiscountType {
 enum DiscountColorType { none, green, yellow }
 
 // 标签类型枚举
-class TextRef {
-  String value;
-  TextRef(this.value);
-}
-
 enum TagType {
-  hot('HOT', Color.fromARGB(255, 255, 128, 59), r'\[热门\]|\[熱門\]'),
-  official('官方', Color.fromARGB(255, 76, 130, 175), r'官方'),
-  chinese('中字', Colors.green, r'中字|中文|简体'),
-  chineseTraditional('繁体', Colors.green, r'繁体'),
-  mandarin('国语', Colors.blue, r'国语|国配|普通话|中配|國語'),
+  hot('HOT', Color.fromARGB(255, 255, 128, 59), ''),
+  official('官方', Color.fromARGB(255, 76, 130, 175), ''),
+  chinese('中字', Colors.green, ''),
+  chineseTraditional('繁体', Colors.green, ''),
+  mandarin('国语', Colors.blue, ''),
+  diy('DIY', Colors.brown, ''),
+  complete('完结',Color.fromARGB(255, 110, 8, 206),''),
+  ep('分集',Color.fromARGB(255, 110, 8, 206),''),
   fourK('4K', Colors.orange, r'\b4K\b|\b2160p\b'),
   resolution1080('1080p', Colors.blue, r'\b1080p\b'),
   hdr('HDR', Colors.purple, r'\bHDR\b|\bHDR10\b'),
@@ -317,8 +315,8 @@ enum TagType {
     r'\bWEB-DL\b|\bWEBDL\b|\bWEB\.DL\b',
   ),
   dovi('DOVI', Colors.pink, r'\bDOVI\b|Dolby Vision|\bDV\b|杜比(视界)*'),
-  blueRay('Blu-ray', Colors.red, r'\bblu-ray\b|\bbluray\b'),
-  diy('DIY', Colors.brown, r'DIY|自定义');
+  blueRay('Blu-ray', Colors.red, r'\bblu-ray\b|\bbluray\b');
+
 
   const TagType(this.content, this.color, this.regex);
   final String content;
@@ -326,23 +324,15 @@ enum TagType {
   final String regex;
 
   // 从字符串中匹配所有标签
-  static List<TagType> matchTags(TextRef textRef) {
+  static List<TagType> matchTags(String text) {
     List<TagType> matchedTags = [];
     for (TagType tag in TagType.values) {
+      if (tag.regex.isEmpty) continue;
       RegExp regExp = RegExp(tag.regex, caseSensitive: false);
-      if (regExp.hasMatch(textRef.value)) {
+      if (regExp.hasMatch(text)) {
         matchedTags.add(tag);
-        // 匹配成功后，直接将关键字从文本中移除
-        textRef.value = textRef.value.replaceAll(regExp, '');
       }
     }
-    // 清理多余空白并修剪
-    textRef.value = textRef.value
-        .replaceAll(RegExp(r"\s{2,}"), ' ')
-        .replaceAll('禁轉', '')
-        .trim()
-        .split('#@')
-        .last;
     return matchedTags;
   }
 }
@@ -1092,6 +1082,7 @@ class SiteConfigTemplate {
   final List<SearchCategoryConfig> searchCategories; // 查询分类配置
   final SiteFeatures features; // 功能支持配置
   final Map<String, String> discountMapping; // 优惠映射配置
+  final Map<String, String> tagMapping; // 标签映射配置
   final Map<String, dynamic>? infoFinder; // 信息提取器配置
   final Map<String, dynamic>? request; // 请求配置
   final String? logo; // 可选的 logo 资源路径（assets/sites_icon/...）
@@ -1106,6 +1097,7 @@ class SiteConfigTemplate {
     this.searchCategories = const [],
     this.features = SiteFeatures.mteamDefault,
     this.discountMapping = const {},
+    this.tagMapping = const {},
     this.infoFinder,
     this.request,
     this.logo,
@@ -1121,6 +1113,7 @@ class SiteConfigTemplate {
     List<SearchCategoryConfig>? searchCategories,
     SiteFeatures? features,
     Map<String, String>? discountMapping,
+    Map<String, String>? tagMapping,
     Map<String, dynamic>? infoFinder,
     Map<String, dynamic>? request,
     String? logo,
@@ -1134,6 +1127,7 @@ class SiteConfigTemplate {
     searchCategories: searchCategories ?? this.searchCategories,
     features: features ?? this.features,
     discountMapping: discountMapping ?? this.discountMapping,
+    tagMapping: tagMapping ?? this.tagMapping,
     infoFinder: infoFinder ?? this.infoFinder,
     request: request ?? this.request,
     logo: logo ?? this.logo,
@@ -1149,6 +1143,7 @@ class SiteConfigTemplate {
     'searchCategories': searchCategories.map((e) => e.toJson()).toList(),
     'features': features.toJson(),
     'discountMapping': discountMapping,
+    'tagMapping': tagMapping,
     'infoFinder': infoFinder,
     'request': request,
     if (logo != null) 'logo': logo,
@@ -1235,6 +1230,9 @@ class SiteConfigTemplate {
       infoFinder: infoFinder,
       request: json['request'] as Map<String, dynamic>?,
       logo: json['logo'] as String?, // 兼容旧版：没有该字段则为 null
+      tagMapping: json['tagMapping'] != null
+          ? Map<String, String>.from(json['tagMapping'] as Map<String, dynamic>)
+          : const {},
     );
   }
 

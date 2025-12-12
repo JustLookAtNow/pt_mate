@@ -11,6 +11,7 @@ class MTeamAdapter extends SiteAdapter {
   late SiteConfig _siteConfig;
   late Dio _dio;
   Map<String, String>? _discountMapping;
+  Map<String, String>? _tagMapping;
   static final Logger _logger = Logger();
 
   @override
@@ -25,6 +26,8 @@ class MTeamAdapter extends SiteAdapter {
     final swDiscount = Stopwatch()..start();
     await _loadDiscountMapping();
     swDiscount.stop();
+    // 加载标签映射配置
+    await _loadTagMapping();
     if (kDebugMode) {
       _logger.d(
         'MTeamAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms',
@@ -97,6 +100,41 @@ class MTeamAdapter extends SiteAdapter {
     } catch (e) {
       _discountMapping = {};
     }
+  }
+
+  /// 加载标签映射配置
+  Future<void> _loadTagMapping() async {
+    try {
+      final template = await SiteConfigService.getTemplateById(
+        '',
+        SiteType.mteam,
+      );
+      if (template?.tagMapping != null) {
+        _tagMapping = Map<String, String>.from(template!.tagMapping);
+      }
+    } catch (e) {
+      _tagMapping = {};
+    }
+  }
+
+  /// 从字符串解析标签类型
+  TagType? _parseTagType(String? str) {
+    if (str == null || str.isEmpty) return null;
+
+    final mapping = _tagMapping ?? {};
+    final enumName = mapping[str];
+
+    if (enumName != null) {
+      for (final type in TagType.values) {
+        if (type.name.toLowerCase() == enumName.toLowerCase()) {
+          return type;
+        }
+        if (type.content == enumName) {
+          return type;
+        }
+      }
+    }
+    return null;
   }
 
   /// 从字符串解析优惠类型
@@ -358,24 +396,22 @@ class MTeamAdapter extends SiteAdapter {
     final smallDescr = (json['smallDescr'] ?? '').toString();
 
     // 1. 从 name 中提取标签
-    final nameRef = TextRef(name);
-    final nameTags = TagType.matchTags(nameRef);
+    // 1. 从 name 中提取标签
+    final nameTags = TagType.matchTags(name);
 
     // 2. 从 labelsNew 中提取标签
-    final List<TagType> labelTags = [];
     final labelsNew = json['labelsNew'];
     if (labelsNew is List) {
       for (var label in labelsNew) {
         final labelStr = label.toString();
-        // 使用 matchTags 来匹配标签，因为它包含了正则逻辑
-        final labelRef = TextRef(labelStr);
-        final matches = TagType.matchTags(labelRef);
-        labelTags.addAll(matches);
+        // 尝试映射标签
+        final mapped = _parseTagType(labelStr);
+        if (mapped != null && !nameTags.contains(mapped)) {
+          nameTags.add(mapped);
+        }
       }
     }
 
-    // 合并去重
-    final tags = {...nameTags, ...labelTags}.toList();
 
     final id = (json['id'] ?? '').toString();
     DownloadStatus downloadStatus = DownloadStatus.none;
@@ -408,7 +444,7 @@ class MTeamAdapter extends SiteAdapter {
       doubanRating: (json['doubanRating'] ?? 'N/A').toString(),
       imdbRating: (json['imdbRating'] ?? 'N/A').toString(),
       isTop: (toppingLevel ?? 0) > 0,
-      tags: tags,
+      tags: nameTags,
     );
   }
 

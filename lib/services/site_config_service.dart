@@ -161,7 +161,9 @@ class SiteConfigService {
         // 如果模板没有 infoFinder 或 request 配置，尝试从默认模板中获取
         if ((template.infoFinder == null ||
                 template.request == null ||
-                template.discountMapping.isEmpty) &&
+                template.request == null ||
+                template.discountMapping.isEmpty ||
+                template.tagMapping.isEmpty) &&
             template.siteType != SiteType.mteam) {
           final swDefault = Stopwatch()..start();
           final defaultTemplate = await _getDefaultTemplateConfig(siteType);
@@ -173,7 +175,10 @@ class SiteConfigService {
             Map<String, dynamic>? infoFinder = template.infoFinder;
             Map<String, dynamic>? request = template.request;
             Map<String, String>? discountMapping = Map<String, String>.from(
-              defaultTemplate['discountMapping'] as Map<String, dynamic>,
+              defaultTemplate['discountMapping'] as Map<String, dynamic>? ?? {},
+            );
+            Map<String, String>? tagMapping = Map<String, String>.from(
+              defaultTemplate['tagMapping'] as Map<String, dynamic>? ?? {},
             );
 
             // 如果模板没有 infoFinder 配置，从默认模板中获取
@@ -189,12 +194,16 @@ class SiteConfigService {
             if (template.discountMapping.isNotEmpty) {
               discountMapping.addAll(template.discountMapping);
             }
+            if (template.tagMapping.isNotEmpty) {
+              tagMapping.addAll(template.tagMapping);
+            }
             // 如果有任何配置需要合并，返回新的模板
 
             result = template.copyWith(
               infoFinder: infoFinder,
               request: request,
               discountMapping: discountMapping,
+              tagMapping: tagMapping,
             );
           } else {
             result = template;
@@ -267,6 +276,14 @@ class SiteConfigService {
         );
       }
 
+      // 解析标签映射配置
+      Map<String, String> tagMapping = {};
+      if (defaultTemplate['tagMapping'] != null) {
+        tagMapping = Map<String, String>.from(
+          defaultTemplate['tagMapping'] as Map<String, dynamic>,
+        );
+      }
+
       // 解析 infoFinder 配置
       Map<String, dynamic>? infoFinder;
       if (defaultTemplate['infoFinder'] != null) {
@@ -297,6 +314,7 @@ class SiteConfigService {
         searchCategories: categories,
         features: features,
         discountMapping: discountMapping,
+        tagMapping: tagMapping,
         infoFinder: infoFinder,
         request: request,
       );

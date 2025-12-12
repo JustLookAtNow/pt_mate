@@ -48,6 +48,25 @@
         "PERCENT_80": "PERCENT_80",
         "PERCENT_90": "PERCENT_90",
         "NORMAL": "NORMAL"
+      },
+      "tagMapping": {
+        "热门": "hot",
+        "熱門": "hot",
+        "官方": "official",
+        "中字": "chinese",
+        "中文": "chinese",
+        "简体": "chinese",
+        "繁体": "chineseTraditional",
+        "国语": "mandarin",
+        "国配": "mandarin",
+        "普通话": "mandarin",
+        "中配": "mandarin",
+        "國語": "mandarin",
+        "DIY": "diy",
+        "自定义": "diy",
+        "完结": "complete",
+        "合集": "complete",
+        "分集": "ep"
       }
     },
     "NexusPHP": {
@@ -79,6 +98,25 @@
         "80%": "PERCENT_80",
         "90%": "PERCENT_90",
         "Normal": "NORMAL"
+      },
+      "tagMapping": {
+        "热门": "hot",
+        "熱門": "hot",
+        "官方": "official",
+        "中字": "chinese",
+        "中文": "chinese",
+        "简体": "chinese",
+        "繁体": "chineseTraditional",
+        "国语": "mandarin",
+        "国配": "mandarin",
+        "普通话": "mandarin",
+        "中配": "mandarin",
+        "國語": "mandarin",
+        "DIY": "diy",
+        "自定义": "diy",
+        "完结": "complete",
+        "合集": "complete",
+        "分集": "ep"
       }
     },
     "NexusPHPWeb": {
@@ -110,6 +148,25 @@
         "80%": "PERCENT_80",
         "90%": "PERCENT_90",
         "Normal": "NORMAL"
+      },
+      "tagMapping": {
+        "热门": "hot",
+        "熱門": "hot",
+        "官方": "official",
+        "中字": "chinese",
+        "中文": "chinese",
+        "简体": "chinese",
+        "繁体": "chineseTraditional",
+        "国语": "mandarin",
+        "国配": "mandarin",
+        "普通话": "mandarin",
+        "中配": "mandarin",
+        "國語": "mandarin",
+        "DIY": "diy",
+        "自定义": "diy",
+        "完结": "complete",
+        "合集": "complete",
+        "分集": "ep"
       },
       "infoFinder": {
         "userInfo": {
@@ -218,8 +275,12 @@
               "selector": "a[href^=\"details.php?id=\"] > b",
               "attribute": "text"
             },
+            "tag": {
+              "selector": "table.torrentname > tbody > tr > td:nth-child(2) > span[title]",
+              "attribute": "text"
+            },
             "description": {
-              "selector": "table.torrentname > tbody > tr > td:nth-child(2)",
+              "selector": "table.torrentname > tbody > tr > td:nth-child(2) > *:last-node",
               "attribute": "text"
             },
             "discount": {
@@ -235,9 +296,7 @@
                 "index": 1
               }
             },
-            "downloadUrl": {
-              
-            },
+            "downloadUrl": {},
             "seedersText": {
               "selector": "td:nth-child(6)",
               "attribute": "text"
@@ -307,12 +366,12 @@
           }
         }
       },
-      "request":{
+      "request": {
         "collect": {
-          "path":"/bookmark.php",
-          "method":"GET",
-          "params":{
-            "torrentid":"{torrentId}"
+          "path": "/bookmark.php",
+          "method": "GET",
+          "params": {
+            "torrentid": "{torrentId}"
           }
         }
       }

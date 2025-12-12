@@ -117,6 +117,10 @@
           "selector": "div.torrent-title > a[href^=\"details.php?id=\"] > b",
           "attribute": "text"
         },
+        "tag": {
+          "selector": "div.torrent-title > span[title]",
+          "attribute": "text"
+        },
         "description": {
           "selector": "div.torrent-title > div.torrent-info-text-small_name",
           "attribute": "text"
