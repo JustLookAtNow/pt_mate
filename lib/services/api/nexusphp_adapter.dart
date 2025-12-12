@@ -15,6 +15,7 @@ class NexusPHPAdapter implements SiteAdapter {
   late SiteConfig _siteConfig;
   late Dio _dio;
   Map<String, String>? _discountMapping;
+  Map<String, String>? _tagMapping;
   static final Logger _logger = Logger();
 
   @override
@@ -28,6 +29,8 @@ class NexusPHPAdapter implements SiteAdapter {
     // 加载优惠类型映射配置
     final swDiscount = Stopwatch()..start();
     await _loadDiscountMapping();
+    // 加载标签映射配置
+    await _loadTagMapping();
     swDiscount.stop();
     if (kDebugMode) {
       _logger.d('NexusPHPAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms');
@@ -92,6 +95,42 @@ class NexusPHPAdapter implements SiteAdapter {
       // 使用默认映射
       _discountMapping = {};
     }
+  }
+
+  /// 加载标签映射配置
+  Future<void> _loadTagMapping() async {
+    try {
+      final template = await SiteConfigService.getTemplateById(
+        '',
+        SiteType.nexusphp,
+      );
+      if (template?.tagMapping != null) {
+        _tagMapping = Map<String, String>.from(template!.tagMapping);
+      }
+    } catch (e) {
+      _tagMapping = {};
+    }
+  }
+
+  /// 从字符串解析标签类型
+
+  TagType? _parseTagType(String? str) {
+    if (str == null || str.isEmpty) return null;
+
+    final mapping = _tagMapping ?? {};
+    final enumName = mapping[str];
+
+    if (enumName != null) {
+      for (final type in TagType.values) {
+        if (type.name.toLowerCase() == enumName.toLowerCase()) {
+          return type;
+        }
+        if (type.content == enumName) {
+          return type;
+        }
+      }
+    }
+    return null;
   }
 
   /// 从字符串解析优惠类型
@@ -268,8 +307,28 @@ class NexusPHPAdapter implements SiteAdapter {
     final smallDescr = item['small_descr'] as String? ?? '';
 
     // 计算标签并清理描述
-    final descrRef = TextRef('$name#@$smallDescr');
-    final tags = TagType.matchTags(descrRef);
+    final tags = TagType.matchTags(name);
+
+    // NexusPHP api tags parsing
+    if (item['tags'] != null && item['tags'] is List) {
+      final tagsList = item['tags'] as List;
+      for (var tagMap in tagsList) {
+        if (tagMap is Map) {
+          final tagName = tagMap['name']?.toString();
+          if (tagName != null && tagName.isNotEmpty) {
+            // 1. matchTags (in case the tag name itself is a known tag keyword)
+            tags.addAll(TagType.matchTags(tagName));
+
+            // 2. _parseTagType (using the mapping config)
+            final mappedTag = _parseTagType(tagName);
+            if (mappedTag != null && !tags.contains(mappedTag)) {
+              tags.add(mappedTag);
+            }
+          }
+        }
+      }
+    }
+
 
 
     return TorrentItem(

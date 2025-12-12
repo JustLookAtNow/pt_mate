@@ -27,6 +27,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
   late SiteConfig _siteConfig;
   late Dio _dio;
   Map<String, String>? _discountMapping;
+  Map<String, String>? _tagMapping;
   SiteConfigTemplate? _customTemplate;
   static final Logger _logger = Logger();
   static const int _maxHtmlDumpLength = 200 * 1024; // 200KB 截断
@@ -63,6 +64,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
     // 加载优惠类型映射配置
     final swDiscount = Stopwatch()..start();
     await _loadDiscountMapping();
+    // 加载标签映射配置
+    await _loadTagMapping();
     swDiscount.stop();
     if (kDebugMode) {
       _logger.d(
@@ -160,6 +163,46 @@ class NexusPHPWebAdapter extends SiteAdapter {
       // 使用默认映射
       _discountMapping = {};
     }
+  }
+
+  /// 加载标签映射配置
+  Future<void> _loadTagMapping() async {
+    try {
+      if (_customTemplate != null) {
+        _tagMapping = Map<String, String>.from(_customTemplate!.tagMapping);
+        return;
+      }
+      final template = await SiteConfigService.getTemplateById(
+        _siteConfig.templateId,
+        _siteConfig.siteType,
+      );
+      if (template?.tagMapping != null) {
+        _tagMapping = Map<String, String>.from(template!.tagMapping);
+      }
+    } catch (e) {
+      _tagMapping = {};
+    }
+  }
+
+  /// 从字符串解析标签类型
+  TagType? _parseTagType(String? str) {
+    if (str == null || str.isEmpty) return null;
+
+    final mapping = _tagMapping ?? {};
+    final enumName = mapping[str];
+
+    if (enumName != null) {
+      for (final type in TagType.values) {
+        if (type.name.toLowerCase() == enumName.toLowerCase()) {
+          return type;
+        }
+        // 也可以尝试匹配 content
+        if (type.content == enumName) {
+          return type;
+        }
+      }
+    }
+    return null;
   }
 
   /// 从字符串解析优惠类型
@@ -453,6 +496,23 @@ class NexusPHPWebAdapter extends SiteAdapter {
     }
   }
 
+  final singleTags = <String>{
+    'br',
+    'hr',
+    'img',
+    'input',
+    'link',
+    'meta',
+    'area',
+    'base',
+    'col',
+    'embed',
+    'param',
+    'source',
+    'track',
+    'wbr',
+  };
+
   /// 根据选择器查找所有匹配的元素
   /// [soup] 可以是 BeautifulSoup 或 Bs4Element 类型
   List<dynamic> _findElementBySelector(dynamic soup, String selector) {
@@ -487,10 +547,19 @@ class NexusPHPWebAdapter extends SiteAdapter {
               next.add(previousSibling);
             }
           } else if (part == 'nextParsed') {
-            // 处理 nextParsed 关键字，获取下一个兄弟元素(包括非标签)
-            final nextParsed = element.nextParsed;
-            if (nextParsed != null) {
-              next.add(nextParsed);
+            // 处理 nextParsed 关键字
+            // 单标签则取element.nextParsed，双标签则取element.nextParsedAll[1]
+
+            if (singleTags.contains(element.name.toLowerCase())) {
+              final nextParsed = element.nextParsed;
+              if (nextParsed != null) {
+                next.add(nextParsed);
+              }
+            } else {
+              final nextParsedAll = element.nextParsedAll;
+              if (nextParsedAll != null && nextParsedAll.length > 1) {
+                next.add(nextParsedAll[1]);
+              }
             }
           } else if (part == 'previousParsed') {
             // 处理 prevParsed 关键字，获取上一个兄弟元素(包括非标签)
@@ -626,7 +695,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
             final nthChild = children[index - 1]; // nth-child是1-based索引
 
             // 如果指定了标签，验证第n个子元素是否匹配该标签
-            if (tag != null && tag.isNotEmpty) {
+            if (tag != null && tag.isNotEmpty && tag != '*') {
               if (nthChild.name.toLowerCase() == tag.toLowerCase()) {
                 return [nthChild];
               }
@@ -654,6 +723,74 @@ class NexusPHPWebAdapter extends SiteAdapter {
             return matchingChildren;
           }
         }
+      }
+    } else if (selector.contains(':first-child')) {
+      // 第一个子元素
+      final children = soup.children;
+      if (children.isNotEmpty) {
+        return [children.first];
+      }
+    } else if (selector.contains(':last-child')) {
+      // 最后一个子元素
+      final children = soup.children;
+      if (children.isNotEmpty) {
+        return [children.last];
+      }
+    } else if (selector.contains(':nth-node')) {
+      // nth-child选择器
+      if (selector.contains(':nth-node(')) {
+        // 带括号数字的 nth-child 选择器
+        final nthChildMatch = RegExp(
+          r'^([^:]*):nth-node\((\d+)\)',
+        ).firstMatch(selector);
+        if (nthChildMatch != null) {
+          final tag = nthChildMatch.group(1)?.trim();
+          final index = int.tryParse(nthChildMatch.group(2) ?? '1') ?? 1;
+
+          // 获取直接子元素
+          final nodes = soup.nodes;
+          if (nodes.isNotEmpty && index > 0 && index <= nodes.length) {
+            final node = nodes[index - 1]; // nth-child是1-based索引
+
+            // 如果指定了标签，验证第n个子元素是否匹配该标签
+            if (tag != null && tag.isNotEmpty && tag != '*') {
+              if (node.name.toLowerCase() == tag.toLowerCase()) {
+                return [node];
+              }
+              // 如果第n个子元素不匹配指定标签，返回空列表
+              return [];
+            } else {
+              // 如果没有指定标签，直接返回第n个子元素
+              return [node];
+            }
+          }
+        }
+      } else {
+        // 不带括号的 nth-child 选择器，只取直接子元素中的指定标签
+        final nthNodeMatch = RegExp(r'^([^:]+):nth-node$').firstMatch(selector);
+        if (nthNodeMatch != null) {
+          final tag = nthNodeMatch.group(1)?.trim();
+          if (tag != null && tag.isNotEmpty) {
+            // 只在直接子元素中查找指定标签
+            final nodes = soup.nodes;
+            final matchingNodes = nodes
+                .where((node) => node.name.toLowerCase() == tag.toLowerCase())
+                .toList();
+            return matchingNodes;
+          }
+        }
+      }
+    } else if (selector.contains(':first-node')) {
+      // 第一个子元素
+      final nodes = soup.nodes;
+      if (nodes.isNotEmpty) {
+        return [nodes.first];
+      }
+    } else if (selector.contains(':last-node')) {
+      // 最后一个子元素
+      final nodes = soup.nodes;
+      if (nodes.isNotEmpty) {
+        return [nodes.last];
       }
     } else if (selector.contains('#')) {
       // ID选择器
@@ -991,6 +1128,11 @@ class NexusPHPWebAdapter extends SiteAdapter {
               ? torrentNameList.first
               : '';
 
+          final tagList = await _extractFieldValue(
+            row,
+            fieldsConfig['tag'] as Map<String, dynamic>? ?? {},
+          );
+
           final descriptionList = await _extractFieldValue(
             row,
             fieldsConfig['description'] as Map<String, dynamic>? ?? {},
@@ -1164,22 +1306,23 @@ class NexusPHPWebAdapter extends SiteAdapter {
             }
           }
 
-          // 清理文本字段
-          var finalSmallDescr = description
-              .replaceAll(torrentName, '')
-              .replaceAll(RegExp(r'\(*(剩余时间|剩餘時間)：\s*\d+.*?\d+[分钟|时|天]\)*'), '')
-              .trim();
-
           // 计算标签并清理描述
-          final descrRef = TextRef('$torrentName#@$finalSmallDescr');
-          final tags = TagType.matchTags(descrRef);
-          finalSmallDescr = descrRef.value;
+          final tags = TagType.matchTags(torrentName);
+
+          if (tagList.isNotEmpty) {
+            for (final tagStr in tagList) {
+              final mappedTag = _parseTagType(tagStr);
+              if (mappedTag != null && !tags.contains(mappedTag)) {
+                tags.add(mappedTag);
+              }
+            }
+          }
 
           torrents.add(
             TorrentItem(
               id: torrentId,
               name: torrentName,
-              smallDescr: finalSmallDescr,
+              smallDescr: description.trim(),
               discount: _parseDiscountType(
                 discount.isNotEmpty ? discount : null,
               ),

@@ -11,6 +11,7 @@ class MTeamAdapter extends SiteAdapter {
   late SiteConfig _siteConfig;
   late Dio _dio;
   Map<String, String>? _discountMapping;
+  Map<String, String>? _tagMapping;
   static final Logger _logger = Logger();
 
   @override
@@ -25,6 +26,8 @@ class MTeamAdapter extends SiteAdapter {
     final swDiscount = Stopwatch()..start();
     await _loadDiscountMapping();
     swDiscount.stop();
+    // 加载标签映射配置
+    await _loadTagMapping();
     if (kDebugMode) {
       _logger.d(
         'MTeamAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms',
@@ -97,6 +100,41 @@ class MTeamAdapter extends SiteAdapter {
     } catch (e) {
       _discountMapping = {};
     }
+  }
+
+  /// 加载标签映射配置
+  Future<void> _loadTagMapping() async {
+    try {
+      final template = await SiteConfigService.getTemplateById(
+        '',
+        SiteType.mteam,
+      );
+      if (template?.tagMapping != null) {
+        _tagMapping = Map<String, String>.from(template!.tagMapping);
+      }
+    } catch (e) {
+      _tagMapping = {};
+    }
+  }
+
+  /// 从字符串解析标签类型
+  TagType? _parseTagType(String? str) {
+    if (str == null || str.isEmpty) return null;
+
+    final mapping = _tagMapping ?? {};
+    final enumName = mapping[str];
+
+    if (enumName != null) {
+      for (final type in TagType.values) {
+        if (type.name.toLowerCase() == enumName.toLowerCase()) {
+          return type;
+        }
+        if (type.content == enumName) {
+          return type;
+        }
+      }
+    }
+    return null;
   }
 
   /// 从字符串解析优惠类型
@@ -235,11 +273,7 @@ class MTeamAdapter extends SiteAdapter {
       options: Options(contentType: 'application/json'),
     );
 
-
     final data = resp.data as Map<String, dynamic>;
-    if (kDebugMode) {
-      _logger.d('MTeamAdapter.searchTorrents raw response: ${resp.data}');
-    }
     if (data['code']?.toString() != '0') {
       throw DioException(
         requestOptions: resp.requestOptions,
@@ -295,33 +329,6 @@ class MTeamAdapter extends SiteAdapter {
     return _parseTorrentDetail(data['data'] as Map<String, dynamic>);
   }
 
-  @override
-  Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20}) async {
-    final requestData = {
-      'type': 'TORRENT',
-      'relationId': id,
-      'pageNumber': pageNumber,
-      'pageSize': pageSize,
-    };
-
-    final resp = await _dio.post(
-      '/api/comment/fetchList',
-      data: requestData,
-      options: Options(contentType: 'application/json'),
-    );
-
-    final data = resp.data as Map<String, dynamic>;
-    if (data['code']?.toString() != '0') {
-      throw DioException(
-        requestOptions: resp.requestOptions,
-        response: resp,
-        error: data['message'] ?? 'Fetch comments failed',
-      );
-    }
-
-    return TorrentCommentList.fromJson(data['data'] as Map<String, dynamic>);
-  }
-
   /// 解析 M-Team 站点的种子详情数据
   TorrentDetail _parseTorrentDetail(Map<String, dynamic> json) {
     return TorrentDetail(descr: (json['descr'] ?? '').toString());
@@ -335,7 +342,6 @@ class MTeamAdapter extends SiteAdapter {
   }) {
     int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
     final list = (json['data'] as List? ?? const []).cast<dynamic>();
-    _logger.d('MTeamAdapter._parseTorrentSearchResult comments : ${list[2]["comments"]}');
     return TorrentSearchResult(
       pageNumber: parseInt(json['pageNumber']),
       pageSize: parseInt(json['pageSize']),
@@ -360,8 +366,6 @@ class MTeamAdapter extends SiteAdapter {
     Map<String, dynamic>? peerMap,
   }) {
     int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
-      _logger.d('MTeamAdapter._parseTorrentItem comments :${parseInt(json['status']['comments'])} ${json['status']} ');
-
     bool parseBool(dynamic v) =>
         v == true || v.toString().toLowerCase() == 'true';
     final status = (json['status'] as Map<String, dynamic>?) ?? const {};
@@ -392,24 +396,22 @@ class MTeamAdapter extends SiteAdapter {
     final smallDescr = (json['smallDescr'] ?? '').toString();
 
     // 1. 从 name 中提取标签
-    final nameRef = TextRef(name);
-    final nameTags = TagType.matchTags(nameRef);
+    // 1. 从 name 中提取标签
+    final nameTags = TagType.matchTags(name);
 
     // 2. 从 labelsNew 中提取标签
-    final List<TagType> labelTags = [];
     final labelsNew = json['labelsNew'];
     if (labelsNew is List) {
       for (var label in labelsNew) {
         final labelStr = label.toString();
-        // 使用 matchTags 来匹配标签，因为它包含了正则逻辑
-        final labelRef = TextRef(labelStr);
-        final matches = TagType.matchTags(labelRef);
-        labelTags.addAll(matches);
+        // 尝试映射标签
+        final mapped = _parseTagType(labelStr);
+        if (mapped != null && !nameTags.contains(mapped)) {
+          nameTags.add(mapped);
+        }
       }
     }
 
-    // 合并去重
-    final tags = {...nameTags, ...labelTags}.toList();
 
     final id = (json['id'] ?? '').toString();
     DownloadStatus downloadStatus = DownloadStatus.none;
@@ -442,8 +444,7 @@ class MTeamAdapter extends SiteAdapter {
       doubanRating: (json['doubanRating'] ?? 'N/A').toString(),
       imdbRating: (json['imdbRating'] ?? 'N/A').toString(),
       isTop: (toppingLevel ?? 0) > 0,
-      tags: tags,
-      comments: parseInt(json['status']['comments']),
+      tags: nameTags,
     );
   }
 

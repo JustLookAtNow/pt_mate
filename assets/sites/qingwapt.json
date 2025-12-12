@@ -65,8 +65,12 @@
           "selector": "a[href^=\"details.php?id=\"] > b",
           "attribute": "text"
         },
+        "tag": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(2) > span[title]",
+          "attribute": "text"
+        },
         "description": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(2)",
+          "selector": "table.torrentname > tbody > tr > td:nth-child(2) > *:last-node",
           "attribute": "text"
         },
         "discount": {

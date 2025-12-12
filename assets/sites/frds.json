@@ -107,11 +107,11 @@
           }
         },
         "torrentName": {
-          "selector": "a[href^=\"details.php?id=\"] > b",
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > br:nth-child > nextParsed",
           "attribute": "text"
         },
         "description": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(1)",
+          "selector": "a[href^=\"details.php?id=\"] > b",
           "attribute": "text"
         },
         "discount": {
