@@ -15,6 +15,7 @@ import '../services/downloader/downloader_config.dart';
 import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
 import '../widgets/torrent_download_dialog.dart';
+import '../utils/format.dart';
 
 // 自定义Quote标签处理器
 class CustomQuoteTag extends WrappedStyleTag {
@@ -573,6 +574,363 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     }
   }
 
+  // 格式化文件大小
+  String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(2)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
+  /// 获取优惠类型对应的颜色
+  Color _discountColor(DiscountType discount) {
+    switch (discount.colorType) {
+      case DiscountColorType.green:
+        return Colors.green;
+      case DiscountColorType.yellow:
+        return Colors.amber;
+      case DiscountColorType.none:
+        return Colors.grey;
+    }
+  }
+
+  /// 获取优惠类型显示文本
+  String _discountText(DiscountType discount, String? endTime) {
+    final baseText = discount.displayText;
+    if ((discount == DiscountType.free || discount == DiscountType.twoXFree) &&
+        endTime != null && endTime.isNotEmpty) {
+      try {
+        final endDateTime = DateTime.parse(endTime);
+        final now = DateTime.now();
+        final hoursLeft = endDateTime.difference(now).inHours;
+        if (hoursLeft > 0) return '$baseText ${hoursLeft}h';
+      } catch (e) { /* 解析失败 */ }
+    }
+    return baseText;
+  }
+
+  /// 检查评分是否有效
+  bool _hasRatingValue(String? r) {
+    if (r == null) return false;
+    final t = r.trim();
+    if (t.isEmpty || t == 'N/A') return false;
+    final m = RegExp(r'([0-9]+(?:\.[0-9]+)?)').firstMatch(t);
+    if (m == null) return false;
+    final v = double.tryParse(m.group(1)!);
+    return v != null && v > 0;
+  }
+
+  /// 构建封面占位符
+  Widget _buildCoverPlaceholder() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.image_outlined, size: 24, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        const SizedBox(height: 4),
+        Text('暂无', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      ],
+    );
+  }
+
+  /// 构建种子信息概览卡片
+  Widget _buildInfoOverviewCard() {
+    final torrent = widget.torrentItem;
+    final hasDouban = _hasRatingValue(torrent.doubanRating);
+    final hasImdb = _hasRatingValue(torrent.imdbRating);
+    final tags = torrent.tags;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // 封面图片回退逻辑：优先使用 cover，否则使用 imageList 的第一张图
+    final coverUrl = torrent.cover.isNotEmpty
+        ? torrent.cover
+        : (torrent.imageList.isNotEmpty ? torrent.imageList.first : '');
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 左侧封面图 - 固定宽度，高度自适应
+              Container(
+                width: 80,
+                constraints: const BoxConstraints(minHeight: 110),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: colorScheme.outline.withValues(alpha: 0.2),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(7),
+                  child: coverUrl.isNotEmpty
+                      ? GestureDetector(
+                          onTap: () => showDialog(
+                            context: context,
+                            builder: (context) => Dialog(
+                              child: Image.network(coverUrl, fit: BoxFit.contain),
+                            ),
+                          ),
+                          child: Image.network(
+                            coverUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _buildCoverPlaceholder(),
+                          ),
+                        )
+                      : _buildCoverPlaceholder(),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // 右侧信息区域 - 自适应高度
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // 上部：副标题和标签
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 副标题
+                        if (torrent.smallDescr.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              torrent.smallDescr,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        // 标签行（包含优惠标签和自定义标签）
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            // 优惠标签 - 放在最前面
+                            if (torrent.discount != DiscountType.normal)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: _discountColor(torrent.discount),
+                                  borderRadius: BorderRadius.circular(4),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: _discountColor(torrent.discount).withValues(alpha: 0.3),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  _discountText(torrent.discount, torrent.discountEndTime),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            // 自定义标签
+                            ...tags.map((tag) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: tag.color,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                tag.content,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            )),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // 下部：统计信息和时间
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 统计信息行
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // 做种数
+                              Icon(Icons.upload_rounded, color: Colors.green.shade600, size: 14),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${torrent.seeders}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green.shade700,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // 下载数
+                              Icon(Icons.download_rounded, color: Colors.orange.shade600, size: 14),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${torrent.leechers}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.orange.shade700,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              // 分隔线
+                              Container(
+                                width: 1,
+                                height: 12,
+                                color: colorScheme.outline.withValues(alpha: 0.3),
+                              ),
+                              const SizedBox(width: 10),
+                              // 文件大小
+                              Icon(Icons.storage_rounded, color: colorScheme.primary, size: 14),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatSize(torrent.sizeBytes),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // 评分和时间行
+                        Row(
+                          children: [
+                            // 豆瓣评分
+                            if (hasDouban) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF007711),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      '豆',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      '${torrent.doubanRating}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            // IMDB评分
+                            if (hasImdb) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF5C518),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      'IMDb',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      '${torrent.imdbRating}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            const Spacer(),
+                            // 发布时间
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.schedule_rounded,
+                                  size: 12,
+                                  color: colorScheme.outline,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  Formatters.formatTorrentCreatedDate(torrent.createdDate),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: colorScheme.outline,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _loadDetail() async {
     if (mounted) {
       setState(() {
@@ -623,10 +981,19 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         });
       }
     } catch (e) {
+      // 当评论 API 不可用时（如 404、API 不存在等），优雅降级为空评论列表
       if (mounted) {
         setState(() {
-          _commentsError = e.toString();
+          // 返回空评论列表而不是显示错误
+          _comments = TorrentCommentList(
+            pageNumber: 1,
+            pageSize: 100,
+            total: 0,
+            totalPages: 0,
+            comments: [],
+          );
           _commentsLoading = false;
+          _commentsError = null;
         });
       }
     }
@@ -2147,6 +2514,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 种子信息概览卡片
+                  _buildInfoOverviewCard(),
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
