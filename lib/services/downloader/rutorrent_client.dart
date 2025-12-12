@@ -3,14 +3,18 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:pt_mate/models/app_models.dart';
 import 'package:xml/xml.dart';
 
 import 'downloader_client.dart';
 import 'downloader_config.dart';
 import 'downloader_models.dart';
+import 'torrent_file_downloader_mixin.dart';
 
 /// ruTorrent下载器客户端实现
-class RuTorrentClient implements DownloaderClient {
+class RuTorrentClient
+    with TorrentFileDownloaderMixin
+    implements DownloaderClient {
   final RuTorrentConfig config;
   final String password;
 
@@ -284,38 +288,7 @@ class RuTorrentClient implements DownloaderClient {
     return v ?? 0;
   }
 
-  /// 下载种子文件并返回字节数据
-  Future<List<int>> _downloadTorrentFile(String url) async {
-    try {
-      final response = await _dio.get<List<int>>(
-        url,
-        options: Options(
-          responseType: ResponseType.bytes,
-          followRedirects: true,
-          maxRedirects: 5,
-          validateStatus: (status) => status != null && status < 400,
-        ),
-      );
 
-      if (response.data != null) {
-        return response.data!;
-      } else {
-        throw Exception('Failed to download torrent file: empty response');
-      }
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 401) {
-        throw Exception('Authentication failed when downloading torrent file');
-      }
-
-      if (e.response?.statusCode != null && e.response!.statusCode! >= 400) {
-        throw HttpException(
-          'HTTP ${e.response!.statusCode} when downloading torrent file',
-        );
-      }
-
-      throw Exception('Failed to download torrent file: ${e.message}');
-    }
-  }
 
   @override
   Future<void> testConnection() async {
@@ -494,7 +467,7 @@ class RuTorrentClient implements DownloaderClient {
   }
 
   @override
-  Future<void> addTask(AddTaskParams params) async {
+  Future<void> addTask(AddTaskParams params, {SiteConfig? siteConfig}) async {
     var url = params.url;
     var forceRelay = false;
     if (url.startsWith('##')) {
@@ -522,7 +495,11 @@ class RuTorrentClient implements DownloaderClient {
       await _request('POST', '/php/addtorrent.php', body: formData);
     } else {
       // 种子文件，需要先下载
-      final torrentData = await _downloadTorrentFile(url);
+      final torrentData = await downloadTorrentFileCommon(
+        _dio,
+        url,
+        siteConfig: siteConfig,
+      );
 
       final body = <String, dynamic>{
         'torrent_file': MultipartFile.fromBytes(
