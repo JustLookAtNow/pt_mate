@@ -21,6 +21,9 @@ enum SortField {
   progress
 }
 
+/// qBittorrent 用于表示"无限"ETA 的值（100天，单位：秒）
+const int kInfinityEtaInSeconds = 8640000;
+
 class DownloadTasksPage extends StatefulWidget {
   const DownloadTasksPage({super.key});
 
@@ -658,8 +661,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                     children: [
                       Text(
                         task.name,
-                        style: const TextStyle(
-                          fontSize: 14,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                         maxLines: 1,
@@ -737,33 +739,33 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                       ),
 
                       // Status Info Row 2: Dynamic Info (Speed & ETA)
-                      if (task.dlspeed > 0 || task.upspeed > 0 || (isDownloading && task.eta > 0 && task.eta < 8640000))
+                      if (task.dlspeed > 0 || task.upspeed > 0 || (isDownloading && task.eta > 0 && task.eta < kInfinityEtaInSeconds))
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
                           child: Row(
                             children: [
                               // DL Speed
                               if (task.dlspeed > 0) ...[
-                                 const Icon(Icons.download, size: 12, color: Colors.green),
+                                 Icon(Icons.download, size: 12, color: Theme.of(context).colorScheme.primary),
                                  const SizedBox(width: 2),
                                  Text(
                                    FormatUtil.formatSpeed(task.dlspeed),
-                                   style: const TextStyle(fontSize: 11, color: Colors.green),
+                                   style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.primary),
                                  ),
                                  const SizedBox(width: 8),
                               ],
                               // UP Speed
                               if (task.upspeed > 0) ...[
-                                 const Icon(Icons.upload, size: 12, color: Colors.blue),
+                                 Icon(Icons.upload, size: 12, color: Theme.of(context).colorScheme.tertiary),
                                  const SizedBox(width: 2),
                                  Text(
                                    FormatUtil.formatSpeed(task.upspeed),
-                                   style: const TextStyle(fontSize: 11, color: Colors.blue),
+                                   style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.tertiary),
                                  ),
                                  const SizedBox(width: 8),
                               ],
                               // ETA
-                              if (isDownloading && task.eta > 0 && task.eta < 8640000) ...[
+                              if (isDownloading && task.eta > 0 && task.eta < kInfinityEtaInSeconds) ...[
                                  Icon(Icons.timer, size: 12, color: Theme.of(context).colorScheme.secondary),
                                  const SizedBox(width: 2),
                                  Text(
