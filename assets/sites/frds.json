@@ -17,7 +17,7 @@
     "downloadHistory": true,
     "categorySearch": true,
     "advancedSearch": true,
-    "showCover": false
+    "showCover": true
   },
   "discountMapping": {},
   "infoFinder": {
@@ -115,15 +115,15 @@
           "attribute": "text"
         },
         "discount": {
-          "selector": "table.torrentname > img[class^=\"pro_free\"]",
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
           "attribute": "alt"
         },
         "discountEndTime": {
-          "selector": "table.torrentname > img[class^=\"pro_free\"]",
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
           "attribute": "onmouseover",
           "filter": {
             "name": "regexp",
-            "args": "<span title=\\\"(.*?)\\\"",
+            "args": "<span title=\"(.*?)\">",
             "index": 1
           }
         },
@@ -157,6 +157,10 @@
         },
         "isTop": {
           "selector": "table.torrentname > img[title~=\"置顶|置頂\"]",
+          "attribute": "src"
+        },
+        "cover": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > img[src]",
           "attribute": "src"
         },
         "createData": {
