@@ -1589,12 +1589,14 @@ class _HomePageState extends State<HomePage> {
                                 ),
                               );
                             }
-                            return ListView.builder(
-                              controller: _scrollCtrl,
-                              padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
-                              itemCount:
-                                  filteredItems.length + (_hasMore ? 1 : 0),
-                              itemBuilder: (context, index) {
+                            return RefreshIndicator(
+                              onRefresh: () => _search(reset: true),
+                              child: ListView.builder(
+                                controller: _scrollCtrl,
+                                padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
+                                itemCount:
+                                    filteredItems.length + (_hasMore ? 1 : 0),
+                                itemBuilder: (context, index) {
                                 if (index == filteredItems.length) {
                                   return const Padding(
                                     padding: EdgeInsets.all(16.0),
@@ -1613,20 +1615,21 @@ class _HomePageState extends State<HomePage> {
                                 final isSelected = _selectedItems.contains(
                                   item.id,
                                 );
-                      return TorrentListItem(
-                                  torrent: item,
-                        isSelected: isSelected,
-                        isSelectionMode: _isSelectionMode,
-                        currentSite: _currentSite,
-                        onTap: () => _isSelectionMode
-                                      ? _onToggleSelection(item)
-                                      : _onTorrentTap(item),
-                                  onLongPress: () => _onLongPress(item),
-                                  onToggleCollection: () =>
-                                      _onToggleCollection(item),
-                                  onDownload: () => _onDownload(item),
-                                );
-                              },
+                        return TorrentListItem(
+                                    torrent: item,
+                          isSelected: isSelected,
+                          isSelectionMode: _isSelectionMode,
+                          currentSite: _currentSite,
+                          onTap: () => _isSelectionMode
+                                        ? _onToggleSelection(item)
+                                        : _onTorrentTap(item),
+                                    onLongPress: () => _onLongPress(item),
+                                    onToggleCollection: () =>
+                                        _onToggleCollection(item),
+                                    onDownload: () => _onDownload(item),
+                                  );
+                                },
+                              ),
                             );
                           },
                         ),
