@@ -644,7 +644,6 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     final coverUrl = torrent.cover.isNotEmpty
         ? torrent.cover
         : (torrent.imageList.isNotEmpty ? torrent.imageList.first : '');
-
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
@@ -677,18 +676,41 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(7),
                   child: coverUrl.isNotEmpty
-                      ? GestureDetector(
-                          onTap: () => showDialog(
-                            context: context,
-                            builder: (context) => Dialog(
-                              child: Image.network(coverUrl, fit: BoxFit.contain),
-                            ),
-                          ),
-                          child: Image.network(
-                            coverUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _buildCoverPlaceholder(),
-                          ),
+                      ? FutureBuilder<List<int>>(
+                          future: ImageHttpClient.instance
+                              .fetchImage(coverUrl)
+                              .then((response) => response.data!),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                              );
+                            }
+                            if (snapshot.hasError || !snapshot.hasData) {
+                              return _buildCoverPlaceholder();
+                            }
+                            final imageData = Uint8List.fromList(snapshot.data!);
+                            return GestureDetector(
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => FullScreenImageViewer(imageData: imageData),
+                                  fullscreenDialog: true,
+                                ),
+                              ),
+                              child: Image.memory(
+                                imageData,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => _buildCoverPlaceholder(),
+                              ),
+                            );
+                          },
                         )
                       : _buildCoverPlaceholder(),
                 ),
