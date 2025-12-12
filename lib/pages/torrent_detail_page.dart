@@ -623,10 +623,19 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         });
       }
     } catch (e) {
+      // 当评论 API 不可用时（如 404、API 不存在等），优雅降级为空评论列表
       if (mounted) {
         setState(() {
-          _commentsError = e.toString();
+          // 返回空评论列表而不是显示错误
+          _comments = TorrentCommentList(
+            pageNumber: 1,
+            pageSize: 100,
+            total: 0,
+            totalPages: 0,
+            comments: [],
+          );
           _commentsLoading = false;
+          _commentsError = null;
         });
       }
     }
