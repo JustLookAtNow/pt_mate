@@ -48,6 +48,7 @@
 适用于api权限没开或者dom比较难适配的网站                                                    |
 | `features`         | object  | ✅   | 功能支持配置                                        |
 | `discountMapping`  | object  | ❌   | 折扣映射配置                                        |
+| `tagMapping`       | object  | ❌   | 标签映射配置                                        |
 | `infoFinder`       | object  | ❌   | 信息提取配置（仅 NexusPHPWeb 类型需要）             |
 | `request`          | object  | ❌   | 自定义请求配置（暂不完善有具体需求可以提issue）     |
 
@@ -81,7 +82,43 @@
 }
 ```
 
-### 4. 自定义请求配置 (request)
+### 4. 标签映射 (tagMapping)
+
+用于将网站特定的标签文本映射到应用内部的标签类型。配置后，应用能正确识别并显示这些标签。
+
+```json
+{
+  "tagMapping": {
+    "热门": "hot",
+    "官方": "official",
+    "中字": "chinese",
+    "DIY": "diy",
+    "完结": "complete"
+  }
+}
+```
+
+#### 支持的内部标签键值表
+
+| 键值 (Key)           | 说明 (显示名称) | 默认正则匹配 (自动识别，只从name中匹配)       |
+| -------------------- | --------------- | --------------------------------------------- |
+| `hot`                | HOT             | -                                             |
+| `official`           | 官方            | -                                             |
+| `chinese`            | 中字            | -                                             |
+| `chineseTraditional` | 繁体            | -                                             |
+| `mandarin`           | 国语            | -                                             |
+| `diy`                | DIY             | -                                             |
+| `complete`           | 完结            | -                                             |
+| `ep`                 | 分集            | -                                             |
+| `fourK`              | 4K              | `\b4K\b\|\b2160p\b`                           |
+| `resolution1080`     | 1080p           | `\b1080p\b`                                   |
+| `hdr`                | HDR             | `\bHDR\b\|\bHDR10\b`                          |
+| `h265`               | H265            | `\bH\.?265\b\|\bHEVC\b\|\bx265\b`             |
+| `webDl`              | WEB-DL          | `\bWEB-DL\b\|\bWEBDL\b\|\bWEB\.DL\b`          |
+| `dovi`               | DOVI            | `\bDOVI\b\|Dolby Vision\|\bDV\b\|杜比(视界)*` |
+| `blueRay`            | Blu-ray         | `\bblu-ray\b\|\bbluray\b`                     |
+
+### 5. 自定义请求配置 (request)
 
 用于配置特殊的 HTTP 请求，如收藏功能：
 
@@ -120,7 +157,7 @@
 - `{baseUrl}` - 网站基础 URL
 - `{passKey}` - 用户密钥
 
-### 5. 信息提取配置 (infoFinder)
+### 6. 信息提取配置 (infoFinder)
 
 仅适用于 `NexusPHPWeb` 类型网站，用于配置如何从网页中提取信息。
 
