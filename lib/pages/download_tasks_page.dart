@@ -666,6 +666,49 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
+                      // Category and Tags
+                      if (task.category.isNotEmpty || task.tags.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              if (task.category.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    task.category,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                    ),
+                                  ),
+                                ),
+                              if (task.category.isNotEmpty && task.tags.isNotEmpty)
+                                const SizedBox(width: 6),
+                              ...task.tags.map((tag) => Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.secondaryContainer,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    tag,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                    ),
+                                  ),
+                                ),
+                              )),
+                            ],
+                          ),
+                        ),
                       // Status Info Row 1: Static Info
                       Row(
                         children: [

@@ -531,6 +531,30 @@ class MTeamAdapter extends SiteAdapter {
   }
 
   @override
+  Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20}) async {
+    final resp = await _dio.post(
+      '/api/torrent/listComments',
+      data: {
+        'id': id,
+        'pageNumber': pageNumber,
+        'pageSize': pageSize,
+      },
+      options: Options(contentType: 'application/json'),
+    );
+
+    final data = resp.data as Map<String, dynamic>;
+    if (data['code']?.toString() != '0') {
+      throw DioException(
+        requestOptions: resp.requestOptions,
+        response: resp,
+        error: data['message'] ?? 'Fetch comments failed',
+      );
+    }
+
+    return TorrentCommentList.fromJson(data['data'] as Map<String, dynamic>);
+  }
+
+  @override
   Future<List<SearchCategoryConfig>> getSearchCategories() async {
     // 从JSON配置文件中加载默认的分类配置，通过baseUrl匹配
     return await SiteConfigService.getDefaultSearchCategories(
