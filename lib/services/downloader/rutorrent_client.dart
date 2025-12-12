@@ -656,7 +656,7 @@ class RuTorrentClient
     final getCompletedChunks = _iv(rawTorrent[6].toString());
     final getSizeChunks = _iv(rawTorrent[7].toString());
     final torrentDownloaded = _iv(rawTorrent[8].toString());
-    // torrentUploaded is at index 9 but not used in the model
+    final torrentUploaded = _iv(rawTorrent[9].toString());
     final ratio = _iv(rawTorrent[10].toString());
     final uploadSpeed = _iv(rawTorrent[11].toString());
     final downloadSpeed = _iv(rawTorrent[12].toString());
@@ -722,6 +722,7 @@ class RuTorrentClient
       amountLeft: torrentSize - torrentDownloaded,
       ratio: ratio / 1000.0, // 转换为实际比率
       timeActive: 0,
+      uploaded: torrentUploaded,
     );
   }
 
