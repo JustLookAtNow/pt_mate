@@ -10,8 +10,9 @@ abstract class DownloaderConfig {
   final String username;
   final String password;
   final bool useLocalRelay;
+  final bool allowSelfSignedCert;
   final String? version;
-  
+
   const DownloaderConfig({
     required this.id,
     required this.name,
@@ -21,6 +22,7 @@ abstract class DownloaderConfig {
     required this.username,
     required this.password,
     this.useLocalRelay = false,
+    this.allowSelfSignedCert = false,
     this.version,
   });
   
@@ -28,12 +30,14 @@ abstract class DownloaderConfig {
   factory DownloaderConfig.fromJson(Map<String, dynamic> json) {
     final typeStr = json['type'] as String? ?? 'qbittorrent';
     final type = DownloaderType.fromString(typeStr);
-    
+
     switch (type) {
       case DownloaderType.qbittorrent:
         return QbittorrentConfig.fromJson(json);
       case DownloaderType.transmission:
         return TransmissionConfig.fromJson(json);
+      case DownloaderType.rutorrent:
+        return RuTorrentConfig.fromJson(json);
     }
   }
   
@@ -49,6 +53,7 @@ abstract class DownloaderConfig {
         'username': username,
         'password': password,
         'useLocalRelay': useLocalRelay,
+        'allowSelfSignedCert': allowSelfSignedCert,
         if (version != null) 'version': version,
       },
     };
@@ -63,6 +68,7 @@ abstract class DownloaderConfig {
     String? username,
     String? password,
     bool? useLocalRelay,
+    bool? allowSelfSignedCert,
     String? version,
   });
   
@@ -79,9 +85,10 @@ abstract class DownloaderConfig {
         other.username == username &&
         other.password == password &&
         other.useLocalRelay == useLocalRelay &&
+        other.allowSelfSignedCert == allowSelfSignedCert &&
         other.version == version;
   }
-  
+
   /// 通用的哈希码计算
   @override
   int get hashCode {
@@ -94,6 +101,7 @@ abstract class DownloaderConfig {
       username,
       password,
       useLocalRelay,
+      allowSelfSignedCert,
       version,
     );
   }
@@ -112,6 +120,7 @@ abstract class DownloaderConfig {
       required String username,
       required String password,
       bool useLocalRelay,
+      bool allowSelfSignedCert,
       String? version,
     })
     constructor,
@@ -119,7 +128,7 @@ abstract class DownloaderConfig {
   ) {
     // 支持嵌套的config结构和扁平结构（向前兼容）
     final config = json['config'] as Map<String, dynamic>? ?? json;
-    
+
     return constructor(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
@@ -128,6 +137,7 @@ abstract class DownloaderConfig {
       username: config['username'] ?? '',
       password: config['password'] ?? '',
       useLocalRelay: config['useLocalRelay'] ?? false,
+      allowSelfSignedCert: config['allowSelfSignedCert'] ?? false,
       version: config['version'],
     );
   }
@@ -143,6 +153,7 @@ class QbittorrentConfig extends DownloaderConfig {
     required super.username,
     required super.password,
     super.useLocalRelay = false,
+    super.allowSelfSignedCert = false,
     super.version,
   }) : super(type: DownloaderType.qbittorrent);
   
@@ -161,6 +172,7 @@ class QbittorrentConfig extends DownloaderConfig {
         required String username,
         required String password,
         bool useLocalRelay = false,
+        bool allowSelfSignedCert = false,
         String? version,
       }) => QbittorrentConfig(
         id: id,
@@ -170,6 +182,7 @@ class QbittorrentConfig extends DownloaderConfig {
         username: username,
         password: password,
         useLocalRelay: useLocalRelay,
+        allowSelfSignedCert: allowSelfSignedCert,
         version: version,
       ),
       8080,
@@ -185,6 +198,7 @@ class QbittorrentConfig extends DownloaderConfig {
     String? username,
     String? password,
     bool? useLocalRelay,
+    bool? allowSelfSignedCert,
     String? version,
   }) {
     return QbittorrentConfig(
@@ -195,6 +209,7 @@ class QbittorrentConfig extends DownloaderConfig {
       username: username ?? this.username,
       password: password ?? this.password,
       useLocalRelay: useLocalRelay ?? this.useLocalRelay,
+      allowSelfSignedCert: allowSelfSignedCert ?? this.allowSelfSignedCert,
       version: version ?? this.version,
     );
   }
@@ -210,6 +225,7 @@ class TransmissionConfig extends DownloaderConfig {
     required super.username,
     required super.password,
     super.useLocalRelay = false,
+    super.allowSelfSignedCert = false,
     super.version,
   }) : super(type: DownloaderType.transmission);
   
@@ -228,6 +244,7 @@ class TransmissionConfig extends DownloaderConfig {
         required String username,
         required String password,
         bool useLocalRelay = false,
+        bool allowSelfSignedCert = false,
         String? version,
       }) => TransmissionConfig(
         id: id,
@@ -237,12 +254,13 @@ class TransmissionConfig extends DownloaderConfig {
         username: username,
         password: password,
         useLocalRelay: useLocalRelay,
+        allowSelfSignedCert: allowSelfSignedCert,
         version: version,
       ),
       9091,
     );
   }
-  
+
   @override
   TransmissionConfig copyWith({
     String? id,
@@ -252,6 +270,7 @@ class TransmissionConfig extends DownloaderConfig {
     String? username,
     String? password,
     bool? useLocalRelay,
+    bool? allowSelfSignedCert,
     String? version,
   }) {
     return TransmissionConfig(
@@ -262,6 +281,79 @@ class TransmissionConfig extends DownloaderConfig {
       username: username ?? this.username,
       password: password ?? this.password,
       useLocalRelay: useLocalRelay ?? this.useLocalRelay,
+      allowSelfSignedCert: allowSelfSignedCert ?? this.allowSelfSignedCert,
+      version: version ?? this.version,
+    );
+  }
+}
+
+/// ruTorrent下载器配置
+class RuTorrentConfig extends DownloaderConfig {
+  const RuTorrentConfig({
+    required super.id,
+    required super.name,
+    required super.host,
+    required super.port,
+    required super.username,
+    required super.password,
+    super.useLocalRelay = true, // ruTorrent 默认启用本地中转
+    super.allowSelfSignedCert = false,
+    super.version,
+  }) : super(type: DownloaderType.rutorrent);
+
+  @override
+  int get defaultPort => 80;
+
+  /// 从JSON创建配置
+  factory RuTorrentConfig.fromJson(Map<String, dynamic> json) {
+    return DownloaderConfig._createFromConfig(
+      json,
+      ({
+        required String id,
+        required String name,
+        required String host,
+        required int port,
+        required String username,
+        required String password,
+        bool useLocalRelay = true,
+        bool allowSelfSignedCert = false,
+        String? version,
+      }) => RuTorrentConfig(
+        id: id,
+        name: name,
+        host: host,
+        port: port,
+        username: username,
+        password: password,
+        useLocalRelay: useLocalRelay,
+        allowSelfSignedCert: allowSelfSignedCert,
+        version: version,
+      ),
+      80,
+    );
+  }
+
+  @override
+  RuTorrentConfig copyWith({
+    String? id,
+    String? name,
+    String? host,
+    int? port,
+    String? username,
+    String? password,
+    bool? useLocalRelay,
+    bool? allowSelfSignedCert,
+    String? version,
+  }) {
+    return RuTorrentConfig(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      host: host ?? this.host,
+      port: port ?? this.port,
+      username: username ?? this.username,
+      password: password ?? this.password,
+      useLocalRelay: useLocalRelay ?? this.useLocalRelay,
+      allowSelfSignedCert: allowSelfSignedCert ?? this.allowSelfSignedCert,
       version: version ?? this.version,
     );
   }

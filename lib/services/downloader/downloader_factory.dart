@@ -3,6 +3,7 @@ import 'downloader_config.dart';
 import 'downloader_models.dart';
 import 'qbittorrent_client.dart';
 import 'transmission_client.dart';
+import 'rutorrent_client.dart';
 
 /// 下载器工厂
 /// 
@@ -70,7 +71,7 @@ class DownloaderFactory {
           return QbittorrentClient(
             config: config,
             password: password,
-            onConfigUpdated: onConfigUpdated != null 
+            onConfigUpdated: onConfigUpdated != null
               ? (updatedConfig) => onConfigUpdated(updatedConfig)
               : null,
           );
@@ -82,12 +83,24 @@ class DownloaderFactory {
           return TransmissionClient(
             config: config,
             password: password,
-            onConfigUpdated: onConfigUpdated != null 
+            onConfigUpdated: onConfigUpdated != null
               ? (updatedConfig) => onConfigUpdated(updatedConfig)
               : null,
           );
         } else {
           throw ArgumentError('Invalid config type for Transmission: ${config.runtimeType}');
+        }
+      case DownloaderType.rutorrent:
+        if (config is RuTorrentConfig) {
+          return RuTorrentClient(
+            config: config,
+            password: password,
+            onConfigUpdated: onConfigUpdated != null
+              ? (updatedConfig) => onConfigUpdated(updatedConfig)
+              : null,
+          );
+        } else {
+          throw ArgumentError('Invalid config type for ruTorrent: ${config.runtimeType}');
         }
     }
   }
