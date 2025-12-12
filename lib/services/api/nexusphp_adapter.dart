@@ -243,6 +243,10 @@ class NexusPHPAdapter implements SiteAdapter {
 
     final response = await _dio.get(url, queryParameters: params);
 
+    if (kDebugMode) {
+      _logger.d('NexusPHPAdapter.searchTorrents raw response: ${response.data}');
+    }
+
     if (response.statusCode == 200) {
       final data = response.data;
       if (data['ret'] == 0) {
@@ -344,6 +348,7 @@ class NexusPHPAdapter implements SiteAdapter {
       createdDate: item['added'] != null ? item['added'] + ':00' : '',
       isTop: item['pos_state'] != 'normal',
       tags: tags,
+      comments: item['comments'] as int? ?? 0,
     );
   }
 
@@ -370,6 +375,18 @@ class NexusPHPAdapter implements SiteAdapter {
     } catch (e) {
       throw Exception('获取种子详情失败: $e');
     }
+  }
+
+  @override
+  Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20}) async {
+    // NexusPHP API 暂时不支持获取评论，返回空列表
+    return TorrentCommentList(
+      pageNumber: pageNumber,
+      pageSize: pageSize,
+      total: 0,
+      totalPages: 0,
+      comments: [],
+    );
   }
 
   //实际上调用不到了

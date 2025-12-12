@@ -129,6 +129,7 @@ class DownloadTask {
   final int amountLeft;
   final double ratio;
   final int timeActive;
+  final int uploaded;
   
   const DownloadTask({
     required this.hash,
@@ -147,6 +148,7 @@ class DownloadTask {
     required this.amountLeft,
     required this.ratio,
     required this.timeActive,
+    required this.uploaded
   });
   
   factory DownloadTask.fromJson(Map<String, dynamic> json) {
@@ -169,9 +171,10 @@ class DownloadTask {
       amountLeft: json['amountLeft'] is int ? json['amountLeft'] : int.tryParse('${json['amountLeft'] ?? 0}') ?? 0,
       ratio: json['ratio'] is double ? json['ratio'] : double.tryParse('${json['ratio'] ?? 0}') ?? 0,
       timeActive: json['timeActive'] is int ? json['timeActive'] : int.tryParse('${json['timeActive'] ?? 0}') ?? 0,
+      uploaded: json['uploaded'] is int ? json['uploaded'] : int.tryParse('${json['uploaded'] ?? 0}') ?? 0,
     );
   }
-  
+
   Map<String, dynamic> toJson() {
     return {
       'hash': hash,
@@ -190,6 +193,7 @@ class DownloadTask {
       'amountLeft': amountLeft,
       'ratio': ratio,
       'timeActive': timeActive,
+      'uploaded': uploaded,
     };
   }
   

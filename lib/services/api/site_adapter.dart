@@ -27,6 +27,9 @@ abstract class SiteAdapter {
   /// 获取种子详情
   Future<TorrentDetail> fetchTorrentDetail(String id);
   
+  /// 获取种子评论列表
+  Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20});
+
   /// 生成下载令牌并返回下载URL
   Future<String> genDlToken({required String id, String? url});
   
