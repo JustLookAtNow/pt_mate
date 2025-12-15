@@ -445,6 +445,7 @@ class MTeamAdapter extends SiteAdapter {
       imdbRating: (json['imdbRating'] ?? 'N/A').toString(),
       isTop: (toppingLevel ?? 0) > 0,
       tags: nameTags,
+      comments: parseInt(status['comments'] ?? 0)
     );
   }
 
@@ -532,13 +533,16 @@ class MTeamAdapter extends SiteAdapter {
 
   @override
   Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20}) async {
+    final requestData = {
+      'type': 'TORRENT',
+      'relationId': id,
+      'pageNumber': pageNumber,
+      'pageSize': pageSize,
+    };
+
     final resp = await _dio.post(
-      '/api/torrent/listComments',
-      data: {
-        'id': id,
-        'pageNumber': pageNumber,
-        'pageSize': pageSize,
-      },
+      '/api/comment/fetchList',
+      data: requestData,
       options: Options(contentType: 'application/json'),
     );
 
@@ -553,6 +557,7 @@ class MTeamAdapter extends SiteAdapter {
 
     return TorrentCommentList.fromJson(data['data'] as Map<String, dynamic>);
   }
+
 
   @override
   Future<List<SearchCategoryConfig>> getSearchCategories() async {
