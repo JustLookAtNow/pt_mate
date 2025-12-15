@@ -1,0 +1,23 @@
+{
+  "id": "ptgtk",
+  "name": "PT GTK",
+  "isShow": true,
+  "baseUrls": [
+    "https://pt.gtkpw.xyz/"
+  ],
+  "primaryUrl": "https://pt.gtkpw.xyz/",
+  "siteType": "NexusPHP",
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": false,
+    "downloadHistory": false,
+    "categorySearch": true,
+    "advancedSearch": true
+  },
+  "discountMapping": {},
+  "logo": "assets/sites_icon/ptgtk.png"
+}
