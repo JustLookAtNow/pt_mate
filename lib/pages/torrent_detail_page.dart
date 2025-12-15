@@ -983,6 +983,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   }
 
   Future<void> _loadComments() async {
+    print('[TorrentDetailPage] _loadComments 开始: torrentId=${widget.torrentItem.id}');
+
     if (mounted) {
       setState(() {
         _commentsLoading = true;
@@ -991,19 +993,31 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     }
 
     try {
+      print('[TorrentDetailPage] 调用 ApiService.fetchComments...');
       final comments = await ApiService.instance.fetchComments(
         widget.torrentItem.id,
         siteConfig: widget.siteConfig,
         pageSize: 100, // 获取较多评论
       );
+      print('[TorrentDetailPage] fetchComments 成功: total=${comments.total}, commentsCount=${comments.comments.length}');
+
+      // 记录前3条评论用于调试
+      for (var i = 0; i < comments.comments.length && i < 3; i++) {
+        final comment = comments.comments[i];
+        print('[TorrentDetailPage] 评论[$i]: id=${comment.id}, author=${comment.author}, textLength=${comment.text.length}');
+      }
+
       if (mounted) {
         setState(() {
           _comments = comments;
           _commentsLoading = false;
         });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       // 当评论 API 不可用时（如 404、API 不存在等），优雅降级为空评论列表
+      print('[TorrentDetailPage] fetchComments 异常: $e');
+      print('[TorrentDetailPage] 异常堆栈: $stackTrace');
+
       if (mounted) {
         setState(() {
           // 返回空评论列表而不是显示错误
