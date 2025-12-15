@@ -496,23 +496,6 @@ class NexusPHPWebAdapter extends SiteAdapter {
     }
   }
 
-  final singleTags = <String>{
-    'br',
-    'hr',
-    'img',
-    'input',
-    'link',
-    'meta',
-    'area',
-    'base',
-    'col',
-    'embed',
-    'param',
-    'source',
-    'track',
-    'wbr',
-  };
-
   /// 根据选择器查找所有匹配的元素
   /// [soup] 可以是 BeautifulSoup 或 Bs4Element 类型
   List<dynamic> _findElementBySelector(dynamic soup, String selector) {
@@ -548,24 +531,45 @@ class NexusPHPWebAdapter extends SiteAdapter {
             }
           } else if (part == 'nextParsed') {
             // 处理 nextParsed 关键字
-            // 单标签则取element.nextParsed，双标签则取element.nextParsedAll[1]
-
-            if (singleTags.contains(element.name.toLowerCase())) {
-              final nextParsed = element.nextParsed;
-              if (nextParsed != null) {
-                next.add(nextParsed);
-              }
-            } else {
-              final nextParsedAll = element.nextParsedAll;
-              if (nextParsedAll != null && nextParsedAll.length > 1) {
-                next.add(nextParsedAll[1]);
-              }
+            final nextParsed = element.nextParsed;
+            if (nextParsed != null) {
+              next.add(nextParsed);
             }
           } else if (part == 'previousParsed') {
             // 处理 prevParsed 关键字，获取上一个兄弟元素(包括非标签)
             final prevParsed = element.previousParsed;
             if (prevParsed != null) {
               next.add(prevParsed);
+            }
+          } else if (part == 'nextNode') {
+            // 处理 nextNode 关键字，通过 parent.nodes 精准获取下一个兄弟节点
+            final parent = element.parent;
+            if (parent != null) {
+              final nodes = parent.nodes;
+              final currentHtml = element.outerHtml;
+              for (int i = 0; i < nodes.length; i++) {
+                if (nodes[i].outerHtml == currentHtml) {
+                  if (i + 1 < nodes.length) {
+                    next.add(nodes[i + 1]);
+                  }
+                  break;
+                }
+              }
+            }
+          } else if (part == 'previousNode') {
+            // 处理 previousNode 关键字，通过 parent.nodes 精准获取上一个兄弟节点
+            final parent = element.parent;
+            if (parent != null) {
+              final nodes = parent.nodes;
+              final currentHtml = element.outerHtml;
+              for (int i = 0; i < nodes.length; i++) {
+                if (nodes[i].outerHtml == currentHtml) {
+                  if (i - 1 >= 0) {
+                    next.add(nodes[i - 1]);
+                  }
+                  break;
+                }
+              }
             }
           } else if (part == 'parent') {
             // 处理 parent 关键字，获取父元素
