@@ -519,6 +519,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   final List<String> _imageUrls = [];
   late bool _isCollected; // 分离收藏状态为独立变量
 
+  // 评论相关状态
+  bool _commentsLoading = false;
+  String? _commentsError;
+  TorrentCommentList? _comments;
+  final GlobalKey _commentsKey = GlobalKey(); // 用于滚动到评论区
+
   // BBCode渲染缓存
   String? _cachedRawContent;
   Widget? _cachedBBCodeWidget;
@@ -554,6 +560,9 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     super.initState();
     _isCollected = widget.torrentItem.collection;
     _loadDetail();
+    if (widget.siteConfig?.siteType == SiteType.mteam) {
+      _loadComments();
+    }
     _loadAutoLoadImagesSetting();
   }
 
@@ -591,6 +600,45 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         setState(() {
           _error = e.toString();
           _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadComments() async {
+    if (mounted) {
+      setState(() {
+        _commentsLoading = true;
+        _commentsError = null;
+      });
+    }
+
+    try {
+      final comments = await ApiService.instance.fetchComments(
+        widget.torrentItem.id,
+        siteConfig: widget.siteConfig,
+        pageSize: 100, // 获取较多评论
+      );
+      if (mounted) {
+        setState(() {
+          _comments = comments;
+          _commentsLoading = false;
+        });
+      }
+    } catch (e) {
+      // 当评论 API 不可用时（如 404、API 不存在等），优雅降级为空评论列表
+      if (mounted) {
+        setState(() {
+          // 返回空评论列表而不是显示错误
+          _comments = TorrentCommentList(
+            pageNumber: 1,
+            pageSize: 100,
+            total: 0,
+            totalPages: 0,
+            comments: [],
+          );
+          _commentsLoading = false;
+          _commentsError = null;
         });
       }
     }
@@ -1661,12 +1709,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                     final uri = Uri.parse(webviewUrl);
                     // 在Linux和Windows平台上，canLaunchUrl可能返回false即使系统可以打开URL
                     // 所以在这些平台上直接尝试启动，其他平台保持原有逻辑
-                    if (defaultTargetPlatform == TargetPlatform.linux || 
+                    if (defaultTargetPlatform == TargetPlatform.linux ||
                         defaultTargetPlatform == TargetPlatform.windows) {
                       final platformName = defaultTargetPlatform == TargetPlatform.linux ? 'Linux' : 'Windows';
                       debugPrint('$platformName平台：尝试启动URL: $webviewUrl');
                       debugPrint('使用模式: LaunchMode.externalApplication');
-                      
+
                       try {
                         // 首先尝试使用 url_launcher
                         await launchUrl(
@@ -1674,12 +1722,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                           mode: LaunchMode.externalApplication,
                         );
                         debugPrint('$platformName平台：url_launcher 启动命令已执行');
-                        
+
                         // 对于 Linux，提供 xdg-open 备选方案
                         if (defaultTargetPlatform == TargetPlatform.linux) {
                           // 等待一小段时间，然后尝试备选方案
                           await Future.delayed(const Duration(milliseconds: 500));
-                          
+
                           // 如果 url_launcher 没有效果，尝试直接调用 xdg-open
                           debugPrint('Linux平台：尝试备选方案 - 直接调用 xdg-open');
                           final result = await Process.run('xdg-open', [webviewUrl]);
@@ -1944,13 +1992,104 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     );
   }
 
+  Widget _buildCommentsSection() {
+    if (_commentsLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(4.0),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_commentsError != null) {
+      return Padding(
+        padding: EdgeInsets.all(4.0),
+        child: Center(
+          child: Column(
+            children: [
+              Text('加载评论失败: $_commentsError', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              ElevatedButton(onPressed: _loadComments, child: const Text('重试')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_comments == null || _comments!.comments.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(4.0),
+        child: Center(child: Text('暂无评论')),
+      );
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _comments!.comments.length,
+      separatorBuilder: (context, index) => const Divider(),
+      itemBuilder: (context, index) {
+        final comment = _comments!.comments[index];
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 4.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                    child: Text(
+                      comment.author.isNotEmpty ? comment.author[0].toUpperCase() : '?',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          comment.author,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          comment.createdDate,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '#${_comments!.total - index}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.outline,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              buildBBCodeContent(comment.text),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, dynamic result) async {
         if (didPop) return;
-        
+
         if (_webViewController != null) {
           try {
             final canGoBack = await _webViewController!.canGoBack();
@@ -1961,7 +2100,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
           } catch (_) {}
           await _disposeWebView();
         }
-        
+
         if (context.mounted) {
           Navigator.of(context).pop();
         }
@@ -2016,13 +2155,13 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
           : _detail?.webviewUrl != null
           ? buildWebViewContent(_detail!.webviewUrl!)
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Card(
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(4),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -2058,6 +2197,41 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                       ),
                     ),
                   ),
+                    // 用户评论 - 仅在 mteam 站点类型时显示
+                    if (widget.siteConfig?.siteType == SiteType.mteam) ...[
+                      const SizedBox(height: 16),
+                      Card(
+                        key: _commentsKey, // Added key to the Card
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.comment,
+                                    color: Colors.green,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '用户评论 (${_comments?.total ?? widget.torrentItem.comments})',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            _buildCommentsSection(),
+                          ],
+                        ),
+                      ),
+                    ],
+                  // 底部留白，防止被FAB遮挡
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
@@ -2065,6 +2239,25 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         mainAxisAlignment: MainAxisAlignment.end,
           mainAxisSize: MainAxisSize.min,
         children: [
+            // 评论按钮 - 仅在 mteam 站点类型时显示
+            if (widget.siteConfig?.siteType == SiteType.mteam) ...[
+              FloatingActionButton(
+                heroTag: "comment",
+                onPressed: () {
+                  final context = _commentsKey.currentContext;
+                  if (context != null) {
+                    Scrollable.ensureVisible(
+                      context,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                  }
+                },
+                tooltip: '评论',
+                child: const Icon(Icons.comment),
+              ),
+              const SizedBox(height: 16),
+            ],
           // 收藏按钮
           FloatingActionButton(
             heroTag: "favorite",

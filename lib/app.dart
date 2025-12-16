@@ -1127,6 +1127,7 @@ class _HomePageState extends State<HomePage> {
           torrentItem: item,
           siteFeatures: _currentSite?.features ?? SiteFeatures.mteamDefault,
           downloaderConfigs: _downloaderConfigs,
+          siteConfig: _currentSite,
         ),
       ),
     );

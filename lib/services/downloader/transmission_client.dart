@@ -202,22 +202,23 @@ class TransmissionClient
         'uploadRatio',
         'activityDate',
         'hashString',
+        'uploadedEver',
       ],
     };
-    
+
     // 如果有过滤参数，可以在这里处理
     // Transmission 的过滤通常在客户端进行
-    
+
     final response = await _rpcRequest('torrent-get', arguments: arguments);
     final List<dynamic> torrents = response['torrents'] as List<dynamic>? ?? [];
-    
+
     return torrents.map((torrent) => _convertToDownloadTask(torrent)).toList();
   }
-  
+
   @override
   Future<void> addTask(AddTaskParams params, {SiteConfig? siteConfig}) async {
     final arguments = <String, dynamic>{};
-    
+
     // Transmission 不支持通过 URL 下载种子文件，只支持磁力链接
     // 对于种子文件，必须先下载并转换为 base64 格式
     var url = params.url;
@@ -237,11 +238,11 @@ class TransmissionClient
       );
       arguments['metainfo'] = base64Encode(torrentData);
     }
-    
+
     if (params.savePath != null) {
       arguments['download-dir'] = params.savePath;
     }
-    
+
     // Transmission 使用 labels 而不是 category 和 tags
     final labels = <String>[];
     if (params.category != null && params.category!.isNotEmpty) {
@@ -253,14 +254,14 @@ class TransmissionClient
     if (labels.isNotEmpty) {
       arguments['labels'] = labels;
     }
-    
+
     // 设置任务自动开始或暂停
     // 当 startPaused 为 true 时，添加后暂停；默认行为为自动开始
     arguments['paused'] = params.startPaused == true;
-    
+
     await _rpcRequest('torrent-add', arguments: arguments);
   }
-  
+
   @override
   Future<void> pauseTasks(List<String> hashes) async {
     final ids = await _hashesToIds(hashes);
@@ -268,7 +269,7 @@ class TransmissionClient
       await _rpcRequest('torrent-stop', arguments: {'ids': ids});
     }
   }
-  
+
   @override
   Future<void> resumeTasks(List<String> hashes) async {
     final ids = await _hashesToIds(hashes);
@@ -276,7 +277,7 @@ class TransmissionClient
       await _rpcRequest('torrent-start', arguments: {'ids': ids});
     }
   }
-  
+
   @override
   Future<void> deleteTasks(List<String> hashes, {bool deleteFiles = false}) async {
     final ids = await _hashesToIds(hashes);
@@ -287,45 +288,45 @@ class TransmissionClient
       });
     }
   }
-  
+
   @override
   Future<List<String>> getCategories() async {
     // Transmission 没有分类概念，返回空列表
     // 可以考虑从 labels 中提取分类信息
     return [];
   }
-  
+
   @override
   Future<List<String>> getTags() async {
     // 获取所有种子的标签
     final response = await _rpcRequest('torrent-get', arguments: {
       'fields': ['labels'],
     });
-    
+
     final List<dynamic> torrents = response['torrents'] as List<dynamic>? ?? [];
     final Set<String> allLabels = {};
-    
+
     for (final torrent in torrents) {
       final labels = torrent['labels'] as List<dynamic>? ?? [];
       allLabels.addAll(labels.map((label) => label.toString()));
     }
-    
+
     return allLabels.toList();
   }
-  
+
   @override
   Future<String> getVersion() async {
     // 如果已经缓存了版本信息，直接返回
     if (_cachedVersion != null) {
       return _cachedVersion!;
     }
-    
+
     final response = await _rpcRequest('session-get');
     final version = response['version'] as String? ?? 'Unknown';
-    
+
     // 缓存版本信息
     _cachedVersion = version;
-    
+
     // 如果配置中没有版本信息且有回调，触发配置更新
     if ((config.version == null || config.version?.isEmpty == true)) {
       final callback = _onConfigUpdated;
@@ -334,72 +335,72 @@ class TransmissionClient
         callback(updatedConfig);
       }
     }
-    
+
     return version;
   }
-  
+
   @override
   Future<List<String>> getPaths() async {
     // 获取所有种子的下载路径
     final response = await _rpcRequest('torrent-get', arguments: {
       'fields': ['downloadDir'],
     });
-    
+
     final List<dynamic> torrents = response['torrents'] as List<dynamic>? ?? [];
     final Set<String> allPaths = {};
-    
+
     for (final torrent in torrents) {
       final downloadDir = torrent['downloadDir'] as String?;
       if (downloadDir != null && downloadDir.isNotEmpty) {
         allPaths.add(downloadDir);
       }
     }
-    
+
     final paths = allPaths.toList();
     paths.sort(); // 按字母顺序排序
     return paths;
   }
-  
+
   @override
   Future<void> pauseTask(String hash) async {
     await pauseTasks([hash]);
   }
-  
+
   @override
   Future<void> resumeTask(String hash) async {
     await resumeTasks([hash]);
   }
-  
+
   @override
   Future<void> deleteTask(String hash, {bool deleteFiles = false}) async {
     await deleteTasks([hash], deleteFiles: deleteFiles);
   }
-  
+
   /// 将哈希值转换为Transmission的ID
-  /// 
+  ///
   /// Transmission 使用数字ID而不是哈希值来标识种子
   Future<List<int>> _hashesToIds(List<String> hashes) async {
     if (hashes.isEmpty) return [];
-    
+
     final response = await _rpcRequest('torrent-get', arguments: {
       'fields': ['id', 'hashString'],
     });
-    
+
     final List<dynamic> torrents = response['torrents'] as List<dynamic>? ?? [];
     final List<int> ids = [];
-    
+
     for (final torrent in torrents) {
       final hash = torrent['hashString'] as String?;
       final id = torrent['id'] as int?;
-      
+
       if (hash != null && id != null && hashes.contains(hash)) {
         ids.add(id);
       }
     }
-    
+
     return ids;
   }
-  
+
   /// 将Transmission API响应转换为DownloadTask
   DownloadTask _convertToDownloadTask(Map<String, dynamic> torrent) {
     // Transmission 状态映射
@@ -430,12 +431,12 @@ class TransmissionClient
       default:
         state = DownloadTaskState.unknown;
     }
-    
+
     final percentDone = (torrent['percentDone'] as num? ?? 0).toDouble();
     final totalSize = torrent['totalSize'] as int? ?? 0;
     final leftUntilDone = torrent['leftUntilDone'] as int? ?? 0;
     final labels = torrent['labels'] as List<dynamic>? ?? [];
-    
+
     return DownloadTask(
       hash: torrent['hashString'] ?? '',
       name: torrent['name'] ?? '',
@@ -453,6 +454,7 @@ class TransmissionClient
       amountLeft: leftUntilDone,
       ratio: (torrent['uploadRatio'] as num? ?? 0).toDouble(),
       timeActive: (torrent['activityDate'] as int? ?? 0) - (torrent['addedDate'] as int? ?? 0),
+      uploaded: torrent['uploadedEver'] ?? 0,
     );
   }
   

@@ -1239,6 +1239,14 @@ class NexusPHPWebAdapter extends SiteAdapter {
               ? imdbRatingList.first
               : '';
 
+          // 提取评论数
+          final commentsList = await _extractFieldValue(
+            row,
+            fieldsConfig['comments'] as Map<String, dynamic>? ?? {},
+          );
+          final commentsText = commentsList.isNotEmpty ? commentsList.first : '0';
+          final comments = int.tryParse(commentsText) ?? 0;
+
           // 检查收藏状态（布尔字段）
           final collectionConfig =
               fieldsConfig['collection'] as Map<String, dynamic>?;
@@ -1338,6 +1346,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
               imdbRating: imdbRating.isNotEmpty ? imdbRating : 'N/A',
               isTop: isTop,
               tags: tags,
+              comments: comments,
             ),
           );
         } catch (e) {
@@ -1386,6 +1395,18 @@ class NexusPHPWebAdapter extends SiteAdapter {
     return TorrentDetail(
       descr: '', // 空描述，因为内容将通过webview显示
       webviewUrl: detailUrl, // 传递URL给页面组件
+    );
+  }
+
+  @override
+  Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20}) async {
+    // NexusPHP Web 暂时不支持获取评论，返回空列表
+    return TorrentCommentList(
+      pageNumber: pageNumber,
+      pageSize: pageSize,
+      total: 0,
+      totalPages: 0,
+      comments: [],
     );
   }
 

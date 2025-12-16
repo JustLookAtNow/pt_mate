@@ -148,7 +148,7 @@
           "attribute": "text"
         },
         "downloadStatus": {
-          "selector": "table.torrentname > parent > parent > div.torrents-progress",
+          "selector": "div.torrents-progress",
           "attribute": "style",
           "filter": {
             "name": "regexp",

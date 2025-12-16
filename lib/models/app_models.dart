@@ -135,6 +135,7 @@ class TorrentItem {
   final String? imdbRating; // IMDB评分
   final bool isTop; // 是否置顶（M-Team：toppingLevel>0）
   final List<TagType> tags; // 种子标签
+  final int comments; // 评论数量
 
   TorrentItem({
     required this.id,
@@ -155,6 +156,7 @@ class TorrentItem {
     this.imdbRating = 'N/A',
     this.isTop = false,
     this.tags = const [],
+    this.comments = 0,
   });
 
   TorrentItem copyWith({
@@ -174,6 +176,7 @@ class TorrentItem {
     String? createdDate,
     bool? isTop,
     List<TagType>? tags,
+    int? comments,
   }) {
     return TorrentItem(
       id: id ?? this.id,
@@ -192,6 +195,7 @@ class TorrentItem {
       createdDate: createdDate ?? this.createdDate,
       isTop: isTop ?? this.isTop,
       tags: tags ?? this.tags,
+      comments: comments ?? this.comments,
     );
   }
 }
@@ -1651,5 +1655,74 @@ class Defaults {
   /// 获取默认的站点功能配置
   static SiteFeatures getDefaultSiteFeatures() {
     return SiteFeatures.mteamDefault;
+  }
+}
+
+// 种子评论
+class TorrentComment {
+  final String id;
+  final String createdDate;
+  final String lastModifiedDate;
+  final String torrentId;
+  final String author;
+  final String text;
+  final String editedBy;
+  final String subject;
+
+  TorrentComment({
+    required this.id,
+    required this.createdDate,
+    required this.lastModifiedDate,
+    required this.torrentId,
+    required this.author,
+    required this.text,
+    required this.editedBy,
+    required this.subject,
+  });
+
+  factory TorrentComment.fromJson(Map<String, dynamic> json) {
+    return TorrentComment(
+      id: (json['id'] ?? '').toString(),
+      createdDate: (json['createdDate'] ?? '').toString(),
+      lastModifiedDate: (json['lastModifiedDate'] ?? '').toString(),
+      torrentId: (json['torrent'] ?? '').toString(),
+      author: (json['author'] ?? '').toString(),
+      text: (json['text'] ?? '').toString(),
+      editedBy: (json['editedBy'] ?? '').toString(),
+      subject: (json['subject'] ?? '').toString(),
+    );
+  }
+}
+
+// 种子评论列表
+class TorrentCommentList {
+  final int pageNumber;
+  final int pageSize;
+  final int total;
+  final int totalPages;
+  final List<TorrentComment> comments;
+
+  TorrentCommentList({
+    required this.pageNumber,
+    required this.pageSize,
+    required this.total,
+    required this.totalPages,
+    required this.comments,
+  });
+
+  factory TorrentCommentList.fromJson(Map<String, dynamic> json) {
+    int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
+
+    final list = (json['data'] as List? ?? const []).cast<dynamic>();
+
+    return TorrentCommentList(
+      pageNumber: parseInt(json['pageNumber']),
+      pageSize: parseInt(json['pageSize']),
+      total: parseInt(json['total']),
+      totalPages: parseInt(json['totalPages']),
+      comments: list
+          .map((e) => TorrentComment.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
   }
 }
