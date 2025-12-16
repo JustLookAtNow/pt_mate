@@ -335,6 +335,12 @@ enum TagType {
     }
     return matchedTags;
   }
+
+  // 序列化为 JSON
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'content': content,
+  };
 }
 
 // 网站类型枚举
