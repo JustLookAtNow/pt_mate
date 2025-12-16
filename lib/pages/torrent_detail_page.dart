@@ -523,6 +523,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   bool _commentsLoading = false;
   String? _commentsError;
   TorrentCommentList? _comments;
+  final GlobalKey _commentsKey = GlobalKey(); // 用于滚动到评论区
 
   // BBCode渲染缓存
   String? _cachedRawContent;
@@ -559,7 +560,9 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     super.initState();
     _isCollected = widget.torrentItem.collection;
     _loadDetail();
-    _loadComments();
+    if (widget.siteConfig?.siteType == SiteType.mteam) {
+      _loadComments();
+    }
     _loadAutoLoadImagesSetting();
   }
 
@@ -1992,14 +1995,14 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   Widget _buildCommentsSection() {
     if (_commentsLoading) {
       return const Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(4.0),
         child: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_commentsError != null) {
       return Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(4.0),
         child: Center(
           child: Column(
             children: [
@@ -2013,7 +2016,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
     if (_comments == null || _comments!.comments.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(4.0),
         child: Center(child: Text('暂无评论')),
       );
     }
@@ -2026,7 +2029,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       itemBuilder: (context, index) {
         final comment = _comments!.comments[index];
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+          padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 4.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -2152,13 +2155,13 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
           : _detail?.webviewUrl != null
           ? buildWebViewContent(_detail!.webviewUrl!)
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Card(
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(4),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -2194,32 +2197,39 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Card(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.comment, color: Colors.green),
-                              const SizedBox(width: 8),
-                              Text(
-                                '用户评论 (${_comments?.total ?? widget.torrentItem.comments})',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                    // 用户评论 - 仅在 mteam 站点类型时显示
+                    if (widget.siteConfig?.siteType == SiteType.mteam) ...[
+                      const SizedBox(height: 16),
+                      Card(
+                        key: _commentsKey, // Added key to the Card
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.comment,
+                                    color: Colors.green,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '用户评论 (${_comments?.total ?? widget.torrentItem.comments})',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                            const Divider(height: 1),
+                            _buildCommentsSection(),
+                          ],
                         ),
-                        const Divider(height: 1),
-                        _buildCommentsSection(),
-                      ],
-                    ),
-                  ),
+                      ),
+                    ],
                   // 底部留白，防止被FAB遮挡
                   const SizedBox(height: 80),
                 ],
@@ -2229,6 +2239,25 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         mainAxisAlignment: MainAxisAlignment.end,
           mainAxisSize: MainAxisSize.min,
         children: [
+            // 评论按钮 - 仅在 mteam 站点类型时显示
+            if (widget.siteConfig?.siteType == SiteType.mteam) ...[
+              FloatingActionButton(
+                heroTag: "comment",
+                onPressed: () {
+                  final context = _commentsKey.currentContext;
+                  if (context != null) {
+                    Scrollable.ensureVisible(
+                      context,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                  }
+                },
+                tooltip: '评论',
+                child: const Icon(Icons.comment),
+              ),
+              const SizedBox(height: 16),
+            ],
           // 收藏按钮
           FloatingActionButton(
             heroTag: "favorite",
