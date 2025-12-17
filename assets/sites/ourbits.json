@@ -21,10 +21,16 @@
   },
   "discountMapping": {},
   "tagMapping": {
-    "杜比视界":"dovi",
-    "菁彩HDR":"hdr",
-    "HDR10":"hdr"
-  },
+      "官方": "official",
+      "中字": "chinese",
+      "国语": "mandarin",
+      "DIY": "diy",
+      "菁彩HDR":"hdr",
+      "HDR10":"hdr",
+      "HLG":"hdr",
+      "HDR10+":"hdr",
+      "杜比视界":"dovi"
+   },
   "infoFinder": {
     "userInfo": {
       "path": "usercp.php",
@@ -104,7 +110,7 @@
           "attribute": "text"
         },
         "tag": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > span.tag",
+          "selector": "table.torrentname > span.tag",
           "attribute": "text"
         },
         "description": {
