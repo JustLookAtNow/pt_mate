@@ -530,6 +530,10 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   String? _cachedRawContent;
   Widget? _cachedBBCodeWidget;
 
+  // 封面图片 Future 缓存
+  Future<List<int>>? _coverImageFuture;
+  String? _cachedCoverUrl;
+
   // WebView相关状态
   InAppWebViewController? _webViewController;
   bool _webViewLoading = false;
@@ -560,6 +564,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   void initState() {
     super.initState();
     _isCollected = widget.torrentItem.collection;
+    // 初始化封面图片 Future
+    final torrent = widget.torrentItem;
+    final coverUrl = torrent.cover.isNotEmpty
+        ? torrent.cover
+        : (torrent.imageList.isNotEmpty ? torrent.imageList.first : '');
+    _initCoverImageFuture(coverUrl);
     _loadDetail();
     if (widget.siteConfig?.siteType == SiteType.mteam) {
       _loadComments();
@@ -575,6 +585,15 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         _showImages = autoLoad;
       });
     }
+  }
+
+  /// 初始化封面图片 Future，仅当 coverUrl 变化时才重新创建
+  void _initCoverImageFuture(String coverUrl) {
+    if (coverUrl.isEmpty || coverUrl == _cachedCoverUrl) return;
+    _cachedCoverUrl = coverUrl;
+    _coverImageFuture = ImageHttpClient.instance
+        .fetchImage(coverUrl)
+        .then((response) => response.data!);
   }
 
   // 格式化文件大小
@@ -678,11 +697,9 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(7),
-                  child: coverUrl.isNotEmpty
+                  child: _coverImageFuture != null
                       ? FutureBuilder<List<int>>(
-                          future: ImageHttpClient.instance
-                              .fetchImage(coverUrl)
-                              .then((response) => response.data!),
+                          future: _coverImageFuture,
                           builder: (context, snapshot) {
                             if (snapshot.connectionState == ConnectionState.waiting) {
                               return Center(
