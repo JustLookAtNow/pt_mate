@@ -168,6 +168,7 @@ class WebDebugService {
               'isTop': e.isTop,
               'downloadStatus': e.downloadStatus.toString().split('.').last,
               'collection': e.collection,
+              'tags': e.tags,
             },
           )
           .toList();

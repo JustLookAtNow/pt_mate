@@ -316,7 +316,7 @@ enum TagType {
   webDl(
     'WEB-DL',
     Color.fromARGB(255, 162, 41, 178),
-    r'\bWEB-DL\b|\bWEbdl\b|\bWEB\.DL\b',
+    r'\bWEB-DL\b|\bWEBDL\b|\bWEB\.DL\b',
   ),
   dovi('DOVI', Colors.pink, r'\bDOVI\b|Dolby Vision|\bDV\b|杜比(视界)*'),
   blueRay('Blu-ray', Colors.red, r'\bblu-ray\b|\bbluray\b');
@@ -339,6 +339,12 @@ enum TagType {
     }
     return matchedTags;
   }
+
+  // 序列化为 JSON
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'content': content,
+  };
 }
 
 // 网站类型枚举
