@@ -111,7 +111,7 @@
           "attribute": "text"
         },
         "description": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > *:last-node",
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > span[title~=\"(未审|通过)\"] > next > nextParsed",
           "attribute": "text"
         },
         "discount": {
