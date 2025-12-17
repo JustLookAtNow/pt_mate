@@ -20,6 +20,17 @@
     "showCover": false
   },
   "discountMapping": {},
+  "tagMapping": {
+      "官方": "official",
+      "中字": "chinese",
+      "国语": "mandarin",
+      "粤语": "mandarin",
+      "DIY": "diy",
+      "HDR10+":"hdr",
+      "HDR10":"hdr",
+      "Dolby Vision":"dovi",
+      "完结": "complete"   
+   },
   "infoFinder": {
     "userInfo": {
       "path": "usercp.php",
@@ -114,6 +125,10 @@
         "torrentName": {
           "selector": "a[href^=\"details.php?id=\"] > b",
           "attribute": "text"
+        },
+        "tag": {
+          "selector": "table.torrentname >  > span.tags",
+          "attribute": "text"     
         },
         "description": {
           "selector": "table.torrentname > tbody > tr > td:nth-child(1) > *:last-node",
