@@ -593,7 +593,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     _cachedCoverUrl = coverUrl;
     _coverImageFuture = ImageHttpClient.instance
         .fetchImage(coverUrl)
-        .then((response) => response.data!);
+        .then((response) {
+      if (response.data == null) {
+        throw Exception('Image data is null for url: $coverUrl');
+      }
+      return response.data!;
+    });
   }
 
   // 格式化文件大小
