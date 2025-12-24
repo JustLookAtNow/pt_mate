@@ -5,12 +5,14 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 class NexusPhpWebLogin extends StatefulWidget {
   final String baseUrl;
+  final String? loginPath; // 自定义登录页面路径，默认为 /login.php
   final Function(String cookie) onCookieReceived;
   final VoidCallback? onCancel;
 
   const NexusPhpWebLogin({
     super.key,
     required this.baseUrl,
+    this.loginPath,
     required this.onCookieReceived,
     this.onCancel,
   });
@@ -288,7 +290,7 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
                 : InAppWebView(
                     initialUrlRequest: URLRequest(
                       url: WebUri(
-                        '${widget.baseUrl.endsWith('/') ? widget.baseUrl.substring(0, widget.baseUrl.length - 1) : widget.baseUrl}/login.php',
+                        '${widget.baseUrl.endsWith('/') ? widget.baseUrl.substring(0, widget.baseUrl.length - 1) : widget.baseUrl}${widget.loginPath ?? '/login.php'}',
                       ),
                     ),
                     initialSettings: InAppWebViewSettings(

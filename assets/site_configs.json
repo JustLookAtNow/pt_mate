@@ -367,6 +367,9 @@
         }
       },
       "request": {
+        "loginPage": {
+          "path": "/login.php"
+        },
         "collect": {
           "path": "/bookmark.php",
           "method": "GET",
