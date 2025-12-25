@@ -26,10 +26,16 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
   bool _isLoading = true;
   String? _errorMessage;
   final Logger _logger = Logger();
+  late final String _initialUrl; // 初始登录页URL
 
   @override
   void initState() {
     super.initState();
+    // 构建初始登录页URL
+    final baseUrl = widget.baseUrl.endsWith('/')
+        ? widget.baseUrl.substring(0, widget.baseUrl.length - 1)
+        : widget.baseUrl;
+    _initialUrl = '$baseUrl${widget.loginPath ?? '/login.php'}';
   }
 
   Future<void> _checkLoginStatus(String url) async {
@@ -37,16 +43,12 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
       _logger.d('当前页面URL: $url'); // 调试信息
     }
 
-    // 检查是否已经登录成功（通常登录成功后会跳转到首页或其他页面）
-    if (url.contains('/index.php') ||
-        url.contains('/torrents.php') ||
-        url.contains('/usercp.php') ||
-        url.contains('/browse.php') ||
-        url.contains('/upload.php') ||
-        (!url.contains('/login.php') &&
-            !url.contains('/signup.php') &&
-            !url.contains('/recover.php') &&
-            url.contains(widget.baseUrl))) {
+    // 检查是否已经登录成功：URL有变化（不等于初始URL）且不是登录/注册/恢复页面
+    if (url != _initialUrl &&
+        !url.contains('/login.php') &&
+        !url.contains('/signup.php') &&
+        !url.contains('/recover.php') &&
+        url.contains(widget.baseUrl)) {
       if (kDebugMode) {
         _logger.i('检测到登录成功，开始获取cookie'); // 调试信息
       }
