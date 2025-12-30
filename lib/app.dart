@@ -1561,73 +1561,105 @@ class _HomePageState extends State<HomePage> {
                           builder: (context) {
                             final filteredItems = _filteredItems;
                             if (filteredItems.isEmpty) {
-                              return Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                              // 空状态也支持下拉刷新
+                              return RefreshIndicator(
+                                onRefresh: () => _search(reset: true),
+                                child: ListView(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
                                   children: [
-                                    Icon(
-                                      Icons.search_off,
-                                      size: 64,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.outline,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      _items.isEmpty
-                                          ? '未找到相关种子'
-                                          : '没有符合筛选条件的种子',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.outline,
-                                          ),
+                                    SizedBox(
+                                      height:
+                                          MediaQuery.of(context).size.height *
+                                          0.5,
+                                      child: Center(
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.search_off,
+                                              size: 64,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.outline,
+                                            ),
+                                            const SizedBox(height: 16),
+                                            Text(
+                                              _items.isEmpty
+                                                  ? '未找到相关种子'
+                                                  : '没有符合筛选条件的种子',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .titleMedium
+                                                  ?.copyWith(
+                                                    color: Theme.of(
+                                                      context,
+                                                    ).colorScheme.outline,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              '下拉刷新',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Theme.of(
+                                                      context,
+                                                    ).colorScheme.outline,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
                               );
                             }
-                            return ListView.builder(
-                              controller: _scrollCtrl,
-                              padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
-                              itemCount:
-                                  filteredItems.length + (_hasMore ? 1 : 0),
-                              itemBuilder: (context, index) {
-                                if (index == filteredItems.length) {
-                                  return const Padding(
-                                    padding: EdgeInsets.all(16.0),
-                                    child: Center(
-                                      child: SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
+                            return RefreshIndicator(
+                              onRefresh: () => _search(reset: true),
+                              child: ListView.builder(
+                                controller: _scrollCtrl,
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
+                                itemCount:
+                                    filteredItems.length + (_hasMore ? 1 : 0),
+                                itemBuilder: (context, index) {
+                                  if (index == filteredItems.length) {
+                                    return const Padding(
+                                      padding: EdgeInsets.all(16.0),
+                                      child: Center(
+                                        child: SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
                                         ),
                                       ),
-                                    ),
+                                    );
+                                  }
+                                  final item = filteredItems[index];
+                                  final isSelected = _selectedItems.contains(
+                                    item.id,
                                   );
-                                }
-                                final item = filteredItems[index];
-                                final isSelected = _selectedItems.contains(
-                                  item.id,
-                                );
-                      return TorrentListItem(
-                                  torrent: item,
-                        isSelected: isSelected,
-                        isSelectionMode: _isSelectionMode,
-                        currentSite: _currentSite,
-                        onTap: () => _isSelectionMode
-                                      ? _onToggleSelection(item)
-                                      : _onTorrentTap(item),
-                                  onLongPress: () => _onLongPress(item),
-                                  onToggleCollection: () =>
-                                      _onToggleCollection(item),
-                                  onDownload: () => _onDownload(item),
-                                );
-                              },
+                                  return TorrentListItem(
+                                    torrent: item,
+                                    isSelected: isSelected,
+                                    isSelectionMode: _isSelectionMode,
+                                    currentSite: _currentSite,
+                                    onTap: () => _isSelectionMode
+                                        ? _onToggleSelection(item)
+                                        : _onTorrentTap(item),
+                                    onLongPress: () => _onLongPress(item),
+                                    onToggleCollection: () =>
+                                        _onToggleCollection(item),
+                                    onDownload: () => _onDownload(item),
+                                  );
+                                },
+                              ),
                             );
                           },
                         ),
