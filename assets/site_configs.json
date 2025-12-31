@@ -153,6 +153,7 @@
         "热门": "hot",
         "熱門": "hot",
         "官方": "official",
+        "官种": "official",
         "中字": "chinese",
         "中文": "chinese",
         "简体": "chinese",
@@ -166,7 +167,13 @@
         "自定义": "diy",
         "完结": "complete",
         "合集": "complete",
-        "分集": "ep"
+        "分集": "ep",
+        "HDR": "hdr",
+        "Dolby Vision": "dovi",
+        "Blu-ray": "blueRay",
+        "4 K": "fourK",
+        "4K": "fourK",
+        "零魔": "zero"
       },
       "infoFinder": {
         "userInfo": {
