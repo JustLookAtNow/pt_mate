@@ -118,11 +118,11 @@
           "attribute": "text"
         },
         "discount": {
-          "selector": "table.torrentname > img[class^=\"pro_free\"]",
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
           "attribute": "alt"
         },
         "discountEndTime": {
-          "selector": "table.torrentname > img[class^=\"pro_free\"]",
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
           "attribute": "onmouseover",
           "filter": {
             "name": "regexp",
