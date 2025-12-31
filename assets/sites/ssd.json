@@ -175,8 +175,8 @@
           }
         },
         "collection": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(5) > img.bookmark",
-          "attribute": "src"
+          "selector": "table.torrentname > tbody > tr > span.bi-star-fill",
+          "attribute": "title"
         },
         "isTop": {
           "selector": "table.torrentname > span[title~=\"置顶|置頂\"]",
