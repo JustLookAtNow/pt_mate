@@ -20,6 +20,16 @@
     "showCover": false
   },
   "discountMapping": {},
+  "tagMapping": {
+      "官方": "official",
+      "中字": "chinese",
+      "国语": "mandarin",
+      "粤语": "mandarin",
+      "DIY": "diy",
+      "HDR":"hdr",
+      "Dolby Vision":"dovi",
+      "完结": "complete"   
+   },
   "infoFinder": {
     "userInfo": {
       "path": "usercp.php",
@@ -98,6 +108,10 @@
           "selector": "a[href^=\"details.php?id=\"] > b",
           "attribute": "text"
         },
+        "tag": {
+          "selector": "table.torrentname > td.embedded > span[style~=\"border-radius:0;font-size:12px\"]",
+          "attribute": "text"     
+        },
         "description": {
           "selector": "table.torrentname > tbody > tr > td:nth-child(1) > *:last-node",
           "attribute": "text"
@@ -140,7 +154,7 @@
           }
         },
         "collection": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(5) > img.bookmark",
+          "selector": "table.torrentname > tbody > tr > img.bookmark",
           "attribute": "src"
         },
         "isTop": {
