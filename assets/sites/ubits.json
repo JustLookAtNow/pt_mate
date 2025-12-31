@@ -169,7 +169,7 @@
           }
         },
         "collection": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(5) > img.bookmark",
+          "selector": "table.torrentname > tbody > tr > td:nth-child(3) > img.bookmark",
           "attribute": "src"
         },
         "isTop": {
