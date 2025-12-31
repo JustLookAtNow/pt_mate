@@ -18,9 +18,12 @@
     "favorites": true,
     "downloadHistory": true,
     "categorySearch": true,
-    "advancedSearch": true
+    "advancedSearch": true,
+    "showCover": false
   },
   "discountMapping": {},
+  "tagMapping": {
+  },
   "infoFinder": {
     "search": {
       "torrentPath": "torrents.php",
@@ -42,6 +45,10 @@
           "selector": "a[href^=\"details.php?id=\"] > b",
           "attribute": "text"
         },
+        "tag": {
+          "selector": "table.torrentname > span.tag",
+          "attribute": "text"
+        },
         "description": {
           "selector": "table.torrentname > tbody > tr > td:nth-child(1) > *:last-node",
           "attribute": "text"
@@ -60,6 +67,7 @@
           }
         },
         "downloadUrl": {
+          "value": "{baseUrl}/download.php?downhash={userId}|{jwt}"
         },
         "seedersText": {
           "selector": "td:nth-child(6)",

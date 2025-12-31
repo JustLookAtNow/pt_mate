@@ -146,6 +146,7 @@
           }
         },
         "downloadUrl": {
+          "value": "{baseUrl}/download.php?downhash={userId}|{jwt}"
         },
         "seedersText": {
           "selector": "td:nth-child(6)",
