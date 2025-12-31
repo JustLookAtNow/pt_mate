@@ -1,0 +1,224 @@
+{
+  "id": "agsvpt",
+  "name": "末日",
+  "isShow": true,
+  "baseUrls": [
+    "https://www.agsvpt.com/",
+    "https://pt.agsvpt.cn/"
+  ],
+  "primaryUrl": "https://www.agsvpt.com/",
+  "siteType": "NexusPHPWeb",
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": true,
+    "downloadHistory": true,
+    "categorySearch": true,
+    "advancedSearch": true
+  },
+  "discountMapping": {},
+  "infoFinder": {
+    "userInfo": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "table#info_block > span.medium"
+      },
+      "fields": {
+        "userId": {
+          "selector": "a[href^=\"userdetails.php?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "index": 1
+          }
+        },
+        "userName": {
+          "selector": "a[href^=\"userdetails.php?id=\"] > b",
+          "attribute": "text"
+        },
+        "ratio": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "分享率(:|：)\\s*([^\\s]+)",
+            "index": 2
+          }
+        },
+        "upload": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(上传|上傳)量(:|：)\\s*(.*?B)",
+            "index": 3
+          }
+        },
+        "download": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(下载|下載)量(:|：)\\s*(.*?B)",
+            "index": 3
+          }
+        },
+        "bonus": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": ":\\s*([^\\s]+)\\s*\\[*(签|簽)到",
+            "index": 1
+          }
+        }
+      }
+    },
+    "passKey": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "#outer > table.main > next > tbody > td:contains('密匙'||'密钥'|| 'Passkey') > next"
+      },
+      "fields": {
+        "passKey": {
+          "selector": "",
+          "attribute": "text"
+        }
+      }
+    },
+    "bonusPerHour": {
+      "path": "mybonus.php",
+      "rows": {
+        "selector": "#outer"
+      },
+      "fields": {
+        "bonusPerHour": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(你当前每小时能获取|You are currently getting|你當前每小時能獲取)\\s*([\\d.]+)",
+            "index": 2
+          }
+        }
+      }
+    },
+    "search": {
+      "torrentPath": "torrents.php",
+      "specialPath": "special.php",
+      "rows": {
+        "selector": "table.torrents > tbody:nth-child > tr:nth-child"
+      },
+      "fields": {
+        "torrentId": {
+          "selector": "a[href^=\"details.php?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "index": 1
+          }
+        },
+        "torrentName": {
+          "selector": "a[href^=\"details.php?id=\"] > b",
+          "attribute": "text"
+        },
+        "tag": {
+          "selector": "table.torrentname > div.torrent_title_desc > span[title]",
+          "attribute": "text"
+        },
+        "description": {
+          "selector": "table.torrentname > div.torrent_title_desc > *:last-node",
+          "attribute": "text"
+        },
+        "discount": {
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
+          "attribute": "alt"
+        },
+        "discountEndTime": {
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
+          "attribute": "onmouseover",
+          "filter": {
+            "name": "regexp",
+            "args": "<span title=\\\"(.*?)\\\"",
+            "index": 1
+          }
+        },
+        "downloadUrl": {
+          "value": "##{baseUrl}/download.php?id={torrentId}"
+        },
+        "seedersText": {
+          "selector": "td:nth-child(6)",
+          "attribute": "text"
+        },
+        "leechersText": {
+          "selector": "td:nth-child(7)",
+          "attribute": "text"
+        },
+        "sizeText": {
+          "selector": "td:nth-child(5)",
+          "attribute": "text"
+        },
+        "downloadStatus": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(2) > div[title]",
+          "attribute": "title",
+          "filter": {
+            "name": "regexp",
+            "args": "(\\d+)%",
+            "index": 1
+          }
+        },
+        "collection": {
+          "selector": "table.torrentname > img.bookmark",
+          "attribute": "src"
+        },
+        "isTop": {
+          "selector": "table.torrentname > img[title~=\"置顶|置頂\"]",
+          "attribute": "src"
+        },
+        "cover": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > img[data-src]",
+          "attribute": "data-src"
+        },
+        "createData": {
+          "selector": "td:nth-child(4) > span[title]",
+          "attribute": "title"
+        },
+        "doubanRating": {
+          "selector": "table.torrentname > img[title==\"douban\"] > next",
+          "attribute": "text"
+        },
+        "imdbRating": {
+          "selector": "table.torrentname > img[title==\"imdb\"] > next",
+          "attribute": "text"
+        }
+      }
+    },
+    "categories": {
+      "path": "usercp.php?action=tracker",
+      "rows": {
+        "selector": "#outer > table.main > next > tbody:nth-child > tr:nth-child(1) > td.rowfollow > table"
+      },
+      "fields": {
+        "categoryId": {
+          "selector": "a[href~=\"(torrents|special)\\.php\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "cat=(\\d+)",
+            "index": 1
+          }
+        },
+        "categoryName": {
+          "selector": "a[href~=\"(torrents|special)\\.php\"] > img",
+          "attribute": "title"
+        }
+      }
+    }
+  },
+  "logo": "assets/sites_icon/agsvpt.png"
+}
