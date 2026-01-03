@@ -168,7 +168,10 @@ class NexusPHPAdapter implements SiteAdapter {
   @override
   Future<MemberProfile> fetchMemberProfile({String? apiKey}) async {
     try {
-      final response = await _dio.get('/api/v1/profile');
+      final response = await _dio.get(
+        '/api/v1/profile',
+        queryParameters: {'include_fields[user]': 'seeding_leeching_data'},
+      );
 
       if (response.statusCode == 200) {
         final data = response.data;
@@ -201,6 +204,8 @@ class NexusPHPAdapter implements SiteAdapter {
       userId: data['id']?.toString(), // 从data.data.id获取用户ID
       passKey: null, // NexusPHP API类型不提供passKey
       lastAccess: data['last_access']?.toString(),
+      bonusPerHour: data['seed_bonus_per_hour']?.toDouble(),
+      seedingSizeBytes: data['seeding_leeching_data']?['seeding_size']?.toInt(),
     );
   }
 
