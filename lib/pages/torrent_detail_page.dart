@@ -560,7 +560,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     super.initState();
     _isCollected = widget.torrentItem.collection;
     _loadDetail();
-    if (widget.siteConfig?.siteType == SiteType.mteam) {
+    if (widget.siteFeatures.supportCommentDetail) {
       _loadComments();
     }
     _loadAutoLoadImagesSetting();
@@ -2197,8 +2197,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                       ),
                     ),
                   ),
-                    // 用户评论 - 仅在 mteam 站点类型时显示
-                    if (widget.siteConfig?.siteType == SiteType.mteam) ...[
+                    // 用户评论 - 仅在支持评论详情时显示
+                    if (widget.siteFeatures.supportCommentDetail) ...[
                       const SizedBox(height: 16),
                       Card(
                         key: _commentsKey, // Added key to the Card
@@ -2239,8 +2239,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         mainAxisAlignment: MainAxisAlignment.end,
           mainAxisSize: MainAxisSize.min,
         children: [
-            // 评论按钮 - 仅在 mteam 站点类型时显示
-            if (widget.siteConfig?.siteType == SiteType.mteam) ...[
+            // 评论按钮 - 仅在支持评论详情时显示
+            if (widget.siteFeatures.supportCommentDetail) ...[
               FloatingActionButton(
                 heroTag: "comment",
                 onPressed: () {

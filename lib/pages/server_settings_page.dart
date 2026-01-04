@@ -2959,6 +2959,16 @@ class _SiteEditPageState extends State<SiteEditPage> {
                             );
                           }),
                         ),
+                        _buildFeatureSwitch(
+                          '评论详情',
+                          '在详情页加载和显示用户评论',
+                          _siteFeatures.supportCommentDetail,
+                          (value) => setState(() {
+                            _siteFeatures = _siteFeatures.copyWith(
+                              supportCommentDetail: value,
+                            );
+                          }),
+                        ),
                       ],
                     ),
                   ),
