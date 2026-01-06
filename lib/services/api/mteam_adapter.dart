@@ -300,11 +300,12 @@ class MTeamAdapter extends SiteAdapter {
       }
     }
 
-    return _parseTorrentSearchResult(
+    final result = _parseTorrentSearchResult(
       searchData,
       historyMap: historyMap,
       peerMap: peerMap,
     );
+    return result;
   }
 
   @override
