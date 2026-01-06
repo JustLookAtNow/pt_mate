@@ -168,7 +168,10 @@ class NexusPHPAdapter implements SiteAdapter {
   @override
   Future<MemberProfile> fetchMemberProfile({String? apiKey}) async {
     try {
-      final response = await _dio.get('/api/v1/profile');
+      final response = await _dio.get(
+        '/api/v1/profile',
+        queryParameters: {'include_fields[user]': 'seeding_leeching_data'},
+      );
 
       if (response.statusCode == 200) {
         final data = response.data;
@@ -201,6 +204,8 @@ class NexusPHPAdapter implements SiteAdapter {
       userId: data['id']?.toString(), // 从data.data.id获取用户ID
       passKey: null, // NexusPHP API类型不提供passKey
       lastAccess: data['last_access']?.toString(),
+      bonusPerHour: data['seed_bonus_per_hour']?.toDouble(),
+      seedingSizeBytes: data['seeding_leeching_data']?['seeding_size']?.toInt(),
     );
   }
 
@@ -379,14 +384,63 @@ class NexusPHPAdapter implements SiteAdapter {
 
   @override
   Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20}) async {
-    // NexusPHP API 暂时不支持获取评论，返回空列表
-    return TorrentCommentList(
-      pageNumber: pageNumber,
-      pageSize: pageSize,
-      total: 0,
-      totalPages: 0,
-      comments: [],
-    );
+    try {
+      final response = await _dio.get(
+        '/api/v1/comments',
+        queryParameters: {
+          'torrent_id': id,
+          'page': pageNumber,
+          'per_page': pageSize,
+        },
+      );
+
+      final data = response.data as Map<String, dynamic>;
+      if (data['ret'] != 0) {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          error: data['msg'] ?? '获取评论失败',
+        );
+      }
+
+      final responseData = data['data'] as Map<String, dynamic>;
+      final meta = responseData['meta'] as Map<String, dynamic>?;
+      final commentsList = responseData['data'] as List? ?? [];
+
+      // 解析评论列表
+      final comments = commentsList.map((item) {
+        final commentData = item as Map<String, dynamic>;
+        final createUser = commentData['create_user'] as Map<String, dynamic>?;
+
+        return TorrentComment(
+          id: (commentData['id'] ?? '').toString(),
+          createdDate: (commentData['created_at'] ?? '').toString(),
+          lastModifiedDate: (commentData['updated_at'] ?? '').toString(),
+          torrentId: id,
+          author: createUser?['username']?.toString() ?? '',
+          text: (commentData['text'] ?? '').toString(),
+          editedBy: '',
+          subject: '',
+        );
+      }).toList();
+
+      return TorrentCommentList(
+        pageNumber: meta?['current_page'] ?? pageNumber,
+        pageSize: meta?['per_page'] ?? pageSize,
+        total: meta?['total'] ?? comments.length,
+        totalPages: meta?['last_page'] ?? 1,
+        comments: comments,
+      );
+    } catch (e) {
+      // 当评论API不可用时，优雅降级返回空列表
+      return TorrentCommentList(
+        pageNumber: pageNumber,
+        pageSize: pageSize,
+        total: 0,
+        totalPages: 0,
+        comments: [],
+      );
+    }
   }
 
   //实际上调用不到了

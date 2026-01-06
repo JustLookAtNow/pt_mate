@@ -2164,10 +2164,31 @@ class _SiteEditPageState extends State<SiteEditPage> {
       return;
     }
 
+    // 从模板配置中获取 loginPath
+    String? loginPath;
+    if (!_isCustomSite && _selectedTemplateUrl != null) {
+      try {
+        final template = _presetTemplates.firstWhere(
+          (t) => t.baseUrls.contains(_selectedTemplateUrl),
+        );
+        final requestConfig = template.request;
+        if (requestConfig != null) {
+          final loginPageConfig =
+              requestConfig['loginPage'] as Map<String, dynamic>?;
+          if (loginPageConfig != null) {
+            loginPath = loginPageConfig['path'] as String?;
+          }
+        }
+      } catch (_) {
+        // 模板未找到，使用默认路径
+      }
+    }
+
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => NexusPhpWebLogin(
           baseUrl: site.baseUrl,
+          loginPath: loginPath,
           onCookieReceived: (cookie) {
             setState(() {
               _savedCookie = cookie;
@@ -2935,6 +2956,16 @@ class _SiteEditPageState extends State<SiteEditPage> {
                           (value) => setState(() {
                             _siteFeatures = _siteFeatures.copyWith(
                               showCover: value,
+                            );
+                          }),
+                        ),
+                        _buildFeatureSwitch(
+                          '评论详情',
+                          '在详情页加载和显示用户评论',
+                          _siteFeatures.supportCommentDetail,
+                          (value) => setState(() {
+                            _siteFeatures = _siteFeatures.copyWith(
+                              supportCommentDetail: value,
                             );
                           }),
                         ),

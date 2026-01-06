@@ -1427,7 +1427,10 @@ class NexusPHPWebAdapter extends SiteAdapter {
           .replaceAll('{jwt}', jwt)
           .replaceAll('{userId}', _siteConfig.userId!);
     }
-    return '${_siteConfig.baseUrl}download.php?downhash=${_siteConfig.userId!}.$jwt';
+    final baseUrl = _siteConfig.baseUrl.endsWith('/')
+        ? _siteConfig.baseUrl.substring(0, _siteConfig.baseUrl.length - 1)
+        : _siteConfig.baseUrl;
+    return '$baseUrl/download.php?downhash=${_siteConfig.userId!}.$jwt';
   }
 
   /// 生成下载Hash令牌

@@ -1,11 +1,11 @@
 {
-  "id": "hdfans",
-  "name": "HDFans",
+  "id": "u2share",
+  "name": "U2Share",
   "isShow": true,
   "baseUrls": [
-    "https://hdfans.org/"
+    "https://u2.dmhy.org/"
   ],
-  "primaryUrl": "https://hdfans.org/",
+  "primaryUrl": "https://u2.dmhy.org/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
   "features": {
@@ -19,17 +19,9 @@
     "advancedSearch": true,
     "showCover": false
   },
-  "discountMapping": {},
-  "tagMapping": {
-      "官方": "official",
-      "中字": "chinese",
-      "国语": "mandarin",
-      "粤语": "mandarin",
-      "DIY": "diy",
-      "HDR":"hdr",
-      "Dolby Vision":"dovi",
-      "完结": "complete"   
-   },
+  "discountMapping": {
+        "FREE": "FREE"
+      },
   "infoFinder": {
     "userInfo": {
       "path": "usercp.php",
@@ -78,16 +70,23 @@
           }
         },
         "bonus": {
-          "selector": "",
-          "attribute": "text",
-          "filter": {
-            "name": "regexp",
-            "args": ":\\s*([^\\s]+)\\s*\\[*(签|簽)到",
-            "index": 1
-          }
+          "selector": "span.ucoin-notation",
+          "attribute": "text"
         }
       }
     },
+        "passKey": {
+          "path": "usercp.php",
+          "rows": {
+            "selector": "#outer > table > tbody > td:contains('密匙' || '密钥' || 'Passkey') > next"
+          },
+          "fields": {
+            "passKey": {
+              "selector": "span.hidden-click",
+              "attribute": "data-content"
+            }
+          }
+        },    
     "search": {
       "torrentPath": "torrents.php",
       "specialPath": "special.php",
@@ -105,15 +104,11 @@
           }
         },
         "torrentName": {
-          "selector": "a[href^=\"details.php?id=\"] > b",
+          "selector": "a[href^=\"details.php?id=\"]",
           "attribute": "text"
         },
-        "tag": {
-          "selector": "table.torrentname > td.embedded > span[style~=\"border-radius:0;font-size:12px\"]",
-          "attribute": "text"     
-        },
         "description": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > *:last-node",
+          "selector": "table.torrentname > tbody > tr:nth-child(2)  > td:nth-child(1) > *:last-node",
           "attribute": "text"
         },
         "discount": {
@@ -121,16 +116,11 @@
           "attribute": "alt"
         },
         "discountEndTime": {
-          "selector": "table.torrentname > img[class^=\"pro_\"]",
-          "attribute": "onmouseover",
-          "filter": {
-            "name": "regexp",
-            "args": "<span title=\"(.*?)\">",
-            "index": 1
-          }
+          "selector": "table.torrentname > img[class^=\"pro_\"] > next > time",
+          "attribute": "title"
         },
         "downloadUrl": {
-          "value": "{baseUrl}/download.php?id={torrentId}&passkey={passKey}&https=1"
+          "value": "{baseUrl}/download.php?id={torrentId}&passkey={passKey}&http=1"
         },
         "seedersText": {
           "selector": "td:nth-child(6)",
@@ -162,7 +152,7 @@
           "attribute": "src"
         },
         "createData": {
-          "selector": "td:nth-child(4) > span[title]",
+          "selector": "td:nth-child(4) > time[title]",
           "attribute": "title"
         },
         "doubanRating": {
@@ -170,7 +160,7 @@
           "attribute": "text"
         },
         "imdbRating": {
-          "selector": "table.torrentname > img[title==\"imdb\"] > next",
+          "selector": "table.torrentname > a[href~=\"anidb\"] > next",
           "attribute": "text"
         }
       }
@@ -178,11 +168,11 @@
     "categories": {
       "path": "usercp.php?action=tracker",
       "rows": {
-        "selector": "#outer > tbody > tr:nth-child(1) > td.rowfollow > table:nth-child(1) > tbody > tr:nth-child(2)"
+        "selector": "#outer > form > tbody > tr:nth-child(2) > td.rowfollow > table:nth-child(1) > tbody > tr:nth-child"
       },
       "fields": {
         "categoryId": {
-          "selector": "a[href~=\"(torrents|special)\\.php.*\"]",
+          "selector": "a[href~=\"torrents\\.php.*\"]",
           "attribute": "href",
           "filter": {
             "name": "regexp",
@@ -191,11 +181,16 @@
           }
         },
         "categoryName": {
-          "selector": "a[href~=\"(torrents|special)\\.php\"] > img",
-          "attribute": "title"
+          "selector": "a[href~=\"torrents\\.php?\"]",
+          "attribute": "text"
         }
       }
     }
   },
-  "logo": "assets/sites_icon/hdfans.png"
+    "request": {
+    "loginPage": {
+      "path": "/portal.php"
+        }
+  },
+  "logo": "assets/sites_icon/u2share.png"
 }

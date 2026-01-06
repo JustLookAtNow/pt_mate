@@ -1,6 +1,7 @@
 {
   "sites": [
     "afun.json",
+    "agsvpt.json",
     "audiences.json",
     "btschool.json",
     "cbg.json",
@@ -22,6 +23,7 @@
     "qingwapt.json",
     "rousi.json",
     "ssd.json",
+    "u2share.json",
     "ubits.json",
     "xingyunge.json",
     "zmpt.json"

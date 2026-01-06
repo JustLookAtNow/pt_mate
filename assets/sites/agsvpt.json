@@ -1,11 +1,12 @@
 {
-  "id": "hdfans",
-  "name": "HDFans",
+  "id": "agsvpt",
+  "name": "末日",
   "isShow": true,
   "baseUrls": [
-    "https://hdfans.org/"
+    "https://www.agsvpt.com/",
+    "https://pt.agsvpt.cn/"
   ],
-  "primaryUrl": "https://hdfans.org/",
+  "primaryUrl": "https://www.agsvpt.com/",
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
   "features": {
@@ -16,20 +17,9 @@
     "favorites": true,
     "downloadHistory": true,
     "categorySearch": true,
-    "advancedSearch": true,
-    "showCover": false
+    "advancedSearch": true
   },
   "discountMapping": {},
-  "tagMapping": {
-      "官方": "official",
-      "中字": "chinese",
-      "国语": "mandarin",
-      "粤语": "mandarin",
-      "DIY": "diy",
-      "HDR":"hdr",
-      "Dolby Vision":"dovi",
-      "完结": "complete"   
-   },
   "infoFinder": {
     "userInfo": {
       "path": "usercp.php",
@@ -55,8 +45,8 @@
           "attribute": "text",
           "filter": {
             "name": "regexp",
-            "args": "分享率:\\s*([^\\s]+)",
-            "index": 1
+            "args": "分享率(:|：)\\s*([^\\s]+)",
+            "index": 2
           }
         },
         "upload": {
@@ -64,8 +54,8 @@
           "attribute": "text",
           "filter": {
             "name": "regexp",
-            "args": "(上传|上傳)量:\\s*(.*?B)",
-            "index": 2
+            "args": "(上传|上傳)量(:|：)\\s*(.*?B)",
+            "index": 3
           }
         },
         "download": {
@@ -73,8 +63,8 @@
           "attribute": "text",
           "filter": {
             "name": "regexp",
-            "args": "(下载|下載)量:\\s*(.*?B)",
-            "index": 2
+            "args": "(下载|下載)量(:|：)\\s*(.*?B)",
+            "index": 3
           }
         },
         "bonus": {
@@ -88,11 +78,40 @@
         }
       }
     },
+    "passKey": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "#outer > table.main > next > tbody > td:contains('密匙'||'密钥'|| 'Passkey') > next"
+      },
+      "fields": {
+        "passKey": {
+          "selector": "",
+          "attribute": "text"
+        }
+      }
+    },
+    "bonusPerHour": {
+      "path": "mybonus.php",
+      "rows": {
+        "selector": "#outer"
+      },
+      "fields": {
+        "bonusPerHour": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(你当前每小时能获取|You are currently getting|你當前每小時能獲取)\\s*([\\d.]+)",
+            "index": 2
+          }
+        }
+      }
+    },
     "search": {
       "torrentPath": "torrents.php",
       "specialPath": "special.php",
       "rows": {
-        "selector": "table.torrents > tbody:nth-child(1) > tr:nth-child"
+        "selector": "table.torrents > tbody:nth-child > tr:nth-child"
       },
       "fields": {
         "torrentId": {
@@ -109,11 +128,11 @@
           "attribute": "text"
         },
         "tag": {
-          "selector": "table.torrentname > td.embedded > span[style~=\"border-radius:0;font-size:12px\"]",
-          "attribute": "text"     
+          "selector": "table.torrentname > div.torrent_title_desc > span[title]",
+          "attribute": "text"
         },
         "description": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > *:last-node",
+          "selector": "table.torrentname > div.torrent_title_desc > *:last-node",
           "attribute": "text"
         },
         "discount": {
@@ -125,12 +144,12 @@
           "attribute": "onmouseover",
           "filter": {
             "name": "regexp",
-            "args": "<span title=\"(.*?)\">",
+            "args": "<span title=\\\"(.*?)\\\"",
             "index": 1
           }
         },
         "downloadUrl": {
-          "value": "{baseUrl}/download.php?id={torrentId}&passkey={passKey}&https=1"
+          "value": "##{baseUrl}/download.php?id={torrentId}"
         },
         "seedersText": {
           "selector": "td:nth-child(6)",
@@ -145,7 +164,7 @@
           "attribute": "text"
         },
         "downloadStatus": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > div[title]",
+          "selector": "table.torrentname > tbody > tr > td:nth-child(2) > div[title]",
           "attribute": "title",
           "filter": {
             "name": "regexp",
@@ -154,12 +173,16 @@
           }
         },
         "collection": {
-          "selector": "table.torrentname > tbody > tr > img.bookmark",
+          "selector": "table.torrentname > img.bookmark",
           "attribute": "src"
         },
         "isTop": {
           "selector": "table.torrentname > img[title~=\"置顶|置頂\"]",
           "attribute": "src"
+        },
+        "cover": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > img[data-src]",
+          "attribute": "data-src"
         },
         "createData": {
           "selector": "td:nth-child(4) > span[title]",
@@ -178,11 +201,11 @@
     "categories": {
       "path": "usercp.php?action=tracker",
       "rows": {
-        "selector": "#outer > tbody > tr:nth-child(1) > td.rowfollow > table:nth-child(1) > tbody > tr:nth-child(2)"
+        "selector": "#outer > table.main > next > tbody:nth-child > tr:nth-child(1) > td.rowfollow > table"
       },
       "fields": {
         "categoryId": {
-          "selector": "a[href~=\"(torrents|special)\\.php.*\"]",
+          "selector": "a[href~=\"(torrents|special)\\.php\"]",
           "attribute": "href",
           "filter": {
             "name": "regexp",
@@ -197,5 +220,5 @@
       }
     }
   },
-  "logo": "assets/sites_icon/hdfans.png"
+  "logo": "assets/sites_icon/agsvpt.png"
 }

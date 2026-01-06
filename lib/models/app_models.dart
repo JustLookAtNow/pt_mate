@@ -303,8 +303,9 @@ enum TagType {
   chineseTraditional('繁体', Colors.green, ''),
   mandarin('国语', Colors.blue, ''),
   diy('DIY', Colors.brown, ''),
-  complete('完结',Color.fromARGB(255, 110, 8, 206),''),
-  ep('分集',Color.fromARGB(255, 110, 8, 206),''),
+  complete('完结',Color.fromARGB(255, 110, 8, 206),r'\bS\d+\b'),
+  zero('零魔',Color.fromARGB(159, 4, 164, 239),''),
+  ep('分集',Color.fromARGB(255, 110, 8, 206),r'\bEP\b|S\d+E\d+|E\d+\-E\d+'),
   fourK('4K', Colors.orange, r'\b4K\b|\b2160p\b'),
   resolution1080('1080p', Colors.blue, r'\b1080p\b'),
   hdr('HDR', Colors.purple, r'\bHDR\b|\bHDR10\b'),
@@ -412,6 +413,7 @@ class SiteFeatures {
   final bool supportCategories; // 支持分类搜索
   final bool supportAdvancedSearch; // 支持高级搜索
   final bool showCover; // 列表显示封面与评分
+  final bool supportCommentDetail; // 支持评论详情
 
   const SiteFeatures({
     this.supportMemberProfile = true,
@@ -423,6 +425,7 @@ class SiteFeatures {
     this.supportCategories = true,
     this.supportAdvancedSearch = true,
     this.showCover = true,
+    this.supportCommentDetail = false,
   });
 
   SiteFeatures copyWith({
@@ -435,6 +438,7 @@ class SiteFeatures {
     bool? supportCategories,
     bool? supportAdvancedSearch,
     bool? showCover,
+    bool? supportCommentDetail,
   }) => SiteFeatures(
     supportMemberProfile: supportMemberProfile ?? this.supportMemberProfile,
     supportTorrentSearch: supportTorrentSearch ?? this.supportTorrentSearch,
@@ -445,6 +449,7 @@ class SiteFeatures {
     supportCategories: supportCategories ?? this.supportCategories,
     supportAdvancedSearch: supportAdvancedSearch ?? this.supportAdvancedSearch,
     showCover: showCover ?? this.showCover,
+    supportCommentDetail: supportCommentDetail ?? this.supportCommentDetail,
   );
 
   Map<String, dynamic> toJson() => {
@@ -457,6 +462,7 @@ class SiteFeatures {
     'supportCategories': supportCategories,
     'supportAdvancedSearch': supportAdvancedSearch,
     'showCover': showCover,
+    'supportCommentDetail': supportCommentDetail,
   };
 
   factory SiteFeatures.fromJson(Map<String, dynamic> json) => SiteFeatures(
@@ -479,6 +485,8 @@ class SiteFeatures {
         json['supportAdvancedSearch'] as bool? ??
         true,
     showCover: json['showCover'] as bool? ?? true,
+    supportCommentDetail:
+        json['commentDetail'] ?? json['supportCommentDetail'] as bool? ?? false,
   );
 
   // M-Team 站点的默认功能配置
@@ -492,6 +500,7 @@ class SiteFeatures {
     supportCategories: true,
     supportAdvancedSearch: true,
     showCover: true,
+    supportCommentDetail: true,
   );
 
   @override

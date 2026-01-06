@@ -47,7 +47,7 @@ class UpdateNotificationDialog extends StatelessWidget {
               const SizedBox(height: 8),
               Container(
                 width: double.maxFinite,
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
