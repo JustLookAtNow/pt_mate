@@ -307,7 +307,7 @@ enum TagType {
   zero('零魔',Color.fromARGB(159, 4, 164, 239),''),
   ep('分集',Color.fromARGB(255, 110, 8, 206),r'\bEP\b|S\d+E\d+|E\d+\-E\d+'),
   fourK('4K', Colors.orange, r'\b4K\b|\b2160p\b'),
-  resolution1080('1080p', Colors.blue, r'\b1080p\b'),
+  resolution1080('1080p', Colors.blue, r'\b1080p\b|x1080'),
   hdr('HDR', Colors.purple, r'\bHDR\b|\bHDR10\b'),
   h265(
     'H265',
