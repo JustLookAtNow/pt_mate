@@ -1550,7 +1550,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
   SiteType? _selectedSiteType;
   bool _loading = false;
   String? _error;
-  MemberProfile? _profile;
+
   List<SearchCategoryConfig> _searchCategories = [];
   SiteFeatures _siteFeatures = SiteFeatures.mteamDefault;
   List<SiteConfigTemplate> _presetTemplates = []; // 预设站点模板列表
@@ -1700,7 +1700,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
       // 清空之前的错误和用户信息
       _error = null;
-      _profile = null;
+
     });
   }
 
@@ -1723,7 +1723,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
       // 清空之前的错误和用户信息
       _error = null;
-      _profile = null;
+
     });
   }
 
@@ -2007,7 +2007,6 @@ class _SiteEditPageState extends State<SiteEditPage> {
     setState(() {
       _loading = true;
       _error = null;
-      _profile = null;
     });
 
     try {
@@ -2020,9 +2019,36 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // 临时设置站点进行测试
       await ApiService.instance.setActiveSite(site);
       final profile = await ApiService.instance.fetchMemberProfile();
-      setState(() => _profile = profile);
+      
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('测试连接成功'),
+          content: SingleChildScrollView(child: _ProfileView(profile: profile)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+      );
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('测试连接失败'),
+          content: Text(e.toString()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -2036,7 +2062,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       setState(() {
         _loading = true;
         _error = null;
-        _profile = null;
+
       });
 
       try {
@@ -2057,7 +2083,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
     setState(() {
       _loading = true;
       _error = null;
-      _profile = null;
+
     });
 
     try {
@@ -3067,26 +3093,10 @@ class _SiteEditPageState extends State<SiteEditPage> {
               const SizedBox(height: 24),
 
               // 操作按钮（只有在用户做出选择时才显示）
-              if (_hasUserMadeSelection)
-                Row(
-                  children: [
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('测试连接'),
-                      onPressed: _loading ? null : _testConnection,
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.save),
-                      label: Text(widget.site != null ? '更新' : '保存'),
-                      onPressed: _loading ? null : _save,
-                    ),
-                  ],
-                ),
+
               const SizedBox(height: 16),
 
-              // 加载指示器
-              if (_loading) const LinearProgressIndicator(),
+
 
               // 错误信息
               if (_error != null) ...[
@@ -3120,14 +3130,50 @@ class _SiteEditPageState extends State<SiteEditPage> {
               ],
 
               // 用户信息显示
-              if (_profile != null) ...[
-                const SizedBox(height: 16),
-                _ProfileView(profile: _profile!),
-              ],
+
             ],
           ),
         ),
       ),
+
+      floatingActionButton: _hasUserMadeSelection
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                FloatingActionButton(
+                  heroTag: 'test_connection',
+                  onPressed: _loading ? null : _testConnection,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.tertiaryContainer,
+                  foregroundColor: Theme.of(
+                    context,
+                  ).colorScheme.onTertiaryContainer,
+                  tooltip: '测试连接',
+                  child: _loading
+                      ? SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onTertiaryContainer,
+                          ),
+                        )
+                      : const Icon(Icons.play_arrow),
+                ),
+                const SizedBox(height: 16),
+                FloatingActionButton(
+                  heroTag: 'save_site',
+                  onPressed: _loading ? null : _save,
+                  tooltip: widget.site != null ? '更新' : '保存',
+                  child: const Icon(Icons.save),
+                ),
+              ],
+            )
+          : null,
     );
   }
 }
