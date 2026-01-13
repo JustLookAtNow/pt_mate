@@ -2865,27 +2865,6 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 const SizedBox(height: 16),
               ],
 
-              // Pass Key输入（仅NexusPHP类型显示，且用户已做出选择）
-              if (_hasUserMadeSelection &&
-                  _selectedSiteType?.requiresPassKey == true) ...[
-                TextFormField(
-                  controller: _passKeyController,
-                  decoration: InputDecoration(
-                    labelText: _selectedSiteType?.passKeyLabel ?? 'Pass Key',
-                    hintText: _selectedSiteType?.passKeyHint ?? '请输入Pass Key',
-                    border: const OutlineInputBorder(),
-                  ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (_selectedSiteType?.requiresPassKey == true &&
-                        (value == null || value.trim().isEmpty)) {
-                      return '请输入Pass Key';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-              ],
               const SizedBox(height: 8),
 
               // 查询分类配置（只有在用户做出选择时才显示）

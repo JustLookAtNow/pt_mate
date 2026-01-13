@@ -357,7 +357,8 @@ enum SiteType {
     'API Key (访问令牌)',
     '控制面板-设定首页-访问令牌（权限都勾上）',
   ),
-  nexusphpweb('NexusPHPWeb', 'NexusPHP(web)', 'Cookie认证', '通过网页登录获取认证信息')
+  nexusphpweb('NexusPHPWeb', 'NexusPHP(web)', 'Cookie认证', '通过网页登录获取认证信息'),
+  rousi('RousiPro', 'Rousi pro', 'paaskey认证', '可以在网站的「账户设置」页面查看和重置自己的 Passkey。')
   // 未来可以添加其他站点类型
   // gazelle('Gazelle', 'Gazelle 站点'),
   ;
@@ -368,38 +369,6 @@ enum SiteType {
   final String apiKeyLabel;
   final String apiKeyHint;
 
-  String get passKeyLabel {
-    switch (this) {
-      case SiteType.mteam:
-        return 'Pass Key'; // M-Team通常不需要passKey
-      case SiteType.nexusphp:
-        return 'Pass Key (可选)';
-      case SiteType.nexusphpweb:
-        return 'Pass Key';
-    }
-  }
-
-  String get passKeyHint {
-    switch (this) {
-      case SiteType.mteam:
-        return '请输入Pass Key（可选）';
-      case SiteType.nexusphp:
-        return '控制面板-设定首页-密钥（可选）';
-      case SiteType.nexusphpweb:
-        return '控制面板-设定首页-密钥（必填）';
-    }
-  }
-
-  bool get requiresPassKey {
-    switch (this) {
-      case SiteType.mteam:
-        return false;
-      case SiteType.nexusphp:
-        return false;
-      case SiteType.nexusphpweb:
-        return false; // 改为可选，从fetchMemberProfile获取
-    }
-  }
 }
 
 // 站点功能配置
