@@ -1,0 +1,24 @@
+{
+  "id": "rousipro",
+  "name": "肉丝Pro(beta)",
+  "isShow": true,
+  "baseUrls": [
+    "https://rousi.pro/"
+  ],
+  "primaryUrl": "https://rousi.pro/",
+  "siteType": "RousiPro",
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": false,
+    "downloadHistory": false,
+    "categorySearch": true,
+    "advancedSearch": true,
+    "commentDetail": true
+  },
+  "discountMapping": {},
+  "logo": "assets/sites_icon/rousipro.png"
+}

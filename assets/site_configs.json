@@ -121,6 +121,29 @@
         "分集": "ep"
       }
     },
+    "RousiPro": {
+      "name": "RousiPro 站点",
+      "baseUrl": "https://",
+      "searchCategories": [
+       
+      ],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": true,
+        "advancedSearch": true,
+        "showCover": true,
+        "commentDetail": true
+      },
+      "discountMapping": {
+      },
+      "tagMapping": {
+      }
+    },
     "NexusPHPWeb": {
       "name": "NexusPHP web",
       "baseUrl": "https://",

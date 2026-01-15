@@ -644,6 +644,83 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     );
   }
 
+  // 构建单个滑动作按钮
+  Widget _buildSwipeActionBtn({
+    required BuildContext context,
+    required Color color,
+    required IconData icon,
+    required String text,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      width: 60,
+      margin: const EdgeInsets.only(left: 4),
+      child: Material(
+        color: color,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              const SizedBox(height: 2),
+              Text(
+                text,
+                style: const TextStyle(color: Colors.white, fontSize: 10),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 构建站点列表项的左滑菜单按钮
+  List<Widget> _buildSwipeActions(
+    BuildContext context,
+    SiteConfig site,
+    bool isActive,
+  ) {
+    final actions = <Widget>[];
+
+    // Refresh
+    actions.add(
+      _buildSwipeActionBtn(
+        context: context,
+        color: Theme.of(context).colorScheme.primary,
+        icon: Icons.refresh,
+        text: '刷新',
+        onTap: () => _refreshSingleSite(site),
+      ),
+    );
+
+    // Edit
+    actions.add(
+      _buildSwipeActionBtn(
+        context: context,
+        color: Colors.amber[700]!,
+        icon: Icons.edit,
+        text: '编辑',
+        onTap: () => _editSite(site),
+      ),
+    );
+
+    // Delete
+    actions.add(
+      _buildSwipeActionBtn(
+        context: context,
+        color: Colors.red,
+        icon: Icons.delete,
+        text: '删除',
+        onTap: () => _deleteSite(site),
+      ),
+    );
+
+    return actions;
+  }
+
   Future<void> _refreshSingleSite(SiteConfig site) async {
     if (!mounted) return;
     final theme = Theme.of(context);
@@ -831,7 +908,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         : null;
     final hs = _healthStatuses[site.id];
 
-    return Card(
+    final card = Card(
       elevation: 2,
       shadowColor: (siteColor ?? Theme.of(context).colorScheme.outline)
           .withValues(alpha: 0.4),
@@ -997,6 +1074,20 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         ],
       ),
     );
+
+    // Mobile swipe
+    if (!ScreenUtils.isLargeScreen(context)) {
+      return _SwipeableSiteItem(
+        actions: _buildSwipeActions(context, site, isActive),
+        onTap: isActive ? null : () => _setActiveSite(site.id),
+        // Keep null or use _showSiteMenu if user still wants it on long press,
+        // but typically swipe replaces it. Requirement says "change to left slide".
+        onLongPress: null,
+        child: card,
+      );
+    }
+
+    return card;
   }
 
   Widget _buildHealthStatus(SiteConfig site, _HealthStatus hs) {
@@ -1459,7 +1550,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
   SiteType? _selectedSiteType;
   bool _loading = false;
   String? _error;
-  MemberProfile? _profile;
+
   List<SearchCategoryConfig> _searchCategories = [];
   SiteFeatures _siteFeatures = SiteFeatures.mteamDefault;
   List<SiteConfigTemplate> _presetTemplates = []; // 预设站点模板列表
@@ -1609,7 +1700,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
       // 清空之前的错误和用户信息
       _error = null;
-      _profile = null;
+
     });
   }
 
@@ -1632,7 +1723,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
       // 清空之前的错误和用户信息
       _error = null;
-      _profile = null;
+
     });
   }
 
@@ -1916,7 +2007,6 @@ class _SiteEditPageState extends State<SiteEditPage> {
     setState(() {
       _loading = true;
       _error = null;
-      _profile = null;
     });
 
     try {
@@ -1929,9 +2019,36 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // 临时设置站点进行测试
       await ApiService.instance.setActiveSite(site);
       final profile = await ApiService.instance.fetchMemberProfile();
-      setState(() => _profile = profile);
+      
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('测试连接成功'),
+          content: SingleChildScrollView(child: _ProfileView(profile: profile)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+      );
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('测试连接失败'),
+          content: Text(e.toString()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1945,7 +2062,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       setState(() {
         _loading = true;
         _error = null;
-        _profile = null;
+
       });
 
       try {
@@ -1966,7 +2083,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
     setState(() {
       _loading = true;
       _error = null;
-      _profile = null;
+
     });
 
     try {
@@ -2748,27 +2865,6 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 const SizedBox(height: 16),
               ],
 
-              // Pass Key输入（仅NexusPHP类型显示，且用户已做出选择）
-              if (_hasUserMadeSelection &&
-                  _selectedSiteType?.requiresPassKey == true) ...[
-                TextFormField(
-                  controller: _passKeyController,
-                  decoration: InputDecoration(
-                    labelText: _selectedSiteType?.passKeyLabel ?? 'Pass Key',
-                    hintText: _selectedSiteType?.passKeyHint ?? '请输入Pass Key',
-                    border: const OutlineInputBorder(),
-                  ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (_selectedSiteType?.requiresPassKey == true &&
-                        (value == null || value.trim().isEmpty)) {
-                      return '请输入Pass Key';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-              ],
               const SizedBox(height: 8),
 
               // 查询分类配置（只有在用户做出选择时才显示）
@@ -2976,26 +3072,10 @@ class _SiteEditPageState extends State<SiteEditPage> {
               const SizedBox(height: 24),
 
               // 操作按钮（只有在用户做出选择时才显示）
-              if (_hasUserMadeSelection)
-                Row(
-                  children: [
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('测试连接'),
-                      onPressed: _loading ? null : _testConnection,
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.save),
-                      label: Text(widget.site != null ? '更新' : '保存'),
-                      onPressed: _loading ? null : _save,
-                    ),
-                  ],
-                ),
+
               const SizedBox(height: 16),
 
-              // 加载指示器
-              if (_loading) const LinearProgressIndicator(),
+
 
               // 错误信息
               if (_error != null) ...[
@@ -3029,14 +3109,50 @@ class _SiteEditPageState extends State<SiteEditPage> {
               ],
 
               // 用户信息显示
-              if (_profile != null) ...[
-                const SizedBox(height: 16),
-                _ProfileView(profile: _profile!),
-              ],
+
             ],
           ),
         ),
       ),
+
+      floatingActionButton: _hasUserMadeSelection
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                FloatingActionButton(
+                  heroTag: 'test_connection',
+                  onPressed: _loading ? null : _testConnection,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.tertiaryContainer,
+                  foregroundColor: Theme.of(
+                    context,
+                  ).colorScheme.onTertiaryContainer,
+                  tooltip: '测试连接',
+                  child: _loading
+                      ? SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onTertiaryContainer,
+                          ),
+                        )
+                      : const Icon(Icons.play_arrow),
+                ),
+                const SizedBox(height: 16),
+                FloatingActionButton(
+                  heroTag: 'save_site',
+                  onPressed: _loading ? null : _save,
+                  tooltip: widget.site != null ? '更新' : '保存',
+                  child: const Icon(Icons.save),
+                ),
+              ],
+            )
+          : null,
     );
   }
 }
@@ -3513,4 +3629,170 @@ class _HueBarPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// -----------------------------------------------------------------------------
+// Added _SwipeableSiteItem for left-slide menu support
+// -----------------------------------------------------------------------------
+
+class _SwipeableSiteItem extends StatefulWidget {
+  final Widget child;
+  final List<Widget> actions;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+
+  const _SwipeableSiteItem({
+    required this.child,
+    required this.actions,
+    this.onTap,
+    this.onLongPress,
+  });
+
+  @override
+  State<_SwipeableSiteItem> createState() => _SwipeableSiteItemState();
+}
+
+class _SwipeableSiteItemState extends State<_SwipeableSiteItem>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  double _dragExtent = 0;
+  bool _isOpen = false;
+
+  // Each action button is designed to be 60px width + 4px margin
+  double get _actionsWidth {
+    if (widget.actions.isEmpty) return 0;
+    return widget.actions.length * 64.0;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+    _animation = Tween<double>(
+      begin: 0,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+
+    _animation.addListener(_updateDragExtent);
+  }
+
+  @override
+  void dispose() {
+    _animation.removeListener(_updateDragExtent);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _updateDragExtent() {
+    setState(() {
+      _dragExtent = _animation.value;
+    });
+  }
+
+  void _handleDragStart(DragStartDetails details) {
+    _controller.stop();
+  }
+
+  void _handleDragUpdate(DragUpdateDetails details) {
+    if (widget.actions.isEmpty) return;
+
+    final delta = details.primaryDelta ?? 0;
+    final newDragExtent = _dragExtent + delta;
+
+    // Limit drag range: negative for left swipe
+    setState(() {
+      _dragExtent = newDragExtent.clamp(-_actionsWidth, 0);
+    });
+  }
+
+  void _handleDragEnd(DragEndDetails details) {
+    if (widget.actions.isEmpty) return;
+
+    final velocity = details.primaryVelocity ?? 0;
+    final threshold = _actionsWidth * 0.3;
+
+    bool shouldOpen = false;
+
+    if (velocity < -300) {
+      // Fast swipe left -> open
+      shouldOpen = true;
+    } else if (velocity > 300) {
+      // Fast swipe right -> close
+      shouldOpen = false;
+    } else {
+      // Drag distance check
+      shouldOpen = _dragExtent.abs() > threshold;
+    }
+
+    _animateToPosition(shouldOpen);
+  }
+
+  void _animateToPosition(bool open) {
+    _isOpen = open;
+    final targetExtent = open ? -_actionsWidth : 0.0;
+
+    if ((_dragExtent - targetExtent).abs() < 0.1) {
+      setState(() {
+        _dragExtent = targetExtent;
+      });
+      return;
+    }
+
+    _animation = Tween<double>(
+      begin: _dragExtent,
+      end: targetExtent,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+
+    _controller.reset();
+    _controller.forward();
+  }
+
+  void _close() {
+    if (_isOpen) {
+      _animateToPosition(false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        if (_isOpen) {
+          _close();
+        } else {
+          widget.onTap?.call();
+        }
+      },
+      onLongPress: _isOpen ? null : widget.onLongPress,
+      onHorizontalDragStart: _handleDragStart,
+      onHorizontalDragUpdate: _handleDragUpdate,
+      onHorizontalDragEnd: _handleDragEnd,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Background actions
+          if (widget.actions.isNotEmpty && _dragExtent.abs() > 0.01)
+            Positioned(
+              right: -_actionsWidth + _dragExtent.abs(),
+              top: 4, // Align with card margin/padding adjustments if needed
+              bottom: 12, // Align with card bottom margin
+              width: _actionsWidth,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: widget.actions,
+              ),
+            ),
+          // Main content
+          Transform.translate(
+            offset: Offset(_dragExtent, 0),
+            child: widget.child,
+          ),
+        ],
+      ),
+    );
+  }
 }
