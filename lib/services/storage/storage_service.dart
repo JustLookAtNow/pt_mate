@@ -67,6 +67,7 @@ class StorageKeys {
   
   // 图片设置
   static const String autoLoadImages = 'images.autoLoad'; // bool
+  static const String showCoverImages = 'images.showCover'; // bool
   // 日志设置
   static const String logToFileEnabled = 'logging.toFile'; // bool
   // 标签显示设置
@@ -638,6 +639,17 @@ class StorageService {
   Future<bool> loadAutoLoadImages() async {
     final prefs = await _prefs;
     return prefs.getBool(StorageKeys.autoLoadImages) ?? true; // 默认自动加载
+  }
+
+  // 封面图片显示设置
+  Future<void> saveShowCoverImages(bool show) async {
+    final prefs = await _prefs;
+    await prefs.setBool(StorageKeys.showCoverImages, show);
+  }
+
+  Future<bool> loadShowCoverImages() async {
+    final prefs = await _prefs;
+    return prefs.getBool(StorageKeys.showCoverImages) ?? true; // 默认自动显示
   }
 
   Future<void> saveLogToFileEnabled(bool enabled) async {

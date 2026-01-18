@@ -44,6 +44,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   double _headerProgress = 1.0; // 1.0=完全显示, 0.0=完全隐藏
   double _lastScrollOffset = 0.0;
   final double _maxHideDistance = 200.0; // 滚动多少距离完全隐藏
+  
+  // 封面图片显示设置（用户偏好）
+  bool _showCoverSetting = true; // 默认自动显示
 
   Color _colorForSite(String siteId) {
     if (_siteColors.containsKey(siteId)) return _siteColors[siteId]!;
@@ -141,6 +144,12 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         );
         provider.setLoading(false);
         provider.initializeDefaultStrategy();
+        
+        // 加载封面图片显示设置
+        final showCoverSetting = await storage.loadShowCoverImages();
+        if (mounted) {
+          setState(() => _showCoverSetting = showCoverSetting);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -763,6 +772,8 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                             isSelectionMode: _isSelectionMode,
                                             isAggregateMode: true,
                                             siteName: item.siteName,
+                                              showCoverSetting:
+                                                  _showCoverSetting,
                                             suspendImageLoading:
                                                 _isFastScrolling,
                                             onTap: _isSelectionMode

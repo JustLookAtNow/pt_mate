@@ -41,6 +41,9 @@ class TorrentListItem extends StatelessWidget {
   final String? siteName;
   final bool? suspendImageLoading;
 
+  /// 用户全局设置的封面显示偏好（true=自动，false=不显示）
+  final bool? showCoverSetting;
+
   /// 点击事件回调
   final VoidCallback? onTap;
 
@@ -66,6 +69,7 @@ class TorrentListItem extends StatelessWidget {
     this.onToggleCollection,
     this.onDownload,
     this.suspendImageLoading,
+    this.showCoverSetting,
   });
 
   bool _hasRatingValue(String? r) {
@@ -82,7 +86,9 @@ class TorrentListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     // 检测是否为移动设备（屏幕宽度小于600px）
     final isMobile = MediaQuery.of(context).size.width < 600;
-    final showCover = currentSite?.features.showCover ?? true;
+    // 将站点配置的 showCover 与用户全局设置做与运算
+    final siteShowCover = currentSite?.features.showCover ?? true;
+    final showCover = siteShowCover && (showCoverSetting ?? true);
 
     // 统一计算标签与清理后的描述，避免重复调用
 

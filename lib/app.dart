@@ -507,6 +507,9 @@ class _HomePageState extends State<HomePage> {
   double _lastScrollOffset = 0.0; // 上次滚动位置
   static const double _maxHideDistance = 200.0; // 累计滚动200px完全隐藏/显示
   
+  // 封面图片显示设置（用户偏好）
+  bool _showCoverSetting = true; // 默认自动显示
+  
   @override
   void initState() {
     super.initState();
@@ -591,6 +594,11 @@ class _HomePageState extends State<HomePage> {
       final downloaderConfigsData = await StorageService.instance.loadDownloaderConfigs();
       final downloaderConfigs = downloaderConfigsData.map((data) => DownloaderConfig.fromJson(data)).toList();
       if (mounted) setState(() => _downloaderConfigs = downloaderConfigs);
+
+      // 加载封面图片显示设置
+      final showCoverSetting = await StorageService.instance
+          .loadShowCoverImages();
+      if (mounted) setState(() => _showCoverSetting = showCoverSetting);
 
       // 拉取用户基础信息
       await ApiService.instance.fetchMemberProfile();
@@ -1650,6 +1658,7 @@ class _HomePageState extends State<HomePage> {
                                     isSelected: isSelected,
                                     isSelectionMode: _isSelectionMode,
                                     currentSite: _currentSite,
+                                    showCoverSetting: _showCoverSetting,
                                     onTap: () => _isSelectionMode
                                         ? _onToggleSelection(item)
                                         : _onTorrentTap(item),

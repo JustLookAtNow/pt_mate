@@ -174,6 +174,8 @@ class _SettingsBody extends StatelessWidget {
             children: [
               _AutoLoadImagesTile(),
               const Divider(height: 1),
+              _ShowCoverImagesTile(),
+              const Divider(height: 1),
               const _DisplayTagSettingsTile(),
             ],
           ),
@@ -1016,9 +1018,80 @@ class _AutoLoadImagesTileState extends State<_AutoLoadImagesTile> {
 
     return SwitchListTile(
       secondary: const Icon(Icons.image),
-      title: const Text('自动加载图片'),
+      title: const Text('详情页图片'),
       subtitle: const Text('在种子详情页面自动显示图片'),
       value: _autoLoad,
+      onChanged: _saveSetting,
+    );
+  }
+}
+
+class _ShowCoverImagesTile extends StatefulWidget {
+  @override
+  State<_ShowCoverImagesTile> createState() => _ShowCoverImagesTileState();
+}
+
+class _ShowCoverImagesTileState extends State<_ShowCoverImagesTile> {
+  bool _showCover = true;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSetting();
+  }
+
+  Future<void> _loadSetting() async {
+    try {
+      final storage = Provider.of<StorageService>(context, listen: false);
+      final showCover = await storage.loadShowCoverImages();
+      if (mounted) {
+        setState(() {
+          _showCover = showCover;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _saveSetting(bool value) async {
+    try {
+      final storage = Provider.of<StorageService>(context, listen: false);
+      await storage.saveShowCoverImages(value);
+      if (mounted) {
+        setState(() => _showCover = value);
+      }
+    } catch (e) {
+      // 保存失败时恢复原值
+      if (mounted) {
+        setState(() => _showCover = !value);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const ListTile(
+        leading: Icon(Icons.photo_library),
+        title: Text('封面图片'),
+        trailing: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    return SwitchListTile(
+      secondary: const Icon(Icons.photo_library),
+      title: const Text('封面图片'),
+      subtitle: Text(_showCover ? '根据站点配置显示' : '不显示封面'),
+      value: _showCover,
       onChanged: _saveSetting,
     );
   }
