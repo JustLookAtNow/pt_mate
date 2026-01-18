@@ -645,7 +645,8 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: Theme.of(context).colorScheme.
-        outlineVariant.withOpacity(0.5)),
+        outlineVariant.withValues(alpha: 0.5),
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
