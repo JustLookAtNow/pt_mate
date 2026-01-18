@@ -69,6 +69,8 @@ class StorageKeys {
   static const String autoLoadImages = 'images.autoLoad'; // bool
   // 日志设置
   static const String logToFileEnabled = 'logging.toFile'; // bool
+  // 标签显示设置
+  static const String visibleTags = 'ui.visibleTags'; // List<String>
   
   // 聚合搜索设置
   static const String aggregateSearchSettings = 'aggregateSearch.settings';
@@ -801,6 +803,23 @@ class StorageService {
     } else {
       await prefs.remove(StorageKeys.defaultDownloaderId);
     }
+  }
+
+  // 标签显示设置
+  List<String>? _visibleTagsCache;
+  List<String> get visibleTags => _visibleTagsCache ?? [];
+
+  Future<void> saveVisibleTags(List<String> tags) async {
+    final prefs = await _prefs;
+    await prefs.setStringList(StorageKeys.visibleTags, tags);
+    _visibleTagsCache = tags;
+  }
+
+  Future<void> loadVisibleTags() async {
+    final prefs = await _prefs;
+    _visibleTagsCache = prefs.getStringList(StorageKeys.visibleTags);
+    // 如果没有保存过设置，默认显示所有标签
+    _visibleTagsCache ??= TagType.values.map((e) => e.name).toList();
   }
 
   Future<List<Map<String, dynamic>>> loadDownloaderConfigs() async {

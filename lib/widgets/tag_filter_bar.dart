@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/app_models.dart';
+import '../services/storage/storage_service.dart';
 
 /// 标签过滤栏 Widget
 /// 
@@ -35,7 +36,10 @@ class TagFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final allTags = TagType.values;
+    final visibleTagNames = StorageService.instance.visibleTags;
+    final allTags = TagType.values
+        .where((tag) => visibleTagNames.contains(tag.name))
+        .toList();
     if (allTags.isEmpty) return const SizedBox.shrink();
 
     return SingleChildScrollView(

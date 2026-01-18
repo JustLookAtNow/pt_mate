@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 
 import '../services/storage/storage_service.dart';
+import '../models/app_models.dart';
 import '../services/theme/theme_manager.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/responsive_layout.dart';
@@ -162,14 +163,20 @@ class _SettingsBody extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         
-        // 图片设置
+        // 显示设置
         Text(
-          '图片设置',
+          '显示设置',
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 8),
         Card(
-          child: _AutoLoadImagesTile(),
+          child: Column(
+            children: [
+              _AutoLoadImagesTile(),
+              const Divider(height: 1),
+              const _DisplayTagSettingsTile(),
+            ],
+          ),
         ),
         const SizedBox(height: 16),
         
@@ -1013,6 +1020,84 @@ class _AutoLoadImagesTileState extends State<_AutoLoadImagesTile> {
       subtitle: const Text('在种子详情页面自动显示图片'),
       value: _autoLoad,
       onChanged: _saveSetting,
+    );
+  }
+}
+
+class _DisplayTagSettingsTile extends StatefulWidget {
+  const _DisplayTagSettingsTile();
+
+  @override
+  State<_DisplayTagSettingsTile> createState() =>
+      _DisplayTagSettingsTileState();
+}
+
+class _DisplayTagSettingsTileState extends State<_DisplayTagSettingsTile> {
+  bool _expanded = false;
+  List<String> _visibleTags = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _visibleTags = List.from(StorageService.instance.visibleTags);
+  }
+
+  Future<void> _toggleTag(String tagName) async {
+    setState(() {
+      if (_visibleTags.contains(tagName)) {
+        _visibleTags.remove(tagName);
+      } else {
+        _visibleTags.add(tagName);
+      }
+    });
+    await StorageService.instance.saveVisibleTags(_visibleTags);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      leading: const Icon(Icons.label_outline),
+      title: const Text('过滤标签设置'),
+      subtitle: const Text('设置显示在顶部的快捷过滤标签'),
+      initiallyExpanded: _expanded,
+      onExpansionChanged: (value) {
+        setState(() {
+          _expanded = value;
+        });
+      },
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: TagType.values.map((tag) {
+              final isSelected = _visibleTags.contains(tag.name);
+              return FilterChip(
+                label: Text(tag.content),
+                selected: isSelected,
+                onSelected: (bool selected) {
+                  _toggleTag(tag.name);
+                },
+                backgroundColor: tag.color.withValues(alpha: 0.1),
+                selectedColor: tag.color.withValues(alpha: 0.3),
+                labelStyle: TextStyle(
+                  color: isSelected
+                      ? tag.color
+                      : Theme.of(context).textTheme.bodyMedium?.color,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+                checkmarkColor: tag.color,
+                side: BorderSide(
+                  color: isSelected
+                      ? tag.color
+                      : Colors.grey.withValues(alpha: 0.3),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
     );
   }
 }

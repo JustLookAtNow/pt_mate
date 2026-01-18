@@ -12,6 +12,7 @@ void main() async {
       WidgetsFlutterBinding.ensureInitialized();
       final enabled = await StorageService.instance.loadLogToFileEnabled();
       await LogFileService.instance.init(enabled: enabled);
+      await StorageService.instance.loadVisibleTags();
 
       runApp(const MTeamApp());
     },
