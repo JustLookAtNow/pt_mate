@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import '../../models/app_models.dart';
 import 'site_adapter.dart';
+import 'api_exceptions.dart';
 import 'package:pt_mate/services/site_config_service.dart';
 import '../../utils/format.dart';
 
@@ -173,18 +174,17 @@ class NexusPHPAdapter implements SiteAdapter {
         queryParameters: {'include_fields[user]': 'seeding_leeching_data'},
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data;
-        if (data['ret'] == 0 && data['data'] != null) {
-          return _parseMemberProfile(data['data']['data']);
-        } else {
-          throw Exception('API返回错误: ${data['msg']}');
-        }
+      final data = response.data;
+      if (data['ret'] == 0 && data['data'] != null) {
+        return _parseMemberProfile(data['data']['data']);
       } else {
-        throw Exception('HTTP错误: ${response.statusCode}');
+        throw SiteApiException(
+          message: '获取用户资料失败: ${data['msg'] ?? '未知错误'}',
+          responseData: data,
+        );
       }
     } catch (e) {
-      throw Exception('获取用户资料失败: $e');
+      throw ApiExceptionAdapter.wrapError(e, '获取用户资料');
     }
   }
 
@@ -246,21 +246,26 @@ class NexusPHPAdapter implements SiteAdapter {
       }
     }
 
-    final response = await _dio.get(url, queryParameters: params);
+    try {
+      final response = await _dio.get(url, queryParameters: params);
 
-    if (kDebugMode) {
-      _logger.d('NexusPHPAdapter.searchTorrents raw response: ${response.data}');
-    }
+      if (kDebugMode) {
+        _logger.d(
+          'NexusPHPAdapter.searchTorrents raw response: ${response.data}',
+        );
+      }
 
-    if (response.statusCode == 200) {
       final data = response.data;
       if (data['ret'] == 0) {
         return _parseTorrentSearchResult(data['data']);
       } else {
-        throw Exception('搜索失败: ${data['msg']}');
+        throw SiteApiException(
+          message: '搜索失败: ${data['msg'] ?? '未知错误'}',
+          responseData: data,
+        );
       }
-    } else {
-      throw Exception('HTTP ${response.statusCode}: ${response.data}');
+    } catch (e) {
+      throw ApiExceptionAdapter.wrapError(e, '搜索种子');
     }
   }
 
@@ -369,7 +374,7 @@ class NexusPHPAdapter implements SiteAdapter {
       if (data == null ||
           data['data'] == null ||
           data['data']['data'] == null) {
-        throw Exception('响应数据格式错误');
+        throw SiteApiException(message: '响应数据格式错误', responseData: data);
       }
 
       final torrentData = data['data']['data'];
@@ -378,7 +383,7 @@ class NexusPHPAdapter implements SiteAdapter {
 
       return TorrentDetail(descr: descr);
     } catch (e) {
-      throw Exception('获取种子详情失败: $e');
+      throw ApiExceptionAdapter.wrapError(e, '获取种子详情');
     }
   }
 
@@ -476,14 +481,11 @@ class NexusPHPAdapter implements SiteAdapter {
     try {
       final String endpoint;
       if (make) {
-        // 添加收藏
         endpoint = '/api/v1/bookmarks';
       } else {
-        // 取消收藏
         endpoint = '/api/v1/bookmarks/delete';
       }
 
-      // 使用FormData发送请求
       final formData = FormData.fromMap({'torrent_id': torrentId});
 
       final response = await _dio.post(
@@ -492,18 +494,15 @@ class NexusPHPAdapter implements SiteAdapter {
         options: Options(headers: {'Accept': 'application/json'}),
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data;
-        // 检查API返回的结果
-        if (data != null && data['ret'] != null && data['ret'] != 0) {
-          throw Exception('收藏操作失败: ${data['msg'] ?? '未知错误'}');
-        }
-        // 成功，无需额外处理
-      } else {
-        throw Exception('HTTP错误: ${response.statusCode}');
+      final data = response.data;
+      if (data != null && data['ret'] != null && data['ret'] != 0) {
+        throw SiteApiException(
+          message: '收藏操作失败: ${data['msg'] ?? '未知错误'}',
+          responseData: data,
+        );
       }
     } catch (e) {
-      throw Exception('收藏操作失败: $e');
+      throw ApiExceptionAdapter.wrapError(e, '收藏操作');
     }
   }
 

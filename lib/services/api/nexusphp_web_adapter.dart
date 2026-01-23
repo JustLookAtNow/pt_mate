@@ -4,6 +4,7 @@ import 'package:logger/logger.dart';
 import '../../models/app_models.dart';
 import '../../utils/format.dart';
 import 'site_adapter.dart';
+import 'api_exceptions.dart';
 import '../site_config_service.dart';
 import 'package:dio/dio.dart';
 import 'package:beautiful_soup_dart/beautiful_soup.dart';
@@ -13,14 +14,7 @@ import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import '../logging/log_file_service.dart';
 
-/// Cookie过期异常
-class CookieExpiredException implements Exception {
-  final String message;
-  CookieExpiredException(this.message);
 
-  @override
-  String toString() => 'CookieExpiredException: $message';
-}
 
 /// NexusPHP Web站点适配器
 /// 用于处理基于Web接口的NexusPHP站点
@@ -106,10 +100,26 @@ class NexusPHPWebAdapter extends SiteAdapter {
         },
         onResponse: (response, handler) {
           // 检查是否是302重定向到登录页面
+          // Dio默认会自动跟随重定向，因此最终状态码可能是200。
+          // 我们需要检查最终的URI或重定向记录来判断是否跳转到了登录页。
+          final isLoginRedirect =
+              response.realUri.toString().contains('login') ||
+              response.redirects.any(
+                (r) => r.location.toString().contains('login'),
+              );
+
+          if (isLoginRedirect) {
+            throw SiteAuthenticationException(
+              message: 'Cookie已过期，请重新登录更新Cookie',
+            );
+          }
+
           if (response.statusCode == 302) {
             final location = response.headers.value('location');
             if (location != null && location.contains('login')) {
-              throw CookieExpiredException('Cookie已过期，请重新登录更新Cookie');
+              throw SiteAuthenticationException(
+                message: 'Cookie已过期，请重新登录更新Cookie',
+              );
             }
           }
           handler.next(response);
@@ -119,7 +129,9 @@ class NexusPHPWebAdapter extends SiteAdapter {
           if (error.response?.statusCode == 302) {
             final location = error.response?.headers.value('location');
             if (location != null && location.contains('login')) {
-              throw CookieExpiredException('Cookie已过期，请重新登录更新Cookie');
+              throw SiteAuthenticationException(
+                message: 'Cookie已过期，请重新登录更新Cookie',
+              );
             }
           }
           handler.next(error);
@@ -282,7 +294,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
         lastAccess: null, // Web版本暂不提供该字段
       );
     } catch (e) {
-      throw Exception('获取用户资料失败: $e');
+      throw ApiExceptionAdapter.wrapError(e, '获取用户资料');
     }
   }
 
@@ -1001,7 +1013,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
         items: torrents,
       );
     } catch (e) {
-      throw Exception('搜索种子失败: $e');
+      throw ApiExceptionAdapter.wrapError(e, '搜索种子');
     }
   }
 
@@ -1414,10 +1426,10 @@ class NexusPHPWebAdapter extends SiteAdapter {
   Future<String> genDlToken({required String id, String? url}) async {
     // 检查必要的配置参数
     if (_siteConfig.passKey == null || _siteConfig.passKey!.isEmpty) {
-      throw Exception('站点配置缺少passKey，无法生成下载链接');
+      throw SiteServiceException(message: '站点配置缺少passKey，无法生成下载链接');
     }
     if (_siteConfig.userId == null || _siteConfig.userId!.isEmpty) {
-      throw Exception('站点配置缺少userId，无法生成下载链接');
+      throw SiteServiceException(message: '站点配置缺少userId，无法生成下载链接');
     }
 
     // https://www.ptskit.org/download.php?downhash={userId}.{jwt}
@@ -1538,7 +1550,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
         );
       }
     } catch (e) {
-      throw Exception('切换收藏状态失败: $e');
+      throw ApiExceptionAdapter.wrapError(e, '切换收藏状态');
     }
   }
 

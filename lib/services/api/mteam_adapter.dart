@@ -4,6 +4,7 @@ import 'package:logger/logger.dart';
 import '../../models/app_models.dart';
 import '../site_config_service.dart';
 import 'site_adapter.dart';
+import 'api_exceptions.dart';
 import '../../utils/format.dart';
 
 /// M-Team站点适配器实现
@@ -157,18 +158,16 @@ class MTeamAdapter extends SiteAdapter {
 
   @override
   Future<MemberProfile> fetchMemberProfile({String? apiKey}) async {
-    final resp = await _dio.post(
-      '/api/member/profile',
-    );
+    try {
+      final resp = await _dio.post('/api/member/profile');
 
-    final data = resp.data as Map<String, dynamic>;
-    if (data['code']?.toString() != '0') {
-      throw DioException(
-        requestOptions: resp.requestOptions,
-        response: resp,
-        error: data['message'] ?? 'Profile fetch failed',
-      );
-    }
+      final data = resp.data as Map<String, dynamic>;
+      if (data['code']?.toString() != '0') {
+        throw SiteApiException(
+          message: '获取用户资料失败: ${data['message'] ?? '未知错误'}',
+          responseData: data,
+        );
+      }
     // 先解析基础资料
     final baseProfile = _parseMemberProfile(data['data'] as Map<String, dynamic>);
 
@@ -203,20 +202,23 @@ class MTeamAdapter extends SiteAdapter {
       // 忽略错误，保持为null
     }
 
-    return MemberProfile(
-      username: baseProfile.username,
-      bonus: baseProfile.bonus,
-      shareRate: baseProfile.shareRate,
-      uploadedBytes: baseProfile.uploadedBytes,
-      downloadedBytes: baseProfile.downloadedBytes,
-      uploadedBytesString: baseProfile.uploadedBytesString,
-      downloadedBytesString: baseProfile.downloadedBytesString,
-      userId: baseProfile.userId,
-      passKey: baseProfile.passKey,
-      lastAccess: baseProfile.lastAccess,
-      bonusPerHour: bonusPerHour,
-      seedingSizeBytes: seedingSizeBytes,
-    );
+      return MemberProfile(
+        username: baseProfile.username,
+        bonus: baseProfile.bonus,
+        shareRate: baseProfile.shareRate,
+        uploadedBytes: baseProfile.uploadedBytes,
+        downloadedBytes: baseProfile.downloadedBytes,
+        uploadedBytesString: baseProfile.uploadedBytesString,
+        downloadedBytesString: baseProfile.downloadedBytesString,
+        userId: baseProfile.userId,
+        passKey: baseProfile.passKey,
+        lastAccess: baseProfile.lastAccess,
+        bonusPerHour: bonusPerHour,
+        seedingSizeBytes: seedingSizeBytes,
+      );
+    } catch (e) {
+      throw ApiExceptionAdapter.wrapError(e, '获取用户资料');
+    }
   }
 
   /// 解析 M-Team 站点的用户资料数据
@@ -267,20 +269,20 @@ class MTeamAdapter extends SiteAdapter {
       });
     }
 
-    final resp = await _dio.post(
-      '/api/torrent/search',
-      data: requestData,
-      options: Options(contentType: 'application/json'),
-    );
-
-    final data = resp.data as Map<String, dynamic>;
-    if (data['code']?.toString() != '0') {
-      throw DioException(
-        requestOptions: resp.requestOptions,
-        response: resp,
-        error: data['message'] ?? 'Search failed',
+    try {
+      final resp = await _dio.post(
+        '/api/torrent/search',
+        data: requestData,
+        options: Options(contentType: 'application/json'),
       );
-    }
+
+      final data = resp.data as Map<String, dynamic>;
+      if (data['code']?.toString() != '0') {
+        throw SiteApiException(
+          message: '搜索失败: ${data['message'] ?? '未知错误'}',
+          responseData: data,
+        );
+      }
 
     final searchData = data['data'] as Map<String, dynamic>;
     final rawList = (searchData['data'] as List? ?? []);
@@ -305,28 +307,34 @@ class MTeamAdapter extends SiteAdapter {
       historyMap: historyMap,
       peerMap: peerMap,
     );
+    } catch (e) {
+      throw ApiExceptionAdapter.wrapError(e, '搜索种子');
+    }
   }
 
   @override
   Future<TorrentDetail> fetchTorrentDetail(String id) async {
-    final formData = FormData.fromMap({'id': id});
+    try {
+      final formData = FormData.fromMap({'id': id});
 
-    final resp = await _dio.post(
-      '/api/torrent/detail',
-      data: formData,
-      options: Options(contentType: 'multipart/form-data'),
-    );
-
-    final data = resp.data as Map<String, dynamic>;
-    if (data['code']?.toString() != '0') {
-      throw DioException(
-        requestOptions: resp.requestOptions,
-        response: resp,
-        error: data['message'] ?? 'Fetch detail failed',
+      final resp = await _dio.post(
+        '/api/torrent/detail',
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
       );
-    }
 
-    return _parseTorrentDetail(data['data'] as Map<String, dynamic>);
+      final data = resp.data as Map<String, dynamic>;
+      if (data['code']?.toString() != '0') {
+        throw SiteApiException(
+          message: '获取种子详情失败: ${data['message'] ?? '未知错误'}',
+          responseData: data,
+        );
+      }
+
+      return _parseTorrentDetail(data['data'] as Map<String, dynamic>);
+    } catch (e) {
+      throw ApiExceptionAdapter.wrapError(e, '获取种子详情');
+    }
   }
 
   /// 解析 M-Team 站点的种子详情数据
@@ -451,51 +459,53 @@ class MTeamAdapter extends SiteAdapter {
 
   @override
   Future<String> genDlToken({required String id, String? url}) async {
-    final form = FormData.fromMap({'id': id});
-    final resp = await _dio.post(
-      '/api/torrent/genDlToken',
-      data: form,
-      options: Options(contentType: 'multipart/form-data'),
-    );
+    try {
+      final form = FormData.fromMap({'id': id});
+      final resp = await _dio.post(
+        '/api/torrent/genDlToken',
+        data: form,
+        options: Options(contentType: 'multipart/form-data'),
+      );
 
-    final data = resp.data as Map<String, dynamic>;
-    if (data['code']?.toString() != '0') {
-      throw DioException(
-        requestOptions: resp.requestOptions,
-        response: resp,
-        error: data['message'] ?? 'genDlToken failed',
-      );
+      final data = resp.data as Map<String, dynamic>;
+      if (data['code']?.toString() != '0') {
+        throw SiteApiException(
+          message: '生成下载链接失败: ${data['message'] ?? '未知错误'}',
+          responseData: data,
+        );
+      }
+      final dlUrl = (data['data'] ?? '').toString();
+      if (dlUrl.isEmpty) {
+        throw SiteApiException(message: '下载链接为空', responseData: data);
+      }
+      return dlUrl;
+    } catch (e) {
+      throw ApiExceptionAdapter.wrapError(e, '生成下载链接');
     }
-    final url = (data['data'] ?? '').toString();
-    if (url.isEmpty) {
-      throw DioException(
-        requestOptions: resp.requestOptions,
-        response: resp,
-        error: 'Empty download url',
-      );
-    }
-    return url;
   }
 
   @override
   Future<Map<String, dynamic>> queryHistory({
     required List<String> tids,
   }) async {
-    final resp = await _dio.post(
-      '/api/tracker/queryHistory',
-      data: {'tids': tids},
-      options: Options(contentType: 'application/json'),
-    );
-
-    final data = resp.data as Map<String, dynamic>;
-    if (data['code']?.toString() != '0') {
-      throw DioException(
-        requestOptions: resp.requestOptions,
-        response: resp,
-        error: data['message'] ?? 'Query history failed',
+    try {
+      final resp = await _dio.post(
+        '/api/tracker/queryHistory',
+        data: {'tids': tids},
+        options: Options(contentType: 'application/json'),
       );
+
+      final data = resp.data as Map<String, dynamic>;
+      if (data['code']?.toString() != '0') {
+        throw SiteApiException(
+          message: '查询下载历史失败: ${data['message'] ?? '未知错误'}',
+          responseData: data,
+        );
+      }
+      return data['data'] as Map<String, dynamic>;
+    } catch (e) {
+      throw ApiExceptionAdapter.wrapError(e, '查询下载历史');
     }
-    return data['data'] as Map<String, dynamic>;
   }
 
   @override
@@ -503,21 +513,24 @@ class MTeamAdapter extends SiteAdapter {
     required String torrentId,
     required bool make,
   }) async {
-    final formData = FormData.fromMap({'id': torrentId, 'make': make});
+    try {
+      final formData = FormData.fromMap({'id': torrentId, 'make': make});
 
-    final resp = await _dio.post(
-      '/api/torrent/collection',
-      data: formData,
-      options: Options(contentType: 'multipart/form-data'),
-    );
-
-    final data = resp.data as Map<String, dynamic>;
-    if (data['code']?.toString() != '0') {
-      throw DioException(
-        requestOptions: resp.requestOptions,
-        response: resp,
-        error: data['message'] ?? 'Toggle collection failed',
+      final resp = await _dio.post(
+        '/api/torrent/collection',
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
       );
+
+      final data = resp.data as Map<String, dynamic>;
+      if (data['code']?.toString() != '0') {
+        throw SiteApiException(
+          message: '收藏操作失败: ${data['message'] ?? '未知错误'}',
+          responseData: data,
+        );
+      }
+    } catch (e) {
+      throw ApiExceptionAdapter.wrapError(e, '收藏操作');
     }
   }
 
@@ -533,29 +546,32 @@ class MTeamAdapter extends SiteAdapter {
 
   @override
   Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20}) async {
-    final requestData = {
-      'type': 'TORRENT',
-      'relationId': id,
-      'pageNumber': pageNumber,
-      'pageSize': pageSize,
-    };
+    try {
+      final requestData = {
+        'type': 'TORRENT',
+        'relationId': id,
+        'pageNumber': pageNumber,
+        'pageSize': pageSize,
+      };
 
-    final resp = await _dio.post(
-      '/api/comment/fetchList',
-      data: requestData,
-      options: Options(contentType: 'application/json'),
-    );
-
-    final data = resp.data as Map<String, dynamic>;
-    if (data['code']?.toString() != '0') {
-      throw DioException(
-        requestOptions: resp.requestOptions,
-        response: resp,
-        error: data['message'] ?? 'Fetch comments failed',
+      final resp = await _dio.post(
+        '/api/comment/fetchList',
+        data: requestData,
+        options: Options(contentType: 'application/json'),
       );
-    }
 
-    return TorrentCommentList.fromJson(data['data'] as Map<String, dynamic>);
+      final data = resp.data as Map<String, dynamic>;
+      if (data['code']?.toString() != '0') {
+        throw SiteApiException(
+          message: '获取评论失败: ${data['message'] ?? '未知错误'}',
+          responseData: data,
+        );
+      }
+
+      return TorrentCommentList.fromJson(data['data'] as Map<String, dynamic>);
+    } catch (e) {
+      throw ApiExceptionAdapter.wrapError(e, '获取评论');
+    }
   }
 
 

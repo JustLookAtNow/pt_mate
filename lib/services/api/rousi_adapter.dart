@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 
-import 'package:logger/logger.dart';
 import '../../models/app_models.dart';
 import 'site_adapter.dart';
+import 'api_exceptions.dart';
 import '../../utils/format.dart';
 
 /// RousiPro 站点适配器
@@ -10,7 +10,6 @@ import '../../utils/format.dart';
 class RousiAdapter implements SiteAdapter {
   late SiteConfig _siteConfig;
   late Dio _dio;
-  static final Logger _logger = Logger();
 
   @override
   SiteConfig get siteConfig => _siteConfig;
@@ -59,18 +58,17 @@ class RousiAdapter implements SiteAdapter {
         queryParameters: {'include_fields[user]': 'seeding_leeching_data'},
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data;
-        if (data['code'] == 0 && data['data'] != null) {
-          return _parseMemberProfile(data['data']);
-        } else {
-          throw Exception('API返回错误: ${data['message']}');
-        }
+      final data = response.data;
+      if (data['code'] == 0 && data['data'] != null) {
+        return _parseMemberProfile(data['data']);
       } else {
-        throw Exception('HTTP错误: ${response.statusCode}');
+        throw SiteApiException(
+          message: '获取用户资料失败: ${data['message'] ?? '未知错误'}',
+          responseData: data,
+        );
       }
     } catch (e) {
-      throw Exception('获取用户资料失败: $e');
+      throw ApiExceptionAdapter.wrapError(e, '获取用户资料');
     }
   }
 
@@ -139,18 +137,17 @@ class RousiAdapter implements SiteAdapter {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data;
-        if (data['code'] == 0 && data['data'] != null) {
-          return _parseTorrentSearchResult(data['data']);
-        } else {
-          throw Exception('搜索失败: ${data['message']}');
-        }
+      final data = response.data;
+      if (data['code'] == 0 && data['data'] != null) {
+        return _parseTorrentSearchResult(data['data']);
       } else {
-        throw Exception('HTTP错误: ${response.statusCode}');
+        throw SiteApiException(
+          message: '搜索失败: ${data['message'] ?? '未知错误'}',
+          responseData: data,
+        );
       }
     } catch (e) {
-      throw Exception('搜索出错: $e');
+      throw ApiExceptionAdapter.wrapError(e, '搜索种子');
     }
   }
 
@@ -237,20 +234,18 @@ class RousiAdapter implements SiteAdapter {
   Future<TorrentDetail> fetchTorrentDetail(String id) async {
     try {
       final response = await _dio.get('/api/v1/torrents/$id');
-      if (response.statusCode == 200) {
-        final data = response.data;
-        if (data['code'] == 0 && data['data'] != null) {
-          final info = data['data'];
-          // 描述内容
-          return TorrentDetail(descr: info['description'] ?? '');
-        } else {
-          throw Exception('获取详情失败: ${data['message']}');
-        }
+      final data = response.data;
+      if (data['code'] == 0 && data['data'] != null) {
+        final info = data['data'];
+        return TorrentDetail(descr: info['description'] ?? '');
       } else {
-        throw Exception('HTTP错误: ${response.statusCode}');
+        throw SiteApiException(
+          message: '获取详情失败: ${data['message'] ?? '未知错误'}',
+          responseData: data,
+        );
       }
     } catch (e) {
-      throw Exception('fetchTorrentDetail error: $e');
+      throw ApiExceptionAdapter.wrapError(e, '获取种子详情');
     }
   }
 
@@ -317,22 +312,19 @@ class RousiAdapter implements SiteAdapter {
   Future<String> genDlToken({required String id, String? url}) async {
     if (url != null && url.isNotEmpty) return url;
 
-    // 如果没有URL，尝试获取详情
     try {
       final response = await _dio.get('/api/v1/torrents/$id');
-      if (response.statusCode == 200) {
-        final data = response.data;
-        if (data['code'] == 0 && data['data'] != null) {
-          final dUrl = data['data']['download_url'];
-          if (dUrl != null && dUrl is String && dUrl.isNotEmpty) {
-            return dUrl;
-          }
+      final data = response.data;
+      if (data['code'] == 0 && data['data'] != null) {
+        final dUrl = data['data']['download_url'];
+        if (dUrl != null && dUrl is String && dUrl.isNotEmpty) {
+          return dUrl;
         }
       }
+      throw SiteApiException(message: '无法获取下载链接', responseData: data);
     } catch (e) {
-      _logger.e('genDlToken error: $e');
+      throw ApiExceptionAdapter.wrapError(e, '生成下载链接');
     }
-    throw Exception('无法获取下载链接');
   }
 
   @override
