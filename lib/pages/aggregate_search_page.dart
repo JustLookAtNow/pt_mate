@@ -32,6 +32,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   bool _isSelectionMode = false;
   final Set<String> _selectedItems = <String>{};
   final ScrollController _listController = ScrollController();
+  final ScrollController _errorListController = ScrollController();
 
   // String? _overlaySiteName; // Moved to _AggregateSearchScrollbar
   // double _overlayOpacity = 0.0; // Moved to _AggregateSearchScrollbar
@@ -124,6 +125,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   void dispose() {
     _searchController.dispose();
     _listController.dispose();
+    _errorListController.dispose();
     // _overlayTimer?.cancel(); // Moved to _AggregateSearchScrollbar
     super.dispose();
   }
@@ -684,31 +686,65 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                   16.0,
                                 ),
                                 children: [
-                                  ...provider.searchErrors.entries.map((entry) {
-                                    final siteName = sites
-                                        .firstWhere(
-                                          (site) => site.id == entry.key,
-                                          orElse: () => SiteConfig(
-                                            id: '',
-                                            name: '未知站点',
-                                            baseUrl: '',
-                                          ),
-                                        )
-                                        .name;
-                                    return Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 4.0,
+                                  Container(
+                                    constraints: const BoxConstraints(
+                                      maxHeight: 240,
+                                    ),
+                                    child: Scrollbar(
+                                      thumbVisibility: true,
+                                      controller: _errorListController,
+                                      child: ListView.separated(
+                                        controller: _errorListController,
+                                        shrinkWrap: true,
+                                        padding: EdgeInsets.zero,
+                                        itemCount: provider.searchErrors.length,
+                                        separatorBuilder: (context, index) =>
+                                            Divider(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onErrorContainer
+                                                  .withValues(alpha: 0.2),
+                                              height: 1,
+                                            ),
+                                        itemBuilder: (context, index) {
+                                          final entry = provider
+                                              .searchErrors
+                                              .entries
+                                              .elementAt(index);
+                                          final siteName = sites
+                                              .firstWhere(
+                                                (site) => site.id == entry.key,
+                                                orElse: () => SiteConfig(
+                                                  id: '',
+                                                  name: '未知站点',
+                                                  baseUrl: '',
+                                                ),
+                                              )
+                                              .name;
+                                          return Padding(
+                                            padding: const EdgeInsets.fromLTRB(
+                                              8.0,
+                                              0,
+                                              8.0,
+                                              8.0,
+                                            ),
+                                            child: Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: Text(
+                                                '$siteName: ${entry.value}',
+                                                textAlign: TextAlign.left,
+                                                style: TextStyle(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .onErrorContainer,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
                                       ),
-                                      child: Text(
-                                        '$siteName: ${entry.value}',
-                                        style: TextStyle(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.onErrorContainer,
-                                        ),
-                                      ),
-                                    );
-                                  }),
+                                    ),
+                                  ),
                                 ],
                               ),
                             );
@@ -1530,10 +1566,15 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
     );
     if (section == _SiteSection.empty) return;
     _overlayTimer?.cancel();
-    setState(() {
-      _overlaySiteName = section.siteName;
-      _overlayOpacity = 1.0;
-    });
+    
+    // 仅当状态只有变化时才调用 setState
+    if (_overlaySiteName != section.siteName || _overlayOpacity != 1.0) {
+      setState(() {
+        _overlaySiteName = section.siteName;
+        _overlayOpacity = 1.0;
+      });
+    }
+    
     if (initial) {
       if (widget.controller.hasClients) {
         final fraction = section.start / totalHeight;
@@ -1555,19 +1596,25 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
     });
   }
 
-  void _scrollToFraction(double f, {bool updateState = true}) {
+  void _scrollToFraction(double f) {
     if (!widget.controller.hasClients) return;
+    // 增加安全性检查，防止 NaN 导致断言错误
+    if (f.isNaN || f.isInfinite) return;
+    
     final max = widget.controller.position.maxScrollExtent;
-    final target = max * f.clamp(0.0, 1.0);
-    widget.controller.jumpTo(target);
-    // 只在非拖动状态或明确要求时更新状态
-    if (updateState && !_isDragging) {
+    final clampedF = f.clamp(0.0, 1.0);
+    final target = max * clampedF;
+
+    try {
+      widget.controller.jumpTo(target);
+    } catch (_) {
+      // 忽略滚动过程中的潜在错误
+    }
+
+    if (_scrollFraction != clampedF) {
       setState(() {
-        _scrollFraction = f.clamp(0.0, 1.0);
+        _scrollFraction = clampedF;
       });
-    } else {
-      // 拖动时直接更新值，不触发重建
-      _scrollFraction = f.clamp(0.0, 1.0);
     }
   }
 
@@ -1586,6 +1633,7 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onTapDown: (details) {
+                  if (totalHeight <= 0) return;
                   final y = details.localPosition.dy;
                   final fraction = (y / totalHeight).clamp(0.0, 1.0);
                   _scrollToFraction(fraction);
@@ -1602,6 +1650,7 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
                   _startOverlayFadeOut();
                 },
                 onPanStart: (details) {
+                  if (totalHeight <= 0) return;
                   setState(() {
                     _isDragging = true;
                   });
@@ -1613,11 +1662,12 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
                   );
                 },
                 onPanUpdate: (details) {
+                  if (totalHeight <= 0) return;
                   _handleScrollbarDrag(details.localPosition.dy, totalHeight);
                   final y = details.localPosition.dy;
                   final fraction = (y / totalHeight).clamp(0.0, 1.0);
-                  // 拖动时不触发 setState，避免频繁重建
-                  _scrollToFraction(fraction, updateState: false);
+                  // 拖动时也需要更新状态以重绘滑块位置
+                  _scrollToFraction(fraction);
                 },
                 onPanEnd: (details) {
                   setState(() {
