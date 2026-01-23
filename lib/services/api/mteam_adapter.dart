@@ -57,7 +57,8 @@ class MTeamAdapter extends SiteAdapter {
 
           // 动态设置API密钥和UA
           options.headers['accept'] = 'application/json, text/plain, */*';
-          options.headers['user-agent'] = 'MTeamApp/1.0 (Flutter; Dio)';
+          options.headers['user-agent'] =
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36';
           final hasExplicitKey =
               options.headers.containsKey('x-api-key') &&
               ((options.headers['x-api-key']?.toString().isNotEmpty) == true);

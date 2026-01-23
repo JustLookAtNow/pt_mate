@@ -37,7 +37,10 @@ class QbittorrentClient
       BaseOptions(
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 30),
-        headers: {'User-Agent': 'PT Mate'},
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+        },
         followRedirects: true,
         maxRedirects: 5,
       ),

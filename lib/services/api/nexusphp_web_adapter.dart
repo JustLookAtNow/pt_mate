@@ -78,7 +78,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
     );
     _dio.options.baseUrl = _siteConfig.baseUrl;
     _dio.options.headers['User-Agent'] =
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36';
     _dio.options.responseType = ResponseType.plain; // 设置为plain避免JSON解析警告
     swDio.stop();
     if (kDebugMode) {
