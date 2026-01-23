@@ -44,6 +44,24 @@ class FormatUtil {
       return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
     }
   }
+
+  /// 解析字符串为整数
+  /// 先判断有没有小数点，有的话则截取整数部分，然后移除掉所有的非数字字符，最后返回int.tryParse的结果
+  static int? parseInt(dynamic value) {
+    if (value == null) return null;
+    String str = value.toString();
+    if (str.isEmpty) return null;
+
+    // 如果包含小数点，截取整数部分
+    if (str.contains('.')) {
+      str = str.substring(0, str.indexOf('.'));
+    }
+
+    // 移除所有非数字字符
+    str = str.replaceAll(RegExp(r'\D'), '');
+
+    return int.tryParse(str);
+  }
 }
 
 class Formatters {

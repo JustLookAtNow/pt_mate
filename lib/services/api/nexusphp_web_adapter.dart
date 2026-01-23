@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
 import '../../models/app_models.dart';
+import '../../utils/format.dart';
 import 'site_adapter.dart';
 import '../site_config_service.dart';
 import 'package:dio/dio.dart';
@@ -691,7 +692,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
         ).firstMatch(selector);
         if (nthChildMatch != null) {
           final tag = nthChildMatch.group(1)?.trim();
-          final index = int.tryParse(nthChildMatch.group(2) ?? '1') ?? 1;
+          final index = FormatUtil.parseInt(nthChildMatch.group(2) ?? '1') ?? 1;
 
           // 获取直接子元素
           final children = soup.children;
@@ -749,7 +750,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
         ).firstMatch(selector);
         if (nthChildMatch != null) {
           final tag = nthChildMatch.group(1)?.trim();
-          final index = int.tryParse(nthChildMatch.group(2) ?? '1') ?? 1;
+          final index = FormatUtil.parseInt(nthChildMatch.group(2) ?? '1') ?? 1;
 
           // 获取直接子元素
           final nodes = soup.nodes;
@@ -1076,7 +1077,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
           r'var\s+maxpage\s*=\s*(\d+);',
         ).firstMatch(scriptText);
         if (pageMatch != null) {
-          totalPages = int.tryParse(pageMatch.group(1) ?? '1') ?? 1;
+          totalPages = FormatUtil.parseInt(pageMatch.group(1) ?? '1') ?? 1;
         }
       }
     }
@@ -1245,7 +1246,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
             fieldsConfig['comments'] as Map<String, dynamic>? ?? {},
           );
           final commentsText = commentsList.isNotEmpty ? commentsList.first : '0';
-          final comments = int.tryParse(commentsText) ?? 0;
+          final comments = FormatUtil.parseInt(commentsText) ?? 0;
 
           // 检查收藏状态（布尔字段）
           final collectionConfig =
@@ -1266,10 +1267,9 @@ class NexusPHPWebAdapter extends SiteAdapter {
             isTop = isTopList.isNotEmpty; // 如果找不到元素说明未置顶
           }
 
-          // 解析下载状态
           DownloadStatus downloadStatus = DownloadStatus.none;
           if (downloadStatusText.isNotEmpty) {
-            final percentInt = int.tryParse(downloadStatusText);
+            final percentInt = FormatUtil.parseInt(downloadStatusText);
             if (percentInt != null) {
               if (percentInt == 100) {
                 downloadStatus = DownloadStatus.completed;
@@ -1334,8 +1334,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
                   ? discountEndTime
                   : null,
               downloadUrl: downloadUrl.isNotEmpty ? downloadUrl : null,
-              seeders: int.tryParse(seedersText) ?? 0,
-              leechers: int.tryParse(leechersText) ?? 0,
+              seeders: FormatUtil.parseInt(seedersText) ?? 0,
+              leechers: FormatUtil.parseInt(leechersText) ?? 0,
               sizeBytes: sizeInBytes,
               downloadStatus: downloadStatus,
               collection: collection,

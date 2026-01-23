@@ -196,7 +196,7 @@ class MTeamAdapter extends SiteAdapter {
       if (seedData['code']?.toString() == '0') {
         final seederSize = (seedData['data'] as Map<String, dynamic>?)?['seederSize'];
         if (seederSize != null) {
-          seedingSizeBytes = int.tryParse(seederSize.toString());
+          seedingSizeBytes = FormatUtil.parseInt(seederSize.toString());
         }
       }
     } catch (_) {
@@ -225,7 +225,7 @@ class MTeamAdapter extends SiteAdapter {
     final memberStatus = json['memberStatus'] as Map<String, dynamic>?;
     double parseDouble(dynamic v) =>
         v == null ? 0.0 : double.tryParse(v.toString()) ?? 0.0;
-    int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
+    int parseInt(dynamic v) => FormatUtil.parseInt(v) ?? 0;
 
     final uploadedBytes = parseInt(mc?['uploaded']);
     final downloadedBytes = parseInt(mc?['downloaded']);
@@ -340,7 +340,7 @@ class MTeamAdapter extends SiteAdapter {
     Map<String, dynamic>? historyMap,
     Map<String, dynamic>? peerMap,
   }) {
-    int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
+    int parseInt(dynamic v) => FormatUtil.parseInt(v) ?? 0;
     final list = (json['data'] as List? ?? const []).cast<dynamic>();
     return TorrentSearchResult(
       pageNumber: parseInt(json['pageNumber']),
@@ -365,7 +365,7 @@ class MTeamAdapter extends SiteAdapter {
     Map<String, dynamic>? historyMap,
     Map<String, dynamic>? peerMap,
   }) {
-    int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
+    int parseInt(dynamic v) => FormatUtil.parseInt(v) ?? 0;
     bool parseBool(dynamic v) =>
         v == true || v.toString().toLowerCase() == 'true';
     final status = (json['status'] as Map<String, dynamic>?) ?? const {};
@@ -381,7 +381,7 @@ class MTeamAdapter extends SiteAdapter {
     var discountEndTime =
         promotionRule['endTime']?.toString() ??
         status['discountEndTime']?.toString();
-    final toppingLevel = int.tryParse(status['toppingLevel']?.toString() ?? '');
+    final toppingLevel = FormatUtil.parseInt(status['toppingLevel']);
     final toppingEndTime = status['toppingEndTime']?.toString();
     if (toppingLevel != null && toppingLevel == 1) {
       discount = "FREE";
@@ -418,7 +418,7 @@ class MTeamAdapter extends SiteAdapter {
     if (historyMap != null && historyMap.containsKey(id)) {
       final history = historyMap[id] as Map<String, dynamic>;
       final timesCompleted =
-          int.tryParse(history['timesCompleted']?.toString() ?? '0') ?? 0;
+          FormatUtil.parseInt(history['timesCompleted']) ?? 0;
       if (timesCompleted > 0) {
         downloadStatus = DownloadStatus.completed;
       } else if (peerMap != null && peerMap.containsKey(id)) {

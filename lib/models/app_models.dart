@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import '../services/site_config_service.dart';
+import '../utils/format.dart';
 
 final Logger _logger = Logger();
 
@@ -61,8 +62,7 @@ class MemberProfile {
     int parseInt(dynamic v) {
       if (v is int) return v;
       if (v is num) return v.toInt();
-      if (v is String) return int.tryParse(v) ?? 0;
-      return 0;
+      return FormatUtil.parseInt(v) ?? 0;
     }
 
     return MemberProfile(
@@ -1362,7 +1362,7 @@ class SearchCategoryConfig {
           result[key] = null;
         } else {
           // 尝试解析为数字
-          final intValue = int.tryParse(valueStr);
+          final intValue = FormatUtil.parseInt(valueStr);
           if (intValue != null) {
             result[key] = intValue;
           } else {
@@ -1689,7 +1689,7 @@ class TorrentCommentList {
   });
 
   factory TorrentCommentList.fromJson(Map<String, dynamic> json) {
-    int parseInt(dynamic v) => v == null ? 0 : int.tryParse(v.toString()) ?? 0;
+    int parseInt(dynamic v) => FormatUtil.parseInt(v) ?? 0;
 
     final list = (json['data'] as List? ?? const []).cast<dynamic>();
 

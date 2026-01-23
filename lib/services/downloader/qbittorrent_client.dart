@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 
 import '../../models/app_models.dart';
+import '../../utils/format.dart';
 
 import 'downloader_client.dart';
 import 'downloader_config.dart';
@@ -90,9 +91,9 @@ class QbittorrentClient
       // 解析版本号，判断是否支持新API路径
       final versionParts = config.version!.split('.');
       if (versionParts.isNotEmpty) {
-        final majorVersion = int.tryParse(versionParts[0]) ?? 0;
+        final majorVersion = FormatUtil.parseInt(versionParts[0]) ?? 0;
         final minorVersion = versionParts.length > 1
-            ? int.tryParse(versionParts[1]) ?? 0
+            ? FormatUtil.parseInt(versionParts[1]) ?? 0
             : 0;
 
         // qBittorrent 4.1+ 使用 /api/v2/ 路径
@@ -266,7 +267,7 @@ class QbittorrentClient
     final serverState = data['server_state'] as Map<String, dynamic>? ?? {};
     final freeSpaceOnDisk = (serverState['free_space_on_disk'] ?? 0) is int
         ? serverState['free_space_on_disk'] as int
-        : int.tryParse('${serverState['free_space_on_disk'] ?? 0}') ?? 0;
+        : FormatUtil.parseInt(serverState['free_space_on_disk']) ?? 0;
 
     return ServerState(freeSpaceOnDisk: freeSpaceOnDisk);
   }
@@ -349,7 +350,7 @@ class QbittorrentClient
     // 解析版本号，判断是 4.x 还是 5.x
     final versionParts = cleanVersion.split('.');
     if (versionParts.isNotEmpty) {
-      final majorVersion = int.tryParse(versionParts[0]);
+      final majorVersion = FormatUtil.parseInt(versionParts[0]);
       if (majorVersion != null && majorVersion >= 5) {
         return '/torrents/stop'; // 5.x 使用 stop
       }
@@ -369,7 +370,7 @@ class QbittorrentClient
     // 解析版本号，判断是 4.x 还是 5.x
     final versionParts = cleanVersion.split('.');
     if (versionParts.isNotEmpty) {
-      final majorVersion = int.tryParse(versionParts[0]);
+      final majorVersion = FormatUtil.parseInt(versionParts[0]);
       if (majorVersion != null && majorVersion >= 5) {
         return '/torrents/start'; // 5.x 使用 start
       }

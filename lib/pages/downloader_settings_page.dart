@@ -8,6 +8,7 @@ import '../services/downloader/downloader_models.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/responsive_layout.dart';
 import '../utils/downloader_utils.dart';
+import '../utils/format.dart';
 
 class DownloaderSettingsPage extends StatefulWidget {
   const DownloaderSettingsPage({super.key});
@@ -566,7 +567,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
   Future<void> _onSubmit() async {
     final name = _nameCtrl.text.trim();
     final host = _hostCtrl.text.trim();
-    final port = int.tryParse(_portCtrl.text.trim());
+    final port = FormatUtil.parseInt(_portCtrl.text.trim());
     final user = _userCtrl.text.trim();
     final pwd = _pwdCtrl.text.trim();
     if (name.isEmpty || host.isEmpty || port == null || user.isEmpty) {
@@ -610,7 +611,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
     // 保存当前上下文状态，避免异步操作后直接使用 context
     final name = _nameCtrl.text.trim();
     final host = _hostCtrl.text.trim();
-    final port = int.tryParse(_portCtrl.text.trim());
+    final port = FormatUtil.parseInt(_portCtrl.text.trim());
     final user = _userCtrl.text.trim();
     final pwd = _pwdCtrl.text.trim();
     

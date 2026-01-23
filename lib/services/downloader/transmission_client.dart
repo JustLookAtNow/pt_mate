@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import '../../models/app_models.dart';
 
+import '../../utils/format.dart';
 import 'downloader_client.dart';
 import 'downloader_config.dart';
 import 'downloader_models.dart';
@@ -179,7 +180,9 @@ class TransmissionClient
     final freeSpace = response['download-dir-free-space'] ?? 0;
     
     return ServerState(
-      freeSpaceOnDisk: freeSpace is int ? freeSpace : int.tryParse('$freeSpace') ?? 0,
+      freeSpaceOnDisk: freeSpace is int
+          ? freeSpace
+          : FormatUtil.parseInt(freeSpace) ?? 0,
     );
   }
   

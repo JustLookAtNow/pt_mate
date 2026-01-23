@@ -83,12 +83,12 @@ DateTime? _parseLastAccess(String? lastAccess) {
   final timeParts = parts[1].split(':');
   if (dateParts.length != 3 || timeParts.length < 2) return null;
 
-  final year = int.tryParse(dateParts[0]);
-  final month = int.tryParse(dateParts[1]);
-  final day = int.tryParse(dateParts[2]);
-  final hour = int.tryParse(timeParts[0]);
-  final minute = int.tryParse(timeParts[1]);
-  final second = timeParts.length > 2 ? int.tryParse(timeParts[2]) : 0;
+  final year = FormatUtil.parseInt(dateParts[0]);
+  final month = FormatUtil.parseInt(dateParts[1]);
+  final day = FormatUtil.parseInt(dateParts[2]);
+  final hour = FormatUtil.parseInt(timeParts[0]);
+  final minute = FormatUtil.parseInt(timeParts[1]);
+  final second = timeParts.length > 2 ? FormatUtil.parseInt(timeParts[2]) : 0;
 
   if (year == null ||
       month == null ||

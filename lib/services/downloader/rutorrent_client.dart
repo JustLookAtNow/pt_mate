@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:pt_mate/models/app_models.dart';
+import 'package:pt_mate/utils/format.dart';
 import 'package:xml/xml.dart';
 
 import 'downloader_client.dart';
@@ -284,8 +285,7 @@ class RuTorrentClient
 
   /// 安全地将字符串转为整数
   int _iv(String? val) {
-    final v = val == null ? 0 : int.tryParse(val);
-    return v ?? 0;
+    return FormatUtil.parseInt(val) ?? 0;
   }
 
 
@@ -409,7 +409,7 @@ class RuTorrentClient
       return ServerState(
         freeSpaceOnDisk: freeSpace is int
             ? freeSpace
-            : int.tryParse('$freeSpace') ?? 0,
+            : FormatUtil.parseInt(freeSpace) ?? 0,
       );
     } catch (e) {
       // 如果 diskspace 插件不可用，尝试从种子列表中获取（取第一个种子的 free_diskspace）

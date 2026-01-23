@@ -2,6 +2,7 @@
 /// 
 /// 这些模型提供了统一的接口，用于不同下载器实现之间的数据交换
 library;
+import '../../utils/format.dart';
 
 /// 下载器类型枚举
 enum DownloaderType {
@@ -156,22 +157,40 @@ class DownloadTask {
       hash: json['hash'] ?? '',
       name: json['name'] ?? '',
       state: json['state'] ?? DownloadTaskState.unknown,
-      size: json['size'] is int ? json['size'] : int.tryParse('${json['size'] ?? 0}') ?? 0,
+      size: json['size'] is int
+          ? json['size'] as int
+          : FormatUtil.parseInt(json['size']) ?? 0,
       progress: json['progress'] is double ? json['progress'] : double.tryParse('${json['progress'] ?? 0}') ?? 0,
-      dlspeed: json['dlspeed'] is int ? json['dlspeed'] : int.tryParse('${json['dlspeed'] ?? 0}') ?? 0,
-      upspeed: json['upspeed'] is int ? json['upspeed'] : int.tryParse('${json['upspeed'] ?? 0}') ?? 0,
-      eta: json['eta'] is int ? json['eta'] : int.tryParse('${json['eta'] ?? 0}') ?? 0,
+      dlspeed: json['dlspeed'] is int
+          ? json['dlspeed'] as int
+          : FormatUtil.parseInt(json['dlspeed']) ?? 0,
+      upspeed: json['upspeed'] is int
+          ? json['upspeed'] as int
+          : FormatUtil.parseInt(json['upspeed']) ?? 0,
+      eta: json['eta'] is int
+          ? json['eta'] as int
+          : FormatUtil.parseInt(json['eta']) ?? 0,
       category: json['category'] ?? '',
       tags: json['tags'] is String 
           ? (json['tags'] as String).split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList() 
           : (json['tags'] is List ? (json['tags'] as List).map((e) => e.toString()).toList() : <String>[]),
-      completionOn: json['completionOn'] is int ? json['completionOn'] : int.tryParse('${json['completionOn'] ?? 0}') ?? 0,
+      completionOn: json['completionOn'] is int
+          ? json['completionOn'] as int
+          : FormatUtil.parseInt(json['completionOn']) ?? 0,
       contentPath: json['contentPath'] ?? '',
-      addedOn: json['addedOn'] is int ? json['addedOn'] : int.tryParse('${json['addedOn'] ?? 0}') ?? 0,
-      amountLeft: json['amountLeft'] is int ? json['amountLeft'] : int.tryParse('${json['amountLeft'] ?? 0}') ?? 0,
+      addedOn: json['addedOn'] is int
+          ? json['addedOn'] as int
+          : FormatUtil.parseInt(json['addedOn']) ?? 0,
+      amountLeft: json['amountLeft'] is int
+          ? json['amountLeft'] as int
+          : FormatUtil.parseInt(json['amountLeft']) ?? 0,
       ratio: json['ratio'] is double ? json['ratio'] : double.tryParse('${json['ratio'] ?? 0}') ?? 0,
-      timeActive: json['timeActive'] is int ? json['timeActive'] : int.tryParse('${json['timeActive'] ?? 0}') ?? 0,
-      uploaded: json['uploaded'] is int ? json['uploaded'] : int.tryParse('${json['uploaded'] ?? 0}') ?? 0,
+      timeActive: json['timeActive'] is int
+          ? json['timeActive'] as int
+          : FormatUtil.parseInt(json['timeActive']) ?? 0,
+      uploaded: json['uploaded'] is int
+          ? json['uploaded'] as int
+          : FormatUtil.parseInt(json['uploaded']) ?? 0,
     );
   }
 
