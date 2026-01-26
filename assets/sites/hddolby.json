@@ -1,0 +1,144 @@
+{
+  "id": "hddolby",
+  "name": "HDDolby",
+  "isShow": true,
+  "baseUrls": [
+    "https://www.hddolby.com/"
+  ],
+  "primaryUrl": "https://www.hddolby.com/",
+  "siteType": "NexusPHPWeb",
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": true,
+    "downloadHistory": true,
+    "categorySearch": true,
+    "advancedSearch": true,
+    "showCover": false
+  },
+  "discountMapping": {},
+  "tagMapping": {
+    "官方": "official",
+    "中字": "chinese",
+    "国语": "mandarin",
+    "DIY": "diy",
+    "菁彩HDR": "hdr",
+    "HDR10": "hdr",
+    "HLG": "hdr",
+    "HDR10+": "hdr",
+    "杜比视界": "dovi"
+  },
+  "infoFinder": {
+    "search": {
+      "torrentPath": "torrents.php",
+      "specialPath": "special.php",
+      "rows": {
+        "selector": "table.torrents > tbody:nth-child(1) > tr:nth-child"
+      },
+      "fields": {
+        "torrentId": {
+          "selector": "a[href^=\"details.php?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "index": 1
+          }
+        },
+        "torrentName": {
+          "selector": "a[href^=\"details.php?id=\"] > b",
+          "attribute": "text"
+        },
+        "tag": {
+          "selector": "table.torrentname > span.tag",
+          "attribute": "text"
+        },
+        "description": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > *:last-node",
+          "attribute": "text"
+        },
+        "discount": {
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
+          "attribute": "alt"
+        },
+        "discountEndTime": {
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
+          "attribute": "onmouseover",
+          "filter": {
+            "name": "regexp",
+            "args": "<span title=\\\"(.*?)\\\"",
+            "index": 1
+          }
+        },
+        "downloadUrl": {
+          "value": "##{baseUrl}/download.php?id={torrentId}"
+        },
+        "seedersText": {
+          "selector": "td:nth-child(6)",
+          "attribute": "text"
+        },
+        "leechersText": {
+          "selector": "td:nth-child(7)",
+          "attribute": "text"
+        },
+        "sizeText": {
+          "selector": "td:nth-child(5)",
+          "attribute": "text"
+        },
+        "downloadStatus": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > div[title]",
+          "attribute": "title",
+          "filter": {
+            "name": "regexp", 
+            "args": "(\\d+)%",
+            "index": 1
+          }
+        },
+        "collection": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(2) > img.bookmark[alt==\"Bookmarked\"]",
+          "attribute": "src"
+        },
+        "isTop": {
+          "selector": "table.torrentname > img[title~=\"置顶|置頂\"]",
+          "attribute": "src"
+        },
+        "cover": {},
+        "createData": {
+          "selector": "td:nth-child(4) > span[title]",
+          "attribute": "title"
+        },
+        "doubanRating": {
+ 
+        },
+        "imdbRating": {
+      
+        }
+      }
+    },
+    "categories": {
+      "path": "usercp.php?action=tracker",
+      "rows": {
+        "selector": "#outer > table.main > next > tbody:nth-child > tr:nth-child(2) > td.rowfollow > table"
+      },
+      "fields": {
+        "categoryId": {
+          "selector": "a[href~=\"(torrents|special)\\.php\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "cat=(\\d+)",
+            "index": 1
+          }
+        },
+        "categoryName": {
+          "selector": "a[href~=\"(torrents|special)\\.php\"] > img",
+          "attribute": "title"
+        }
+      }
+    }
+  },
+  "logo": "assets/sites_icon/hddolby.png"
+}

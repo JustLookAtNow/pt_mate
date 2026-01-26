@@ -599,6 +599,84 @@ class NexusPHPWebAdapter extends SiteAdapter {
       return current;
     }
 
+    // 处理复合选择器：tag.class[attr=="value"] 或 tag.class[attr]
+    // 这种选择器同时包含类名和属性条件
+    final classAndAttrValueMatch = RegExp(
+      r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$',
+    ).firstMatch(selector);
+    if (classAndAttrValueMatch != null) {
+      final tag = classAndAttrValueMatch.group(1)?.trim();
+      final className = classAndAttrValueMatch.group(2)?.trim();
+      final attribute = classAndAttrValueMatch.group(3)?.trim();
+      final operator = classAndAttrValueMatch.group(4)?.trim();
+      final value = classAndAttrValueMatch.group(5)?.trim();
+
+      if (className != null &&
+          attribute != null &&
+          operator != null &&
+          value != null) {
+        // 先按标签和类名查找元素
+        final elements = tag != null && tag.isNotEmpty
+            ? soup.findAll(tag, class_: className)
+            : soup.findAll('*', class_: className);
+
+        // 然后按属性条件过滤
+        final filteredElements = <dynamic>[];
+        for (final element in elements) {
+          final attrValue = element.attributes[attribute];
+          if (attrValue != null) {
+            bool matches = false;
+            switch (operator) {
+              case '^': // 前缀匹配
+                matches = attrValue.startsWith(value);
+                break;
+              case '=': // 完全匹配
+                matches = attrValue == value;
+                break;
+              case '~': // 正则匹配
+                try {
+                  final regex = RegExp(value);
+                  matches = regex.hasMatch(attrValue);
+                } catch (e) {
+                  matches = false;
+                }
+                break;
+            }
+            if (matches) {
+              filteredElements.add(element);
+            }
+          }
+        }
+        return filteredElements;
+      }
+    }
+
+    // 处理复合选择器：tag.class[attr]（属性存在性）
+    final classAndAttrExistsMatch = RegExp(
+      r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)\]$',
+    ).firstMatch(selector);
+    if (classAndAttrExistsMatch != null) {
+      final tag = classAndAttrExistsMatch.group(1)?.trim();
+      final className = classAndAttrExistsMatch.group(2)?.trim();
+      final attribute = classAndAttrExistsMatch.group(3)?.trim();
+
+      if (className != null && attribute != null) {
+        // 先按标签和类名查找元素
+        final elements = tag != null && tag.isNotEmpty
+            ? soup.findAll(tag, class_: className)
+            : soup.findAll('*', class_: className);
+
+        // 然后按属性存在性过滤
+        final filteredElements = <dynamic>[];
+        for (final element in elements) {
+          if (element.attributes[attribute] != null) {
+            filteredElements.add(element);
+          }
+        }
+        return filteredElements;
+      }
+    }
+
     // 处理属性选择器
     // 1. 属性存在性选择器 tag[attr]
     final attributeExistsMatch = RegExp(
@@ -618,7 +696,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
       }
     }
 
-    // 2. 属性值选择器 tag[attr^="value"], tag[attr="value"], tag[attr~="pattern"]
+    // 2. 属性值选择器 tag[attr^="value"], tag[attr=="value"], tag[attr~="pattern"]
     final attributeValueMatch = RegExp(
       r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$',
     ).firstMatch(selector);
