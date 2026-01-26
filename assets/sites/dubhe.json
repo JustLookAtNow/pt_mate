@@ -1,0 +1,25 @@
+{
+  "id": "dubhe",
+  "name": "天枢",
+  "isShow": true,
+  "baseUrls": [
+    "https://dubhe.site/"
+  ],
+  "primaryUrl": "https://dubhe.site/",
+  "siteType": "NexusPHP",
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": false,
+    "downloadHistory": false,
+    "categorySearch": true,
+    "advancedSearch": true,
+    "showCover": true,
+    "commentDetail": false
+  },
+  "discountMapping": {},
+  "logo": "assets/sites_icon/dubhe.png"
+}
