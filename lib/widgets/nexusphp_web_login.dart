@@ -36,24 +36,138 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
         ? widget.baseUrl.substring(0, widget.baseUrl.length - 1)
         : widget.baseUrl;
     _initialUrl = '$baseUrl${widget.loginPath ?? '/login.php'}';
+
+    // 强制“洗大澡”：在启动时清除所有相关 Cookie
+    _clearAllCookies();
+  }
+
+  Future<void> _clearAllCookies() async {
+    try {
+      if (kDebugMode) {
+        _logger.i('正在清空旧 Cookie 以触发 Cloudflare 验证...');
+      }
+      final cookieManager = CookieManager.instance();
+      await cookieManager.deleteAllCookies();
+    } catch (e) {
+      if (kDebugMode) _logger.e('清理 Cookie 失败: $e');
+    }
   }
 
   Future<void> _checkLoginStatus(String url) async {
     if (kDebugMode) {
-      _logger.d('当前页面URL: $url'); // 调试信息
+      _logger.d('检查登录状态, 当前页面URL: $url');
     }
 
-    // 检查是否已经登录成功：URL有变化（不等于初始URL）且不是登录/注册/恢复页面
-    if (url != _initialUrl &&
-        !url.contains('/login.php') &&
-        !url.contains('/signup.php') &&
-        !url.contains('/recover.php') &&
-        url.contains(widget.baseUrl)) {
-      if (kDebugMode) {
-        _logger.i('检测到登录成功，开始获取cookie'); // 调试信息
+    // 1. 基本路径检查：处于登录、注册或恢复页面时，直接跳过
+    if (url == _initialUrl ||
+        url.contains('/login.php') ||
+        url.contains('/signup.php') ||
+        url.contains('/recover.php') ||
+        !url.contains(widget.baseUrl)) {
+      return;
+    }
+
+    // 2. 深入核实内容 (解决 URL 变了但内容其实是登录表单的情况)
+    try {
+      if (_controller == null) return;
+
+      final html = await _controller?.getHtml();
+      if (html == null || html.isEmpty) return;
+
+      // 检查页面标题
+      final titleMatch = RegExp(
+        r'<title>(.*?)<\/title>',
+        caseSensitive: false,
+      ).firstMatch(html);
+      final title = titleMatch?.group(1) ?? "";
+
+      // 如果标题包含登录字样，说明尚未成功
+      if (title.contains('登錄') ||
+          title.contains('Login') ||
+          title.contains('Authentication')) {
+        if (kDebugMode) {
+          _logger.w('虽然 URL 已跳转，但页面标题显示仍处于登录状态: $title');
+        }
+        return;
       }
-      // 获取cookie
+
+      // 检查典型的登录成功标志 (NexusPHP 特有)
+      bool hasSuccessIndicator =
+          html.contains('userdetails.php') ||
+          html.contains('logout.php') ||
+          html.contains('控制面板') ||
+          html.contains('个人中心');
+
+      if (!hasSuccessIndicator) {
+        if (kDebugMode) {
+          _logger.w('页面内容中未找到典型的登录成功标志元素 (userdetails/logout)');
+        }
+        // 对于某些特殊的站点，如果没有成功标志但标题已经变了，我们暂时持保留意见，不立即认定成功
+        return;
+      }
+
+      if (kDebugMode) {
+        _logger.i('检测到登录成功 (标题与内容核实通过)，正在最终提取并清洗 Cookie...');
+      }
+
+      // 成功后，最后提取一次
       await _extractCookie();
+    } catch (e) {
+      _logger.e('检查登录状态时发生异常: $e');
+    }
+  }
+
+  // 辅助方法：清洗并除重 WebView 内部存储的 Cookie
+  Future<void> _sanitizeWebViewCookies(WebUri url) async {
+    try {
+      final cookieManager = CookieManager.instance();
+      final cookies = await cookieManager.getCookies(url: url);
+
+      final Map<String, List<Cookie>> groups = {};
+      for (var c in cookies) {
+        groups.putIfAbsent(c.name, () => []).add(c);
+      }
+
+      bool hasCleaned = false;
+      for (var entry in groups.entries) {
+        if (entry.value.length > 1) {
+          // 只保留最后一项，删除之前的重复项
+          for (var i = 0; i < entry.value.length - 1; i++) {
+            await cookieManager.deleteCookie(
+              url: url,
+              name: entry.key,
+              domain: entry.value[i].domain,
+              path: entry.value[i].path ?? '/',
+            );
+          }
+          hasCleaned = true;
+        }
+      }
+      if (hasCleaned && kDebugMode) {
+        _logger.i('已完成同名 Cookie 清洗 (针对 Cloudflare 冗余项)');
+      }
+    } catch (e) {
+      if (kDebugMode) _logger.e('清洗 Cookie 失败: $e');
+    }
+  }
+
+  // 辅助方法：检查是否存在 Session Cookie
+  Future<bool> _hasSessionCookie() async {
+    try {
+      final cookieManager = CookieManager.instance();
+      final cookies = await cookieManager.getCookies(
+        url: WebUri(widget.baseUrl),
+      );
+      // NexusPHP 常见的登录成功标志 Cookie
+      return cookies.any(
+        (c) =>
+            c.name.contains('jwt') ||
+            c.name.contains('pass') ||
+            c.name.contains('uid') ||
+            c.name == 'c_lang_folder', // 有些站只要有这个也就代表过了初步校验
+      );
+    } catch (e) {
+      return false;
     }
   }
 
@@ -118,28 +232,41 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
           );
           updatedCookies.add(langCookie);
 
-          // 设置到CookieManager
-          final cookieManager = CookieManager.instance();
-          await cookieManager.setCookie(
-            url: WebUri(widget.baseUrl),
-            name: 'c_lang_folder',
-            value: 'chs',
-            domain: Uri.parse(widget.baseUrl).host,
-            path: '/',
-          );
-          if (kDebugMode) {
-            _logger.i('添加c_lang_folder cookie为chs');
-          }
+          // // 设置到CookieManager
+          // final cookieManager = CookieManager.instance();
+          // await cookieManager.setCookie(
+          //   url: WebUri(widget.baseUrl),
+          //   name: 'c_lang_folder',
+          //   value: 'chs',
+          //   domain: Uri.parse(widget.baseUrl).host,
+          //   path: '/',
+          // );
+          // if (kDebugMode) {
+          //   _logger.i('添加c_lang_folder cookie为chs');
+          // }
         }
 
-        // 将cookie转换为标准格式
-        final cookieStrings = updatedCookies
-            .map((cookie) => '${cookie.name}=${cookie.value}')
+        // 将cookie转换为 Map 进行去重
+        // 解决某些站点（如带 Cloudflare）在不同域设置多个重复 name cookie 的问题
+        final Map<String, String> cookieMap = {};
+        for (final cookie in updatedCookies) {
+          final name = cookie.name;
+          final value = cookie.value.toString();
+
+          if (cookieMap.containsKey(name) && kDebugMode) {
+            _logger.w('检测到重复 Cookie [$name], 将使用新值覆盖旧值');
+          }
+          cookieMap[name] = value;
+        }
+
+        // 构建标准 Cookie 字符串
+        final cookieStrings = cookieMap.entries
+            .map((entry) => '${entry.key}=${entry.value}')
             .toList();
         final cookieString = cookieStrings.join('; ');
 
         if (kDebugMode) {
-          _logger.d('获取到的cookie: $cookieString');
+          _logger.d('导出 Cookie (去重后共 ${cookieMap.length} 个): $cookieString');
         }
 
         // 创建包含所有cookie信息的JSON
@@ -299,36 +426,65 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
                       javaScriptEnabled: true,
                       domStorageEnabled: true,
                       databaseEnabled: true,
-                      clearCache: true,
-                      clearSessionCache: true,
+                      // 因为 initState 里已经手动清了，这里保持 false 以便在登录过程中保持 session
+                      clearCache: false,
+                      clearSessionCache: false,
                       thirdPartyCookiesEnabled: true,
-                      supportMultipleWindows: false,
-                      useOnDownloadStart: false,
+                      supportMultipleWindows: true, // 开启多窗口支持，有时挑战在弹窗中
+                      // 彻底关闭拦截功能，减少指纹特征
                       useOnLoadResource: false,
                       useShouldOverrideUrlLoading: false,
+                      useOnNavigationResponse: false,
+                      useShouldInterceptRequest: false,
+
+                      // 模拟纯净的手机 Chrome (Android 13)
+                      userAgent:
+                          'Mozilla/5.0 (Linux; Android 13; Pixel 7 Build/TQ3A.230705.001) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+                      preferredContentMode: UserPreferredContentMode.MOBILE,
+
+                      // 允许混合内容
+                      mixedContentMode:
+                          MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
+
+                      supportZoom: true,
                     ),
                     onWebViewCreated: (controller) {
                       _controller = controller;
-                      debugPrint('InAppWebView创建完成');
                     },
-                    onLoadStart: (controller, url) {
-                      debugPrint('开始加载页面: $url');
-                      setState(() {
-                        _isLoading = true;
-                        _errorMessage = null;
-                      });
-                    },
-                    onLoadStop: (controller, url) {
-                      debugPrint('页面加载完成: $url');
-                      setState(() {
-                        _isLoading = false;
-                      });
+                    onLoadStart: (controller, url) async {
                       if (url != null) {
-                        _checkLoginStatus(url.toString());
+                        // 在请求发起前，清洗一次重复的 Cookie
+                        await _sanitizeWebViewCookies(url);
+                      }
+                      if (mounted) {
+                        setState(() {
+                          _isLoading = true;
+                          _errorMessage = null;
+                        });
                       }
                     },
+                    onLoadStop: (controller, url) async {
+                      if (url == null) return;
+                      if (mounted) {
+                        setState(() => _isLoading = false);
+                      }
+
+                      // 处理同步延迟：如果在 index.php 但内容显示未登录，且已有 session，强制重载
+                      if (url.toString().contains('index.php')) {
+                        final html = await controller.getHtml() ?? "";
+                        if (html.contains('登錄') || html.contains('login.php')) {
+                          final hasSession = await _hasSessionCookie();
+                          if (hasSession) {
+                            debugPrint('🔄 同步 Session 中，即将自动重载...');
+                            await controller.reload();
+                            return;
+                          }
+                        }
+                      }
+                      _checkLoginStatus(url.toString());
+                    },
                     onProgressChanged: (controller, progress) {
-                      debugPrint('WebView加载进度: $progress%');
+                      // debugPrint('WebView加载进度: $progress%'); // Removed verbose logging
                     },
                     onReceivedError: (controller, request, error) {
                       debugPrint('WebView错误: ${error.description}, URL: ${request.url}, isForMainFrame: ${request.isForMainFrame}');
