@@ -89,8 +89,8 @@
           "attribute": "text"
         },
         "downloadStatus": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > div[title]",
-          "attribute": "title",
+          "selector": "td:nth-child(9) > b",
+          "attribute": "text",
           "filter": {
             "name": "regexp", 
             "args": "(\\d+)%",
