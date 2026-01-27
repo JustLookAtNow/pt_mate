@@ -174,7 +174,7 @@ class BackupService {
       String? result;
       if (defaultTargetPlatform == TargetPlatform.linux) {
         // Linux平台：使用传统的文件路径方式
-        result = await FilePicker.platform.saveFile(
+        result = await FilePicker.saveFile(
           dialogTitle: '导出备份文件 (建议文件名: $fileName)',
           type: FileType.custom,
           allowedExtensions: ['json'],
@@ -186,7 +186,7 @@ class BackupService {
         }
       } else {
         // Android和iOS平台：使用bytes参数直接保存文件内容
-        result = await FilePicker.platform.saveFile(
+        result = await FilePicker.saveFile(
           dialogTitle: '导出备份文件',
           fileName: fileName,
           type: FileType.custom,
@@ -204,7 +204,7 @@ class BackupService {
   // 从文件导入备份
   Future<BackupData?> importBackup() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['json'],
         dialogTitle: '选择备份文件',
