@@ -151,7 +151,7 @@
           "selector": "table.torrentname > img[title~=\"置顶|置頂\"]",
           "attribute": "src"
         },
-        "createData": {
+        "createDate": {
           "selector": "td:nth-child(4) > time[title]",
           "attribute": "title"
         },

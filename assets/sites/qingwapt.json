@@ -122,7 +122,7 @@
           "selector": "table.torrentname > img[alt=\"Sticky\"]",
           "attribute": "src"
         },
-        "createData": {
+        "createDate": {
           "selector": "td:nth-child(4) > span[title]",
           "attribute": "title"
         },

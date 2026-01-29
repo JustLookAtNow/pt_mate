@@ -1,0 +1,525 @@
+{
+  "id": "ttg",
+  "name": "TTG",
+  "isShow": true,
+  "baseUrls": [
+    "https://totheglory.im/"
+  ],
+  "primaryUrl": "https://totheglory.im/",
+  "siteType": "NexusPHPWeb",
+  "searchCategories": [
+    {
+      "id": "normal",
+      "displayName": "影视&音乐",
+      "parameters": "{\"c\": \"M\"}"
+    },
+    {
+      "id": "special",
+      "displayName": "游戏&软件",
+      "parameters": "{\"c\": \"G\"}"
+    },
+    {
+      "id": "movie_dvdrip",
+      "displayName": "电影DVDRip",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"电影DVDRip\\\"\"}"
+    },
+    {
+      "id": "movie_720p",
+      "displayName": "电影720p",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"电影720p\\\"\"}"
+    },
+    {
+      "id": "movie_1080p",
+      "displayName": "电影1080i/p",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"电影1080i/p\\\"\"}"
+    },
+    {
+      "id": "bluray_orig",
+      "displayName": "BluRay原盘",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"BluRay原盘\\\"\"}"
+    },
+    {
+      "id": "movie_2160p",
+      "displayName": "影视2160p",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"影视2160p\\\"\"}"
+    },
+    {
+      "id": "uhd_orig",
+      "displayName": "UHD原盘",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"UHD原盘\\\"\"}"
+    },
+    {
+      "id": "doc_720p",
+      "displayName": "纪录片720p",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"纪录片720p\\\"\"}"
+    },
+    {
+      "id": "doc_1080p",
+      "displayName": "纪录片1080i/p",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"纪录片1080i/p\\\"\"}"
+    },
+    {
+      "id": "doc_bluray",
+      "displayName": "纪录片BluRay原盘",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"纪录片BluRay原盘\\\"\"}"
+    },
+    {
+      "id": "tv_eu_us_720p",
+      "displayName": "欧美剧720p",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"欧美剧720p\\\"\"}"
+    },
+    {
+      "id": "tv_eu_us_1080p",
+      "displayName": "欧美剧1080i/p",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"欧美剧1080i/p\\\"\"}"
+    },
+    {
+      "id": "tv_jp_hd",
+      "displayName": "高清日剧",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"高清日剧\\\"\"}"
+    },
+    {
+      "id": "tv_cn_720p",
+      "displayName": "大陆港台剧720p",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"大陆港台剧720p\\\"\"}"
+    },
+    {
+      "id": "tv_cn_1080p",
+      "displayName": "大陆港台剧1080i/p",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"大陆港台剧1080i/p\\\"\"}"
+    },
+    {
+      "id": "tv_kr_hd",
+      "displayName": "高清韩剧",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"高清韩剧\\\"\"}"
+    },
+    {
+      "id": "tv_pack_eu_us",
+      "displayName": "欧美剧包",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"欧美剧包\\\"\"}"
+    },
+    {
+      "id": "tv_pack_jp",
+      "displayName": "日剧包",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"日剧包\\\"\"}"
+    },
+    {
+      "id": "tv_pack_kr",
+      "displayName": "韩剧包",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"韩剧包\\\"\"}"
+    },
+    {
+      "id": "tv_pack_cn",
+      "displayName": "华语剧包",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"华语剧包\\\"\"}"
+    },
+    {
+      "id": "appz",
+      "displayName": "APPZ",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"APPZ\\\"\"}"
+    },
+    {
+      "id": "game_ebook",
+      "displayName": "Game Ebook",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"Game Ebook\\\"\"}"
+    },
+    {
+      "id": "ebook",
+      "displayName": "Ebook",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"Ebook\\\"\"}"
+    },
+    {
+      "id": "ost",
+      "displayName": "(电影原声&Game)OST",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"(电影原声&Game)OST\\\"\"}"
+    },
+    {
+      "id": "music_lossless",
+      "displayName": "无损音乐FLAC&APE",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"无损音乐FLAC&APE\\\"\"}"
+    },
+    {
+      "id": "mv_concert",
+      "displayName": "MV&演唱会",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"MV&演唱会\\\"\"}"
+    },
+    {
+      "id": "sports_hd",
+      "displayName": "高清体育节目",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"高清体育节目\\\"\"}"
+    },
+    {
+      "id": "anime_hd",
+      "displayName": "高清动漫",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"高清动漫\\\"\"}"
+    },
+    {
+      "id": "show_kr",
+      "displayName": "韩国综艺",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"韩国综艺\\\"\"}"
+    },
+    {
+      "id": "show_jp",
+      "displayName": "日本综艺",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"日本综艺\\\"\"}"
+    },
+    {
+      "id": "show_hd",
+      "displayName": "高清综艺",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"高清综艺\\\"\"}"
+    },
+    {
+      "id": "minivideo",
+      "displayName": "MiniVideo",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"MiniVideo\\\"\"}"
+    },
+    {
+      "id": "audio_track",
+      "displayName": "补充音轨",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"补充音轨\\\"\"}"
+    },
+    {
+      "id": "anime_orig",
+      "displayName": "动漫原盘",
+      "parameters": "{\"c\": \"M\", \"search_field\": \"分类:\\\"动漫原盘\\\"\"}"
+    },
+    {
+      "id": "mac",
+      "displayName": "MAC",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"MAC\\\"\"}"
+    },
+    {
+      "id": "pc",
+      "displayName": "PC",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"PC\\\"\"}"
+    },
+    {
+      "id": "xbox_to_360",
+      "displayName": "XBOX to XBOX360",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"XBOX to XBOX360\\\"\"}"
+    },
+    {
+      "id": "xbla",
+      "displayName": "XBLA",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"XBLA\\\"\"}"
+    },
+    {
+      "id": "xbox360",
+      "displayName": "XBOX360",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"XBOX360\\\"\"}"
+    },
+    {
+      "id": "xbox1",
+      "displayName": "XBOX1",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"XBOX1\\\"\"}"
+    },
+    {
+      "id": "ps2",
+      "displayName": "PS2",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"PS2\\\"\"}"
+    },
+    {
+      "id": "ps4",
+      "displayName": "PS4",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"PS4\\\"\"}"
+    },
+    {
+      "id": "psp",
+      "displayName": "PSP",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"PSP\\\"\"}"
+    },
+    {
+      "id": "ps3",
+      "displayName": "PS3",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"PS3\\\"\"}"
+    },
+    {
+      "id": "psv",
+      "displayName": "PSV",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"PSV\\\"\"}"
+    },
+    {
+      "id": "switch",
+      "displayName": "SWITCH",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"SWITCH\\\"\"}"
+    },
+    {
+      "id": "nds",
+      "displayName": "NDS",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"NDS\\\"\"}"
+    },
+    {
+      "id": "wiiu",
+      "displayName": "WIIU",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"WIIU\\\"\"}"
+    },
+    {
+      "id": "wii",
+      "displayName": "WII",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"WII\\\"\"}"
+    },
+    {
+      "id": "ngc",
+      "displayName": "NGC",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"NGC\\\"\"}"
+    },
+    {
+      "id": "psp_hd_sd",
+      "displayName": "PSP兼容高清&标清",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"PSP兼容高清&标清\\\"\"}"
+    },
+    {
+      "id": "ps3_hd",
+      "displayName": "PS3兼容高清",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"PS3兼容高清\\\"\"}"
+    },
+    {
+      "id": "game_video",
+      "displayName": "Game Video",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"Game Video\\\"\"}"
+    },
+    {
+      "id": "xbox360_hd",
+      "displayName": "XBOX360兼容高清",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"XBOX360兼容高清\\\"\"}"
+    },
+    {
+      "id": "ios_video",
+      "displayName": "iPhone/iPad视频",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"iPhone/iPad视频\\\"\"}"
+    },
+    {
+      "id": "ios_game",
+      "displayName": "iPhone/iPad游戏",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"iPhone/iPad游戏\\\"\"}"
+    },
+    {
+      "id": "ipad_book",
+      "displayName": "iPad书籍",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"iPad书籍\\\"\"}"
+    },
+    {
+      "id": "ios_app",
+      "displayName": "iPhone/iPad软件",
+      "parameters": "{\"c\": \"G\", \"search_field\": \"分类:\\\"iPhone/iPad软件\\\"\"}"
+    }
+  ],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": true,
+    "downloadHistory": true,
+    "categorySearch": true,
+    "advancedSearch": true,
+    "showCover": false
+  },
+  "discountMapping": {
+    "free": "FREE",
+    "2x free": "2xFREE",
+    "2x 50%": "2x50%",
+    "10%": "PERCENT_10",
+    "20%": "PERCENT_20",
+    "30%": "PERCENT_30",
+    "40%": "PERCENT_40",
+    "50%": "PERCENT_50",
+    "60%": "PERCENT_60",
+    "70%": "PERCENT_70",
+    "80%": "PERCENT_80",
+    "90%": "PERCENT_90",
+    "normal": "NORMAL"
+  },
+  "tagMapping": {
+    "官方": "official",
+    "中字": "chinese",
+    "国语": "mandarin",
+    "DIY": "diy",
+    "菁彩HDR": "hdr",
+    "HDR10": "hdr",
+    "HLG": "hdr",
+    "HDR10+": "hdr",
+    "杜比视界": "dovi"
+  },
+  "infoFinder": {
+    "userInfo": {
+      "path": "my.php",
+      "rows": {
+        "selector": "body > table:nth-child(3)"
+      },
+      "fields": {
+        "userId": {
+          "selector": "a[href^=\"/userdetails.php?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "index": 1
+          }
+        },
+        "userName": {
+          "selector": "a[href^=\"/userdetails.php?id=\"]",
+          "attribute": "text"
+        },
+        "ratio": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "分享率 :\\s*([^\\s]+)",
+            "index": 1
+          }
+        },
+        "upload": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "上传量 :\\s*(.*?B)",
+            "index": 1
+          }
+        },
+        "download": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "下载量 :\\s*(.*?B)",
+            "index": 1
+          }
+        },
+        "bonus": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "积分 :\\s*([^\\s]+)",
+            "index": 1
+          }
+        }
+      }
+    },
+    "passKey": {
+      "path": "my.php",
+      "rows": {
+        "selector": "form[action==\"takeprofedit.php\"] > table:nth-child(1) > tbody:nth-child(1) > tr:nth-child(7) > td:nth-child(2)"
+      },
+      "fields": {
+        "passKey": {
+          "selector": "",
+          "attribute": "text"
+        }
+      }
+    },
+    "bonusPerHour": {
+      "path": "mybonus.php",
+      "rows": {
+        "selector": "#bonus_tb > table:nth-child(1) > tbody:nth-child(1) > tr:nth-child(10) > td:nth-child(2)"
+      },
+      "fields": {
+        "bonusPerHour": {
+          "selector": "",
+          "attribute": "text"
+        }
+      }
+    },
+    "search": {
+      "torrentPath": "browse.php",
+      "specialPath": "browse.php",
+      "rows": {
+        "selector": "#torrent_table > tbody:nth-child(1) > tr:nth-child"
+      },
+      "fields": {
+        "torrentId": {
+          "selector": "td:nth-child(2) > a[href^=\"/t/\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "/t/(\\d+)",
+            "index": 1
+          }
+        },
+        "torrentName": {
+          "selector": "td:nth-child(2) > a[href^=\"/t/\"] > b > nextParsed",
+          "attribute": "text"
+        },
+        "tag": {},
+        "description": {
+          "selector": "td:nth-child(2) > a[href^=\"/t/\"] > b > span",
+          "attribute": "text"
+        },
+        "discount": {
+          "selector": "td:nth-child(2) > a[href^=\"/t/\"] > next",
+          "attribute": "alt"
+        },
+        "discountEndTime": {},
+        "downloadUrl": {
+          "value": "{baseUrl}/dl/{torrentId}/{passKey}"
+        },
+        "seedersText": {
+          "selector": "td:nth-child(9) > b:nth-child(1)",
+          "attribute": "text"
+        },
+        "leechersText": {
+          "selector": "td:nth-child(9) > b:nth-child(2)",
+          "attribute": "text"
+        },
+        "sizeText": {
+          "selector": "td:nth-child(7)",
+          "attribute": "text"
+        },
+        "downloadStatus": {
+          "selector": "td:nth-child(2) > dev.process > span",
+          "attribute": "style",
+          "filter": {
+            "name": "regexp",
+            "args": "width: (\\d+)%",
+            "index": 1
+          }
+        },
+        "collection": {
+          "selector": "",
+          "attribute": "style"
+        },
+        "isTop": {
+          "selector": "td:nth-child(2) > img[alt==\"置顶\"]",
+          "attribute": "src"
+        },
+        "cover": {},
+        "createDate": {
+          "selector": "td:nth-child(5)",
+          "attribute": "text"
+        },
+        "doubanRating": {},
+        "imdbRating": {
+          "selector": "td:nth-child(2) > span.imdb_rate",
+          "attribute": "text"
+        }
+      }
+    },
+    "categories": {}
+  },
+  "request": {
+    "collect": {
+      "path": "/bookmark.php",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "params": {
+        "tid": "{torrentId}"
+      }
+    },
+    "unCollect": {
+      "path": "/takedelbookmarks.php",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "params": {
+        "delbookmark[]": "{torrentId}"
+      }
+    }
+  },
+  "logo": "assets/sites_icon/ttg.png"
+}

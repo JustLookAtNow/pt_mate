@@ -182,7 +182,7 @@
           "selector": "table.torrentname > span[title~=\"置顶|置頂\"]",
           "attribute": "title"
         },
-        "createData": {
+        "createDate": {
           "selector": "td:nth-child(4) > span[title]",
           "attribute": "title"
         },

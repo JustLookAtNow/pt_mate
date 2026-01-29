@@ -163,7 +163,7 @@
           "attribute": "src"
         },
         "cover": {},
-        "createData": {
+        "createDate": {
           "selector": "td:nth-child(4) > span[title]",
           "attribute": "title"
         },

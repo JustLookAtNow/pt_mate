@@ -169,7 +169,7 @@
           "attribute": "src"
         },
         "cover": {},
-        "createData": {
+        "createDate": {
           "selector": "div.torrent-info-text-added > span",
           "attribute": "title"
         },

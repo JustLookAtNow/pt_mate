@@ -1025,6 +1025,13 @@ class NexusPHPWebAdapter extends SiteAdapter {
     Map<String, dynamic>? additionalParams,
   }) async {
     try {
+      // 获取搜索配置，从中读取 torrentPath 和 specialPath
+      final searchConfig = await _getFinderConfig('search');
+      final torrentPath =
+          searchConfig['torrentPath'] as String? ?? 'torrents.php';
+      final specialPath =
+          searchConfig['specialPath'] as String? ?? 'special.php';
+
       // 构建查询参数
       final queryParams = <String, dynamic>{
         'page': pageNumber - 1, // 页面从0开始
@@ -1042,8 +1049,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
         queryParams['inclbookmarked'] = 1;
       }
 
-      // 确定请求路径
-      String requestPath = '/torrents.php';
+      // 确定请求路径（使用配置中的路径）
+      String requestPath = '/$torrentPath';
 
       // 处理分类参数
       if (additionalParams != null) {
@@ -1055,7 +1062,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
               try {
                 // 检查是否是special前缀
                 if (categoryParam.startsWith('special')) {
-                  requestPath = '/special.php';
+                  requestPath = '/$specialPath';
                 }
                 final parts = categoryParam.split('#');
                 if (parts.length == 2 && parts[1].isNotEmpty) {
@@ -1308,7 +1315,7 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
           final createDateList = await _extractFieldValue(
             row,
-            fieldsConfig['createData'] as Map<String, dynamic>? ?? {},
+            fieldsConfig['createDate'] as Map<String, dynamic>? ?? {},
           );
           final createDate = createDateList.isNotEmpty
               ? createDateList.first
@@ -1578,20 +1585,26 @@ class NexusPHPWebAdapter extends SiteAdapter {
         _siteConfig.siteType,
       );
 
-      final collectConfig =
-          template?.request?['collect'] as Map<String, dynamic>?;
+      // 根据操作类型选择配置：取消收藏优先使用unCollect配置，否则使用collect配置
+      Map<String, dynamic>? actionConfig;
+      if (!make) {
+        // 取消收藏：优先使用unCollect配置，如果没有则回退到collect配置
+        actionConfig = template?.request?['unCollect'] as Map<String, dynamic>?;
+      }
+      // 如果是添加收藏，或者取消收藏但没有专门的unCollect配置，则使用collect配置
+      actionConfig ??= template?.request?['collect'] as Map<String, dynamic>?;
 
-      if (collectConfig != null) {
+      if (actionConfig != null) {
         final url =
-            collectConfig['path'] as String? ??
-            collectConfig['url'] as String? ??
+            actionConfig['path'] as String? ??
+            actionConfig['url'] as String? ??
             '/bookmark.php';
-        final method = collectConfig['method'] as String? ?? 'GET';
+        final method = actionConfig['method'] as String? ?? 'GET';
         final params = Map<String, dynamic>.from(
-          collectConfig['params'] as Map<String, dynamic>? ?? {},
+          actionConfig['params'] as Map<String, dynamic>? ?? {},
         );
         final headers = Map<String, String>.from(
-          collectConfig['headers'] as Map<String, dynamic>? ?? {},
+          actionConfig['headers'] as Map<String, dynamic>? ?? {},
         );
 
         // 替换参数中的占位符
