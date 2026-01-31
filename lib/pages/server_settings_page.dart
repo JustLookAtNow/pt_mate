@@ -71,47 +71,13 @@ class _HealthStatus {
 }
 
 /// 解析 "yyyy-MM-dd HH:mm:ss" 格式的时间字符串
-DateTime? _parseLastAccess(String? lastAccess) {
-  if (lastAccess == null) return null;
-  final raw = lastAccess.trim();
-  if (raw.isEmpty) return null;
-
-  // 期望格式:2025-10-30 11:09:04
-  final parts = raw.split(' ');
-  if (parts.length != 2) return null;
-  final dateParts = parts[0].split('-');
-  final timeParts = parts[1].split(':');
-  if (dateParts.length != 3 || timeParts.length < 2) return null;
-
-  final year = FormatUtil.parseInt(dateParts[0]);
-  final month = FormatUtil.parseInt(dateParts[1]);
-  final day = FormatUtil.parseInt(dateParts[2]);
-  final hour = FormatUtil.parseInt(timeParts[0]);
-  final minute = FormatUtil.parseInt(timeParts[1]);
-  final second = timeParts.length > 2 ? FormatUtil.parseInt(timeParts[2]) : 0;
-
-  if (year == null ||
-      month == null ||
-      day == null ||
-      hour == null ||
-      minute == null ||
-      second == null) {
-    return null;
-  }
-
-  try {
-    return DateTime(year, month, day, hour, minute, second);
-  } catch (_) {
-    return null;
-  }
-}
+// _parseLastAccess 已废弃，字段现为 DateTime 类型
 
 /// 判断最后访问时间是否超过一个月
-bool _isLastAccessOverMonth(String? lastAccess) {
-  final dt = _parseLastAccess(lastAccess);
-  if (dt == null) return false;
+bool _isLastAccessOverMonth(DateTime? lastAccess) {
+  if (lastAccess == null) return false;
   final now = DateTime.now();
-  return now.difference(dt).inDays >= 30;
+  return now.difference(lastAccess).inDays >= 30;
 }
 
 // 站点排序下拉功能已移除
@@ -877,7 +843,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         color: isActive
             ? Theme.of(
                 context,
-              ).colorScheme.primaryContainer.withValues(alpha: 0.3)
+              ).colorScheme.primaryContainer.withOpacity(0.3)
             : Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(
           side: BorderSide(
@@ -911,7 +877,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     final card = Card(
       elevation: 2,
       shadowColor: (siteColor ?? Theme.of(context).colorScheme.outline)
-          .withValues(alpha: 0.4),
+          .withOpacity(0.4),
       shape: RoundedRectangleBorder(
         side: BorderSide(
           color: siteColor ?? Theme.of(context).colorScheme.outline,
@@ -923,7 +889,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       color: isActive
           ? Theme.of(
               context,
-            ).colorScheme.primaryContainer.withValues(alpha: 0.3)
+            ).colorScheme.primaryContainer.withOpacity(0.3)
           : null,
       child: Stack(
         clipBehavior: Clip.none,
@@ -1011,14 +977,10 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                           ),
                                         ),
                                       ),
-                                      // 一个月未登录提醒图标
                                       if (hs?.profile?.lastAccess != null &&
-                                          hs!.profile!.lastAccess!
-                                              .trim()
-                                              .isNotEmpty &&
                                           _isLastAccessOverMonth(
-                                            hs.profile!.lastAccess,
-                                          ))
+                                            hs!.profile!.lastAccess,
+                                          )) ...[
                                         Padding(
                                           padding: const EdgeInsets.only(
                                             left: 6,
@@ -1034,6 +996,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                             ),
                                           ),
                                         ),
+                                      ],
                                       const SizedBox(width: 8),
                                     ],
                                   ),
@@ -1049,7 +1012,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                 ),
                                 if (hs != null)
                                   Text(
-                                    '(${Formatters.formatTorrentCreatedDate(hs.updatedAt.toIso8601String())})',
+                                    '(${Formatters.formatTorrentCreatedDate(hs.updatedAt)})',
                                     style: Theme.of(context).textTheme.bodySmall
                                         ?.copyWith(
                                           color: Theme.of(
@@ -1139,7 +1102,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
               buildItem(
                 Icons.schedule,
                 Theme.of(context).colorScheme.primary,
-                p.lastAccess?.substring(0, 10) ?? '',
+                p.lastAccess?.toIso8601String().substring(0, 10) ?? '',
               ),
           ];
 

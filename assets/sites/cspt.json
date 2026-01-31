@@ -35,7 +35,7 @@
           "filter": {
             "name": "regexp",
             "args": "id=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "userName": {
@@ -48,7 +48,7 @@
           "filter": {
             "name": "regexp",
             "args": "分享率(:|：)\\s*([^\\s]+)",
-            "index": 2
+            "value": "$2"
           }
         },
         "upload": {
@@ -57,7 +57,7 @@
           "filter": {
             "name": "regexp",
             "args": "(上传|上傳)量(:|：)\\s*(.*?B)",
-            "index": 3
+            "value": "$3"
           }
         },
         "download": {
@@ -66,7 +66,7 @@
           "filter": {
             "name": "regexp",
             "args": "(下载|下載)量(:|：)\\s*(.*?B)",
-            "index": 3
+            "value": "$3"
           }
         },
         "bonus": {
@@ -75,7 +75,6 @@
         }
       }
     },
-
     "categories": {
       "path": "usercp.php?action=tracker",
       "rows": {
@@ -88,7 +87,7 @@
           "filter": {
             "name": "regexp",
             "args": "cat=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "categoryName": {
@@ -110,7 +109,7 @@
           "filter": {
             "name": "regexp",
             "args": "id=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "torrentName": {
@@ -135,7 +134,11 @@
           "filter": {
             "name": "regexp",
             "args": "<span title=\\\"(.*?)\\\"",
-            "index": 1
+            "value": "$1"
+          },
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
           }
         },
         "downloadUrl": {},
@@ -157,7 +160,7 @@
           "filter": {
             "name": "regexp",
             "args": "(\\d+)%",
-            "index": 1
+            "value": "$1"
           }
         },
         "collection": {
@@ -171,7 +174,11 @@
         "cover": {},
         "createDate": {
           "selector": "div.torrent-info-text-added > span",
-          "attribute": "title"
+          "attribute": "title",
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
         },
         "doubanRating": {
           "selector": "div.torrent-title > img[title==\"douban\"] > next",

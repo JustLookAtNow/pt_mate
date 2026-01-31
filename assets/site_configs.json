@@ -124,9 +124,7 @@
     "RousiPro": {
       "name": "RousiPro 站点",
       "baseUrl": "https://",
-      "searchCategories": [
-       
-      ],
+      "searchCategories": [],
       "features": {
         "userProfile": true,
         "torrentSearch": true,
@@ -139,10 +137,8 @@
         "showCover": true,
         "commentDetail": true
       },
-      "discountMapping": {
-      },
-      "tagMapping": {
-      }
+      "discountMapping": {},
+      "tagMapping": {}
     },
     "NexusPHPWeb": {
       "name": "NexusPHP web",
@@ -214,7 +210,7 @@
               "filter": {
                 "name": "regexp",
                 "args": "id=(\\d+)",
-                "index": 1
+                "value": "$1"
               }
             },
             "userName": {
@@ -227,7 +223,7 @@
               "filter": {
                 "name": "regexp",
                 "args": "分享率(:|：)\\s*([^\\s]+)",
-                "index": 2
+                "value": "$2"
               }
             },
             "upload": {
@@ -236,7 +232,7 @@
               "filter": {
                 "name": "regexp",
                 "args": "(上传|上傳)量(:|：)\\s*(.*?B)",
-                "index": 3
+                "value": "$3"
               }
             },
             "download": {
@@ -245,7 +241,7 @@
               "filter": {
                 "name": "regexp",
                 "args": "(下载|下載)量(:|：)\\s*(.*?B)",
-                "index": 3
+                "value": "$3"
               }
             },
             "bonus": {
@@ -254,7 +250,7 @@
               "filter": {
                 "name": "regexp",
                 "args": ":\\s*([^\\s]+)\\s*\\[*(签|簽)到",
-                "index": 1
+                "value": "$1"
               }
             }
           }
@@ -283,7 +279,7 @@
               "filter": {
                 "name": "regexp",
                 "args": "(你当前每小时能获取|You are currently getting|你當前每小時能獲取)\\s*([\\d.]+)",
-                "index": 2
+                "value": "$2"
               }
             }
           }
@@ -301,7 +297,7 @@
               "filter": {
                 "name": "regexp",
                 "args": "id=(\\d+)",
-                "index": 1
+                "value": "$1"
               }
             },
             "torrentName": {
@@ -326,7 +322,11 @@
               "filter": {
                 "name": "regexp",
                 "args": "<span title=\\\"(.*?)\\\"",
-                "index": 1
+                "value": "$1"
+              },
+              "time": {
+                "format": "yyyy-MM-dd HH:mm:ss",
+                "zone": "+08:00"
               }
             },
             "downloadUrl": {},
@@ -348,7 +348,7 @@
               "filter": {
                 "name": "regexp",
                 "args": "(\\d+)%",
-                "index": 1
+                "value": "$1"
               }
             },
             "collection": {
@@ -365,7 +365,11 @@
             },
             "createDate": {
               "selector": "td:nth-child(4) > span[title]",
-              "attribute": "title"
+              "attribute": "title",
+              "time": {
+                "format": "yyyy-MM-dd HH:mm:ss",
+                "zone": "+08:00"
+              }
             },
             "doubanRating": {
               "selector": "table.torrentname > img[title==\"douban\"] > next",
@@ -389,7 +393,7 @@
               "filter": {
                 "name": "regexp",
                 "args": "cat=(\\d+)",
-                "index": 1
+                "value": "$1"
               }
             },
             "categoryName": {

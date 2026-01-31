@@ -354,7 +354,7 @@
           "filter": {
             "name": "regexp",
             "args": "id=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "userName": {
@@ -367,7 +367,7 @@
           "filter": {
             "name": "regexp",
             "args": "分享率 :\\s*([^\\s]+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "upload": {
@@ -376,7 +376,7 @@
           "filter": {
             "name": "regexp",
             "args": "上传量 :\\s*(.*?B)",
-            "index": 1
+            "value": "$1"
           }
         },
         "download": {
@@ -385,7 +385,7 @@
           "filter": {
             "name": "regexp",
             "args": "下载量 :\\s*(.*?B)",
-            "index": 1
+            "value": "$1"
           }
         },
         "bonus": {
@@ -394,7 +394,7 @@
           "filter": {
             "name": "regexp",
             "args": "积分 :\\s*([^\\s]+)",
-            "index": 1
+            "value": "$1"
           }
         }
       }
@@ -436,7 +436,7 @@
           "filter": {
             "name": "regexp",
             "args": "/t/(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "torrentName": {
@@ -452,7 +452,19 @@
           "selector": "td:nth-child(2) > a[href^=\"/t/\"] > next",
           "attribute": "alt"
         },
-        "discountEndTime": {},
+        "discountEndTime": {
+          "selector": "td:nth-child(2) > span[onmouseover==\"this.style.cursor='pointer'\"]",
+          "attribute": "onclick",
+          "filter": {
+            "name": "regexp",
+            "args": "持续到(.*?),",
+            "value": "$1"
+          },
+          "time": {
+            "format": "yyyy年MM月dd日HH点mm分",
+            "zone": "+08:00"
+          }
+        },
         "downloadUrl": {
           "value": "{baseUrl}/dl/{torrentId}/{passKey}"
         },
@@ -474,7 +486,7 @@
           "filter": {
             "name": "regexp",
             "args": "width: (\\d+)%",
-            "index": 1
+            "value": "$1"
           }
         },
         "collection": {
@@ -488,7 +500,16 @@
         "cover": {},
         "createDate": {
           "selector": "td:nth-child(5)",
-          "attribute": "text"
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(\\d{4}-\\d{2}-\\d{2})(\\d{2}:\\d{2}:\\d{2})",
+            "value": "$1 $2"
+          },
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
         },
         "doubanRating": {},
         "imdbRating": {

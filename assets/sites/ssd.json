@@ -21,99 +21,99 @@
   },
   "discountMapping": {},
   "tagMapping": {
-      "官方": "official",
-      "中字": "chinese",
-      "国配": "mandarin",
-      "DIY": "diy",
-      "菁彩HDR":"hdr",
-      "HDR10":"hdr",
-      "HLG":"hdr",
-      "HDR10+":"hdr",
-      "DoVi":"dovi",
-      "合集": "complete"
-   },
+    "官方": "official",
+    "中字": "chinese",
+    "国配": "mandarin",
+    "DIY": "diy",
+    "菁彩HDR": "hdr",
+    "HDR10": "hdr",
+    "HLG": "hdr",
+    "HDR10+": "hdr",
+    "DoVi": "dovi",
+    "合集": "complete"
+  },
   "infoFinder": {
-     "userInfo": {
-          "path": "usercp.php",
-          "rows": {
-            "selector": "div#info_block > div:nth-child(1)"
-          },
-          "fields": {
-            "userId": {
-              "selector": "a[href^=\"userdetails.php?id=\"]",
-              "attribute": "href",
-              "filter": {
-                "name": "regexp",
-                "args": "id=(\\d+)",
-                "index": 1
-              }
-            },
-            "userName": {
-              "selector": "a[href^=\"userdetails.php?id=\"] > b",
-              "attribute": "text"
-            },
-            "ratio": {
-              "selector": "",
-              "attribute": "text",
-              "filter": {
-                "name": "regexp",
-                "args": "分享率(:|：)\\s*([^\\s]+)",
-                "index": 2
-              }
-            },
-            "upload": {
-              "selector": "",
-              "attribute": "text",
-              "filter": {
-                "name": "regexp",
-                "args": "(上传|上傳)量(:|：)\\s*(.*?B)",
-                "index": 3
-              }
-            },
-            "download": {
-              "selector": "",
-              "attribute": "text",
-              "filter": {
-                "name": "regexp",
-                "args": "(下载|下載)量(:|：)\\s*(.*?B)",
-                "index": 3
-              }
-            },
-            "bonus": {
-              "selector": "a[href^=\"mybonus.php\"]",
-              "attribute": "title",
-              "filter": {
-                "name": "regexp",
-                "args": "茉莉(:|：)\\s*([^\\s]+)\\s*",
-                "index": 2
-              }
-            }
+    "userInfo": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "div#info_block > div:nth-child(1)"
+      },
+      "fields": {
+        "userId": {
+          "selector": "a[href^=\"userdetails.php?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "value": "$1"
           }
         },
+        "userName": {
+          "selector": "a[href^=\"userdetails.php?id=\"] > b",
+          "attribute": "text"
+        },
+        "ratio": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "分享率(:|：)\\s*([^\\s]+)",
+            "value": "$2"
+          }
+        },
+        "upload": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(上传|上傳)量(:|：)\\s*(.*?B)",
+            "value": "$3"
+          }
+        },
+        "download": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(下载|下載)量(:|：)\\s*(.*?B)",
+            "value": "$3"
+          }
+        },
+        "bonus": {
+          "selector": "a[href^=\"mybonus.php\"]",
+          "attribute": "title",
+          "filter": {
+            "name": "regexp",
+            "args": "茉莉(:|：)\\s*([^\\s]+)\\s*",
+            "value": "$2"
+          }
+        }
+      }
+    },
+    "passKey": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "div#outer > div.main > next > tbody >td:contains('密匙' || '密钥' || 'Passkey') > next"
+      },
+      "fields": {
         "passKey": {
-          "path": "usercp.php",
-          "rows": {
-          "selector": "div#outer > div.main > next > tbody >td:contains('密匙' || '密钥' || 'Passkey') > next"
-          },
-          "fields": {
-            "passKey": {
-              "selector": "",
-              "attribute": "text"
-            }
-          }
-        },
+          "selector": "",
+          "attribute": "text"
+        }
+      }
+    },
+    "bonusPerHour": {
+      "path": "mybonus.php",
+      "rows": {
+        "selector": "#outer"
+      },
+      "fields": {
         "bonusPerHour": {
-          "path": "mybonus.php",
-          "rows": {
-            "selector": "#outer"
-          },
-          "fields": {
-            "bonusPerHour": {
-              "selector": "div.main > div:nth-child(4) > div.section-text > table:nth-child(4) > tbody > tr:nth-child(1) > td:nth-child(11)",
-              "attribute": "text"
-            }
-          }
-        },
+          "selector": "div.main > div:nth-child(4) > div.section-text > table:nth-child(4) > tbody > tr:nth-child(1) > td:nth-child(11)",
+          "attribute": "text"
+        }
+      }
+    },
     "search": {
       "torrentPath": "torrents.php",
       "specialPath": "special.php",
@@ -127,7 +127,7 @@
           "filter": {
             "name": "regexp",
             "args": "id=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "torrentName": {
@@ -136,7 +136,7 @@
         },
         "tag": {
           "selector": "table.torrentname > div.torrent-smalldescr > span.torrent-tag",
-          "attribute": "text"     
+          "attribute": "text"
         },
         "description": {
           "selector": "table.torrentname > div.torrent-smalldescr > span:nth-child",
@@ -148,7 +148,11 @@
         },
         "discountEndTime": {
           "selector": "table.torrentname > span[class~=\"torrent-pro\"] > next > span",
-          "attribute": "title"
+          "attribute": "title",
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
         },
         "downloadUrl": {
           "value": "{baseUrl}/download.php?id={torrentId}&passkey={passKey}&https=1"
@@ -171,7 +175,7 @@
           "filter": {
             "name": "regexp",
             "args": "(\\d+)%",
-            "index": 1
+            "value": "$1"
           }
         },
         "collection": {
@@ -184,7 +188,11 @@
         },
         "createDate": {
           "selector": "td:nth-child(4) > span[title]",
-          "attribute": "title"
+          "attribute": "title",
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
         },
         "doubanRating": {
           "selector": "table.torrentname > img[alt==\"douban\"] > next",
@@ -208,7 +216,7 @@
           "filter": {
             "name": "regexp",
             "args": "cat=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "categoryName": {

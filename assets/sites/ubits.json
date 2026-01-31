@@ -21,89 +21,89 @@
   },
   "discountMapping": {},
   "tagMapping": {
-      "官方": "official",
-      "中字": "chinese",
-      "国语": "mandarin",
-      "粤语": "mandarin",
-      "DIY": "diy",
-      "菁彩HDR":"hdr",
-      "HDR10":"hdr",
-      "HLG":"hdr",
-      "HDR10+":"hdr",
-      "杜比视界":"dovi",
-      "合集": "complete",
-      "连载": "ep"  
-   },
+    "官方": "official",
+    "中字": "chinese",
+    "国语": "mandarin",
+    "粤语": "mandarin",
+    "DIY": "diy",
+    "菁彩HDR": "hdr",
+    "HDR10": "hdr",
+    "HLG": "hdr",
+    "HDR10+": "hdr",
+    "杜比视界": "dovi",
+    "合集": "complete",
+    "连载": "ep"
+  },
   "infoFinder": {
-     "userInfo": {
-          "path": "usercp.php",
-          "rows": {
-            "selector": "table#info_block > td.bottom"
-          },
-          "fields": {
-            "userId": {
-              "selector": "a[href^=\"userdetails.php?id=\"]",
-              "attribute": "href",
-              "filter": {
-                "name": "regexp",
-                "args": "id=(\\d+)",
-                "index": 1
-              }
-            },
-            "userName": {
-              "selector": "a[href^=\"userdetails.php?id=\"] > b",
-              "attribute": "text"
-            },
-            "ratio": {
-              "selector": "",
-              "attribute": "text",
-              "filter": {
-                "name": "regexp",
-                "args": "分享率(:|：)\\s*([^\\s]+)",
-                "index": 2
-              }
-            },
-            "upload": {
-              "selector": "",
-              "attribute": "text",
-              "filter": {
-                "name": "regexp",
-                "args": "(上传|上傳)量(:|：)\\s*(.*?B)",
-                "index": 3
-              }
-            },
-            "download": {
-              "selector": "",
-              "attribute": "text",
-              "filter": {
-                "name": "regexp",
-                "args": "(下载|下載)量(:|：)\\s*(.*?B)",
-                "index": 3
-              }
-            },
-            "bonus": {
-              "selector": "",
-              "attribute": "text",
-              "filter": {
-                "name": "regexp",
-                "args": ":\\s*([^\\s]+)\\s*\\[*(签|簽)到",
-                "index": 1
-              }
-            }
+    "userInfo": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "table#info_block > td.bottom"
+      },
+      "fields": {
+        "userId": {
+          "selector": "a[href^=\"userdetails.php?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "value": "$1"
           }
         },
+        "userName": {
+          "selector": "a[href^=\"userdetails.php?id=\"] > b",
+          "attribute": "text"
+        },
+        "ratio": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "分享率(:|：)\\s*([^\\s]+)",
+            "value": "$2"
+          }
+        },
+        "upload": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(上传|上傳)量(:|：)\\s*(.*?B)",
+            "value": "$3"
+          }
+        },
+        "download": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(下载|下載)量(:|：)\\s*(.*?B)",
+            "value": "$3"
+          }
+        },
+        "bonus": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": ":\\s*([^\\s]+)\\s*\\[*(签|簽)到",
+            "value": "$1"
+          }
+        }
+      }
+    },
+    "passKey": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "#outer > table.main > next > tbody > td:contains('密匙' || '密钥' || 'Passkey') > next"
+      },
+      "fields": {
         "passKey": {
-          "path": "usercp.php",
-          "rows": {
-            "selector": "#outer > table.main > next > tbody > td:contains('密匙' || '密钥' || 'Passkey') > next"
-          },
-          "fields": {
-            "passKey": {
-              "selector": "",
-              "attribute": "text"
-            }
-          }
-        },
+          "selector": "",
+          "attribute": "text"
+        }
+      }
+    },
     "search": {
       "torrentPath": "torrents.php",
       "specialPath": "special.php",
@@ -117,7 +117,7 @@
           "filter": {
             "name": "regexp",
             "args": "id=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "torrentName": {
@@ -126,7 +126,7 @@
         },
         "tag": {
           "selector": "table.torrentname > a[href~=\"tag_id\"]",
-          "attribute": "text"     
+          "attribute": "text"
         },
         "description": {
           "selector": "table.torrentname > tbody > tr > td:nth-child(1) > span[title~=\"(未审|通过)\"] > next > nextParsed",
@@ -142,7 +142,11 @@
           "filter": {
             "name": "regexp",
             "args": "<span title=\"(.*?)\">",
-            "index": 1
+            "value": "$1"
+          },
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
           }
         },
         "downloadUrl": {
@@ -166,7 +170,7 @@
           "filter": {
             "name": "regexp",
             "args": "(\\d+)%",
-            "index": 1
+            "value": "$1"
           }
         },
         "collection": {
@@ -179,7 +183,11 @@
         },
         "createDate": {
           "selector": "td:nth-child(4) > span[title]",
-          "attribute": "title"
+          "attribute": "title",
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
         },
         "doubanRating": {
           "selector": "table.torrentname > img[title==\"douban\"] > parent > next",
@@ -203,7 +211,7 @@
           "filter": {
             "name": "regexp",
             "args": "cat=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "categoryName": {

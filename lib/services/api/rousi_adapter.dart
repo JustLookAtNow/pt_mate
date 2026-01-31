@@ -101,7 +101,9 @@ class RousiAdapter implements SiteAdapter {
       downloadedBytesString: Formatters.dataFromBytes(downloadedBytes),
       userId: data['id']?.toString(),
       passKey: null, // API V1 不直接返回 passkey (虽然 account settings 有)
-      lastAccess: data['last_active_at']?.toString(),
+      lastAccess: Formatters.parseDateTimeCustom(
+        data['last_active_at']?.toString(),
+      ),
       bonusPerHour: bonusPerHour,
       seedingSizeBytes: seedingSize,
     );
@@ -219,12 +221,14 @@ class RousiAdapter implements SiteAdapter {
       name: name,
       smallDescr: map['subtitle'] as String? ?? '',
       discount: discount,
-      discountEndTime: discountEndTime,
+      discountEndTime: Formatters.parseDateTimeCustom(discountEndTime),
       downloadUrl: null, // 列表不返回下载链接，需详情获取
       seeders: (map['seeders'] ?? 0).toInt(),
       leechers: (map['leechers'] ?? 0).toInt(),
       sizeBytes: (map['size'] ?? 0).toInt(),
-      createdDate: map['created_at'] ?? '',
+      createdDate: Formatters.parseDateTimeCustom(
+        map['created_at']?.toString(),
+      ),
       imageList: [],
       cover: cover,
       downloadStatus: DownloadStatus.none, // API 暂不支持返回当前用户下载状态
@@ -302,8 +306,10 @@ class RousiAdapter implements SiteAdapter {
   TorrentComment _parseComment(Map<String, dynamic> c, String tId) {
     return TorrentComment(
       id: c['id'].toString(),
-      createdDate: c['created_at'] ?? '',
-      lastModifiedDate: '',
+      createdDate: Formatters.parseDateTimeCustom(c['created_at']?.toString()),
+      lastModifiedDate: Formatters.parseDateTimeCustom(
+        c['created_at']?.toString(),
+      ),
       torrentId: tId,
       author: c['username'] ?? '',
       text: c['content'] ?? '',

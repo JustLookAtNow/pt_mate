@@ -18,7 +18,7 @@ class MemberProfile {
   final String downloadedBytesString; // 下载量字符串格式，如"500 MB"
   final String? userId; // 用户ID，NexusPHP类型从data.data.id获取
   final String? passKey; // Pass Key，nexusphpweb类型从usercp.php获取
-  final String? lastAccess; // 最后访问时间，来自 API data['last_access']
+  final DateTime? lastAccess; // 最后访问时间，来自 API data['last_access']
   // 额外信息（可选）：时魔与做种体积，仅部分站点提供
   final double? bonusPerHour; // 时魔：每小时魔力增长值
   final int? seedingSizeBytes; // 做种体积（字节）
@@ -75,7 +75,11 @@ class MemberProfile {
       downloadedBytesString: downloadedStr.toString(),
       userId: json['userId']?.toString(),
       passKey: json['passKey']?.toString(),
-      lastAccess: json['lastAccess']?.toString(),
+      lastAccess: json['lastAccess'] != null
+          ? DateTime.tryParse(json['lastAccess'].toString())?.toLocal()
+          : (json['last_access'] != null
+                ? Formatters.parseDateTimeCustom(json['last_access'].toString())
+                : null),
       bonusPerHour: bonusPerHourVal == null ? null : parseDouble(bonusPerHourVal),
       seedingSizeBytes: seedingSizeVal == null ? null : parseInt(seedingSizeVal),
     );
@@ -92,7 +96,7 @@ class MemberProfile {
       'downloadedBytesString': downloadedBytesString,
       'userId': userId,
       'passKey': passKey,
-      'lastAccess': lastAccess,
+      'lastAccess': lastAccess?.toIso8601String(),
       if (bonusPerHour != null) 'bonusPerHour': bonusPerHour,
       if (seedingSizeBytes != null) 'seedingSizeBytes': seedingSizeBytes,
     };
@@ -120,7 +124,7 @@ class TorrentItem {
   final String name;
   final String smallDescr;
   final DiscountType discount; // 优惠类型枚举
-  final String? discountEndTime; // e.g., 2025-08-27 21:16:48
+  final DateTime? discountEndTime; // 优惠结束时间
   final String? downloadUrl; //下载链接，有些网站可以直接通过列表接口获取到
   final int seeders;
   final int leechers;
@@ -130,7 +134,7 @@ class TorrentItem {
   final String cover;
   final DownloadStatus downloadStatus;
   bool collection; // 是否已收藏（改为可变）
-  final String createdDate; // 种子创建时间
+  final DateTime createdDate; // 种子创建时间
   final String? doubanRating; // 豆瓣评分
   final String? imdbRating; // IMDB评分
   final bool isTop; // 是否置顶（M-Team：toppingLevel>0）
@@ -164,7 +168,7 @@ class TorrentItem {
     String? name,
     String? smallDescr,
     DiscountType? discount,
-    String? discountEndTime,
+    DateTime? discountEndTime,
     String? downloadUrl,
     int? seeders,
     int? leechers,
@@ -173,7 +177,7 @@ class TorrentItem {
     String? cover,
     DownloadStatus? downloadStatus,
     bool? collection,
-    String? createdDate,
+    DateTime? createdDate,
     bool? isTop,
     List<TagType>? tags,
     int? comments,
@@ -1639,8 +1643,8 @@ class Defaults {
 // 种子评论
 class TorrentComment {
   final String id;
-  final String createdDate;
-  final String lastModifiedDate;
+  final DateTime createdDate;
+  final DateTime lastModifiedDate;
   final String torrentId;
   final String author;
   final String text;
@@ -1661,8 +1665,12 @@ class TorrentComment {
   factory TorrentComment.fromJson(Map<String, dynamic> json) {
     return TorrentComment(
       id: (json['id'] ?? '').toString(),
-      createdDate: (json['createdDate'] ?? '').toString(),
-      lastModifiedDate: (json['lastModifiedDate'] ?? '').toString(),
+      createdDate: Formatters.parseDateTimeCustom(
+        json['createdDate']?.toString(),
+      ),
+      lastModifiedDate: Formatters.parseDateTimeCustom(
+        json['lastModifiedDate']?.toString(),
+      ),
       torrentId: (json['torrent'] ?? '').toString(),
       author: (json['author'] ?? '').toString(),
       text: (json['text'] ?? '').toString(),

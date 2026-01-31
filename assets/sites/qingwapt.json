@@ -36,7 +36,7 @@
           "filter": {
             "name": "regexp",
             "args": "cat=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "categoryName": {
@@ -58,7 +58,7 @@
           "filter": {
             "name": "regexp",
             "args": "id=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "torrentName": {
@@ -83,7 +83,11 @@
           "filter": {
             "name": "regexp",
             "args": "<span title=\\\"(.*?)\\\">",
-            "index": 1
+            "value": "$1"
+          },
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
           }
         },
         "downloadUrl": {
@@ -107,7 +111,7 @@
           "filter": {
             "name": "regexp",
             "args": "(\\d+)%",
-            "index": 1
+            "value": "$1"
           }
         },
         "collection": {
@@ -124,7 +128,11 @@
         },
         "createDate": {
           "selector": "td:nth-child(4) > span[title]",
-          "attribute": "title"
+          "attribute": "title",
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
         },
         "doubanRating": {
           "selector": "table.torrentname > img[title==\"douban\"] > next",

@@ -45,7 +45,7 @@
           "filter": {
             "name": "regexp",
             "args": "id=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "torrentName": {
@@ -70,7 +70,11 @@
           "filter": {
             "name": "regexp",
             "args": "<span title=\\\"(.*?)\\\"",
-            "index": 1
+            "value": "$1"
+          },
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
           }
         },
         "downloadUrl": {
@@ -92,9 +96,9 @@
           "selector": "td:nth-child(9) > b",
           "attribute": "text",
           "filter": {
-            "name": "regexp", 
+            "name": "regexp",
             "args": "(\\d+)%",
-            "index": 1
+            "value": "$1"
           }
         },
         "collection": {
@@ -108,14 +112,14 @@
         "cover": {},
         "createDate": {
           "selector": "td:nth-child(4) > span[title]",
-          "attribute": "title"
+          "attribute": "title",
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
         },
-        "doubanRating": {
- 
-        },
-        "imdbRating": {
-      
-        }
+        "doubanRating": {},
+        "imdbRating": {}
       }
     },
     "categories": {
@@ -130,7 +134,7 @@
           "filter": {
             "name": "regexp",
             "args": "cat=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "categoryName": {

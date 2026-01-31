@@ -756,23 +756,18 @@ class TorrentListItem extends StatelessWidget {
   }
 
   /// 获取优惠类型显示文本
-  String _discountText(DiscountType discount, String? endTime) {
+  String _discountText(DiscountType discount, DateTime? endTime) {
     final baseText = discount.displayText;
 
     if ((discount == DiscountType.free || discount == DiscountType.twoXFree) &&
-        endTime != null &&
-        endTime.isNotEmpty) {
-      try {
-        final endDateTime = DateTime.parse(endTime);
-        final now = DateTime.now();
-        final difference = endDateTime.difference(now);
-        final hoursLeft = difference.inHours;
+        endTime != null) {
+      final endDateTime = endTime;
+      final now = DateTime.now();
+      final difference = endDateTime.difference(now);
+      final hoursLeft = difference.inHours;
 
-        if (hoursLeft > 0) {
-          return '$baseText ${hoursLeft}h';
-        }
-      } catch (e) {
-        // 解析失败，返回基础文本
+      if (hoursLeft > 0) {
+        return '$baseText ${hoursLeft}h';
       }
     }
 

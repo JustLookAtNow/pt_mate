@@ -242,7 +242,9 @@ class MTeamAdapter extends SiteAdapter {
       uploadedBytesString: Formatters.dataFromBytes(uploadedBytes),
       downloadedBytesString: Formatters.dataFromBytes(downloadedBytes),
       passKey: null, // M-Team类型不提供passKey
-      lastAccess: memberStatus?['lastBrowse']?.toString(),
+      lastAccess: Formatters.parseDateTimeCustom(
+        memberStatus?['lastBrowse']?.toString(),
+      ),
     );
   }
 
@@ -440,7 +442,9 @@ class MTeamAdapter extends SiteAdapter {
       name: name,
       smallDescr: smallDescr, // 使用原始描述
       discount: _parseDiscountType(discount),
-      discountEndTime: discountEndTime,
+      discountEndTime: discountEndTime != null
+          ? Formatters.parseDateTimeCustom(discountEndTime)
+          : null,
       downloadUrl: null,
       seeders: parseInt(status['seeders']),
       leechers: parseInt(status['leechers']),
@@ -449,7 +453,9 @@ class MTeamAdapter extends SiteAdapter {
       cover: imgs.isNotEmpty ? imgs.first : '',
       downloadStatus: downloadStatus,
       collection: parseBool(json['collection']),
-      createdDate: json['createdDate'] ?? '',
+      createdDate: Formatters.parseDateTimeCustom(
+        json['createdDate']?.toString(),
+      ),
       doubanRating: (json['doubanRating'] ?? 'N/A').toString(),
       imdbRating: (json['imdbRating'] ?? 'N/A').toString(),
       isTop: (toppingLevel ?? 0) > 0,

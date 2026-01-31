@@ -207,7 +207,9 @@ class NexusPHPAdapter implements SiteAdapter {
       downloadedBytesString: Formatters.dataFromBytes(downloadedBytes),
       userId: data['id']?.toString(), // 从data.data.id获取用户ID
       passKey: null, // NexusPHP API类型不提供passKey
-      lastAccess: data['last_access']?.toString(),
+      lastAccess: Formatters.parseDateTimeCustom(
+        data['last_access']?.toString(),
+      ),
       bonusPerHour: data['seed_bonus_per_hour']?.toDouble(),
       seedingSizeBytes: data['seeding_leeching_data']?['seeding_size']?.toInt(),
     );
@@ -359,7 +361,9 @@ class NexusPHPAdapter implements SiteAdapter {
       collection: item['has_bookmarked'] as bool? ?? false, 
       imageList: const [], // 暂时没有图片列表
       cover: item['cover'] as String? ?? '',
-      createdDate: item['added'] != null ? item['added'] + ':00' : '',
+      createdDate: Formatters.parseDateTimeCustom(
+        item['added'] != null ? item['added'] + ':00' : null,
+      ),
       isTop: item['pos_state'] != 'normal',
       tags: tags,
       comments: item['comments'] as int? ?? 0,
@@ -423,8 +427,12 @@ class NexusPHPAdapter implements SiteAdapter {
 
         return TorrentComment(
           id: (commentData['id'] ?? '').toString(),
-          createdDate: (commentData['created_at'] ?? '').toString(),
-          lastModifiedDate: (commentData['updated_at'] ?? '').toString(),
+          createdDate: Formatters.parseDateTimeCustom(
+            commentData['created_at']?.toString(),
+          ),
+          lastModifiedDate: Formatters.parseDateTimeCustom(
+            commentData['created_at']?.toString(),
+          ),
           torrentId: id,
           author: createUser?['username']?.toString() ?? '',
           text: (commentData['text'] ?? '').toString(),

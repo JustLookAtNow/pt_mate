@@ -20,8 +20,8 @@
     "showCover": false
   },
   "discountMapping": {
-        "FREE": "FREE"
-      },
+    "FREE": "FREE"
+  },
   "infoFinder": {
     "userInfo": {
       "path": "usercp.php",
@@ -35,7 +35,7 @@
           "filter": {
             "name": "regexp",
             "args": "id=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "userName": {
@@ -48,7 +48,7 @@
           "filter": {
             "name": "regexp",
             "args": "分享率:\\s*([^\\s]+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "upload": {
@@ -57,7 +57,7 @@
           "filter": {
             "name": "regexp",
             "args": "(上传|上傳)量:\\s*(.*?B)",
-            "index": 2
+            "value": "$2"
           }
         },
         "download": {
@@ -66,7 +66,7 @@
           "filter": {
             "name": "regexp",
             "args": "(下载|下載)量:\\s*(.*?B)",
-            "index": 2
+            "value": "$2"
           }
         },
         "bonus": {
@@ -75,18 +75,18 @@
         }
       }
     },
+    "passKey": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "#outer > table > tbody > td:contains('密匙' || '密钥' || 'Passkey') > next"
+      },
+      "fields": {
         "passKey": {
-          "path": "usercp.php",
-          "rows": {
-            "selector": "#outer > table > tbody > td:contains('密匙' || '密钥' || 'Passkey') > next"
-          },
-          "fields": {
-            "passKey": {
-              "selector": "span.hidden-click",
-              "attribute": "data-content"
-            }
-          }
-        },    
+          "selector": "span.hidden-click",
+          "attribute": "data-content"
+        }
+      }
+    },
     "search": {
       "torrentPath": "torrents.php",
       "specialPath": "special.php",
@@ -100,7 +100,7 @@
           "filter": {
             "name": "regexp",
             "args": "id=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "torrentName": {
@@ -117,7 +117,11 @@
         },
         "discountEndTime": {
           "selector": "table.torrentname > img[class^=\"pro_\"] > next > time",
-          "attribute": "title"
+          "attribute": "title",
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
         },
         "downloadUrl": {
           "value": "{baseUrl}/download.php?id={torrentId}&passkey={passKey}&http=1"
@@ -140,7 +144,7 @@
           "filter": {
             "name": "regexp",
             "args": "(\\d+)%",
-            "index": 1
+            "value": "$1"
           }
         },
         "collection": {
@@ -153,7 +157,11 @@
         },
         "createDate": {
           "selector": "td:nth-child(4) > time[title]",
-          "attribute": "title"
+          "attribute": "title",
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
         },
         "doubanRating": {
           "selector": "table.torrentname > img[title==\"douban\"] > next",
@@ -177,7 +185,7 @@
           "filter": {
             "name": "regexp",
             "args": "cat=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "categoryName": {
@@ -187,10 +195,10 @@
       }
     }
   },
-    "request": {
+  "request": {
     "loginPage": {
       "path": "/portal.php"
-        }
+    }
   },
   "logo": "assets/sites_icon/u2share.png"
 }

@@ -21,16 +21,16 @@
   },
   "discountMapping": {},
   "tagMapping": {
-      "官方": "official",
-      "中字": "chinese",
-      "国语": "mandarin",
-      "DIY": "diy",
-      "菁彩HDR":"hdr",
-      "HDR10":"hdr",
-      "HLG":"hdr",
-      "HDR10+":"hdr",
-      "杜比视界":"dovi"
-   },
+    "官方": "official",
+    "中字": "chinese",
+    "国语": "mandarin",
+    "DIY": "diy",
+    "菁彩HDR": "hdr",
+    "HDR10": "hdr",
+    "HLG": "hdr",
+    "HDR10+": "hdr",
+    "杜比视界": "dovi"
+  },
   "infoFinder": {
     "userInfo": {
       "path": "usercp.php",
@@ -44,7 +44,7 @@
           "filter": {
             "name": "regexp",
             "args": "id=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "userName": {
@@ -57,7 +57,7 @@
           "filter": {
             "name": "regexp",
             "args": "分享率：\\s*([^\\s]+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "upload": {
@@ -66,7 +66,7 @@
           "filter": {
             "name": "regexp",
             "args": "(上传|上傳)量：\\s*(.*?B)",
-            "index": 2
+            "value": "$2"
           }
         },
         "download": {
@@ -75,7 +75,7 @@
           "filter": {
             "name": "regexp",
             "args": "(下载|下載)量：\\s*(.*?B)",
-            "index": 2
+            "value": "$2"
           }
         },
         "bonus": {
@@ -84,7 +84,7 @@
           "filter": {
             "name": "regexp",
             "args": ":\\s*([^\\s]+)\\s*\\(*(签|簽)到",
-            "index": 1
+            "value": "$1"
           }
         }
       }
@@ -102,7 +102,7 @@
           "filter": {
             "name": "regexp",
             "args": "id=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "torrentName": {
@@ -127,7 +127,11 @@
           "filter": {
             "name": "regexp",
             "args": "<span title=\\\"(.*?)\\\"",
-            "index": 1
+            "value": "$1"
+          },
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
           }
         },
         "downloadUrl": {
@@ -151,7 +155,7 @@
           "filter": {
             "name": "regexp",
             "args": "(\\d+)%",
-            "index": 1
+            "value": "$1"
           }
         },
         "collection": {
@@ -165,7 +169,11 @@
         "cover": {},
         "createDate": {
           "selector": "td:nth-child(4) > span[title]",
-          "attribute": "title"
+          "attribute": "title",
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
         },
         "doubanRating": {
           "selector": "table.torrentname > img[title==\"douban\"] > next",
@@ -189,7 +197,7 @@
           "filter": {
             "name": "regexp",
             "args": "cat=(\\d+)",
-            "index": 1
+            "value": "$1"
           }
         },
         "categoryName": {

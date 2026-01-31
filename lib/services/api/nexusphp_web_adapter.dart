@@ -1002,13 +1002,20 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
     if (filterName == 'regexp') {
       final args = filter['args'] as String?;
-      final index = filter['index'] as int? ?? 0;
+      final format = filter['value'] as String?;
 
       if (args != null) {
         final regex = RegExp(args);
         final match = regex.firstMatch(value);
-        if (match != null && match.groupCount >= index) {
-          return match.group(index); // group(0) 是整个匹配，group(1) 是第一个捕获组
+        if (match != null) {
+          final template = format ?? '\$0';
+          return template.replaceAllMapped(RegExp(r'\$(\d+)'), (m) {
+            final groupIndex = int.parse(m.group(1)!);
+            if (groupIndex <= match.groupCount) {
+              return match.group(groupIndex) ?? '';
+            }
+            return m.group(0)!;
+          });
         }
       }
     }
@@ -1249,13 +1256,17 @@ class NexusPHPWebAdapter extends SiteAdapter {
           );
           final discount = discountList.isNotEmpty ? discountList.first : '';
 
+          final discountEndTimeConfig =
+              fieldsConfig['discountEndTime'] as Map<String, dynamic>? ?? {};
           final discountEndTimeList = await _extractFieldValue(
             row,
-            fieldsConfig['discountEndTime'] as Map<String, dynamic>? ?? {},
+            discountEndTimeConfig,
           );
           final discountEndTime = discountEndTimeList.isNotEmpty
               ? discountEndTimeList.first
               : '';
+          final discountEndTimeTimeConfig =
+              discountEndTimeConfig['time'] as Map<String, dynamic>?;
 
           final seedersTextList = await _extractFieldValue(
             row,
@@ -1313,13 +1324,17 @@ class NexusPHPWebAdapter extends SiteAdapter {
           );
           final cover = coverList.isNotEmpty ? coverList.first : '';
 
+          final createDateConfig =
+              fieldsConfig['createDate'] as Map<String, dynamic>? ?? {};
           final createDateList = await _extractFieldValue(
             row,
-            fieldsConfig['createDate'] as Map<String, dynamic>? ?? {},
+            createDateConfig,
           );
           final createDate = createDateList.isNotEmpty
               ? createDateList.first
               : '';
+          final createDateTimeConfig =
+              createDateConfig['time'] as Map<String, dynamic>?;
 
           final doubanRatingList = await _extractFieldValue(
             row,
@@ -1428,7 +1443,11 @@ class NexusPHPWebAdapter extends SiteAdapter {
                 discount.isNotEmpty ? discount : null,
               ),
               discountEndTime: discountEndTime.isNotEmpty
-                  ? discountEndTime
+                  ? Formatters.parseDateTimeCustom(
+                      discountEndTime,
+                      format: discountEndTimeTimeConfig?['format'] as String?,
+                      zone: discountEndTimeTimeConfig?['zone'] as String?,
+                    )
                   : null,
               downloadUrl: downloadUrl.isNotEmpty ? downloadUrl : null,
               seeders: FormatUtil.parseInt(seedersText) ?? 0,
@@ -1438,7 +1457,11 @@ class NexusPHPWebAdapter extends SiteAdapter {
               collection: collection,
               imageList: [], // 暂时不解析图片列表
               cover: cover,
-              createdDate: createDate,
+              createdDate: Formatters.parseDateTimeCustom(
+                createDate,
+                format: createDateTimeConfig?['format'] as String?,
+                zone: createDateTimeConfig?['zone'] as String?,
+              ),
               doubanRating: doubanRating.isNotEmpty ? doubanRating : 'N/A',
               imdbRating: imdbRating.isNotEmpty ? imdbRating : 'N/A',
               isTop: isTop,

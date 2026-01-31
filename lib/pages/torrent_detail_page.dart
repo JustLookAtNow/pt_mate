@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:ui';
 import 'dart:io';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_bbcode/flutter_bbcode.dart';
 import 'package:bbob_dart/bbob_dart.dart' as bbob;
@@ -2056,7 +2057,9 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          comment.createdDate,
+                          DateFormat(
+                            'yyyy-MM-dd HH:mm',
+                          ).format(comment.createdDate),
                           style: TextStyle(
                             fontSize: 12,
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
