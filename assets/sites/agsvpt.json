@@ -108,8 +108,6 @@
       }
     },
     "search": {
-      "torrentPath": "torrents.php",
-      "specialPath": "special.php",
       "rows": {
         "selector": "table.torrents > tbody:nth-child > tr:nth-child"
       },

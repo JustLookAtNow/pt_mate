@@ -97,8 +97,6 @@
       }
     },
     "search": {
-      "torrentPath": "torrents.php",
-      "specialPath": "special.php",
       "rows": {
         "selector": "div.torrents > div:nth-child(2) > div:nth-child"
       },

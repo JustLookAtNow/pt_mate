@@ -120,19 +120,38 @@
 
 ### 5. 自定义请求配置 (request)
 
-用于配置特殊的 HTTP 请求，如收藏功能：
+用于配置各种 HTTP 请求（如搜索、收藏、登录页）。该配置支持**层级回退逻辑**：
+1. 搜索自定义配置 -> 指定模板配置 -> `NexusPHPWeb` 默认模板配置。
+2. 如果子配置中缺少某个字段（如 `headers`），会自动从上层（模板）中继承。
+
+#### 常用请求动作 (Actions)
+
+- `search.normal`: 普通搜索请求（对应 `torrents.php`）。
+- `search.special`: 特色/高级搜索请求（对应 `special.php`，当分类 ID 以 `special` 开头时使用）。
+- `collect`: 收藏/订阅种子。
+- `unCollect`: 取消收藏/订阅。
+- `loginPage`: 登录页面路径。
+
+#### 配置示例
 
 ```json
 {
   "request": {
+    "search": {
+      "normal": {
+        "path": "/browse.php",
+        "method": "GET",
+        "params": {
+          "search": "{keyword}",
+          "page": "{page}",
+          "inclbookmarked": "{onlyFav}"
+        }
+      }
+    },
     "collect": {
-      "path": "/api.php",
+      "path": "/bookmark.php",
       "method": "POST",
-      "headers": {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
       "params": {
-        "action": "bookmark",
         "tid": "{torrentId}"
       }
     }
@@ -147,15 +166,19 @@
 | `path`    | string | ✅   | 请求路径，可以是相对路径或绝对 URL        |
 | `method`  | string | ❌   | HTTP 方法，默认 `GET`，支持 `GET`、`POST` |
 | `headers` | object | ❌   | 请求头配置                                |
-| `params`  | object | ❌   | 请求参数                                  |
+| `params`  | object | ❌   | 请求参数，支持键值对                      |
 
 #### 参数占位符
 
-在 `path` 和 `params` 中可以使用以下占位符：
+在 `path` 、 `params` 和 `headers` 中可以使用以下占位符，应用在发送请求前会进行动态替换：
 
-- `{torrentId}` - 种子 ID
-- `{baseUrl}` - 网站基础 URL
-- `{passKey}` - 用户密钥
+- `{keyword}` - 搜索关键词。
+- `{page}` - 当前页码（从 0 开始）。
+- `{pageSize}` - 每页种子数量。
+- `{onlyFav}` - 仅看收藏。若启用（`onlyFav=1`）则替换为 `1`，否则自动移除该参数。
+- `{torrentId}` - 种子 ID。
+- `{baseUrl}` - 网站基础 URL。
+- `{passKey}` - 用户密钥。
 
 ### 6. 信息提取配置 (infoFinder)
 

@@ -341,10 +341,71 @@ class NexusPHPWebAdapter extends SiteAdapter {
         return infoFinder[configType] as Map<String, dynamic>;
       }
     }
-
-    // 如果都没有找到，返回空配置（会导致异常）
-    throw Exception('未找到 $configType 提取配置');
+    return {};
   }
+
+  /// 获取指定类型的请求配置
+  /// [action] 请求动作，如 'loginPage', 'collect', 'unCollect' 或 'search.normal' 等
+  Future<Map<String, dynamic>?> _getRequestConfig(String action) async {
+    final templatesToTry = <SiteConfigTemplate?>[];
+
+    // 1. 尝试自定义模板
+    if (_customTemplate != null) {
+      templatesToTry.add(_customTemplate);
+    }
+
+    // 2. 尝试指定的模板 ID
+    if (_siteConfig.templateId != '-1' && _siteConfig.templateId.isNotEmpty) {
+      try {
+        final template = await SiteConfigService.getTemplateById(
+          _siteConfig.templateId,
+          _siteConfig.siteType,
+        );
+        if (template != null) {
+          templatesToTry.add(template);
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          _logger.e('获取模板失败: $e');
+        }
+      }
+    }
+
+    // 3. 始终最后尝试默认的 NexusPHPWeb 模板
+    try {
+      final defaultTemplate = await SiteConfigService.getTemplateById(
+        '',
+        SiteType.nexusphpweb,
+      );
+      if (defaultTemplate != null) {
+        templatesToTry.add(defaultTemplate);
+      }
+    } catch (_) {}
+
+    // 对每个模板尝试解析动作路径
+    final parts = action.split('.');
+    for (final template in templatesToTry) {
+      if (template == null || template.request == null) continue;
+
+      dynamic current = template.request;
+      bool found = true;
+      for (final part in parts) {
+        if (current is Map && current.containsKey(part)) {
+          current = current[part];
+        } else {
+          found = false;
+          break;
+        }
+      }
+
+      if (found && current is Map<String, dynamic>) {
+        return current;
+      }
+    }
+
+    return null;
+  }
+
 
   /// 获取用户信息配置（保持向前兼容）
   Future<Map<String, dynamic>> _getUserInfoConfig() async {
@@ -1032,63 +1093,80 @@ class NexusPHPWebAdapter extends SiteAdapter {
     Map<String, dynamic>? additionalParams,
   }) async {
     try {
-      // 获取搜索配置，从中读取 torrentPath 和 specialPath
-      final searchConfig = await _getFinderConfig('search');
-      final torrentPath =
-          searchConfig['torrentPath'] as String? ?? 'torrents.php';
-      final specialPath =
-          searchConfig['specialPath'] as String? ?? 'special.php';
+      // 确定搜索动作类型
+      String searchAction = 'search.normal';
 
-      // 构建查询参数
-      final queryParams = <String, dynamic>{
-        'page': pageNumber - 1, // 页面从0开始
-        'pageSize': pageSize,
-        'incldead': 1, // 添加默认参数
-      };
-
-      // 添加关键词搜索
-      if (keyword != null && keyword.isNotEmpty) {
-        queryParams['search'] = keyword;
+      // 提取分类前缀信息（如果存在）
+      String? categoryParam;
+      if (additionalParams != null &&
+          additionalParams.containsKey('category')) {
+        categoryParam = additionalParams['category'] as String?;
+        if (categoryParam != null && categoryParam.startsWith('special')) {
+          searchAction = 'search.special';
+        }
       }
 
-      // 添加收藏筛选
-      if (onlyFav != null && onlyFav == 1) {
-        queryParams['inclbookmarked'] = 1;
+      // 获取搜索请求配置
+      final requestConfig = await _getRequestConfig(searchAction);
+      if (requestConfig == null) {
+        throw Exception('未找到搜索配置: $searchAction');
       }
 
-      // 确定请求路径（使用配置中的路径）
-      String requestPath = '/$torrentPath';
+      final path = requestConfig['path'] as String? ?? '/torrents.php';
+      final method = requestConfig['method'] as String? ?? 'GET';
+      final configParams = Map<String, dynamic>.from(
+        requestConfig['params'] as Map<String, dynamic>? ?? {},
+      );
 
-      // 处理分类参数
+      // 构建最终查询参数
+      final queryParams = <String, dynamic>{};
+
+      // 替换占位符并填充参数
+      configParams.forEach((key, value) {
+        if (value is String) {
+          String val = value;
+          val = val.replaceAll('{keyword}', keyword ?? '');
+          val = val.replaceAll('{page}', (pageNumber - 1).toString());
+          val = val.replaceAll('{pageSize}', pageSize.toString());
+
+          // 处理 {onlyFav} 占位符
+          if (val.contains('{onlyFav}')) {
+            if (onlyFav == 1) {
+              val = val.replaceAll('{onlyFav}', '1');
+              queryParams[key] = val;
+            }
+            // 如果不是 1，则不加入 queryParams (即移除该参数)
+          } else {
+            queryParams[key] = val;
+          }
+        } else {
+          queryParams[key] = value;
+        }
+      });
+
+      // 处理分类 ID 替换
+      if (categoryParam != null) {
+        final parts = categoryParam.split('#');
+        if (parts.length == 2 && parts[1].isNotEmpty) {
+          queryParams['cat'] = parts[1];
+        }
+      }
+
+      // 添加其他额外参数
       if (additionalParams != null) {
         additionalParams.forEach((key, value) {
-          if (key == 'category') {
-            final categoryParam = value as String?;
-            if (categoryParam != null) {
-              // 解析category参数，格式为 {"category":"prefix#catid"}
-              try {
-                // 检查是否是special前缀
-                if (categoryParam.startsWith('special')) {
-                  requestPath = '/$specialPath';
-                }
-                final parts = categoryParam.split('#');
-                if (parts.length == 2 && parts[1].isNotEmpty) {
-                  queryParams['cat'] = parts[1];
-                }
-              } catch (e) {
-                // 解析失败时忽略分类参数
-              }
-            }
-          } else {
+          if (key != 'category') {
             queryParams[key] = value;
           }
         });
       }
 
       // 发送请求
-      final response = await _dio.get(
-        requestPath,
-        queryParameters: queryParams,
+      final response = await _dio.request(
+        path,
+        queryParameters: method.toUpperCase() == 'GET' ? queryParams : null,
+        data: method.toUpperCase() == 'POST' ? queryParams : null,
+        options: Options(method: method.toUpperCase()),
       );
       final soup = BeautifulSoup(response.data);
       // 解析种子列表
@@ -1603,19 +1681,13 @@ class NexusPHPWebAdapter extends SiteAdapter {
   }) async {
     try {
       // 从站点模板配置中获取收藏请求配置
-      final template = await SiteConfigService.getTemplateById(
-        _siteConfig.templateId,
-        _siteConfig.siteType,
-      );
-
-      // 根据操作类型选择配置：取消收藏优先使用unCollect配置，否则使用collect配置
       Map<String, dynamic>? actionConfig;
       if (!make) {
         // 取消收藏：优先使用unCollect配置，如果没有则回退到collect配置
-        actionConfig = template?.request?['unCollect'] as Map<String, dynamic>?;
+        actionConfig = await _getRequestConfig('unCollect');
       }
       // 如果是添加收藏，或者取消收藏但没有专门的unCollect配置，则使用collect配置
-      actionConfig ??= template?.request?['collect'] as Map<String, dynamic>?;
+      actionConfig ??= await _getRequestConfig('collect');
 
       if (actionConfig != null) {
         final url =

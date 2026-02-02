@@ -424,8 +424,6 @@
       }
     },
     "search": {
-      "torrentPath": "browse.php",
-      "specialPath": "browse.php",
       "rows": {
         "selector": "#torrent_table > tbody:nth-child(1) > tr:nth-child"
       },
@@ -521,6 +519,24 @@
     "categories": {}
   },
   "request": {
+    "search": {
+      "normal": {
+        "path": "/browse.php",
+        "method": "GET",
+        "params": {
+          "search_field": "{keyword}",
+          "page": "{page}"
+        }
+      },
+      "special": {
+        "path": "/browse.php",
+        "method": "GET",
+        "params": {
+          "search_field": "{keyword}",
+          "page": "{page}"
+        }
+      }
+    },
     "collect": {
       "path": "/bookmark.php",
       "method": "POST",
