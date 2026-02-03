@@ -309,7 +309,7 @@
     "torrentSearch": true,
     "torrentDetail": true,
     "download": true,
-    "favorites": true,
+    "favorites": false,
     "downloadHistory": true,
     "categorySearch": true,
     "advancedSearch": true,
@@ -516,6 +516,22 @@
         }
       }
     },
+    "totalPages": {
+      "rows": {
+        "selector": "#delform > next > next"
+      },
+      "fields": {
+        "totalPages": {
+          "selector": "a[href~=\"browse.php.*page=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "page=(\\d+)",
+            "value": "$1"
+          }
+        }
+      }
+    },
     "categories": {}
   },
   "request": {
@@ -548,9 +564,11 @@
       }
     },
     "unCollect": {
+      "备注": "取消收藏需要穿收藏id不是种子id，暂时不实现",
       "path": "/takedelbookmarks.php",
       "method": "POST",
       "headers": {
+        "referer": "https://totheglory.im/bookmarks.php",
         "Content-Type": "application/x-www-form-urlencoded"
       },
       "params": {

@@ -379,6 +379,22 @@
             }
           }
         },
+        "totalPages": {
+          "rows": {
+            "selector": "div#footer"
+          },
+          "fields": {
+            "totalPages": {
+              "selector": "script",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": "var\\s+maxpage\\s*=\\s*(\\d+);",
+                "value": "$1"
+              }
+            }
+          }
+        },
         "categories": {
           "path": "usercp.php?action=tracker",
           "rows": {

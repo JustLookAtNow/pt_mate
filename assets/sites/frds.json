@@ -183,6 +183,22 @@
         }
       }
     },
+    "totalPages": {
+      "rows": {
+        "selector": "#form_torrent > next"
+      },
+      "fields": {
+        "totalPages": {
+          "selector": "a[href~=\"page=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "page=(\\d+)",
+            "value": "$1"
+          }
+        }
+      }
+    },
     "categories": {
       "path": "usercp.php?action=tracker",
       "rows": {

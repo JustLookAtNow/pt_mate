@@ -65,7 +65,7 @@ void main() {
         final soup = soups[fileName]!;
         List<TorrentItem> torrents = await adapter.parseTorrentList(soup);
         print('  Found ${torrents.length} torrents');
-        int totalPages = adapter.parseTotalPages(soup);
+        int totalPages = await adapter.parseTotalPages(soup);
         print('  Total pages: $totalPages');
         for (var torrent in torrents.take(5)) {
           print('  ID: ${torrent.id}');

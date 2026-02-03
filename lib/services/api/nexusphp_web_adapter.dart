@@ -14,8 +14,6 @@ import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import '../logging/log_file_service.dart';
 
-
-
 /// NexusPHP Web站点适配器
 /// 用于处理基于Web接口的NexusPHP站点
 class NexusPHPWebAdapter extends SiteAdapter {
@@ -405,7 +403,6 @@ class NexusPHPWebAdapter extends SiteAdapter {
 
     return null;
   }
-
 
   /// 获取用户信息配置（保持向前兼容）
   Future<Map<String, dynamic>> _getUserInfoConfig() async {
@@ -1087,8 +1084,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
   @override
   Future<TorrentSearchResult> searchTorrents({
     String? keyword,
-    int pageNumber = 1,
-    int pageSize = 30,
+    int pageNumber = 0,
+    int pageSize = 100,
     int? onlyFav,
     Map<String, dynamic>? additionalParams,
   }) async {
@@ -1172,8 +1169,8 @@ class NexusPHPWebAdapter extends SiteAdapter {
       // 解析种子列表
       final torrents = await parseTorrentList(soup);
 
-      // 解析总页数（从JavaScript变量maxpage中提取）
-      int totalPages = parseTotalPages(soup);
+      // 解析总页数
+      int totalPages = await parseTotalPages(soup);
 
       return TorrentSearchResult(
         pageNumber: pageNumber,
@@ -1248,20 +1245,55 @@ class NexusPHPWebAdapter extends SiteAdapter {
     }
   }
 
-  int parseTotalPages(BeautifulSoup soup) {
+  Future<int> parseTotalPages(BeautifulSoup soup) async {
     int totalPages = 1;
-    final footerDiv = soup.find('div', id: 'footer');
-    if (footerDiv != null) {
-      final scriptElement = footerDiv.find('script');
-      if (scriptElement != null) {
-        final scriptText = scriptElement.text;
-        final pageMatch = RegExp(
-          r'var\s+maxpage\s*=\s*(\d+);',
-        ).firstMatch(scriptText);
-        if (pageMatch != null) {
-          totalPages = FormatUtil.parseInt(pageMatch.group(1) ?? '1') ?? 1;
+    try {
+      // 获取配置
+      final config = await _getFinderConfig('totalPages');
+      if (config.isEmpty) {
+        return 1;
+      }
+
+      final rowsConfig = config['rows'] as Map<String, dynamic>?;
+      final fieldsConfig = config['fields'] as Map<String, dynamic>?;
+
+      if (rowsConfig == null || fieldsConfig == null) {
+        return 1;
+      }
+
+      // 获取行选择器配置
+      final rowSelector = rowsConfig['selector'] as String?;
+      if (rowSelector == null || rowSelector.isEmpty) {
+        return 1;
+      }
+
+      // 找到目标行
+      final rows = _findElementBySelector(soup, rowSelector);
+      if (rows.isEmpty) {
+        return 1;
+      }
+
+      final fieldConfig = fieldsConfig['totalPages'] as Map<String, dynamic>?;
+      if (fieldConfig == null) {
+        return 1;
+      }
+
+      List<int> pageValues = [];
+      for (final row in rows) {
+        final values = await _extractFieldValue(row, fieldConfig);
+        for (final val in values) {
+          final parsed = FormatUtil.parseInt(val);
+          if (parsed != null) {
+            pageValues.add(parsed);
+          }
         }
       }
+
+      if (pageValues.isNotEmpty) {
+        totalPages = pageValues.reduce((a, b) => a > b ? a : b);
+      }
+    } catch (e) {
+      _logger.e('解析总页数失败: $e');
     }
     return totalPages;
   }
@@ -1435,7 +1467,9 @@ class NexusPHPWebAdapter extends SiteAdapter {
             row,
             fieldsConfig['comments'] as Map<String, dynamic>? ?? {},
           );
-          final commentsText = commentsList.isNotEmpty ? commentsList.first : '0';
+          final commentsText = commentsList.isNotEmpty
+              ? commentsList.first
+              : '0';
           final comments = FormatUtil.parseInt(commentsText) ?? 0;
 
           // 检查收藏状态（布尔字段）
@@ -1597,7 +1631,11 @@ class NexusPHPWebAdapter extends SiteAdapter {
   }
 
   @override
-  Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20}) async {
+  Future<TorrentCommentList> fetchComments(
+    String id, {
+    int pageNumber = 1,
+    int pageSize = 20,
+  }) async {
     // NexusPHP Web 暂时不支持获取评论，返回空列表
     return TorrentCommentList(
       pageNumber: pageNumber,
@@ -1715,24 +1753,36 @@ class NexusPHPWebAdapter extends SiteAdapter {
         // 准备请求选项
         final options = Options(
           method: method.toUpperCase(),
+          contentType: 'application/x-www-form-urlencoded',
           headers: headers.isNotEmpty ? headers : null,
         );
 
         // 根据配置的方法发送请求
+        Response response;
         if (method.toUpperCase() == 'POST') {
-          await _dio.post(url, data: processedParams, options: options);
+          response = await _dio.post(
+            url,
+            data: processedParams,
+            options: options,
+          );
         } else {
-          await _dio.get(
+          response = await _dio.get(
             url,
             queryParameters: processedParams,
             options: options,
           );
         }
+        debugPrint(
+          'NexusPHPWebAdapter: toggleCollection response:${response.headers} ${response.data}',
+        );
       } else {
         // 如果没有配置，使用默认的收藏请求
-        await _dio.get(
+        final response = await _dio.get(
           '/bookmark.php',
           queryParameters: {'torrentid': torrentId},
+        );
+        debugPrint(
+          'NexusPHPWebAdapter: toggleCollection (default) response:${response.headers} ${response.data}',
         );
       }
     } catch (e) {
