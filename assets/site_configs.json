@@ -140,6 +140,27 @@
       "discountMapping": {},
       "tagMapping": {}
     },
+    "Gazelle": {
+      "name": "Gazelle 站点",
+      "baseUrl": "https://",
+      "searchCategories": [],
+      "features": {
+        "userProfile": true,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": true,
+        "downloadHistory": false,
+        "categorySearch": false,
+        "advancedSearch": false,
+        "showCover": true,
+        "commentDetail": false
+      },
+      "discountMapping": {
+        "Freeleech": "FREE"
+      },
+      "tagMapping": {}
+    },
     "NexusPHPWeb": {
       "name": "NexusPHP web",
       "baseUrl": "https://",

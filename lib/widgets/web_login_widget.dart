@@ -3,13 +3,13 @@ import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
-class NexusPhpWebLogin extends StatefulWidget {
+class WebLoginWidget extends StatefulWidget {
   final String baseUrl;
   final String? loginPath; // 自定义登录页面路径，默认为 /login.php
   final Function(String cookie) onCookieReceived;
   final VoidCallback? onCancel;
 
-  const NexusPhpWebLogin({
+  const WebLoginWidget({
     super.key,
     required this.baseUrl,
     this.loginPath,
@@ -18,10 +18,10 @@ class NexusPhpWebLogin extends StatefulWidget {
   });
 
   @override
-  State<NexusPhpWebLogin> createState() => _NexusPhpWebLoginState();
+  State<WebLoginWidget> createState() => _WebLoginWidgetState();
 }
 
-class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
+class _WebLoginWidgetState extends State<WebLoginWidget> {
   InAppWebViewController? _controller;
   bool _isLoading = true;
   String? _errorMessage;
@@ -487,9 +487,11 @@ class _NexusPhpWebLoginState extends State<NexusPhpWebLogin> {
                       // debugPrint('WebView加载进度: $progress%'); // Removed verbose logging
                     },
                     onReceivedError: (controller, request, error) {
-                      debugPrint('WebView错误: ${error.description}, URL: ${request.url}, isForMainFrame: ${request.isForMainFrame}');
+                      debugPrint(
+                        'WebView错误: ${error.description}, URL: ${request.url}, isForMainFrame: ${request.isForMainFrame}',
+                      );
                       // 只有主页面加载错误才显示错误信息，子资源错误忽略
-                       if (request.isForMainFrame == true) {
+                      if (request.isForMainFrame == true) {
                         setState(() {
                           _isLoading = false;
                           _errorMessage = '加载失败: ${error.description}';

@@ -1,0 +1,8 @@
+{
+  "track_id": "gazelle_adapter_20260204",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-02-04T10:00:00Z",
+  "updated_at": "2026-02-04T10:00:00Z",
+  "description": "增加gazelle类型的站点适配，并重构NexusPHP Web登录组件为通用组件。"
+}

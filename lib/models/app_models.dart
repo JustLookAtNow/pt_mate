@@ -18,6 +18,7 @@ class MemberProfile {
   final String downloadedBytesString; // 下载量字符串格式，如"500 MB"
   final String? userId; // 用户ID，NexusPHP类型从data.data.id获取
   final String? passKey; // Pass Key，nexusphpweb类型从usercp.php获取
+  final String? authKey; // 认证密钥，Gazelle类型使用
   final DateTime? lastAccess; // 最后访问时间，来自 API data['last_access']
   // 额外信息（可选）：时魔与做种体积，仅部分站点提供
   final double? bonusPerHour; // 时魔：每小时魔力增长值
@@ -33,6 +34,7 @@ class MemberProfile {
     required this.downloadedBytesString,
     this.userId,
     this.passKey,
+    this.authKey,
     this.lastAccess,
     this.bonusPerHour,
     this.seedingSizeBytes,
@@ -75,6 +77,8 @@ class MemberProfile {
       downloadedBytesString: downloadedStr.toString(),
       userId: json['userId']?.toString(),
       passKey: json['passKey']?.toString(),
+      authKey: (json['authKey'] ?? json['auth_key'] ?? json['authkey'])
+          ?.toString(),
       lastAccess: json['lastAccess'] != null
           ? DateTime.tryParse(json['lastAccess'].toString())?.toLocal()
           : (json['last_access'] != null
@@ -96,6 +100,7 @@ class MemberProfile {
       'downloadedBytesString': downloadedBytesString,
       'userId': userId,
       'passKey': passKey,
+      if (authKey != null) 'authKey': authKey,
       'lastAccess': lastAccess?.toIso8601String(),
       if (bonusPerHour != null) 'bonusPerHour': bonusPerHour,
       if (seedingSizeBytes != null) 'seedingSizeBytes': seedingSizeBytes,
@@ -303,8 +308,8 @@ enum DiscountColorType { none, green, yellow }
 enum TagType {
   hot('HOT', Color.fromARGB(255, 255, 128, 59), ''),
   official('官方', Color.fromARGB(255, 76, 130, 175), ''),
-  chinese('中字', Colors.green, ''),
-  chineseTraditional('繁体', Colors.green, ''),
+  chinese('中字', Colors.green, 'chinese_simplified'),
+  chineseTraditional('繁体', Colors.green, 'chinese_traditional'),
   mandarin('国语', Colors.blue, ''),
   diy('DIY', Colors.brown, ''),
   complete('完结',Color.fromARGB(255, 110, 8, 206),r'\bS\d+\b'),
@@ -354,7 +359,7 @@ enum TagType {
 
 // 网站类型枚举
 enum SiteType {
-  mteam('M-Team', 'M-Team 站点', 'API Key (x-api-key)', '从 控制台-实验室-存储令牌 获取并粘贴此处'),
+  mteam('M-Team', 'M-Team', 'API Key (x-api-key)', '从 控制台-实验室-存储令牌 获取并粘贴此处'),
   nexusphp(
     'NexusPHP',
     'NexusPHP(api)',
@@ -362,9 +367,13 @@ enum SiteType {
     '控制面板-设定首页-访问令牌（权限都勾上）',
   ),
   nexusphpweb('NexusPHPWeb', 'NexusPHP(web)', 'Cookie认证', '通过网页登录获取认证信息'),
-  rousi('RousiPro', 'Rousi pro', 'paaskey认证', '可以在网站的「账户设置」页面查看和重置自己的 Passkey。')
-  // 未来可以添加其他站点类型
-  // gazelle('Gazelle', 'Gazelle 站点'),
+  rousi(
+    'RousiPro',
+    'Rousi pro',
+    'paaskey认证',
+    '可以在网站的「账户设置」页面查看和重置自己的 Passkey。',
+  ),
+  gazelle('Gazelle', 'Gazelle (Alpha)', 'Cookie认证', '通过网页登录获取认证信息')
   ;
 
   const SiteType(this.id, this.displayName, this.apiKeyLabel, this.apiKeyHint);
@@ -698,6 +707,7 @@ class SiteConfig {
   final String baseUrl; // e.g. https://kp.m-team.cc/
   final String? apiKey; // x-api-key
   final String? passKey; // NexusPHP类型网站的passKey
+  final String? authKey; // Gazelle类型网站的authKey
   final String? cookie; // NexusPHPWeb类型网站的登录cookie
   final String? userId; // 用户ID，从fetchMemberProfile获取
   final SiteType siteType; // 网站类型
@@ -713,6 +723,7 @@ class SiteConfig {
     required this.baseUrl,
     this.apiKey,
     this.passKey,
+    this.authKey,
     this.cookie,
     this.userId,
     this.siteType = SiteType.mteam,
@@ -729,6 +740,7 @@ class SiteConfig {
     String? baseUrl,
     String? apiKey,
     String? passKey,
+    String? authKey,
     String? cookie,
     String? userId,
     SiteType? siteType,
@@ -743,6 +755,7 @@ class SiteConfig {
     baseUrl: baseUrl ?? this.baseUrl,
     apiKey: apiKey ?? this.apiKey,
     passKey: passKey ?? this.passKey,
+    authKey: authKey ?? this.authKey,
     cookie: cookie ?? this.cookie,
     userId: userId ?? this.userId,
     siteType: siteType ?? this.siteType,
@@ -759,6 +772,7 @@ class SiteConfig {
     'baseUrl': baseUrl,
     'apiKey': apiKey,
     'passKey': passKey,
+    'authKey': authKey,
     'cookie': cookie,
     'userId': userId,
     'siteType': siteType.id,
@@ -833,6 +847,7 @@ class SiteConfig {
       baseUrl: json['baseUrl'] as String,
       apiKey: json['apiKey'] as String?,
       passKey: json['passKey'] as String?,
+      authKey: json['authKey'] as String?,
       cookie: json['cookie'] as String?,
       userId: json['userId'] as String?,
       siteType: SiteType.values.firstWhere(
@@ -978,6 +993,7 @@ class SiteConfig {
       baseUrl: json['baseUrl'] as String,
       apiKey: json['apiKey'] as String?,
       passKey: json['passKey'] as String?,
+      authKey: json['authKey'] as String?,
       cookie: json['cookie'] as String?,
       userId: json['userId'] as String?,
       siteType: SiteType.values.firstWhere(

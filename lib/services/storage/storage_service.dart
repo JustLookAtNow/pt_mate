@@ -97,9 +97,7 @@ class StorageService {
   List<SiteConfig>? get siteConfigsCache => _siteConfigsCache; // 只读访问器
 
   final FlutterSecureStorage _secure = const FlutterSecureStorage(
-    aOptions: AndroidOptions(
-      encryptedSharedPreferences: true,
-    ),
+    aOptions: AndroidOptions(),
     iOptions: IOSOptions(
       accessibility: KeychainAccessibility.first_unlock_this_device,
     ),

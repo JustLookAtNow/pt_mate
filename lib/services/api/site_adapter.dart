@@ -3,6 +3,7 @@ import 'mteam_adapter.dart';
 import 'nexusphp_adapter.dart';
 import 'nexusphp_web_adapter.dart';
 import 'rousi_adapter.dart';
+import 'gazelle_adapter.dart';
 
 /// 统一的站点协议接口
 /// 定义所有站点适配器都应该实现的基本操作
@@ -62,6 +63,8 @@ class SiteAdapterFactory {
         return NexusPHPWebAdapter();
       case SiteType.rousi:
         return RousiAdapter();
+      case SiteType.gazelle:
+        return GazelleAdapter();
     }
   }
 }

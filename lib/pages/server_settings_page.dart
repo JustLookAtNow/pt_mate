@@ -8,7 +8,7 @@ import '../services/api/api_service.dart';
 import '../utils/screen_utils.dart';
 import '../services/site_config_service.dart';
 import '../widgets/qb_speed_indicator.dart';
-import '../widgets/nexusphp_web_login.dart';
+import '../widgets/web_login_widget.dart';
 import '../widgets/responsive_layout.dart';
 
 import '../utils/format.dart';
@@ -843,7 +843,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         color: isActive
             ? Theme.of(
                 context,
-              ).colorScheme.primaryContainer.withOpacity(0.3)
+              ).colorScheme.primaryContainer.withValues(alpha: 0.3)
             : Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(
           side: BorderSide(
@@ -877,7 +877,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     final card = Card(
       elevation: 2,
       shadowColor: (siteColor ?? Theme.of(context).colorScheme.outline)
-          .withOpacity(0.4),
+          .withValues(alpha: 0.4),
       shape: RoundedRectangleBorder(
         side: BorderSide(
           color: siteColor ?? Theme.of(context).colorScheme.outline,
@@ -889,7 +889,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       color: isActive
           ? Theme.of(
               context,
-            ).colorScheme.primaryContainer.withOpacity(0.3)
+            ).colorScheme.primaryContainer.withValues(alpha: 0.3)
           : null,
       child: Stack(
         clipBehavior: Clip.none,
@@ -1792,7 +1792,11 @@ class _SiteEditPageState extends State<SiteEditPage> {
         siteType: template.siteType,
         searchCategories: _searchCategories,
         features: _siteFeatures,
-        cookie: template.siteType == SiteType.nexusphpweb ? _savedCookie : null,
+        cookie:
+            (template.siteType == SiteType.nexusphpweb ||
+                template.siteType == SiteType.gazelle)
+            ? _savedCookie
+            : null,
         templateId: templateId,
         siteColor: _siteColor?.toARGB32(),
       );
@@ -1817,7 +1821,11 @@ class _SiteEditPageState extends State<SiteEditPage> {
       siteType: _selectedSiteType!,
       searchCategories: _searchCategories,
       features: _siteFeatures,
-      cookie: _selectedSiteType == SiteType.nexusphpweb ? _savedCookie : null,
+      cookie:
+          (_selectedSiteType == SiteType.nexusphpweb ||
+              _selectedSiteType == SiteType.gazelle)
+          ? _savedCookie
+          : null,
       templateId: templateId,
       siteColor: _siteColor?.toARGB32(),
     );
@@ -1856,7 +1864,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
   Future<void> _resetSearchCategories() async {
     // 检查必要的配置是否完整
-    if (_selectedSiteType == SiteType.nexusphpweb) {
+    if (_selectedSiteType == SiteType.nexusphpweb ||
+        _selectedSiteType == SiteType.gazelle) {
       // nexusphpweb类型需要cookie
       if (_savedCookie == null || _savedCookie!.isEmpty) {
         if (mounted) {
@@ -2054,7 +2063,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       await ApiService.instance.setActiveSite(site);
       final profile = await ApiService.instance.fetchMemberProfile();
 
-      // 创建包含userId和passKey的最终站点配置
+      // 创建包含userId、passKey和authKey的最终站点配置
       // 优先使用用户填写的passKey，如果没有填写则使用从fetchMemberProfile获取的
       final userPassKey = _passKeyController.text.trim();
       final finalPassKey = userPassKey.isNotEmpty
@@ -2063,6 +2072,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       final finalSite = site.copyWith(
         userId: profile.userId,
         passKey: finalPassKey,
+        authKey: profile.authKey, // Gazelle类型站点需要authKey用于下载
       );
 
       if (widget.site != null) {
@@ -2266,7 +2276,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => NexusPhpWebLogin(
+        builder: (context) => WebLoginWidget(
           baseUrl: site.baseUrl,
           loginPath: loginPath,
           onCookieReceived: (cookie) {
@@ -2675,7 +2685,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
               // API Key输入或登录按钮（只有在用户做出选择时才显示）
               if (_hasUserMadeSelection &&
-                  _selectedSiteType != SiteType.nexusphpweb) ...[
+                  _selectedSiteType != SiteType.nexusphpweb &&
+                  _selectedSiteType != SiteType.gazelle) ...[
                 TextFormField(
                   controller: _apiKeyController,
                   decoration: InputDecoration(
