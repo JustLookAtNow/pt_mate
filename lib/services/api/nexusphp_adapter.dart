@@ -323,7 +323,7 @@ class NexusPHPAdapter implements SiteAdapter {
     final smallDescr = item['small_descr'] as String? ?? '';
 
     // 计算标签并清理描述
-    final tags = TagType.matchTags(name);
+    final tags = TagType.matchTags(name + smallDescr);
 
     // NexusPHP api tags parsing
     if (item['tags'] != null && item['tags'] is List) {
@@ -333,7 +333,7 @@ class NexusPHPAdapter implements SiteAdapter {
           final tagName = tagMap['name']?.toString();
           if (tagName != null && tagName.isNotEmpty) {
             // 1. matchTags (in case the tag name itself is a known tag keyword)
-            tags.addAll(TagType.matchTags(tagName));
+            // tags.addAll(TagType.matchTags(tagName));
 
             // 2. _parseTagType (using the mapping config)
             final mappedTag = _parseTagType(tagName);

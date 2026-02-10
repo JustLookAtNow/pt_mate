@@ -1,0 +1,279 @@
+{
+  "id": "hhanclub",
+  "name": "HHanClub",
+  "primaryUrl": "https://hhanclub.net/",
+  "baseUrls": [
+    "https://hhanclub.net/"
+  ],
+  "siteType": "NexusPHPWeb",
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": true,
+    "downloadHistory": true,
+    "categorySearch": true,
+    "advancedSearch": true,
+    "showCover": false,
+    "commentDetail": false
+  },
+  "discountMapping": {
+    "免费": "FREE",
+    "2X Free": "2xFREE",
+    "2X 50%": "2x50%",
+    "10%": "PERCENT_10",
+    "20%": "PERCENT_20",
+    "30%": "PERCENT_30",
+    "40%": "PERCENT_40",
+    "50%": "PERCENT_50",
+    "60%": "PERCENT_60",
+    "70%": "PERCENT_70",
+    "80%": "PERCENT_80",
+    "90%": "PERCENT_90",
+    "Normal": "NORMAL"
+  },
+  "tagMapping": {
+    "官方": "official",
+    "完结": "complete",
+    "国语": "mandarin",
+    "中字": "chinese",
+    "DIY": "diy",
+    "HDR": "hdr",
+    "杜比视界": "dovi"
+  },
+  "infoFinder": {
+    "userInfo": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "div#user-info-panel"
+      },
+      "fields": {
+        "userId": {
+          "selector": "a.User_Name",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "value": "$1"
+          }
+        },
+        "userName": {
+          "selector": "a.User_Name > b",
+          "attribute": "text"
+        },
+        "ratio": {
+          "selector": "img[alt==\"分享率\"] > next",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "\\[分享率\\]:&nbsp;([^\\s]+)",
+            "value": "$1"
+          }
+        },
+        "upload": {
+          "selector": "img[alt==\"上传\"] > nextParse",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "&nbsp;(.*?B)",
+            "value": "$1"
+          }
+        },
+        "download": {
+          "selector": "img[alt==\"下载\"] > nextParse",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "&nbsp;(.*?B)",
+            "value": "$1"
+          }
+        },
+        "bonus": {
+          "selector": "a[href^=\"mybonus.php\"]",
+          "attribute": "text"
+        }
+      }
+    },
+    "passKey": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "div.home-info-table > span[onclick^=\"doCopyLink\"]"
+      },
+      "fields": {
+        "passKey": {
+          "selector": "",
+          "attribute": "text"
+        }
+      }
+    },
+    "bonusPerHour": {
+      "path": "mybonus.php",
+      "rows": {
+        "selector": "div#bonus-table > next > div.items-center"
+      },
+      "fields": {
+        "bonusPerHour": {
+          "selector": "",
+          "attribute": "text"
+        }
+      }
+    },
+    "search": {
+      "rows": {
+        "selector": "div.torrent-table-for-spider > div.torrent-table-sub-info"
+      },
+      "fields": {
+        "torrentId": {
+          "selector": "a[href^=\"details.php?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "value": "$1"
+          }
+        },
+        "torrentName": {
+          "selector": "a[href^=\"details.php?id=\"]",
+          "attribute": "text"
+        },
+        "tag": {
+          "selector": "span.tag",
+          "attribute": "text"
+        },
+        "description": {
+          "selector": "div.torrent-info-text-small_name",
+          "attribute": "text"
+        },
+        "discount": {
+          "selector": "span.promotion-tag",
+          "attribute": "text"
+        },
+        "discountEndTime": {},
+        "downloadUrl": {
+          "value": "{baseUrl}/download.php?id={torrentId}&passkey={passKey}"
+        },
+        "seedersText": {
+          "selector": "div.torrent-info-text-seeders",
+          "attribute": "text"
+        },
+        "leechersText": {
+          "selector": "div.torrent-info-text-leechers",
+          "attribute": "text"
+        },
+        "sizeText": {
+          "selector": "div.torrent-info-text-size",
+          "attribute": "text"
+        },
+        "downloadStatus": {
+          "selector": "div.w-full"
+        },
+        "collection": {
+          "selector": "div.torrent-manage > img[alt==\"Bookmarked\"]",
+          "attribute": "src"
+        },
+        "isTop": {
+          "selector": "",
+          "attribute": "class",
+          "filter": {
+            "name": "regexp",
+            "args": "bg-\\[#(11e5e380|FFF3B1)\\]",
+            "value": "true"
+          }
+        },
+        "cover": {},
+        "createDate": {
+          "selector": "div.torrent-info-text-added > span",
+          "attribute": "title",
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
+        },
+        "doubanRating": {
+          "selector": "img[title==\"douban\"] > next",
+          "attribute": "text"
+        },
+        "imdbRating": {
+          "selector": "img[title==\"imdb\"] > next",
+          "attribute": "text"
+        }
+      }
+    },
+    "totalPages": {
+      "rows": {
+        "selector": "div#footer"
+      },
+      "fields": {
+        "totalPages": {
+          "selector": "script",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "var\\s+maxpage\\s*=\\s*(\\d+);",
+            "value": "$1"
+          }
+        }
+      }
+    },
+    "categories": {
+      "path": "usercp.php?action=tracker",
+      "rows": {
+        "selector": "div.tracker-setting-top"
+      },
+      "fields": {
+        "categoryId": {
+          "selector": "a[href~=\"(torrents|special)\\.php\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "cat=(\\d+)",
+            "value": "$1"
+          }
+        },
+        "categoryName": {
+          "selector": "a[href~=\"(torrents|special)\\.php\"] > img",
+          "attribute": "title"
+        }
+      }
+    }
+  },
+  "request": {
+    "search": {
+      "normal": {
+        "path": "/torrents.php",
+        "method": "GET",
+        "params": {
+          "incldead": 1,
+          "inclbookmarked": "{onlyFav}",
+          "search": "{keyword}",
+          "page": "{page}",
+          "pageSize": "{pageSize}"
+        }
+      },
+      "special": {
+        "path": "/special.php",
+        "method": "GET",
+        "params": {
+          "incldead": 1,
+          "inclbookmarked": "{onlyFav}",
+          "search": "{keyword}",
+          "page": "{page}",
+          "pageSize": "{pageSize}"
+        }
+      }
+    },
+    "loginPage": {
+      "path": "/login.php"
+    },
+    "collect": {
+      "path": "/bookmark.php",
+      "method": "GET",
+      "params": {
+        "torrentid": "{torrentId}"
+      }
+    }
+  },
+  "logo": "assets/sites_icon/hhanclub.png"
+}

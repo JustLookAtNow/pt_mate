@@ -1022,7 +1022,7 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           }
 
           // 计算标签并清理描述
-          final tags = TagType.matchTags(torrentName);
+          final tags = TagType.matchTags(torrentName + description);
 
           if (tagList.isNotEmpty) {
             for (final tagStr in tagList) {
