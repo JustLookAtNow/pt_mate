@@ -1922,6 +1922,11 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                   mediaPlaybackRequiresUserGesture: false,
                   useOnDownloadStart: true,
                   useShouldOverrideUrlLoading: true,
+                  forceDark: Theme.of(context).brightness == Brightness.dark
+                      ? ForceDark.ON
+                      : ForceDark.OFF,
+                  algorithmicDarkeningAllowed:
+                      Theme.of(context).brightness == Brightness.dark,
                 ),
                 onWebViewCreated: (controller) async {
                   _webViewController = controller;

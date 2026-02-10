@@ -447,6 +447,11 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
                           MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
 
                       supportZoom: true,
+                      forceDark: Theme.of(context).brightness == Brightness.dark
+                          ? ForceDark.ON
+                          : ForceDark.OFF,
+                      algorithmicDarkeningAllowed:
+                          Theme.of(context).brightness == Brightness.dark,
                     ),
                     onWebViewCreated: (controller) {
                       _controller = controller;
