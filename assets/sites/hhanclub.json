@@ -3,7 +3,8 @@
   "name": "HHanClub",
   "primaryUrl": "https://hhanclub.net/",
   "baseUrls": [
-    "https://hhanclub.net/"
+    "https://hhanclub.net/",
+    "https://hhan.club/"
   ],
   "siteType": "NexusPHPWeb",
   "searchCategories": [],
