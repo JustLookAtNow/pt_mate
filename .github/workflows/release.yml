@@ -504,13 +504,17 @@ jobs:
             disable_web_page_preview: false
           };
 
+          // Helper function to wait
+          const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
           // Helper function to send requests
           function sendRequest(method, endpoint, data) {
             return new Promise((resolve, reject) => {
               const url = \`https://api.telegram.org/bot\${process.env.TG_BOT_TOKEN}/\${endpoint}\`;
               const req = https.request(url, {
                 method: method,
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 15000 // 15s timeout
               }, (res) => {
                 let body = '';
                 res.on('data', (chunk) => body += chunk);
@@ -523,29 +527,47 @@ jobs:
                   }
                 });
               });
+              req.on('timeout', () => {
+                req.destroy();
+                reject(new Error('Request timed out after 15 seconds'));
+              });
               req.on('error', reject);
               if (data) req.write(JSON.stringify(data));
               req.end();
             });
           }
 
+          async function sendWithRetry(method, endpoint, data, maxRetries = 3) {
+            for (let i = 0; i < maxRetries; i++) {
+              try {
+                const res = await sendRequest(method, endpoint, data);
+                if (res.ok) return res;
+                // If not ok, might be rate limited or other API errors
+                console.error(\`Telegram API error (Attempt \${i+1}):\`, JSON.stringify(res));
+              } catch (err) {
+                console.error(\`Network error (Attempt \${i+1}):\`, err.message);
+              }
+              if (i < maxRetries - 1) {
+                const waitTime = 2000 * (i + 1);
+                console.log(\`Retrying in \${waitTime}ms...\`);
+                await delay(waitTime);
+              }
+            }
+            throw new Error(\`Failed after \${maxRetries} attempts\`);
+          }
+
           try {
             console.log('Sending message...');
-            const sendRes = await sendRequest('POST', 'sendMessage', payload);
-            
-            if (!sendRes.ok) {
-              console.error('Failed to send message:', JSON.stringify(sendRes));
-              process.exit(1);
-            }
+            const sendRes = await sendWithRetry('POST', 'sendMessage', payload);
             
             const messageId = sendRes.result.message_id;
             console.log('Message sent successfully with ID:', messageId);
             
             // Unpin all messages
-            await sendRequest('POST', 'unpinAllChatMessages', { chat_id: process.env.TG_CHAT_ID });
+            await sendWithRetry('POST', 'unpinAllChatMessages', { chat_id: process.env.TG_CHAT_ID });
             
             // Pin the new message
-            await sendRequest('POST', 'pinChatMessage', {
+            await sendWithRetry('POST', 'pinChatMessage', {
               chat_id: process.env.TG_CHAT_ID,
               message_id: messageId,
               disable_notification: false
@@ -553,7 +575,7 @@ jobs:
             
             console.log('Message pinned successfully');
           } catch (error) {
-            console.error('Error:', error);
+            console.error('Final Error:', error.message);
             process.exit(1);
           }
         })();
