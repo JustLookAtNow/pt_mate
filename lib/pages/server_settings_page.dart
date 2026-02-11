@@ -3039,6 +3039,16 @@ class _SiteEditPageState extends State<SiteEditPage> {
                             );
                           }),
                         ),
+                        _buildFeatureSwitch(
+                          '原生详情',
+                          '提取页面内容原生渲染（而非WebView）',
+                          _siteFeatures.nativeDetail,
+                          (value) => setState(() {
+                            _siteFeatures = _siteFeatures.copyWith(
+                              nativeDetail: value,
+                            );
+                          }),
+                        ),
                       ],
                     ),
                   ),

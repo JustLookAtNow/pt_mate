@@ -313,7 +313,8 @@
     "downloadHistory": true,
     "categorySearch": true,
     "advancedSearch": true,
-    "showCover": false
+    "showCover": false,
+    "nativeDetail": true
   },
   "discountMapping": {
     "free": "FREE",
@@ -532,7 +533,13 @@
         }
       }
     },
-    "categories": {}
+    "categories": {},
+    "detail": {
+      "isBbcode": false,
+      "rows": {
+        "selector": "div#kdescr"
+      }
+    }
   },
   "request": {
     "search": {

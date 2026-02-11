@@ -69,6 +69,7 @@ dependencies:
   image: ^4.1.7
   share_plus: ^12.0.1
   xml: ^6.5.0
+  flutter_widget_from_html_core: ^0.17.0
 
 
 dev_dependencies:

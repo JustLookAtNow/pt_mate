@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_bbcode/flutter_bbcode.dart';
 import 'package:bbob_dart/bbob_dart.dart' as bbob;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api/api_service.dart';
 import '../services/storage/storage_service.dart';
@@ -1668,6 +1669,21 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   }
 
   // 构建WebView内容
+  /// 构建 HTML 原生渲染内容
+  Widget buildHtmlContent(String html) {
+    return HtmlWidget(
+      html,
+      onTapUrl: (url) {
+        launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        return true;
+      },
+      customStylesBuilder: (element) {
+        // 可以根据需要自定义样式
+        return null;
+      },
+    );
+  }
+
   Widget buildWebViewContent(String webviewUrl) {
     // 检查是否为Android平台
     if (defaultTargetPlatform == TargetPlatform.linux ||
@@ -2160,9 +2176,44 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                 ],
               ),
             )
-          : _detail?.webviewUrl != null
-          ? buildWebViewContent(_detail!.webviewUrl!)
-          : SingleChildScrollView(
+            : _detail?.descrHtml != null && _detail!.descrHtml!.isNotEmpty
+            ? SingleChildScrollView(
+                padding: const EdgeInsets.all(4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.info, color: Colors.blue),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  '种子详情',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            buildHtmlContent(_detail!.descrHtml!),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // 底部留白，防止被FAB遮挡
+                    const SizedBox(height: 80),
+                  ],
+                ),
+              )
+            : _detail?.descr != null && _detail!.descr.toString().isNotEmpty
+            ? SingleChildScrollView(
                 padding: const EdgeInsets.all(4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2209,7 +2260,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                     if (widget.siteFeatures.supportCommentDetail) ...[
                       const SizedBox(height: 16),
                       Card(
-                        key: _commentsKey, // Added key to the Card
+                        key: _commentsKey,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -2242,11 +2293,44 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                   const SizedBox(height: 80),
                 ],
               ),
-            ),
+              )
+            : _detail?.webviewUrl != null
+            ? buildWebViewContent(_detail!.webviewUrl!)
+            : const Center(child: Text('暂无详情')),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
           mainAxisSize: MainAxisSize.min,
         children: [
+            // 在浏览器中打开按钮 - 当原生渲染（HTML或BBCode）且webviewUrl可用时显示
+            if (_detail?.webviewUrl != null &&
+                ((_detail?.descrHtml != null &&
+                        _detail!.descrHtml!.isNotEmpty) ||
+                    (_detail?.descr != null &&
+                        _detail!.descr.toString().isNotEmpty))) ...[
+              FloatingActionButton(
+                heroTag: "openBrowser",
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => Scaffold(
+                        appBar: AppBar(
+                          title: Text(
+                            widget.torrentItem.name,
+                            style: const TextStyle(fontSize: 16),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        body: buildWebViewContent(_detail!.webviewUrl!),
+                      ),
+                    ),
+                  );
+                },
+                tooltip: '在浏览器中打开',
+                child: const Icon(Icons.open_in_browser),
+              ),
+              const SizedBox(height: 16),
+            ],
             // 评论按钮 - 仅在支持评论详情时显示
             if (widget.siteFeatures.supportCommentDetail) ...[
               FloatingActionButton(

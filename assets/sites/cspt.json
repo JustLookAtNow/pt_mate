@@ -19,7 +19,8 @@
     "downloadHistory": true,
     "categorySearch": true,
     "advancedSearch": true,
-    "showCover": true
+    "showCover": true,
+    "nativeDetail": true
   },
   "discountMapping": {},
   "infoFinder": {
@@ -186,6 +187,12 @@
           "selector": "div.torrent-title > img[title==\"imdb\"] > next",
           "attribute": "text"
         }
+      }
+    },
+    "detail": {
+      "isBbcode": false,
+      "rows": {
+        "selector": "div#kdescr"
       }
     }
   },

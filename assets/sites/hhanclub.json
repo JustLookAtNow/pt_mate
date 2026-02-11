@@ -18,7 +18,8 @@
     "categorySearch": true,
     "advancedSearch": true,
     "showCover": false,
-    "commentDetail": false
+    "commentDetail": false,
+    "nativeDetail": false
   },
   "discountMapping": {
     "免费": "FREE",

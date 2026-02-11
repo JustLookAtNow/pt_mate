@@ -19,7 +19,8 @@
     "favorites": true,
     "downloadHistory": true,
     "categorySearch": true,
-    "advancedSearch": true
+    "advancedSearch": true,
+    "nativeDetail": true
   },
   "discountMapping": {},
   "logo": "assets/sites_icon/qingwapt.png",
@@ -140,6 +141,12 @@
           "selector": "table.torrentname > img[title==\"imdb\"] > next",
           "attribute": "text"
         }
+      }
+    },
+    "detail": {
+      "isBbcode": false,
+      "rows": {
+        "selector": "div#kdescr"
       }
     }
   }

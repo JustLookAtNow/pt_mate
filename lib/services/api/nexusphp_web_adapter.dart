@@ -1087,6 +1087,80 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
         ? _siteConfig.baseUrl.substring(0, _siteConfig.baseUrl.length - 1)
         : _siteConfig.baseUrl;
     final detailUrl = '$baseUrl/details.php?id=$id&hit=1';
+
+    // 如果启用了原生详情渲染，提取 DOM
+    if (_siteConfig.features.nativeDetail) {
+      try {
+        final response = await _dio.get(
+          '/details.php',
+          queryParameters: {'id': id, 'hit': '1'},
+        );
+        final soup = BeautifulSoup(response.data);
+
+        // 尝试通过配置获取详情选择器和内容类型
+        String extractedContent = '';
+        bool isBbcode = false;
+        try {
+          final detailConfig = await _getFinderConfig('detail');
+          if (detailConfig.isNotEmpty) {
+            isBbcode = detailConfig['isBbcode'] as bool? ?? false;
+            final rowsConfig = detailConfig['rows'] as Map<String, dynamic>?;
+            final selector = rowsConfig?['selector'] as String?;
+            if (selector != null && selector.isNotEmpty) {
+              final element = findFirstElementBySelector(soup, selector);
+              if (element != null) {
+                extractedContent = isBbcode ? element.text : element.innerHtml;
+              }
+            }
+          }
+        } catch (_) {
+          // 配置不存在，使用默认选择器
+        }
+
+        // 默认 fallback 选择器（默认 HTML 模式）
+        if (extractedContent.isEmpty) {
+          final kdescr =
+              soup.find('div', id: 'kdescr') ??
+              soup.find('td', id: 'kdescr') ??
+              soup.find('#kdescr');
+          if (kdescr != null) {
+            extractedContent = isBbcode ? kdescr.text : kdescr.innerHtml;
+          }
+        }
+
+        if (extractedContent.isNotEmpty) {
+          if (isBbcode) {
+            return TorrentDetail(
+              descr: extractedContent,
+              webviewUrl: detailUrl,
+            );
+          } else {
+            // HTML 模式：处理相对URL
+            extractedContent = extractedContent.replaceAllMapped(
+              RegExp(r'(src|href)="(/[^"]*)"', caseSensitive: false),
+              (match) => '${match.group(1)}="$baseUrl${match.group(2)}"',
+            );
+            return TorrentDetail(
+              descr: '',
+              descrHtml: extractedContent,
+              webviewUrl: detailUrl,
+            );
+          }
+        }
+
+        // 如果提取失败，fallback 到 WebView
+        if (kDebugMode) {
+          _logger.w('NativeDetail: 未能提取到描述内容，回退到 WebView 模式');
+        }
+      } catch (e) {
+        // 提取失败，fallback 到 WebView
+        if (kDebugMode) {
+          _logger.e('NativeDetail: 提取失败，回退到 WebView: $e');
+        }
+      }
+    }
+
+    // WebView 模式（默认行为或 nativeDetail fallback）
     if (defaultTargetPlatform == TargetPlatform.android) {
       // 设置Cookie到baseUrl域下，HTTPOnly避免带到图片请求
       final cookieManager = CookieManager.instance();

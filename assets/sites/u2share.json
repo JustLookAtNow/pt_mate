@@ -17,7 +17,8 @@
     "downloadHistory": true,
     "categorySearch": true,
     "advancedSearch": true,
-    "showCover": false
+    "showCover": false,
+    "nativeDetail": true
   },
   "discountMapping": {
     "FREE": "FREE"
@@ -190,6 +191,12 @@
           "selector": "a[href~=\"torrents\\.php?\"]",
           "attribute": "text"
         }
+      }
+    },
+    "detail": {
+      "isBbcode": false,
+      "rows": {
+        "selector": "div#kdescr"
       }
     }
   },

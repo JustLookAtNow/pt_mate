@@ -16,7 +16,8 @@
     "favorites": true,
     "downloadHistory": true,
     "categorySearch": true,
-    "advancedSearch": true
+    "advancedSearch": true,
+    "nativeDetail": true
   },
   "discountMapping": {},
   "logo": "assets/sites_icon/afun.png"

@@ -17,7 +17,8 @@
     "downloadHistory": true,
     "categorySearch": true,
     "advancedSearch": true,
-    "showCover": true
+    "showCover": true,
+    "nativeDetail": true
   },
   "discountMapping": {},
   "infoFinder": {
@@ -218,6 +219,12 @@
           "selector": "a[href~=\"(torrents|special)\\.php\"] > img",
           "attribute": "title"
         }
+      }
+    },
+    "detail": {
+      "isBbcode": false,
+      "rows": {
+        "selector": "div#kdescr"
       }
     }
   },

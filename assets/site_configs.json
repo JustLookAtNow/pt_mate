@@ -175,7 +175,8 @@
         "categorySearch": true,
         "advancedSearch": true,
         "showCover": true,
-        "commentDetail": false
+        "commentDetail": false,
+        "nativeDetail": true
       },
       "discountMapping": {
         "Free": "FREE",
@@ -219,6 +220,12 @@
         "零魔": "zero"
       },
       "infoFinder": {
+        "detail": {
+          "isBbcode": false,
+          "rows": {
+            "selector": "div#kdescr"
+          }
+        },
         "userInfo": {
           "path": "usercp.php",
           "rows": {

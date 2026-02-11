@@ -111,9 +111,10 @@ class MemberProfile {
 // 种子详情
 class TorrentDetail {
   final String descr;
+  final String? descrHtml; // 可选的HTML描述，用于原生HTML渲染
   final String? webviewUrl; // 可选的webview URL，用于嵌入式显示
 
-  TorrentDetail({required this.descr, this.webviewUrl});
+  TorrentDetail({required this.descr, this.descrHtml, this.webviewUrl});
 }
 
 // 下载状态枚举
@@ -400,6 +401,7 @@ class SiteFeatures {
   final bool supportAdvancedSearch; // 支持高级搜索
   final bool showCover; // 列表显示封面与评分
   final bool supportCommentDetail; // 支持评论详情
+  final bool nativeDetail; // 是否提取DOM原生渲染详情（而非WebView）
 
   const SiteFeatures({
     this.supportMemberProfile = true,
@@ -412,6 +414,7 @@ class SiteFeatures {
     this.supportAdvancedSearch = true,
     this.showCover = true,
     this.supportCommentDetail = false,
+    this.nativeDetail = false,
   });
 
   SiteFeatures copyWith({
@@ -425,6 +428,7 @@ class SiteFeatures {
     bool? supportAdvancedSearch,
     bool? showCover,
     bool? supportCommentDetail,
+    bool? nativeDetail,
   }) => SiteFeatures(
     supportMemberProfile: supportMemberProfile ?? this.supportMemberProfile,
     supportTorrentSearch: supportTorrentSearch ?? this.supportTorrentSearch,
@@ -436,6 +440,7 @@ class SiteFeatures {
     supportAdvancedSearch: supportAdvancedSearch ?? this.supportAdvancedSearch,
     showCover: showCover ?? this.showCover,
     supportCommentDetail: supportCommentDetail ?? this.supportCommentDetail,
+    nativeDetail: nativeDetail ?? this.nativeDetail,
   );
 
   Map<String, dynamic> toJson() => {
@@ -449,6 +454,7 @@ class SiteFeatures {
     'supportAdvancedSearch': supportAdvancedSearch,
     'showCover': showCover,
     'supportCommentDetail': supportCommentDetail,
+    'nativeDetail': nativeDetail,
   };
 
   factory SiteFeatures.fromJson(Map<String, dynamic> json) => SiteFeatures(
@@ -473,6 +479,7 @@ class SiteFeatures {
     showCover: json['showCover'] as bool? ?? true,
     supportCommentDetail:
         json['commentDetail'] ?? json['supportCommentDetail'] as bool? ?? false,
+    nativeDetail: json['nativeDetail'] as bool? ?? false,
   );
 
   // M-Team 站点的默认功能配置
