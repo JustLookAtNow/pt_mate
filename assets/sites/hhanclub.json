@@ -75,22 +75,12 @@
           }
         },
         "upload": {
-          "selector": "img[alt==\"上传\"] > nextParse",
-          "attribute": "text",
-          "filter": {
-            "name": "regexp",
-            "args": "&nbsp;(.*?B)",
-            "value": "$1"
-          }
+          "selector": "img[alt==\"上传\"] > nextParsed",
+          "attribute": "text"
         },
         "download": {
-          "selector": "img[alt==\"下载\"] > nextParse",
-          "attribute": "text",
-          "filter": {
-            "name": "regexp",
-            "args": "&nbsp;(.*?B)",
-            "value": "$1"
-          }
+          "selector": "img[alt==\"下载\"] > nextParsed",
+          "attribute": "text"
         },
         "bonus": {
           "selector": "a[href^=\"mybonus.php\"]",
