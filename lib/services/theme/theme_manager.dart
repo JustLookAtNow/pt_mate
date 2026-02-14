@@ -23,7 +23,7 @@ class ThemeManager extends ChangeNotifier {
   }
 
   // 获取字体fallback配置
-  List<String> _getFontFallback() {
+  List<String>? _getFontFallback() {
     switch (Platform.operatingSystem) {
       case 'windows':
         return [
@@ -53,13 +53,8 @@ class ThemeManager extends ChangeNotifier {
           'sans-serif',
         ];
       default:
-        return [
-          'Roboto',
-          'Noto Sans CJK SC',
-          'Source Han Sans SC',
-          'Arial Unicode MS',
-          'sans-serif',
-        ];
+        // 安卓、iOS使用系统默认字体
+        return null;
     }
   }
 
