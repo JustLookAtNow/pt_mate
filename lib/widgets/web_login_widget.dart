@@ -24,6 +24,7 @@ class WebLoginWidget extends StatefulWidget {
 class _WebLoginWidgetState extends State<WebLoginWidget> {
   InAppWebViewController? _controller;
   bool _isLoading = true;
+  bool _loginSuccess = false;
   String? _errorMessage;
   final Logger _logger = Logger();
   late final String _initialUrl; // 初始登录页URL
@@ -284,7 +285,29 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
 
         widget.onCookieReceived(cookieString);
         if (mounted) {
-          Navigator.of(context).pop();
+          setState(() {
+            _loginSuccess = true;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Cookie 获取成功！如有二次验证请继续操作，完成后请手动关闭此页面',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+              ),
+              duration: const Duration(seconds: 5),
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              behavior: SnackBarBehavior.floating,
+              action: SnackBarAction(
+                label: '关闭页面',
+                textColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ),
+          );
         }
         return;
       }
@@ -342,7 +365,7 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('网站登录'),
+        title: Text(_loginSuccess ? '登录成功 - 请手动关闭' : '网站登录'),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () {
