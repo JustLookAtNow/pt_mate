@@ -920,7 +920,12 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
 
             // 注意事项
             Card(
-              color: Theme.of(context).colorScheme.errorContainer,
+              color: Colors.orange.withValues(alpha: 0.1),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.orange.withValues(alpha: 0.2)),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -928,18 +933,20 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                   children: [
                     Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.warning,
-                          color: Theme.of(context).colorScheme.onErrorContainer,
+                          color: Colors.orange,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           '重要提示',
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onErrorContainer,
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.light
+                                    ? Colors.orange.shade900
+                                    : Colors.orange.shade200,
                                 fontWeight: FontWeight.bold,
                               ),
                         ),
@@ -952,7 +959,9 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                       '• 备份文件支持版本兼容，新版本可以读取旧版本备份\n'
                       '• 建议定期创建备份以防数据丢失',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onErrorContainer,
+                        color: Theme.of(context).brightness == Brightness.light
+                            ? Colors.orange.shade900
+                            : Colors.orange.shade200,
                       ),
                     ),
                   ],
