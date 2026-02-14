@@ -455,7 +455,8 @@
               "inclbookmarked": "{onlyFav}",
               "search": "{keyword}",
               "page": "{page}",
-              "pageSize": "{pageSize}"
+              "pageSize": "{pageSize}",
+              "cat": "{categoryId}"
             }
           },
           "special": {
@@ -466,7 +467,8 @@
               "inclbookmarked": "{onlyFav}",
               "search": "{keyword}",
               "page": "{page}",
-              "pageSize": "{pageSize}"
+              "pageSize": "{pageSize}",
+              "cat": "{categoryId}"
             }
           }
         },

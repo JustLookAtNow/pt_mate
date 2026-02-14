@@ -602,6 +602,15 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
         requestConfig['params'] as Map<String, dynamic>? ?? {},
       );
 
+      // 提取分类 ID（格式: "prefix#categoryId"）
+      String categoryId = '';
+      if (categoryParam != null) {
+        final parts = categoryParam.split('#');
+        if (parts.length == 2 && parts[1].isNotEmpty) {
+          categoryId = parts[1];
+        }
+      }
+
       // 构建最终查询参数
       final queryParams = <String, dynamic>{};
 
@@ -613,6 +622,15 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           val = val.replaceAll('{page}', (pageNumber - 1).toString());
           val = val.replaceAll('{pageSize}', pageSize.toString());
 
+          // 处理 {categoryId} 占位符：无分类时移除该参数
+          if (val.contains('{categoryId}')) {
+            if (categoryId.isNotEmpty) {
+              val = val.replaceAll('{categoryId}', categoryId);
+            } else {
+              return; // 没有分类 ID，不加入 queryParams
+            }
+          }
+
           // 处理 {onlyFav} 占位符
           if (val.contains('{onlyFav}')) {
             if (onlyFav == 1) {
@@ -623,18 +641,11 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           } else {
             queryParams[key] = val;
           }
+          
         } else {
           queryParams[key] = value;
         }
       });
-
-      // 处理分类 ID 替换
-      if (categoryParam != null) {
-        final parts = categoryParam.split('#');
-        if (parts.length == 2 && parts[1].isNotEmpty) {
-          queryParams['cat'] = parts[1];
-        }
-      }
 
       // 添加其他额外参数
       if (additionalParams != null) {
