@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'dart:math';
@@ -859,9 +860,48 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          trailing: ReorderableDragStartListener(
-            index: index,
-            child: const Icon(Icons.drag_handle),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.vertical_align_top),
+                onPressed: index == 0
+                    ? null
+                    : () {
+                        setState(() {
+                          final item = _sites.removeAt(index);
+                          _sites.insert(0, item);
+                        });
+                      },
+                tooltip: '置顶',
+              ),
+              IconButton(
+                icon: const Icon(Icons.vertical_align_bottom),
+                onPressed: index == _sites.length - 1
+                    ? null
+                    : () {
+                        setState(() {
+                          final item = _sites.removeAt(index);
+                          _sites.add(item);
+                        });
+                      },
+                tooltip: '置底',
+              ),
+              Listener(
+                onPointerDown: (_) {
+                  if (!ScreenUtils.isLargeScreen(context)) {
+                    HapticFeedback.lightImpact();
+                  }
+                },
+                child: ReorderableDragStartListener(
+                  index: index,
+                  child: const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Icon(Icons.drag_handle),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
