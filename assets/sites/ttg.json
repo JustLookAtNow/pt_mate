@@ -314,7 +314,7 @@
     "categorySearch": true,
     "advancedSearch": true,
     "showCover": false,
-    "nativeDetail": true
+    "nativeDetail": false
   },
   "discountMapping": {
     "free": "FREE",
@@ -571,7 +571,7 @@
       }
     },
     "unCollect": {
-      "备注": "取消收藏需要穿收藏id不是种子id，暂时不实现",
+      "备注": "取消收藏需要传收藏id不是种子id，暂时不实现",
       "path": "/takedelbookmarks.php",
       "method": "POST",
       "headers": {

@@ -18,7 +18,7 @@
     "categorySearch": true,
     "advancedSearch": true,
     "showCover": false,
-    "nativeDetail": true
+    "nativeDetail": false
   },
   "discountMapping": {},
   "tagMapping": {
