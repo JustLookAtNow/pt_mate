@@ -70,7 +70,7 @@
           "attribute": "text",
           "filter": {
             "name": "regexp",
-            "args": "\\[分享率\\]:&nbsp;([^\\s]+)",
+            "args": "\\[分享率\\]:\\s+([^\\s]+)",
             "value": "$1"
           }
         },
