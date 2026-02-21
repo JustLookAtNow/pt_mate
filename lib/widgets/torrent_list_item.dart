@@ -127,9 +127,24 @@ class TorrentListItem extends StatelessWidget {
                     )
                   : null,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(4),
-              child: Row(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Stack(
+                children: [
+                  // 移动端已收藏大红心背景
+                  if (isMobile && torrent.collection)
+                    Positioned(
+                      right: 10,
+                      bottom: 10,
+                      child: Icon(
+                        Icons.favorite,
+                        color: Colors.red.withValues(alpha: 0.5),
+                        size: 80,
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 封面截图和创建时间（在 showCover 为 true 时显示）
@@ -437,20 +452,7 @@ class TorrentListItem extends StatelessWidget {
                                         fontSize: 13,
                                       ),
                                     ),
-                                    // 移动设备上显示收藏状态小红心
-                                    if (isMobile && torrent.collection)
-                                      WidgetSpan(
-                                        child: Padding(
-                                          padding: const EdgeInsets.only(
-                                            left: 4,
-                                          ),
-                                          child: Icon(
-                                            Icons.favorite,
-                                            color: Colors.red,
-                                            size: 15,
-                                          ),
-                                        ),
-                                      ),
+
                                   ],
                                 ),
                               ),
@@ -476,20 +478,7 @@ class TorrentListItem extends StatelessWidget {
                                         fontSize: 13,
                                       ),
                                     ),
-                                    // 移动设备上显示收藏状态小红心
-                                    if (isMobile && torrent.collection)
-                                      WidgetSpan(
-                                        child: Padding(
-                                          padding: const EdgeInsets.only(
-                                            left: 4,
-                                          ),
-                                          child: Icon(
-                                            Icons.favorite,
-                                            color: Colors.red,
-                                            size: 15,
-                                          ),
-                                        ),
-                                      ),
+
                                   ],
                                 ),
                               ),
@@ -623,6 +612,9 @@ class TorrentListItem extends StatelessWidget {
                       ],
                     ),
                   ],
+                ],
+              ),
+            ),
                 ],
               ),
             ),
