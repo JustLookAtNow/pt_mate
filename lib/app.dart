@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:logger/logger.dart';
+import 'package:flutter/rendering.dart';
+import 'dart:math' as math;
 
 import 'models/app_models.dart';
 import 'pages/torrent_detail_page.dart';
@@ -481,6 +483,13 @@ class _HomePageState extends State<HomePage> {
   // 选中状态管理
   bool _isSelectionMode = false;
   final Set<String> _selectedItems = <String>{};
+
+  // 拖动与多选增强功能
+  bool _isDraggingSelection = false;
+  int? _dragStartIndex;
+  int? _lastSelectedIndex;
+  Set<String> _preDragSelectedItems = <String>{};
+  final GlobalKey _listKey = GlobalKey();
 
   // 收藏请求间隔控制
   DateTime? _lastCollectionRequest;
@@ -1628,46 +1637,62 @@ class _HomePageState extends State<HomePage> {
                             }
                             return RefreshIndicator(
                               onRefresh: () => _search(reset: true),
-                              child: ListView.builder(
-                                controller: _scrollCtrl,
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
-                                itemCount:
-                                    filteredItems.length + (_hasMore ? 1 : 0),
-                                itemBuilder: (context, index) {
-                                  if (index == filteredItems.length) {
-                                    return const Padding(
-                                      padding: EdgeInsets.all(16.0),
-                                      child: Center(
-                                        child: SizedBox(
-                                          width: 24,
-                                          height: 24,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
+                              child: Listener(
+                                onPointerMove: _onPointerMove,
+                                onPointerUp: _onPointerUp,
+                                child: ListView.builder(
+                                  key: _listKey,
+                                  controller: _scrollCtrl,
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.fromLTRB(
+                                    0,
+                                    0,
+                                    0,
+                                    16,
+                                  ),
+                                  itemCount:
+                                      filteredItems.length + (_hasMore ? 1 : 0),
+                                  itemBuilder: (context, index) {
+                                    if (index == filteredItems.length) {
+                                      return const Padding(
+                                        padding: EdgeInsets.all(16.0),
+                                        child: Center(
+                                          child: SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
                                           ),
                                         ),
+                                      );
+                                    }
+                                    final item = filteredItems[index];
+                                    final isSelected = _selectedItems.contains(
+                                      item.id,
+                                    );
+                                    return MetaData(
+                                      metaData: index,
+                                      behavior: HitTestBehavior.translucent,
+                                      child: TorrentListItem(
+                                        torrent: item,
+                                        isSelected: isSelected,
+                                        isSelectionMode: _isSelectionMode,
+                                        currentSite: _currentSite,
+                                        showCoverSetting: _showCoverSetting,
+                                        onTap: () => _isSelectionMode
+                                            ? _onToggleSelection(item, index)
+                                            : _onTorrentTap(item),
+                                        onLongPress: () =>
+                                            _onLongPress(item, index),
+                                        onToggleCollection: () =>
+                                            _onToggleCollection(item),
+                                        onDownload: () => _onDownload(item),
                                       ),
                                     );
-                                  }
-                                  final item = filteredItems[index];
-                                  final isSelected = _selectedItems.contains(
-                                    item.id,
-                                  );
-                                  return TorrentListItem(
-                                    torrent: item,
-                                    isSelected: isSelected,
-                                    isSelectionMode: _isSelectionMode,
-                                    currentSite: _currentSite,
-                                    showCoverSetting: _showCoverSetting,
-                                    onTap: () => _isSelectionMode
-                                        ? _onToggleSelection(item)
-                                        : _onTorrentTap(item),
-                                    onLongPress: () => _onLongPress(item),
-                                    onToggleCollection: () =>
-                                        _onToggleCollection(item),
-                                    onDownload: () => _onDownload(item),
-                                  );
-                                },
+                                  },
+                                ),
                               ),
                             );
                           },
@@ -1690,20 +1715,55 @@ class _HomePageState extends State<HomePage> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       Expanded(
-                        child: ElevatedButton(
+                          child: TextButton(
                           onPressed: _onCancelSelection,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(
-                              context,
-                            ).colorScheme.secondary,
-                            foregroundColor: Theme.of(
-                              context,
-                            ).colorScheme.onSecondary,
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 0,
+                              ),
+                              textStyle: const TextStyle(fontSize: 13),
+                              side: BorderSide(
+                                color: Theme.of(context).colorScheme.outline,
+                                width: 1.0,
+                              ),
                           ),
                           child: const Text('取消'),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                        const SizedBox(width: 8),
+                        // 全选按钮
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () {
+                              if (_selectedItems.length ==
+                                  _filteredItems.length) {
+                                setState(() => _selectedItems.clear());
+                              } else {
+                                setState(() {
+                                  _selectedItems.addAll(
+                                    _filteredItems.map((e) => e.id),
+                                  );
+                                });
+                              }
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 0,
+                              ),
+                              textStyle: const TextStyle(fontSize: 13),
+                              side: BorderSide(
+                                color: Theme.of(context).colorScheme.outline,
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Text(
+                              _selectedItems.length == _filteredItems.length
+                                  ? '全不选'
+                                  : '全选',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                       // 批量收藏按钮 - 仅在站点支持收藏功能时显示
                       if (_currentSite?.features.supportCollection ?? true) ...[
                         Expanded(
@@ -1712,6 +1772,10 @@ class _HomePageState extends State<HomePage> {
                                 ? _onBatchFavorite
                                 : null,
                             style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 0,
+                                ),
+                                textStyle: const TextStyle(fontSize: 13),
                               backgroundColor: Colors.red,
                               foregroundColor: Colors.white,
                             ),
@@ -1728,6 +1792,10 @@ class _HomePageState extends State<HomePage> {
                                 ? _onBatchDownload
                                 : null,
                             style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 0,
+                                ),
+                                textStyle: const TextStyle(fontSize: 13),
                               backgroundColor: Theme.of(
                                 context,
                               ).colorScheme.primary,
@@ -1749,30 +1817,122 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  void _onPointerUp(PointerUpEvent event) {
+    if (_isDraggingSelection && mounted) {
+      setState(() {
+        _isDraggingSelection = false;
+        _dragStartIndex = null;
+      });
+    }
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (!_isDraggingSelection || _dragStartIndex == null || !mounted) return;
+
+    final RenderBox? box =
+        _listKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+
+    final result = BoxHitTestResult();
+    box.hitTest(result, position: box.globalToLocal(event.position));
+
+    int? currentIndex;
+    for (final hit in result.path) {
+      if (hit.target is RenderMetaData) {
+        final metaData = (hit.target as RenderMetaData).metaData;
+        if (metaData is int) {
+          currentIndex = metaData;
+          break;
+        }
+      }
+    }
+
+    if (currentIndex != null) {
+      final minIndex = math.min(_dragStartIndex!, currentIndex);
+      final maxIndex = math.max(_dragStartIndex!, currentIndex);
+
+      final newSelection = Set<String>.from(_preDragSelectedItems);
+      final filteredItems = _filteredItems;
+      for (int i = minIndex; i <= maxIndex; i++) {
+        if (i >= 0 && i < filteredItems.length) {
+          newSelection.add(filteredItems[i].id);
+        }
+      }
+
+      setState(() {
+        _selectedItems.clear();
+        _selectedItems.addAll(newSelection);
+        _lastSelectedIndex = currentIndex;
+      });
+
+      // Auto-scrolling logic inside list area
+      final localY = box.globalToLocal(event.position).dy;
+      if (localY < 50) {
+        _scrollCtrl.position.moveTo(_scrollCtrl.offset - 15);
+      } else if (localY > box.size.height - 50) {
+        _scrollCtrl.position.moveTo(_scrollCtrl.offset + 15);
+      }
+    }
+  }
+
   // 长按触发选中模式
-  void _onLongPress(TorrentItem item) {
-    if (!_isSelectionMode && mounted) {
+  void _onLongPress(TorrentItem item, int index) {
+    if (mounted) {
       // 使用 Flutter 内置的触觉反馈，提供原生的震动体验
       HapticFeedback.mediumImpact();
       setState(() {
-        _isSelectionMode = true;
-        _selectedItems.add(item.id);
+        if (!_isSelectionMode) {
+          _isSelectionMode = true;
+          _selectedItems.add(item.id);
+        }
+        _isDraggingSelection = true;
+        _dragStartIndex = index;
+        _preDragSelectedItems = Set<String>.from(_selectedItems);
       });
     }
   }
 
   // 切换选中状态
-  void _onToggleSelection(TorrentItem item) {
+  void _onToggleSelection(TorrentItem item, int index) {
     if (mounted) {
+      final isShiftPressed =
+          HardwareKeyboard.instance.logicalKeysPressed.contains(
+            LogicalKeyboardKey.shiftLeft,
+          ) ||
+          HardwareKeyboard.instance.logicalKeysPressed.contains(
+            LogicalKeyboardKey.shiftRight,
+          );
+                             
       setState(() {
-        if (_selectedItems.contains(item.id)) {
-          _selectedItems.remove(item.id);
-          if (_selectedItems.isEmpty) {
-            _isSelectionMode = false;
+        if (isShiftPressed && _lastSelectedIndex != null) {
+          final minIndex = math.min(_lastSelectedIndex!, index);
+          final maxIndex = math.max(_lastSelectedIndex!, index);
+
+          final isSelecting = !_selectedItems.contains(item.id);
+          final filteredItems =
+              _filteredItems; // Make sure to use the active list
+
+          for (int i = minIndex; i <= maxIndex; i++) {
+            if (i >= 0 && i < filteredItems.length) {
+              final targetItem = filteredItems[i];
+              if (isSelecting) {
+                _selectedItems.add(targetItem.id);
+              } else {
+                _selectedItems.remove(targetItem.id);
+              }
+            }
           }
         } else {
-          _selectedItems.add(item.id);
+          if (_selectedItems.contains(item.id)) {
+            _selectedItems.remove(item.id);
+            if (_selectedItems.isEmpty) {
+              _isSelectionMode = false;
+            }
+          } else {
+            _selectedItems.add(item.id);
+          }
         }
+        _lastSelectedIndex = index;
       });
     }
   }

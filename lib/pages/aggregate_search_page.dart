@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/rendering.dart';
+import 'dart:math' as math;
 import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
 import '../services/api/api_service.dart';
@@ -31,6 +33,14 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   // 选择模式相关状态
   bool _isSelectionMode = false;
   final Set<String> _selectedItems = <String>{};
+
+  // 拖动与多选增强功能
+  bool _isDraggingSelection = false;
+  int? _dragStartIndex;
+  int? _lastSelectedIndex;
+  Set<String> _preDragSelectedItems = <String>{};
+  final GlobalKey _listKey = GlobalKey();
+
   final ScrollController _listController = ScrollController();
   final ScrollController _errorListController = ScrollController();
 
@@ -788,43 +798,60 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                     behavior: ScrollConfiguration.of(
                                       context,
                                     ).copyWith(scrollbars: false),
-                                    child: ListView.builder(
-                                      controller: _listController,
-                                      itemCount:
-                                          provider.filteredResults.length,
-                                      itemBuilder: (context, index) {
-                                        final item =
-                                            provider.filteredResults[index];
-                                        // final Color siteColor = _colorForSite(item.siteId);
-                                        return Container(
-                                          key: ValueKey(item.torrent.id),
-                                          padding: EdgeInsets.zero,
-                                          child: RepaintBoundary(
-                                            child: TorrentListItem(
-                                            torrent: item.torrent,
-                                            isSelected: _selectedItems.contains(
-                                              item.torrent.id,
+                                    child: Listener(
+                                      onPointerMove: _onPointerMove,
+                                      onPointerUp: _onPointerUp,
+                                      child: ListView.builder(
+                                        key: _listKey,
+                                        controller: _listController,
+                                        itemCount:
+                                            provider.filteredResults.length,
+                                        itemBuilder: (context, index) {
+                                          final item =
+                                              provider.filteredResults[index];
+                                          // final Color siteColor = _colorForSite(item.siteId);
+                                          return Container(
+                                            key: ValueKey(item.torrent.id),
+                                            padding: EdgeInsets.zero,
+                                            child: MetaData(
+                                              metaData: index,
+                                              behavior:
+                                                  HitTestBehavior.translucent,
+                                              child: RepaintBoundary(
+                                                child: TorrentListItem(
+                                                  torrent: item.torrent,
+                                                  isSelected: _selectedItems
+                                                      .contains(
+                                                        item.torrent.id,
+                                                      ),
+                                                  isSelectionMode:
+                                                      _isSelectionMode,
+                                                  isAggregateMode: true,
+                                                  siteName: item.siteName,
+                                                  showCoverSetting:
+                                                      _showCoverSetting,
+                                                  suspendImageLoading:
+                                                      _isFastScrolling,
+                                                  onTap: _isSelectionMode
+                                                      ? () =>
+                                                            _onToggleSelection(
+                                                              item,
+                                                              index,
+                                                            )
+                                                      : () =>
+                                                            _onTorrentTap(item),
+                                                  onLongPress: () =>
+                                                      _onLongPress(item, index),
+                                                  onDownload: () =>
+                                                      _showDownloadDialog(item),
+                                                  onToggleCollection: () =>
+                                                      _onToggleCollection(item),
+                                                ),
+                                              ),
                                             ),
-                                            isSelectionMode: _isSelectionMode,
-                                            isAggregateMode: true,
-                                            siteName: item.siteName,
-                                              showCoverSetting:
-                                                  _showCoverSetting,
-                                            suspendImageLoading:
-                                                _isFastScrolling,
-                                            onTap: _isSelectionMode
-                                                ? () => _onToggleSelection(item)
-                                                : () => _onTorrentTap(item),
-                                            onLongPress: () =>
-                                                _onLongPress(item),
-                                            onDownload: () =>
-                                                _showDownloadDialog(item),
-                                            onToggleCollection: () =>
-                                                _onToggleCollection(item),
-                                          ),
-                                          ),
-                                        );
-                                      },
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                                   if (provider.filteredResults.isNotEmpty)
@@ -894,17 +921,25 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                         const SizedBox(height: 8),
                         Card(
                           child: Padding(
-                            padding: const EdgeInsets.all(16.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0,
+                              vertical: 12.0,
+                            ),
                             child: Row(
                               children: [
                                 Text(
                                   '已选择 ${_selectedItems.length} 项',
-                                  style: Theme.of(context).textTheme.titleSmall,
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(fontSize: 13),
                                 ),
                                 const Spacer(),
                                 TextButton(
                                   onPressed: _onCancelSelection,
                                   style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    textStyle: const TextStyle(fontSize: 12),
                                     side: BorderSide(
                                       color: Theme.of(
                                         context,
@@ -914,13 +949,55 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                   ),
                                   child: const Text('取消'),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 6),
+                                // 全选按钮
+                                TextButton(
+                                  onPressed: () {
+                                    if (_selectedItems.length ==
+                                        provider.filteredResults.length) {
+                                      setState(() => _selectedItems.clear());
+                                    } else {
+                                      setState(() {
+                                        _selectedItems.addAll(
+                                          provider.filteredResults.map(
+                                            (e) => e.torrent.id,
+                                          ),
+                                        );
+                                      });
+                                    }
+                                  },
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    textStyle: const TextStyle(fontSize: 12),
+                                    side: BorderSide(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.outline,
+                                      width: 1.0,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _selectedItems.length ==
+                                            provider.filteredResults.length
+                                        ? '全不选'
+                                        : '全选',
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
                                 ElevatedButton.icon(
                                   onPressed: _selectedItems.isEmpty
                                       ? null
                                       : _onBatchDownload,
-                                  icon: const Icon(Icons.download),
-                                  label: const Text('批量下载'),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    textStyle: const TextStyle(fontSize: 12),
+                                  ),
+                                  icon: const Icon(Icons.download, size: 16),
+                                  label: const Text('下载'),
                                 ),
                               ],
                             ),
@@ -1258,30 +1335,131 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     }
   }
 
+  void _onPointerUp(PointerUpEvent event) {
+    if (_isDraggingSelection && mounted) {
+      setState(() {
+        _isDraggingSelection = false;
+        _dragStartIndex = null;
+      });
+    }
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (!_isDraggingSelection || _dragStartIndex == null || !mounted) return;
+
+    final RenderBox? box =
+        _listKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+
+    final result = BoxHitTestResult();
+    box.hitTest(result, position: box.globalToLocal(event.position));
+
+    int? currentIndex;
+    for (final hit in result.path) {
+      if (hit.target is RenderMetaData) {
+        final metaData = (hit.target as RenderMetaData).metaData;
+        if (metaData is int) {
+          currentIndex = metaData;
+          break;
+        }
+      }
+    }
+
+    if (currentIndex != null) {
+      final minIndex = math.min(_dragStartIndex!, currentIndex);
+      final maxIndex = math.max(_dragStartIndex!, currentIndex);
+
+      final newSelection = Set<String>.from(_preDragSelectedItems);
+      final provider = Provider.of<AggregateSearchProvider>(
+        context,
+        listen: false,
+      );
+      final filteredResults = provider.filteredResults;
+      for (int i = minIndex; i <= maxIndex; i++) {
+        if (i >= 0 && i < filteredResults.length) {
+          newSelection.add(filteredResults[i].torrent.id);
+        }
+      }
+
+      setState(() {
+        _selectedItems.clear();
+        _selectedItems.addAll(newSelection);
+        _lastSelectedIndex = currentIndex;
+      });
+
+      // Auto-scrolling logic inside list area
+      if (_listController.hasClients) {
+        final localY = box.globalToLocal(event.position).dy;
+        if (localY < 50) {
+          _listController.position.moveTo(_listController.offset - 15);
+        } else if (localY > box.size.height - 50) {
+          _listController.position.moveTo(_listController.offset + 15);
+        }
+      }
+    }
+  }
+
   // 长按触发选中模式
-  void _onLongPress(AggregateSearchResultItem item) {
-    if (!_isSelectionMode && mounted) {
+  void _onLongPress(AggregateSearchResultItem item, int index) {
+    if (mounted) {
       // 使用 Flutter 内置的触觉反馈，提供原生的震动体验
       HapticFeedback.mediumImpact();
       setState(() {
-        _isSelectionMode = true;
-        _selectedItems.add(item.torrent.id);
+        if (!_isSelectionMode) {
+          _isSelectionMode = true;
+          _selectedItems.add(item.torrent.id);
+        }
+        _isDraggingSelection = true;
+        _dragStartIndex = index;
+        _preDragSelectedItems = Set<String>.from(_selectedItems);
       });
     }
   }
 
   // 切换选中状态
-  void _onToggleSelection(AggregateSearchResultItem item) {
+  void _onToggleSelection(AggregateSearchResultItem item, int index) {
     if (mounted) {
+      final isShiftPressed =
+          HardwareKeyboard.instance.logicalKeysPressed.contains(
+            LogicalKeyboardKey.shiftLeft,
+          ) ||
+          HardwareKeyboard.instance.logicalKeysPressed.contains(
+            LogicalKeyboardKey.shiftRight,
+          );
+                             
       setState(() {
-        if (_selectedItems.contains(item.torrent.id)) {
-          _selectedItems.remove(item.torrent.id);
-          if (_selectedItems.isEmpty) {
-            _isSelectionMode = false;
+        if (isShiftPressed && _lastSelectedIndex != null) {
+          final minIndex = math.min(_lastSelectedIndex!, index);
+          final maxIndex = math.max(_lastSelectedIndex!, index);
+
+          final isSelecting = !_selectedItems.contains(item.torrent.id);
+          final provider = Provider.of<AggregateSearchProvider>(
+            context,
+            listen: false,
+          );
+          final filteredResults = provider.filteredResults;
+
+          for (int i = minIndex; i <= maxIndex; i++) {
+            if (i >= 0 && i < filteredResults.length) {
+              final targetItem = filteredResults[i];
+              if (isSelecting) {
+                _selectedItems.add(targetItem.torrent.id);
+              } else {
+                _selectedItems.remove(targetItem.torrent.id);
+              }
+            }
           }
         } else {
-          _selectedItems.add(item.torrent.id);
+          if (_selectedItems.contains(item.torrent.id)) {
+            _selectedItems.remove(item.torrent.id);
+            if (_selectedItems.isEmpty) {
+              _isSelectionMode = false;
+            }
+          } else {
+            _selectedItems.add(item.torrent.id);
+          }
         }
+        _lastSelectedIndex = index;
       });
     }
   }

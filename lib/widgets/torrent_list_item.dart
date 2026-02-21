@@ -154,8 +154,7 @@ class TorrentListItem extends StatelessWidget {
                       children: [
                         // 封面截图
                         Container(
-                          width: 70,
-                          height: 100,
+                                width: 70,
                           margin: const EdgeInsets.only(right: 8),
                           decoration: BoxDecoration(
                             color: Theme.of(
@@ -647,10 +646,11 @@ class TorrentListItem extends StatelessWidget {
         child: mainContent,
       );
     } else {
-      // 桌面端直接返回带手势检测的内容
+      // 桌面端直接返回带手势检测的内容（附加右键长按等效功能）
       return GestureDetector(
         onTap: onTap,
         onLongPress: onLongPress,
+        onSecondaryTap: onLongPress,
         child: mainContent,
       );
     }
