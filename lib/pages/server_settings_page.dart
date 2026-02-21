@@ -921,9 +921,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                       : Theme.of(
                                           context,
                                         ).colorScheme.surfaceContainerHighest,
-                                  child: FutureBuilder<String>(
-                                    future: _resolveLogoPath(site),
-                                    builder: (context, snapshot) {
+                                  child: Builder(
+                                    builder: (context) {
                                       final Color fgColor = isActive
                                           ? Theme.of(
                                               context,
@@ -931,34 +930,54 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                           : Theme.of(
                                               context,
                                             ).colorScheme.onSurfaceVariant;
-                                      if (snapshot.connectionState !=
-                                              ConnectionState.done ||
-                                          (snapshot.data == null ||
-                                              snapshot.data!.isEmpty)) {
-                                        return Icon(
-                                          Icons.dns,
-                                          size: 24,
-                                          color: fgColor,
+
+                                      Widget buildImage(String path) {
+                                        if (path.isEmpty) {
+                                          return Icon(
+                                            Icons.dns,
+                                            size: 24,
+                                            color: fgColor,
+                                          );
+                                        }
+                                        return ClipOval(
+                                          child: Image.asset(
+                                            path,
+                                            width: 24,
+                                            height: 24,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                                  return Image.asset(
+                                                    'assets/sites_icon/_default_nexusphp.png',
+                                                    width: 24,
+                                                    height: 24,
+                                                    fit: BoxFit.cover,
+                                                  );
+                                                },
+                                          ),
                                         );
                                       }
 
-                                      final String path = snapshot.data!;
-                                      return ClipOval(
-                                        child: Image.asset(
-                                          path,
-                                          width: 24,
-                                          height: 24,
-                                          fit: BoxFit.cover,
-                                          errorBuilder:
-                                              (context, error, stackTrace) {
-                                                return Image.asset(
-                                                  'assets/sites_icon/_default_nexusphp.png',
-                                                  width: 24,
-                                                  height: 24,
-                                                  fit: BoxFit.cover,
-                                                );
-                                              },
-                                        ),
+                                      final cached = _logoPathCache[site.id];
+                                      if (cached != null) {
+                                        return buildImage(cached);
+                                      }
+
+                                      return FutureBuilder<String>(
+                                        future: _resolveLogoPath(site),
+                                        builder: (context, snapshot) {
+                                          if (snapshot.connectionState !=
+                                                  ConnectionState.done ||
+                                              (snapshot.data == null ||
+                                                  snapshot.data!.isEmpty)) {
+                                            return Icon(
+                                              Icons.dns,
+                                              size: 24,
+                                              color: fgColor,
+                                            );
+                                          }
+                                          return buildImage(snapshot.data!);
+                                        },
                                       );
                                     },
                                   ),
@@ -1023,7 +1042,10 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                               ],
                             ),
                             const SizedBox(height: 6),
-                            if (hs != null) _buildHealthStatus(site, hs),
+                            if (hs != null)
+                              _buildHealthStatus(site, hs)
+                            else
+                              _buildHealthStatusSkeleton(),
                           ],
                         ),
                       ),
@@ -1172,6 +1194,75 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                 ),
               ),
             ],
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildHealthStatusSkeleton() {
+    return Builder(
+      builder: (context) {
+        Widget buildSkeletonItem() {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Container(
+                  height: 10,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        final items = List.generate(6, (index) => buildSkeletonItem());
+
+        final isLarge = ScreenUtils.isLargeScreen(context);
+        if (isLarge) {
+          return Row(
+            children: [
+              for (int i = 0; i < items.length; i++) ...[
+                items[i],
+                if (i != items.length - 1)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Text(
+                      '•',
+                      style: TextStyle(color: Colors.transparent),
+                    ),
+                  ),
+              ],
+            ],
+          );
+        } else {
+          return GridView.count(
+            crossAxisCount: 3,
+            crossAxisSpacing: 6,
+            mainAxisSpacing: 6,
+            childAspectRatio: 8.0,
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            children: items,
           );
         }
       },
