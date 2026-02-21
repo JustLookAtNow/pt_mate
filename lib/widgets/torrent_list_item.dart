@@ -138,8 +138,8 @@ class TorrentListItem extends StatelessWidget {
                       bottom: 10,
                       child: Icon(
                         Icons.favorite,
-                        color: Colors.red.withValues(alpha: 0.5),
-                        size: 80,
+                        color: Colors.red.withValues(alpha: 0.7),
+                        size: 30,
                       ),
                     ),
                   Padding(
