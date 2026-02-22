@@ -546,12 +546,14 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
       });
 
       // 下载并恢复备份
-      final backupData = await _backupService.downloadWebDAVBackup(selectedFile);
+      final backupData = await _backupService.downloadWebDAVBackup(
+        selectedFile,
+      );
       if (backupData == null) {
         _showWebDAVMessage('下载备份文件失败', isError: true);
         return;
       }
-      
+
       final result = await _backupService.restoreBackup(backupData);
 
       if (result.success) {
@@ -573,48 +575,156 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
 
   // 显示备份文件选择对话框
   Future<String?> _showBackupFileSelectionDialog(
-    List<Map<String, dynamic>> backupFiles,
+    List<Map<String, dynamic>> initialBackupFiles,
   ) async {
+    List<Map<String, dynamic>> backupFiles = List.from(initialBackupFiles);
+
     return await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('选择备份文件'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: backupFiles.length,
-            itemBuilder: (context, index) {
-              final backup = backupFiles[index];
-              final fileName = backup['name'] as String; // 只显示文件名
-              final fullPath = backup['path'] as String; // 完整路径用于返回
-              final modifiedTime = backup['modifiedTime'] as DateTime?;
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('选择备份文件'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: backupFiles.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text('没有找到备份文件'),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: backupFiles.length,
+                      itemBuilder: (context, index) {
+                        final backup = backupFiles[index];
+                        final fileName = backup['name'] as String; // 只显示文件名
+                        final fullPath = backup['path'] as String; // 完整路径用于返回
+                        final modifiedTime =
+                            backup['modifiedTime'] as DateTime?;
 
-              return ListTile(
-                leading: const Icon(Icons.backup),
-                title: Text(fileName),
-                subtitle: Text(
-                  modifiedTime != null
-                      ? '修改时间: ${modifiedTime.toString().substring(0, 19)}'
-                      : '点击选择此备份',
-                ),
-                onTap: () => Navigator.of(context).pop(fullPath), // 返回完整路径
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: TextButton.styleFrom(
-              side: BorderSide(
-                color: Theme.of(context).colorScheme.outline,
-                width: 1.0,
-              ),
+                        Future<void> deleteAction() async {
+                          final confirmDelete =
+                              await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('确认删除'),
+                                  content: Text(
+                                    '确定要删除备份文件\n"$fileName" 吗？\n\n此操作无法撤销。',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(false),
+                                      style: TextButton.styleFrom(
+                                        side: BorderSide(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.outline,
+                                          width: 1.0,
+                                        ),
+                                      ),
+                                      child: const Text('取消'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(true),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: Theme.of(
+                                          context,
+                                        ).colorScheme.error,
+                                        foregroundColor: Theme.of(
+                                          context,
+                                        ).colorScheme.onError,
+                                      ),
+                                      child: const Text('删除'),
+                                    ),
+                                  ],
+                                ),
+                              ) ??
+                              false;
+
+                          if (confirmDelete && context.mounted) {
+                            try {
+                              await _backupService.deleteWebDAVBackup(fullPath);
+                              setState(() {
+                                backupFiles.removeAt(index);
+                              });
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '已删除 $fileName',
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                    backgroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.primaryContainer,
+                                    behavior: SnackBarBehavior.floating,
+                                    duration: const Duration(seconds: 3),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '删除失败: $e',
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onErrorContainer,
+                                      ),
+                                    ),
+                                    backgroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.errorContainer,
+                                    behavior: SnackBarBehavior.floating,
+                                    duration: const Duration(seconds: 3),
+                                  ),
+                                );
+                              }
+                            }
+                          }
+                        }
+
+                        return GestureDetector(
+                          onSecondaryTap: deleteAction,
+                          child: ListTile(
+                            leading: const Icon(Icons.backup),
+                            title: Text(fileName),
+                            subtitle: Text(
+                              modifiedTime != null
+                                  ? '修改时间: ${modifiedTime.toString().substring(0, 19)}\n长按或右键可以删除该备份'
+                                  : '点击选择此备份\n长按或右键可以删除该备份',
+                            ),
+                            isThreeLine: true,
+                            onTap: () =>
+                                Navigator.of(context).pop(fullPath), // 返回完整路径
+                            onLongPress: deleteAction,
+                          ),
+                        );
+                      },
+                    ),
             ),
-            child: const Text('取消'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: TextButton.styleFrom(
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.outline,
+                    width: 1.0,
+                  ),
+                ),
+                child: const Text('取消'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -933,10 +1043,7 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                   children: [
                     Row(
                       children: [
-                        const Icon(
-                          Icons.warning,
-                          color: Colors.orange,
-                        ),
+                        const Icon(Icons.warning, color: Colors.orange),
                         const SizedBox(width: 8),
                         Text(
                           '重要提示',
