@@ -1,0 +1,41 @@
+{
+  "name": "momentpt",
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": true,
+    "downloadHistory": false,
+    "categorySearch": true,
+    "advancedSearch": true,
+    "showCover": true,
+    "commentDetail": false
+  },
+  "discountMapping": {
+    "Free": "FREE",
+    "Free*2": "2xFREE",
+    "2X 50%": "2x50%",
+    "10%": "PERCENT_10",
+    "20%": "PERCENT_20",
+    "30%": "PERCENT_30",
+    "40%": "PERCENT_40",
+    "50%": "PERCENT_50",
+    "60%": "PERCENT_60",
+    "70%": "PERCENT_70",
+    "80%": "PERCENT_80",
+    "90%": "PERCENT_90",
+    "Normal": "NORMAL"
+  },
+  "tagMapping": {
+    "官方": "official"
+  },
+  "id": "momentpt",
+  "primaryUrl": "https://www.momentpt.top/",
+  "baseUrls": [
+    "https://www.momentpt.top/"
+  ],
+  "siteType": "NexusPHP",
+  "logo": "assets/sites_icon/momentpt.png"
+}

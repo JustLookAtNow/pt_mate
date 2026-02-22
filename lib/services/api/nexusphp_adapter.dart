@@ -586,7 +586,9 @@ class NexusPHPAdapter implements SiteAdapter {
         final data = response.data;
         if (data['ret'] == 0 && data['data'] != null) {
           // 双循环遍历sections和categories
-          final sectionsData = data['data']['data'] as List;
+          final sectionsData = data['data']['data'] is List
+              ? data['data']['data']
+              : data['data']['sections'] as List;
           var onlyOne = false;
           if (sectionsData.length == 1) {
             onlyOne = true;
