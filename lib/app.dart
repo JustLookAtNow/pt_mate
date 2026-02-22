@@ -369,6 +369,114 @@ class _CategoryFilterDialogState extends State<_CategoryFilterDialog> {
   }
 }
 
+class _SiteSelectionDialog extends StatefulWidget {
+  final List<SiteConfig> sites;
+  final String activeSiteId;
+
+  const _SiteSelectionDialog({required this.sites, required this.activeSiteId});
+
+  @override
+  State<_SiteSelectionDialog> createState() => _SiteSelectionDialogState();
+}
+
+class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
+  late String _selectedSiteId;
+  late TextEditingController _searchController;
+  late List<SiteConfig> _filteredSites;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedSiteId = widget.activeSiteId;
+    _searchController = TextEditingController();
+    _filteredSites = widget.sites;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterSites(String keyword) {
+    setState(() {
+      if (keyword.isEmpty) {
+        _filteredSites = widget.sites;
+      } else {
+        final lowerKeyword = keyword.toLowerCase();
+        _filteredSites = widget.sites.where((s) {
+          return s.name.toLowerCase().contains(lowerKeyword) ||
+              s.baseUrl.toLowerCase().contains(lowerKeyword);
+        }).toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('切换站点'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _searchController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: '搜索站点名称或网址',
+                isDense: true,
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: _filterSites,
+            ),
+            const SizedBox(height: 16),
+            if (_filteredSites.isEmpty)
+              const Text('未找到匹配的站点', style: TextStyle(color: Colors.grey))
+            else
+              SizedBox(
+                height: 300,
+                child: RadioGroup<String>(
+                  groupValue: _selectedSiteId,
+                  onChanged: (value) {
+                    if (value != null) {
+                      Navigator.of(context).pop(value);
+                    }
+                  },
+                  child: ListView.builder(
+                    itemCount: _filteredSites.length,
+                    itemBuilder: (context, index) {
+                      final site = _filteredSites[index];
+                      final isSelected = site.id == _selectedSiteId;
+                      return ListTile(
+                        title: Text(site.name),
+                        subtitle: Text(
+                          site.baseUrl,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        leading: Radio<String>(value: site.id),
+                        selected: isSelected,
+                        selectedTileColor: Theme.of(
+                          context,
+                        ).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                        onTap: () {
+                          Navigator.of(context).pop(site.id);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class MTeamApp extends StatefulWidget {
   const MTeamApp({super.key});
 
@@ -1352,6 +1460,66 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _showSiteSelectionDialog() async {
+    final sitesData = await StorageService.instance.loadSiteConfigs(
+      includeApiKeys: false,
+    );
+    if (!mounted) return;
+
+    final appState = context.read<AppState>();
+    final activeSiteId = appState.site?.id ?? '';
+
+    final selectedSiteId = await showDialog<String>(
+      context: context,
+      builder: (context) =>
+          _SiteSelectionDialog(sites: sitesData, activeSiteId: activeSiteId),
+    );
+
+    if (selectedSiteId != null && selectedSiteId != activeSiteId && mounted) {
+      await _setActiveSite(selectedSiteId);
+    }
+  }
+
+  Future<void> _setActiveSite(String siteId) async {
+    if (!mounted) return;
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final appState = context.read<AppState>();
+    final theme = Theme.of(context);
+
+    try {
+      await appState.setActiveSite(siteId);
+      if (mounted) {
+        setState(() {
+          _currentSite = appState.site;
+        });
+        await _init(); // 加载新站点的数据
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              '已切换活跃站点',
+              style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+            ),
+            backgroundColor: theme.colorScheme.primaryContainer,
+            behavior: SnackBarBehavior.fixed,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              '切换站点失败: $e',
+              style: TextStyle(color: theme.colorScheme.onErrorContainer),
+            ),
+            backgroundColor: theme.colorScheme.errorContainer,
+            behavior: SnackBarBehavior.fixed,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AppState>(
@@ -1811,6 +1979,15 @@ class _HomePageState extends State<HomePage> {
                 ),
             ],
           ),
+            floatingActionButton: !_isSelectionMode
+                ? FloatingActionButton.extended(
+                    onPressed: _showSiteSelectionDialog,
+                    icon: const Icon(Icons.swap_horiz),
+                    label: const Text('切换站点'),
+                  )
+                : null,
+            floatingActionButtonLocation:
+                FloatingActionButtonLocation.centerFloat,
           ),
         );
       },
