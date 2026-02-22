@@ -1657,6 +1657,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
   bool _showPresetList = true; // 控制预设站点列表的显示/隐藏
   bool _showManualCookieInput = false; // 是否展示手动输入cookie框
   Color? _siteColor; // 站点颜色（编辑页）
+  String? _newSiteId; // 新建站点时保持稳定的ID
 
   @override
   void initState() {
@@ -1671,6 +1672,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
     // 添加预设站点搜索监听器
     _presetSearchController.addListener(_filterPresetSites);
+
+    _newSiteId =
+        'site-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1000)}';
 
     if (widget.site != null) {
       // 编辑现有站点时，先保存原始数据，但不立即填充到UI字段
@@ -1888,8 +1892,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       templateId = widget.site!.templateId;
     } else {
       // 新建站点时，生成新的 id 和设置 templateId
-      id =
-          'site-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1000)}';
+      id = _newSiteId!;
 
       // 根据是否选择预设站点来设置 templateId
       if (!_isCustomSite && _selectedTemplateUrl != null) {
@@ -2123,6 +2126,18 @@ class _SiteEditPageState extends State<SiteEditPage> {
       await ApiService.instance.setActiveSite(site);
       final profile = await ApiService.instance.fetchMemberProfile();
       
+      try {
+        final statuses = await StorageService.instance.loadHealthStatuses();
+        statuses[site.id] = _HealthStatus(
+          ok: true,
+          message: '正常',
+          username: profile.username,
+          profile: profile,
+          updatedAt: DateTime.now(),
+        ).toJson();
+        await StorageService.instance.saveHealthStatuses(statuses);
+      } catch (_) {}
+
       if (!mounted) return;
       showDialog(
         context: context,
@@ -2138,6 +2153,19 @@ class _SiteEditPageState extends State<SiteEditPage> {
         ),
       );
     } catch (e) {
+      try {
+        final site = _composeCurrentSite();
+        final statuses = await StorageService.instance.loadHealthStatuses();
+        statuses[site.id] = _HealthStatus(
+          ok: false,
+          message: e.toString(),
+          username: null,
+          profile: null,
+          updatedAt: DateTime.now(),
+        ).toJson();
+        await StorageService.instance.saveHealthStatuses(statuses);
+      } catch (_) {}
+
       if (!mounted) return;
       showDialog(
         context: context,
