@@ -16,6 +16,7 @@ import 'services/theme/theme_manager.dart';
 import 'services/backup_service.dart';
 import 'services/webdav_service.dart';
 import 'providers/aggregate_search_provider.dart';
+import 'services/site_config_service.dart';
 
 import 'services/downloader/downloader_config.dart';
 import 'services/downloader/downloader_service.dart';
@@ -384,6 +385,33 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
   late TextEditingController _searchController;
   late List<SiteConfig> _filteredSites;
 
+  final Map<String, String> _logoPathCache = {};
+
+  Future<String> _resolveLogoPath(SiteConfig site) async {
+    final cached = _logoPathCache[site.id];
+    if (cached != null && cached.isNotEmpty) return cached;
+
+    String path = 'assets/sites_icon/_default_nexusphp.png';
+    try {
+      final template = await SiteConfigService.getTemplateById(
+        site.templateId,
+        site.siteType,
+      );
+      final logo = template?.logo;
+      if (logo != null && logo.isNotEmpty) {
+        final lower = logo.toLowerCase();
+        path = lower.endsWith('.png')
+            ? logo
+            : (logo.contains('.')
+                  ? '${logo.substring(0, logo.lastIndexOf('.'))}.png'
+                  : logo);
+      }
+    } catch (_) {}
+
+    _logoPathCache[site.id] = path;
+    return path;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -450,14 +478,81 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                     itemBuilder: (context, index) {
                       final site = _filteredSites[index];
                       final isSelected = site.id == _selectedSiteId;
+                      final Color? siteColor = site.siteColor != null
+                          ? Color(site.siteColor!)
+                          : null;
+
+                      Widget buildImage(String path, Color fgColor) {
+                        if (path.isEmpty) {
+                          return Icon(Icons.dns, size: 24, color: fgColor);
+                        }
+                        return ClipOval(
+                          child: Image.asset(
+                            path,
+                            width: 24,
+                            height: 24,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Image.asset(
+                                'assets/sites_icon/_default_nexusphp.png',
+                                width: 24,
+                                height: 24,
+                                fit: BoxFit.cover,
+                              );
+                            },
+                          ),
+                        );
+                      }
+
                       return ListTile(
+                        leading: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : siteColor?.withValues(alpha: 0.2) ??
+                                    Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerHighest,
+                          child: Builder(
+                            builder: (context) {
+                              final fgColor = isSelected
+                                  ? Theme.of(context).colorScheme.onPrimary
+                                  : siteColor ??
+                                        Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant;
+
+                              final cached = _logoPathCache[site.id];
+                              if (cached != null) {
+                                return buildImage(cached, fgColor);
+                              }
+
+                              return FutureBuilder<String>(
+                                future: _resolveLogoPath(site),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState !=
+                                          ConnectionState.done ||
+                                      (snapshot.data == null ||
+                                          snapshot.data!.isEmpty)) {
+                                    return Icon(
+                                      Icons.dns,
+                                      size: 24,
+                                      color: fgColor,
+                                    );
+                                  }
+                                  return buildImage(snapshot.data!, fgColor);
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        trailing: Radio<String>(value: site.id),
                         title: Text(site.name),
                         subtitle: Text(
                           site.baseUrl,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        leading: Radio<String>(value: site.id),
                         selected: isSelected,
                         selectedTileColor: Theme.of(
                           context,
