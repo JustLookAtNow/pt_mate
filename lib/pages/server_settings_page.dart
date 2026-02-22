@@ -470,8 +470,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     }
   }
 
-  void _addSite() {
-    Navigator.of(context).push(
+  void _addSite() async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => SiteEditPage(
           onSaved: () {
@@ -480,6 +480,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         ),
       ),
     );
+    if (!mounted) return;
+    _loadCachedHealthStatuses();
   }
 
   void _editSite(SiteConfig site) async {
@@ -493,7 +495,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     );
 
     if (!mounted) return;
-    Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => SiteEditPage(
           site: fullSite,
@@ -503,6 +505,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         ),
       ),
     );
+    if (!mounted) return;
+    _loadCachedHealthStatuses();
   }
 
   // 小屏长按弹菜单；大屏右侧按钮使用此数据源
