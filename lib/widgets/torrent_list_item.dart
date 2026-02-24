@@ -169,17 +169,29 @@ class TorrentListItem extends StatelessWidget {
                             ),
                           ),
                           child: GestureDetector(
-                            onTap: () {
+                                  onTap: () async {
                               if (torrent.cover.isNotEmpty) {
-                                showDialog(
+                                      // 先取消当前焦点（如搜索框），防止 Dialog 关闭后恢复
+                                      FocusManager.instance.primaryFocus
+                                          ?.unfocus();
+                                      await showDialog(
                                   context: context,
-                                  builder: (context) => Dialog(
+                                        builder: (ctx) => Dialog(
                                     child: CachedNetworkImage(
                                       imageUrl: torrent.cover,
                                       fit: BoxFit.contain,
                                     ),
                                   ),
                                 );
+                                      // Dialog 关闭后焦点恢复机制会在下一帧重新聚焦之前的控件，
+                                      // 必须在 postFrameCallback 中再次取消
+                                      if (context.mounted) {
+                                        WidgetsBinding.instance
+                                            .addPostFrameCallback((_) {
+                                              FocusManager.instance.primaryFocus
+                                                  ?.unfocus();
+                                            });
+                                      }
                               }
                             },
                             child: ClipRRect(

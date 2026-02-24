@@ -295,6 +295,7 @@ class _CategoryFilterDialogState extends State<_CategoryFilterDialog> {
             const SizedBox(height: 8),
             TextField(
               controller: _keywordController,
+              onTapOutside: (event) => FocusScope.of(context).unfocus(),
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 hintText: '输入关键词（可选）',
@@ -452,6 +453,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
           children: [
             TextField(
               controller: _searchController,
+              onTapOutside: (event) => FocusScope.of(context).unfocus(),
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 hintText: '搜索站点名称或网址',
@@ -628,6 +630,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final _keywordCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   int _selectedCategoryIndex = 0;
   List<SearchCategoryConfig> _categories = [];
@@ -756,6 +759,7 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _scrollCtrl.dispose();
     _keywordCtrl.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -927,6 +931,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onScroll() {
+    // 滑动时收起键盘（滑动不触发 onTapOutside）
+    if (_searchFocusNode.hasFocus) {
+      _searchFocusNode.unfocus();
+    }
     final currentOffset = _scrollCtrl.position.pixels;
     final delta = currentOffset - _lastScrollOffset;
 
@@ -995,6 +1003,8 @@ class _HomePageState extends State<HomePage> {
                   Expanded(
                     child: TextField(
                       controller: _keywordCtrl,
+                      focusNode: _searchFocusNode,
+                      onTapOutside: (event) => FocusScope.of(context).unfocus(),
                       textInputAction: TextInputAction.search,
                       enabled: _currentSite?.features.supportTorrentSearch ?? true,
                       decoration: InputDecoration(
@@ -1346,6 +1356,11 @@ class _HomePageState extends State<HomePage> {
     // 从详情页返回后，刷新列表页状态以确保收藏状态同步
     if (mounted) {
       setState(() {});
+      // 路由 pop 后 Flutter 焦点恢复机制会在下一帧重新聚焦 TextField，
+      // 必须在 postFrameCallback 中再次取消焦点才能真正阻止键盘弹出
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _searchFocusNode.unfocus();
+      });
     }
   }
 
@@ -1547,6 +1562,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _showSiteSelectionDialog() async {
+
     final sitesData = await StorageService.instance.loadSiteConfigs(
       includeApiKeys: false,
     );
@@ -1838,6 +1854,8 @@ class _HomePageState extends State<HomePage> {
                                 child: ListView(
                                   physics:
                                       const AlwaysScrollableScrollPhysics(),
+                                  keyboardDismissBehavior:
+                                      ScrollViewKeyboardDismissBehavior.onDrag,
                                   children: [
                                     SizedBox(
                                       height:
@@ -1899,6 +1917,8 @@ class _HomePageState extends State<HomePage> {
                                   controller: _scrollCtrl,
                                   physics:
                                       const AlwaysScrollableScrollPhysics(),
+                                  keyboardDismissBehavior:
+                                      ScrollViewKeyboardDismissBehavior.onDrag,
                                   padding: const EdgeInsets.fromLTRB(
                                     0,
                                     0,
