@@ -466,14 +466,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
             else
               SizedBox(
                 height: 300,
-                child: RadioGroup<String>(
-                  groupValue: _selectedSiteId,
-                  onChanged: (value) {
-                    if (value != null) {
-                      Navigator.of(context).pop(value);
-                    }
-                  },
-                  child: ListView.builder(
+                child: ListView.builder(
                     itemCount: _filteredSites.length,
                     itemBuilder: (context, index) {
                       final site = _filteredSites[index];
@@ -545,8 +538,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                               );
                             },
                           ),
-                        ),
-                        trailing: Radio<String>(value: site.id),
+                      ),
                         title: Text(site.name),
                         subtitle: Text(
                           site.baseUrl,
@@ -562,7 +554,6 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                         },
                       );
                     },
-                  ),
                 ),
               ),
           ],
