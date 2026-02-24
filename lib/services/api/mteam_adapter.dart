@@ -262,7 +262,7 @@ class MTeamAdapter extends SiteAdapter {
       'pageSize': pageSize,
       if (keyword != null && keyword.trim().isNotEmpty)
         'keyword': keyword.trim(),
-      if (onlyFav != null) 'onlyFav': onlyFav,
+      'onlyFav': ?onlyFav,
     };
 
     // 合并额外参数

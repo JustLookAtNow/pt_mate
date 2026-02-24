@@ -87,7 +87,7 @@ class TransmissionClient
     
     final requestBody = {
       'method': method,
-      if (arguments != null) 'arguments': arguments,
+      'arguments': ?arguments,
     };
     
     final requestHeaders = <String, String>{
