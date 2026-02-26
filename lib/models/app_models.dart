@@ -313,7 +313,7 @@ enum TagType {
   chineseTraditional('繁体', Colors.green, 'chinese_traditional'),
   mandarin('国语', Colors.blue, ''),
   diy('DIY', Colors.brown, ''),
-  complete('完结', Color.fromARGB(255, 110, 8, 206), ''),
+  complete('完结', Color.fromARGB(255, 110, 8, 206), r'\b完结\b|全[^\s]+集'),
   zero('零魔',Color.fromARGB(159, 4, 164, 239),''),
   ep(
     '分集',
