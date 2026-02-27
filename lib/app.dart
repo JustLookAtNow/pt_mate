@@ -717,6 +717,9 @@ class _HomePageState extends State<HomePage> {
   // 封面图片显示设置（用户偏好）
   bool _showCoverSetting = true; // 默认自动显示
   
+  // 切换站点 FAB 按钮的显示状态（向上滑动隐藏，向下滑动显示）
+  bool _fabVisible = true;
+  
   @override
   void initState() {
     super.initState();
@@ -931,17 +934,31 @@ class _HomePageState extends State<HomePage> {
     // 基于滚动距离的连续进度控制：向下滚动逐步隐藏，向上滚动逐步显示
     double newProgress = _headerProgress;
     if (delta > 0) {
-      // 向下滚动：减少显示进度
+      // 向下滚动（内容上移）：减少头部显示进度，隐藏 FAB
       newProgress = (newProgress - delta / _maxHideDistance).clamp(0.0, 1.0);
+      if (_fabVisible) {
+        setState(() {
+          _headerProgress = newProgress;
+          _fabVisible = false;
+        });
+      } else if (newProgress != _headerProgress) {
+        setState(() {
+          _headerProgress = newProgress;
+        });
+      }
     } else if (delta < 0) {
-      // 向上滚动：增加显示进度
+      // 向上滚动（内容下移）：增加头部显示进度，显示 FAB
       newProgress = (newProgress + (-delta) / _maxHideDistance).clamp(0.0, 1.0);
-    }
-
-    if (newProgress != _headerProgress) {
-      setState(() {
-        _headerProgress = newProgress;
-      });
+      if (!_fabVisible) {
+        setState(() {
+          _headerProgress = newProgress;
+          _fabVisible = true;
+        });
+      } else if (newProgress != _headerProgress) {
+        setState(() {
+          _headerProgress = newProgress;
+        });
+      }
     }
     _lastScrollOffset = currentOffset;
 
@@ -1505,6 +1522,8 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         setState(() {
           _currentSite = appState.site;
+          _headerProgress = 1.0;
+          _fabVisible = true;
         });
         await _init(); // 加载新站点的数据
         NotificationHelper.showInfo(context, '已切换活跃站点');
@@ -1969,10 +1988,22 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
             floatingActionButton: !_isSelectionMode
-                ? FloatingActionButton.extended(
-                    onPressed: _showSiteSelectionDialog,
-                    icon: const Icon(Icons.swap_horiz),
-                    label: const Text('切换站点'),
+                ? AnimatedSlide(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                    offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                      opacity: _fabVisible ? 1.0 : 0.0,
+                      child: FloatingActionButton.extended(
+                        onPressed: _fabVisible
+                            ? _showSiteSelectionDialog
+                            : null,
+                        icon: const Icon(Icons.swap_horiz),
+                        label: const Text('切换站点'),
+                      ),
+                    ),
                   )
                 : null,
             floatingActionButtonLocation:
