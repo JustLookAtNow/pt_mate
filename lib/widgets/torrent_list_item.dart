@@ -56,6 +56,9 @@ class TorrentListItem extends StatelessWidget {
   /// 下载回调
   final VoidCallback? onDownload;
 
+  // 使用 static final 避免每次重复编译正则表达式
+  static final RegExp _ratingRegex = RegExp(r'([0-9]+(?:\.[0-9]+)?)');
+
   const TorrentListItem({
     super.key,
     required this.torrent,
@@ -76,7 +79,7 @@ class TorrentListItem extends StatelessWidget {
     if (r == null) return false;
     final t = r.trim();
     if (t.isEmpty || t == 'N/A') return false;
-    final m = RegExp(r'([0-9]+(?:\.[0-9]+)?)').firstMatch(t);
+    final m = _ratingRegex.firstMatch(t);
     if (m == null) return false;
     final v = double.tryParse(m.group(1)!);
     return v != null && v > 0;
