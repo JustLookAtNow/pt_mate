@@ -289,7 +289,11 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
           setState(() {
             _loginSuccess = true;
           });
-                    NotificationHelper.showInfo(context, 'Cookie 获取成功！如有二次验证请继续操作，完成后请手动关闭此页面', duration: const Duration(seconds: 5));
+          NotificationHelper.showInfo(
+            context,
+            'Cookie 获取成功！如有二次验证请继续操作，完成后请手动关闭此页面',
+            duration: const Duration(seconds: 5),
+          );
         }
         return;
       }
@@ -298,14 +302,18 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
         _logger.w('CookieManager未获取到cookie');
       }
       if (mounted) {
-                NotificationHelper.showInfo(context, '无法获取cookie，请检查登录状态', duration: const Duration(seconds: 3));
+        NotificationHelper.showInfo(
+          context,
+          '无法获取cookie，请检查登录状态',
+          duration: const Duration(seconds: 3),
+        );
       }
     } catch (e) {
       if (kDebugMode) {
         _logger.e('提取cookie时出错: $e');
       }
       if (mounted) {
-                NotificationHelper.showError(context, 'Cookie提取失败: $e');
+        NotificationHelper.showError(context, 'Cookie提取失败: $e');
       }
     }
   }

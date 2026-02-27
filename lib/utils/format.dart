@@ -33,11 +33,11 @@ class FormatUtil {
     if (seconds < 0) {
       return '未知';
     }
-    
+
     final hours = seconds ~/ 3600;
     final minutes = (seconds % 3600) ~/ 60;
     final remainingSeconds = seconds % 60;
-    
+
     if (hours > 0) {
       return '$hours:${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
     } else {
@@ -106,14 +106,14 @@ class Formatters {
     try {
       final now = DateTime.now();
       final difference = now.difference(date);
-      
+
       // 计算各个时间单位
       final years = difference.inDays ~/ 365;
       final months = (difference.inDays % 365) ~/ 30;
       final days = difference.inDays % 30;
       final hours = difference.inHours % 24;
       final minutes = difference.inMinutes % 60;
-      
+
       // 按优先级返回两段显示
       if (years > 0) {
         if (months > 0) {
@@ -121,33 +121,33 @@ class Formatters {
         }
         return '$years 年 前';
       }
-      
+
       if (months > 0) {
         if (days > 0) {
           return '$months 月 $days 天 前';
         }
         return '$months 月 前';
       }
-      
+
       if (days > 0) {
         if (hours > 0) {
           return '$days 天 $hours 小时 前';
         }
         return '$days 天 前';
       }
-      
+
       if (hours > 0) {
         if (minutes > 0) {
           return '$hours 小时 $minutes 分钟 前';
         }
         return '$hours 小时 前';
       }
-      
+
       // 最小单位为分钟
       if (minutes > 0) {
         return '$minutes 分钟 前';
       }
-      
+
       return '刚刚'; // 不足1分钟显示为刚刚
     } catch (e) {
       return "- -";
@@ -213,5 +213,4 @@ class Formatters {
       }
     }
   }
-
 }

@@ -23,7 +23,9 @@ class ApiService {
       await _initAdapter(activeSite);
       swInitAdapter.stop();
       if (kDebugMode) {
-        _logger.d('ApiService.init: 初始化活跃适配器耗时=${swInitAdapter.elapsedMilliseconds}ms');
+        _logger.d(
+          'ApiService.init: 初始化活跃适配器耗时=${swInitAdapter.elapsedMilliseconds}ms',
+        );
       }
     }
     swTotal.stop();
@@ -49,7 +51,9 @@ class ApiService {
     await adapter.init(siteConfig);
     swInit.stop();
     if (kDebugMode) {
-      _logger.d('ApiService.getAdapter: 适配器(${siteConfig.siteType.id})初始化耗时=${swInit.elapsedMilliseconds}ms');
+      _logger.d(
+        'ApiService.getAdapter: 适配器(${siteConfig.siteType.id})初始化耗时=${swInit.elapsedMilliseconds}ms',
+      );
     }
     _adapters[adapterId] = adapter;
 
@@ -164,14 +168,22 @@ class ApiService {
     // 如果提供了siteConfig，使用临时适配器
     if (siteConfig != null) {
       final adapter = await getAdapter(siteConfig);
-      return adapter.fetchComments(id, pageNumber: pageNumber, pageSize: pageSize);
+      return adapter.fetchComments(
+        id,
+        pageNumber: pageNumber,
+        pageSize: pageSize,
+      );
     }
 
     // 否则使用当前活跃适配器
     if (_activeAdapter == null) {
       throw StateError('No active site adapter available');
     }
-    return _activeAdapter!.fetchComments(id, pageNumber: pageNumber, pageSize: pageSize);
+    return _activeAdapter!.fetchComments(
+      id,
+      pageNumber: pageNumber,
+      pageSize: pageSize,
+    );
   }
 
   /// 生成下载令牌

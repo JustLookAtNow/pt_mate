@@ -145,7 +145,9 @@ Future<void> main() async {
           stdout.writeln('Downloaded $name -> ${pngOutFile.path}');
           createdStems.add(stem);
         } else if (isIco) {
-          final img.Image? image = img.decodeIco(Uint8List.fromList(bytes)) ?? img.decodeImage(Uint8List.fromList(bytes));
+          final img.Image? image =
+              img.decodeIco(Uint8List.fromList(bytes)) ??
+              img.decodeImage(Uint8List.fromList(bytes));
           if (image == null) {
             stderr.writeln('Failed to decode ICO: $name');
             continue;
@@ -259,7 +261,9 @@ Future<void> main() async {
           await pngOutFile.writeAsBytes(pngBytes);
           converted++;
           createdStems.add(stem);
-          stdout.writeln('Converted favicon ICO for $stem -> ${pngOutFile.path}');
+          stdout.writeln(
+            'Converted favicon ICO for $stem -> ${pngOutFile.path}',
+          );
           continue;
         }
         image = img.decodeImage(Uint8List.fromList(bytes));
@@ -277,7 +281,7 @@ Future<void> main() async {
       continue;
     }
   }
-  
+
   // 更新对应站点 JSON，logo 字段统一指向 PNG 资源
   for (final stem in createdStems) {
     final pngFile = File('${outDir.path}/$stem.png');

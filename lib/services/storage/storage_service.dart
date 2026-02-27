@@ -11,41 +11,46 @@ import '../downloader/downloader_config.dart';
 class StorageKeys {
   // 应用版本管理
   static const String appVersion = 'app.version'; // 存储应用数据版本
-  
+
   // 多站点配置
   static const String siteConfigs = 'app.sites'; // 存储所有站点配置
   static const String activeSiteId = 'app.activeSiteId'; // 当前活跃站点ID
-  
+
   // 兼容性：旧的单站点配置（用于迁移）
   static const String siteConfig = 'app.site';
-  
+
   // 兼容性：旧的qBittorrent配置（用于迁移）
   static const String legacyQbClientConfigs = 'qb.clients';
   static const String legacyDefaultQbId = 'qb.defaultId';
   static String legacyQbPasswordKey(String id) => 'qb.password.$id';
-  static String legacyQbPasswordFallbackKey(String id) => 'qb.password.fallback.$id';
+  static String legacyQbPasswordFallbackKey(String id) =>
+      'qb.password.fallback.$id';
   static String legacyQbCategoriesKey(String id) => 'qb.categories.$id';
   static String legacyQbTagsKey(String id) => 'qb.tags.$id';
-  
+
   // 新的下载器配置
   static const String downloaderConfigs = 'downloader.configs';
   static const String defaultDownloaderId = 'downloader.defaultId';
   static String downloaderPasswordKey(String id) => 'downloader.password.$id';
-  static String downloaderPasswordFallbackKey(String id) => 'downloader.password.fallback.$id';
-  static String downloaderCategoriesKey(String id) => 'downloader.categories.$id';
+  static String downloaderPasswordFallbackKey(String id) =>
+      'downloader.password.fallback.$id';
+  static String downloaderCategoriesKey(String id) =>
+      'downloader.categories.$id';
   static String downloaderTagsKey(String id) => 'downloader.tags.$id';
   static String downloaderPathsKey(String id) => 'downloader.paths.$id';
-  
+
   // 默认下载设置
   static const String defaultDownloadCategory = 'download.defaultCategory';
   static const String defaultDownloadTags = 'download.defaultTags';
   static const String defaultDownloadSavePath = 'download.defaultSavePath';
-  static const String defaultDownloadStartPaused = 'download.defaultStartPaused';
+  static const String defaultDownloadStartPaused =
+      'download.defaultStartPaused';
 
   // 多站点API密钥存储
   static String siteApiKey(String siteId) => 'site.apiKey.$siteId';
-  static String siteApiKeyFallback(String siteId) => 'site.apiKey.fallback.$siteId';
-  
+  static String siteApiKeyFallback(String siteId) =>
+      'site.apiKey.fallback.$siteId';
+
   // 兼容性：旧的API密钥存储
   static const String legacySiteApiKey = 'site.apiKey';
   // 非安全存储的降级 Key（例如 Linux 桌面端 keyring 被锁定时）
@@ -53,8 +58,9 @@ class StorageKeys {
 
   // WebDAV密码安全存储
   static String webdavPassword(String configId) => 'webdav.password.$configId';
-  static String webdavPasswordFallback(String configId) => 'webdav.password.fallback.$configId';
-  
+  static String webdavPasswordFallback(String configId) =>
+      'webdav.password.fallback.$configId';
+
   // 设备ID（与历史 DeviceIdService 使用的 key 保持一致）
   static const String deviceId = 'device_id';
   // 非安全存储的降级 Key（例如 Linux 桌面端 keyring 被锁定时）
@@ -64,7 +70,7 @@ class StorageKeys {
   static const String themeMode = 'theme.mode'; // system | light | dark
   static const String themeUseDynamic = 'theme.useDynamic'; // bool
   static const String themeSeedColor = 'theme.seedColor'; // int (ARGB)
-  
+
   // 图片设置
   static const String autoLoadImages = 'images.autoLoad'; // bool
   static const String showCoverImages = 'images.showCover'; // bool
@@ -72,13 +78,13 @@ class StorageKeys {
   static const String logToFileEnabled = 'logging.toFile'; // bool
   // 标签显示设置
   static const String visibleTags = 'ui.visibleTags'; // List<String>
-  
+
   // 聚合搜索设置
   static const String aggregateSearchSettings = 'aggregateSearch.settings';
-  
+
   // 健康检查结果缓存（站点ID -> 状态JSON）
   static const String healthStatuses = 'app.healthStatuses';
-  
+
   // 查询条件配置已移至站点配置中，不再需要全局键
 }
 
@@ -105,7 +111,7 @@ class StorageService {
   final FlutterSecureStorage _legacySecure = const FlutterSecureStorage();
 
   Future<SharedPreferences> get _prefs async => SharedPreferences.getInstance();
-  
+
   /// 统一安全存储读取：优先使用统一选项的安全存储，若没有读到则尝试旧构造参数的安全存储，并在读到旧值后自动迁移到新存储。
   Future<String?> _secureReadWithMigration(String key) async {
     try {
@@ -137,12 +143,12 @@ class StorageService {
 
   // 版本管理
   static const String currentVersion = '1.2.0';
-  
+
   /// 检查并执行数据迁移
   Future<void> checkAndMigrate() async {
     final prefs = await _prefs;
     final storedVersion = prefs.getString(StorageKeys.appVersion);
-    
+
     if (storedVersion == null) {
       // 首次安装或从1.0.0升级（1.0.0版本没有版本标记）
       await _migrateFrom100To110();
@@ -157,18 +163,19 @@ class StorageService {
       await prefs.setString(StorageKeys.appVersion, currentVersion);
     }
   }
-  
+
   /// 从1.0.0迁移到1.1.0
   Future<void> _migrateFrom100To110() async {
     final prefs = await _prefs;
-    
+
     // 迁移qBittorrent配置到下载器配置
     final qbConfigsStr = prefs.getString(StorageKeys.legacyQbClientConfigs);
     if (qbConfigsStr != null) {
       try {
-        final qbConfigs = (jsonDecode(qbConfigsStr) as List).cast<Map<String, dynamic>>();
+        final qbConfigs = (jsonDecode(qbConfigsStr) as List)
+            .cast<Map<String, dynamic>>();
         final downloaderConfigs = <Map<String, dynamic>>[];
-        
+
         for (final qbConfig in qbConfigs) {
           // 转换为新的下载器配置格式
           final downloaderConfig = {
@@ -184,7 +191,7 @@ class StorageService {
             },
           };
           downloaderConfigs.add(downloaderConfig);
-          
+
           // 迁移密码
           final clientId = qbConfig['id'] as String?;
           if (clientId != null && clientId.isNotEmpty) {
@@ -193,48 +200,61 @@ class StorageService {
             await _migrateTags(clientId);
           }
         }
-        
+
         // 保存新的下载器配置
-        await prefs.setString(StorageKeys.downloaderConfigs, jsonEncode(downloaderConfigs));
-        
+        await prefs.setString(
+          StorageKeys.downloaderConfigs,
+          jsonEncode(downloaderConfigs),
+        );
+
         // 迁移默认下载器ID
         final defaultQbId = prefs.getString(StorageKeys.legacyDefaultQbId);
         if (defaultQbId != null) {
           await prefs.setString(StorageKeys.defaultDownloaderId, defaultQbId);
         }
-        
+
         // 清理旧配置
         await prefs.remove(StorageKeys.legacyQbClientConfigs);
         await prefs.remove(StorageKeys.legacyDefaultQbId);
-        
       } catch (e) {
-         // 迁移失败时记录错误，但不阻塞应用启动
-         if (kDebugMode) {
-           _logger.e('数据迁移失败: $e');
-         }
-       }
+        // 迁移失败时记录错误，但不阻塞应用启动
+        if (kDebugMode) {
+          _logger.e('数据迁移失败: $e');
+        }
+      }
     }
   }
-  
+
   /// 迁移密码
   Future<void> _migratePassword(String clientId) async {
     try {
       // 尝试从安全存储读取旧密码
-      final oldPassword = await _secureReadWithMigration(StorageKeys.legacyQbPasswordKey(clientId));
+      final oldPassword = await _secureReadWithMigration(
+        StorageKeys.legacyQbPasswordKey(clientId),
+      );
       if (oldPassword != null && oldPassword.isNotEmpty) {
-        await _secure.write(key: StorageKeys.downloaderPasswordKey(clientId), value: oldPassword);
+        await _secure.write(
+          key: StorageKeys.downloaderPasswordKey(clientId),
+          value: oldPassword,
+        );
         await _secure.delete(key: StorageKeys.legacyQbPasswordKey(clientId));
-        try { await _legacySecure.delete(key: StorageKeys.legacyQbPasswordKey(clientId)); } catch (_) {}
+        try {
+          await _legacySecure.delete(
+            key: StorageKeys.legacyQbPasswordKey(clientId),
+          );
+        } catch (_) {}
         return;
       }
     } catch (_) {
       // 安全存储读取失败，尝试从降级存储读取
     }
-    
+
     try {
       // 尝试从降级存储读取旧密码
       final prefs = await _prefs;
-      final oldPassword = prefs.getString(StorageKeys.legacyQbPasswordFallbackKey(clientId));
+      final oldPassword = prefs.getString(
+        StorageKeys.legacyQbPasswordFallbackKey(clientId),
+      );
       if (oldPassword != null && oldPassword.isNotEmpty) {
         await saveDownloaderPassword(clientId, oldPassword);
         await prefs.remove(StorageKeys.legacyQbPasswordFallbackKey(clientId));
@@ -243,21 +263,26 @@ class StorageService {
       // 降级存储读取失败，忽略
     }
   }
-  
+
   /// 迁移分类缓存
   Future<void> _migrateCategories(String clientId) async {
     try {
       final prefs = await _prefs;
-      final oldCategories = prefs.getString(StorageKeys.legacyQbCategoriesKey(clientId));
+      final oldCategories = prefs.getString(
+        StorageKeys.legacyQbCategoriesKey(clientId),
+      );
       if (oldCategories != null) {
-        await prefs.setString(StorageKeys.downloaderCategoriesKey(clientId), oldCategories);
+        await prefs.setString(
+          StorageKeys.downloaderCategoriesKey(clientId),
+          oldCategories,
+        );
         await prefs.remove(StorageKeys.legacyQbCategoriesKey(clientId));
       }
     } catch (_) {
       // 迁移失败，忽略
     }
   }
-  
+
   /// 迁移标签缓存
   Future<void> _migrateTags(String clientId) async {
     try {
@@ -297,12 +322,18 @@ class StorageService {
     // secure parts
     if ((config.apiKey ?? '').isNotEmpty) {
       try {
-        await _secure.write(key: StorageKeys.legacySiteApiKey, value: config.apiKey);
+        await _secure.write(
+          key: StorageKeys.legacySiteApiKey,
+          value: config.apiKey,
+        );
         // 清理降级存储
         await prefs.remove(StorageKeys.legacySiteApiKeyFallback);
       } catch (_) {
         // 当桌面环境的 keyring 被锁定或不可用时，降级到本地存储，避免崩溃
-        await prefs.setString(StorageKeys.legacySiteApiKeyFallback, config.apiKey!);
+        await prefs.setString(
+          StorageKeys.legacySiteApiKeyFallback,
+          config.apiKey!,
+        );
       }
     } else {
       try {
@@ -342,12 +373,16 @@ class StorageService {
   // 多站点配置管理
   Future<void> saveSiteConfigs(List<SiteConfig> configs) async {
     final prefs = await _prefs;
-    final jsonList = configs.map((config) => {
-      ...config.toJson(),
-      'apiKey': null, // API密钥单独存储
-    }).toList();
+    final jsonList = configs
+        .map(
+          (config) => {
+            ...config.toJson(),
+            'apiKey': null, // API密钥单独存储
+          },
+        )
+        .toList();
     await prefs.setString(StorageKeys.siteConfigs, jsonEncode(jsonList));
-    
+
     // 保存每个站点的API密钥
     for (final config in configs) {
       // 仅当传入的 apiKey 非空时才更新安全存储；
@@ -388,7 +423,9 @@ class StorageService {
         baseConfigs = _siteConfigsCache!;
         hasUpdates = _siteConfigsCacheNeedsUpdate;
         if (kDebugMode) {
-          _logger.d('StorageService.loadSiteConfigs: 使用内存缓存，includeApiKeys=$includeApiKeys');
+          _logger.d(
+            'StorageService.loadSiteConfigs: 使用内存缓存，includeApiKeys=$includeApiKeys',
+          );
         }
       } else {
         // 重新解析 JSON
@@ -435,7 +472,9 @@ class StorageService {
           }
           swKey.stop();
           if (kDebugMode) {
-            _logger.d('StorageService.loadSiteConfigs: 第${idx + 1}个站点 加载API密钥耗时=${swKey.elapsedMilliseconds}ms');
+            _logger.d(
+              'StorageService.loadSiteConfigs: 第${idx + 1}个站点 加载API密钥耗时=${swKey.elapsedMilliseconds}ms',
+            );
           }
           finalConfig = cfg.copyWith(apiKey: apiKey);
         } else {
@@ -451,18 +490,24 @@ class StorageService {
         await saveSiteConfigs(configs);
         swSave.stop();
         if (kDebugMode) {
-          _logger.d('StorageService.loadSiteConfigs: 保存更新耗时=${swSave.elapsedMilliseconds}ms');
+          _logger.d(
+            'StorageService.loadSiteConfigs: 保存更新耗时=${swSave.elapsedMilliseconds}ms',
+          );
         }
       } else if (hasUpdates && !includeApiKeys) {
         _hasPendingConfigUpdates = true;
         if (kDebugMode) {
-          _logger.i('StorageService.loadSiteConfigs: 检测到配置需要更新，但已跳过保存以避免清除API密钥（稍后持久化）');
+          _logger.i(
+            'StorageService.loadSiteConfigs: 检测到配置需要更新，但已跳过保存以避免清除API密钥（稍后持久化）',
+          );
         }
       }
 
       swTotal.stop();
       if (kDebugMode) {
-        _logger.d('StorageService.loadSiteConfigs: 总耗时=${swTotal.elapsedMilliseconds}ms');
+        _logger.d(
+          'StorageService.loadSiteConfigs: 总耗时=${swTotal.elapsedMilliseconds}ms',
+        );
       }
 
       return configs;
@@ -511,7 +556,7 @@ class StorageService {
     );
     await _deleteSiteApiKey(siteId);
     _siteApiKeysCache.remove(siteId); // 移除缓存中的 apiKey
-    
+
     // 如果删除的是当前活跃站点，清除活跃站点设置
     final activeSiteId = await getActiveSiteId();
     if (activeSiteId == siteId) {
@@ -560,7 +605,7 @@ class StorageService {
       await _deleteSiteApiKey(siteId);
       return;
     }
-    
+
     try {
       await _secure.write(key: StorageKeys.siteApiKey(siteId), value: apiKey);
       // 清理降级存储
@@ -575,12 +620,14 @@ class StorageService {
 
   Future<String?> _loadSiteApiKey(String siteId) async {
     try {
-      final apiKey = await _secureReadWithMigration(StorageKeys.siteApiKey(siteId));
+      final apiKey = await _secureReadWithMigration(
+        StorageKeys.siteApiKey(siteId),
+      );
       if (apiKey != null && apiKey.isNotEmpty) return apiKey;
     } catch (_) {
       // ignore and try fallback
     }
-    
+
     final prefs = await _prefs;
     return prefs.getString(StorageKeys.siteApiKeyFallback(siteId));
   }
@@ -591,8 +638,10 @@ class StorageService {
     } catch (_) {
       // ignore
     }
-    try { await _legacySecure.delete(key: StorageKeys.siteApiKey(siteId)); } catch (_) {}
-    
+    try {
+      await _legacySecure.delete(key: StorageKeys.siteApiKey(siteId));
+    } catch (_) {}
+
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.siteApiKeyFallback(siteId));
   }
@@ -721,34 +770,44 @@ class StorageService {
       await deleteWebDAVPassword(configId);
       return;
     }
-    
+
     try {
-      await _secure.write(key: StorageKeys.webdavPassword(configId), value: password);
+      await _secure.write(
+        key: StorageKeys.webdavPassword(configId),
+        value: password,
+      );
       // 清理降级存储
       final prefs = await _prefs;
       await prefs.remove(StorageKeys.webdavPasswordFallback(configId));
     } catch (_) {
       // 当桌面环境的 keyring 被锁定或不可用时，降级到本地存储，避免崩溃
       final prefs = await _prefs;
-      await prefs.setString(StorageKeys.webdavPasswordFallback(configId), password);
+      await prefs.setString(
+        StorageKeys.webdavPasswordFallback(configId),
+        password,
+      );
     }
   }
 
   Future<String?> loadWebDAVPassword(String configId) async {
     try {
-      final password = await _secureReadWithMigration(StorageKeys.webdavPassword(configId));
+      final password = await _secureReadWithMigration(
+        StorageKeys.webdavPassword(configId),
+      );
       if (password != null && password.isNotEmpty) return password;
     } catch (_) {
       // 读取失败时，从降级存储取值
     }
-    
+
     // 若安全存储读取到的值为空或为 null，则继续尝试降级存储
     final prefs = await _prefs;
-    final fallback = prefs.getString(StorageKeys.webdavPasswordFallback(configId));
+    final fallback = prefs.getString(
+      StorageKeys.webdavPasswordFallback(configId),
+    );
     if (fallback != null && fallback.isNotEmpty) {
       return fallback;
     }
-    
+
     return null;
   }
 
@@ -758,16 +817,23 @@ class StorageService {
     } catch (_) {
       // ignore
     }
-    try { await _legacySecure.delete(key: StorageKeys.webdavPassword(configId)); } catch (_) {}
-    
+    try {
+      await _legacySecure.delete(key: StorageKeys.webdavPassword(configId));
+    } catch (_) {}
+
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.webdavPasswordFallback(configId));
   }
 
   // 聚合搜索设置相关
-  Future<void> saveAggregateSearchSettings(AggregateSearchSettings settings) async {
+  Future<void> saveAggregateSearchSettings(
+    AggregateSearchSettings settings,
+  ) async {
     final prefs = await _prefs;
-    await prefs.setString(StorageKeys.aggregateSearchSettings, jsonEncode(settings.toJson()));
+    await prefs.setString(
+      StorageKeys.aggregateSearchSettings,
+      jsonEncode(settings.toJson()),
+    );
   }
 
   Future<AggregateSearchSettings> loadAggregateSearchSettings() async {
@@ -784,7 +850,7 @@ class StorageService {
         searchThreads: 3,
       );
     }
-    
+
     try {
       final json = jsonDecode(str) as Map<String, dynamic>;
       return AggregateSearchSettings.fromJson(json);
@@ -802,12 +868,15 @@ class StorageService {
   }
 
   // 新的下载器配置管理方法
-  Future<void> saveDownloaderConfigs(List<DownloaderConfig> configs, {String? defaultId}) async {
+  Future<void> saveDownloaderConfigs(
+    List<DownloaderConfig> configs, {
+    String? defaultId,
+  }) async {
     final prefs = await _prefs;
     final jsonList = configs.map((config) => config.toJson()).toList();
-    
+
     await prefs.setString(StorageKeys.downloaderConfigs, jsonEncode(jsonList));
-    
+
     if (defaultId != null) {
       await prefs.setString(StorageKeys.defaultDownloaderId, defaultId);
     } else {
@@ -836,7 +905,7 @@ class StorageService {
     final prefs = await _prefs;
     final str = prefs.getString(StorageKeys.downloaderConfigs);
     if (str == null) return [];
-    
+
     try {
       final list = (jsonDecode(str) as List).cast<Map<String, dynamic>>();
       return list;
@@ -852,32 +921,42 @@ class StorageService {
 
   Future<void> saveDownloaderPassword(String id, String password) async {
     try {
-      await _secure.write(key: StorageKeys.downloaderPasswordKey(id), value: password);
+      await _secure.write(
+        key: StorageKeys.downloaderPasswordKey(id),
+        value: password,
+      );
       // 清理可能存在的降级存储
       final prefs = await _prefs;
       await prefs.remove(StorageKeys.downloaderPasswordFallbackKey(id));
     } catch (_) {
       // 在 Linux 桌面端等环境，可能出现 keyring 未解锁；降级写入本地存储，避免功能中断
       final prefs = await _prefs;
-      await prefs.setString(StorageKeys.downloaderPasswordFallbackKey(id), password);
+      await prefs.setString(
+        StorageKeys.downloaderPasswordFallbackKey(id),
+        password,
+      );
     }
   }
 
   Future<String?> loadDownloaderPassword(String id) async {
     try {
-      final password = await _secureReadWithMigration(StorageKeys.downloaderPasswordKey(id));
+      final password = await _secureReadWithMigration(
+        StorageKeys.downloaderPasswordKey(id),
+      );
       if (password != null && password.isNotEmpty) return password;
     } catch (_) {
       // 读取失败时，从降级存储取值
     }
-    
+
     // 若安全存储读取到的值为空或为 null，则继续尝试降级存储
     final prefs = await _prefs;
-    final fallback = prefs.getString(StorageKeys.downloaderPasswordFallbackKey(id));
+    final fallback = prefs.getString(
+      StorageKeys.downloaderPasswordFallbackKey(id),
+    );
     if (fallback != null && fallback.isNotEmpty) {
       return fallback;
     }
-    
+
     return null;
   }
 
@@ -887,20 +966,29 @@ class StorageService {
     } catch (_) {
       // ignore
     }
-    try { await _legacySecure.delete(key: StorageKeys.downloaderPasswordKey(id)); } catch (_) {}
+    try {
+      await _legacySecure.delete(key: StorageKeys.downloaderPasswordKey(id));
+    } catch (_) {}
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.downloaderPasswordFallbackKey(id));
   }
 
   // 下载器分类与标签的本地缓存
-  Future<void> saveDownloaderCategories(String id, List<String> categories) async {
+  Future<void> saveDownloaderCategories(
+    String id,
+    List<String> categories,
+  ) async {
     final prefs = await _prefs;
-    await prefs.setStringList(StorageKeys.downloaderCategoriesKey(id), categories);
+    await prefs.setStringList(
+      StorageKeys.downloaderCategoriesKey(id),
+      categories,
+    );
   }
 
   Future<List<String>> loadDownloaderCategories(String id) async {
     final prefs = await _prefs;
-    return prefs.getStringList(StorageKeys.downloaderCategoriesKey(id)) ?? <String>[];
+    return prefs.getStringList(StorageKeys.downloaderCategoriesKey(id)) ??
+        <String>[];
   }
 
   Future<void> saveDownloaderTags(String id, List<String> tags) async {
@@ -920,7 +1008,8 @@ class StorageService {
 
   Future<List<String>> loadDownloaderPaths(String id) async {
     final prefs = await _prefs;
-    return prefs.getStringList(StorageKeys.downloaderPathsKey(id)) ?? <String>[];
+    return prefs.getStringList(StorageKeys.downloaderPathsKey(id)) ??
+        <String>[];
   }
 
   // 设备ID统一读写删除（使用安全存储，支持旧存储兼容与自动迁移；在桌面环境等不可用时降级到本地存储）
@@ -958,7 +1047,9 @@ class StorageService {
     } catch (_) {
       // ignore
     }
-    try { await _legacySecure.delete(key: StorageKeys.deviceId); } catch (_) {}
+    try {
+      await _legacySecure.delete(key: StorageKeys.deviceId);
+    } catch (_) {}
 
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.deviceIdFallback);
@@ -980,7 +1071,9 @@ class StorageService {
   }
 
   // 健康检查结果缓存：保存与读取
-  Future<void> saveHealthStatuses(Map<String, Map<String, dynamic>> statuses) async {
+  Future<void> saveHealthStatuses(
+    Map<String, Map<String, dynamic>> statuses,
+  ) async {
     final prefs = await _prefs;
     try {
       await prefs.setString(StorageKeys.healthStatuses, jsonEncode(statuses));
@@ -999,7 +1092,9 @@ class StorageService {
         // 强制转换为 Map<String, Map<String, dynamic>>
         return decoded.map((key, value) {
           final k = key.toString();
-          final v = (value is Map) ? value.cast<String, dynamic>() : <String, dynamic>{};
+          final v = (value is Map)
+              ? value.cast<String, dynamic>()
+              : <String, dynamic>{};
           return MapEntry(k, v);
         });
       }

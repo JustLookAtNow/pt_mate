@@ -53,7 +53,8 @@ class MemberProfile {
         json['downloadedBytesString'] ?? json['downloaded_str'] ?? '';
     // 新增字段兼容旧版本与不同命名
     final bonusPerHourVal = json['bonusPerHour'] ?? json['bonus_per_hour'];
-    final seedingSizeVal = json['seedingSizeBytes'] ?? json['seedingSize'] ?? json['seederSize'];
+    final seedingSizeVal =
+        json['seedingSizeBytes'] ?? json['seedingSize'] ?? json['seederSize'];
 
     double parseDouble(dynamic v) {
       if (v is num) return v.toDouble();
@@ -84,8 +85,12 @@ class MemberProfile {
           : (json['last_access'] != null
                 ? Formatters.parseDateTimeCustom(json['last_access'].toString())
                 : null),
-      bonusPerHour: bonusPerHourVal == null ? null : parseDouble(bonusPerHourVal),
-      seedingSizeBytes: seedingSizeVal == null ? null : parseInt(seedingSizeVal),
+      bonusPerHour: bonusPerHourVal == null
+          ? null
+          : parseDouble(bonusPerHourVal),
+      seedingSizeBytes: seedingSizeVal == null
+          ? null
+          : parseInt(seedingSizeVal),
     );
   }
 
@@ -314,7 +319,7 @@ enum TagType {
   mandarin('国语', Colors.blue, ''),
   diy('DIY', Colors.brown, ''),
   complete('完结', Color.fromARGB(255, 110, 8, 206), r'\b完结\b|全[^\s]+集'),
-  zero('零魔',Color.fromARGB(159, 4, 164, 239),''),
+  zero('零魔', Color.fromARGB(159, 4, 164, 239), ''),
   ep(
     '分集',
     Color.fromARGB(255, 110, 8, 206),
@@ -336,7 +341,6 @@ enum TagType {
   dovi('DOVI', Colors.pink, r'\bDOVI\b|Dolby Vision|\bDV\b|杜比(视界)*'),
   blueRay('Blu-ray', Colors.red, r'\bblu-ray\b|\bbluray\b');
 
-
   const TagType(this.content, this.color, this.regex);
   final String content;
   final Color color;
@@ -356,10 +360,7 @@ enum TagType {
   }
 
   // 序列化为 JSON
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'content': content,
-  };
+  Map<String, dynamic> toJson() => {'name': name, 'content': content};
 }
 
 // 网站类型枚举
@@ -378,15 +379,13 @@ enum SiteType {
     'paaskey认证',
     '可以在网站的「账户设置」页面查看和重置自己的 Passkey。',
   ),
-  gazelle('Gazelle', 'Gazelle (Alpha)', 'Cookie认证', '通过网页登录获取认证信息')
-  ;
+  gazelle('Gazelle', 'Gazelle (Alpha)', 'Cookie认证', '通过网页登录获取认证信息');
 
   const SiteType(this.id, this.displayName, this.apiKeyLabel, this.apiKeyHint);
   final String id;
   final String displayName;
   final String apiKeyLabel;
   final String apiKeyHint;
-
 }
 
 // 站点功能配置
@@ -841,10 +840,7 @@ class SiteConfig {
         final v = colorJson.trim();
         if (v.startsWith('#')) {
           final hex = v.substring(1);
-          final parsed = int.parse(
-            hex.length == 6 ? 'FF$hex' : hex,
-            radix: 16,
-          );
+          final parsed = int.parse(hex.length == 6 ? 'FF$hex' : hex, radix: 16);
           siteColor = parsed;
         }
       }
@@ -987,10 +983,7 @@ class SiteConfig {
         final v = colorJson.trim();
         if (v.startsWith('#')) {
           final hex = v.substring(1);
-          final parsed = int.parse(
-            hex.length == 6 ? 'FF$hex' : hex,
-            radix: 16,
-          );
+          final parsed = int.parse(hex.length == 6 ? 'FF$hex' : hex, radix: 16);
           siteColor = parsed;
         }
       }

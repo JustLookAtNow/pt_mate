@@ -4,7 +4,6 @@ import 'storage/storage_service.dart';
 import 'package:uuid/uuid.dart';
 
 class DeviceIdService {
-
   static DeviceIdService? _instance;
   static DeviceIdService get instance => _instance ??= DeviceIdService._();
 
@@ -21,7 +20,7 @@ class DeviceIdService {
     try {
       // 统一由 StorageService 管理设备ID的读写，支持旧存储兼容与自动迁移
       String? storedDeviceId = await StorageService.instance.loadDeviceId();
-      
+
       if (storedDeviceId != null && storedDeviceId.isNotEmpty) {
         _cachedDeviceId = storedDeviceId;
         return storedDeviceId;
@@ -29,10 +28,10 @@ class DeviceIdService {
 
       // 如果没有存储的设备ID，生成一个新的
       String newDeviceId = await _generateDeviceId();
-      
+
       // 保存到安全存储
       await StorageService.instance.saveDeviceId(newDeviceId);
-      
+
       _cachedDeviceId = newDeviceId;
       return newDeviceId;
     } catch (e) {
@@ -45,7 +44,7 @@ class DeviceIdService {
   Future<String> _generateDeviceId() async {
     const uuid = Uuid();
     String baseId = uuid.v4();
-    
+
     // 添加平台前缀以便区分
     String platform = _getPlatformName();
     return '${platform}_$baseId';
@@ -56,28 +55,39 @@ class DeviceIdService {
     try {
       DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
       String deviceIdentifier = '';
-      
+
       if (Platform.isAndroid) {
         AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-        deviceIdentifier = '${androidInfo.model}_${androidInfo.id}_${androidInfo.fingerprint}'.hashCode.toString();
+        deviceIdentifier =
+            '${androidInfo.model}_${androidInfo.id}_${androidInfo.fingerprint}'
+                .hashCode
+                .toString();
       } else if (Platform.isIOS) {
         IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
-        deviceIdentifier = '${iosInfo.model}_${iosInfo.identifierForVendor}_${iosInfo.systemVersion}'.hashCode.toString();
+        deviceIdentifier =
+            '${iosInfo.model}_${iosInfo.identifierForVendor}_${iosInfo.systemVersion}'
+                .hashCode
+                .toString();
       } else if (Platform.isLinux) {
         LinuxDeviceInfo linuxInfo = await deviceInfo.linuxInfo;
-        deviceIdentifier = '${linuxInfo.machineId}_${linuxInfo.name}'.hashCode.toString();
+        deviceIdentifier = '${linuxInfo.machineId}_${linuxInfo.name}'.hashCode
+            .toString();
       } else if (Platform.isMacOS) {
         MacOsDeviceInfo macInfo = await deviceInfo.macOsInfo;
-        deviceIdentifier = '${macInfo.systemGUID}_${macInfo.computerName}'.hashCode.toString();
+        deviceIdentifier = '${macInfo.systemGUID}_${macInfo.computerName}'
+            .hashCode
+            .toString();
       } else if (Platform.isWindows) {
         WindowsDeviceInfo windowsInfo = await deviceInfo.windowsInfo;
-        deviceIdentifier = '${windowsInfo.computerName}_${windowsInfo.userName}'.hashCode.toString();
+        deviceIdentifier = '${windowsInfo.computerName}_${windowsInfo.userName}'
+            .hashCode
+            .toString();
       } else {
         // Web或其他平台
         const uuid = Uuid();
         deviceIdentifier = uuid.v4();
       }
-      
+
       String platform = _getPlatformName();
       return '${platform}_fallback_$deviceIdentifier';
     } catch (e) {

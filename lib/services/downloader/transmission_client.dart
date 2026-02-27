@@ -16,40 +16,42 @@ class TransmissionClient
     implements DownloaderClient {
   final TransmissionConfig config;
   final String password;
-  
+
   // HTTP客户端和会话管理
   late final Dio _dio;
   String? _sessionId;
-  
+
   // 缓存的版本信息，避免重复调用 API
   String? _cachedVersion;
-  
+
   // 配置更新回调
   final Function(TransmissionConfig)? _onConfigUpdated;
-  
+
   TransmissionClient({
     required this.config,
     required this.password,
     Function(TransmissionConfig)? onConfigUpdated,
   }) : _onConfigUpdated = onConfigUpdated {
-    _dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 30),
-      headers: {
+    _dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 30),
+        headers: {
           'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
-              'Content-Type': 'application/json',
-      },
+          'Content-Type': 'application/json',
+        },
         followRedirects: true,
         maxRedirects: 5,
-    ));
+      ),
+    );
   }
-  
+
   /// 获取基础URL
   String get _baseUrl => _buildBase(config);
-  
+
   /// 构建基础URL，处理各种格式的主机地址
-  String _buildBase(TransmissionConfig c) { 
+  String _buildBase(TransmissionConfig c) {
     var urlStr = c.host.trim();
     // 补全协议
     if (!urlStr.startsWith(RegExp(r'https?://'))) {
@@ -74,47 +76,44 @@ class TransmissionClient
       return urlStr;
     }
   }
-  
+
   /// 获取RPC路径
   String get _rpcPath => '/transmission/rpc';
-  
+
   /// 执行RPC请求
   Future<Map<String, dynamic>> _rpcRequest(
     String method, {
     Map<String, dynamic>? arguments,
   }) async {
     final url = '$_baseUrl$_rpcPath';
-    
-    final requestBody = {
-      'method': method,
-      'arguments': ?arguments,
-    };
-    
-    final requestHeaders = <String, String>{
-      'Content-Type': 'application/json',
-    };
-    
+
+    final requestBody = {'method': method, 'arguments': ?arguments};
+
+    final requestHeaders = <String, String>{'Content-Type': 'application/json'};
+
     // 添加认证信息
     if (config.username.isNotEmpty) {
-      final credentials = base64Encode(utf8.encode('${config.username}:$password'));
+      final credentials = base64Encode(
+        utf8.encode('${config.username}:$password'),
+      );
       requestHeaders['Authorization'] = 'Basic $credentials';
     }
-    
+
     // 添加会话ID（如果有）
     if (_sessionId != null) {
       requestHeaders['X-Transmission-Session-Id'] = _sessionId!;
     }
-    
+
     try {
       final response = await _dio.post(
         url,
         data: jsonEncode(requestBody),
         options: Options(headers: requestHeaders),
       );
-      
+
       if (response.statusCode == 200) {
         final responseData = response.data as Map<String, dynamic>;
-        
+
         // 检查响应结果
         final result = responseData['result'] as String?;
         if (result == 'success') {
@@ -129,28 +128,30 @@ class TransmissionClient
       // 检查是否需要会话ID
       if (e.response?.statusCode == 409) {
         // 从响应头中提取会话ID
-        final sessionId = e.response?.headers.value('X-Transmission-Session-Id');
+        final sessionId = e.response?.headers.value(
+          'X-Transmission-Session-Id',
+        );
         if (sessionId != null) {
           _sessionId = sessionId;
           // 重试请求
           return _rpcRequest(method, arguments: arguments);
         }
       }
-      
+
       if (e.response?.statusCode == 401) {
         throw Exception('Authentication failed');
       }
-      
+
       if (e.response?.statusCode != null && e.response!.statusCode! >= 400) {
-        throw HttpException('HTTP ${e.response!.statusCode}: ${e.response!.data}');
+        throw HttpException(
+          'HTTP ${e.response!.statusCode}: ${e.response!.data}',
+        );
       }
-      
+
       throw Exception('Request failed: ${e.message}');
     }
   }
-  
 
-  
   @override
   Future<void> testConnection() async {
     try {
@@ -160,11 +161,11 @@ class TransmissionClient
       throw Exception('Connection test failed: $e');
     }
   }
-  
+
   @override
   Future<TransferInfo> getTransferInfo() async {
     final response = await _rpcRequest('session-stats');
-    
+
     return TransferInfo(
       upSpeed: response['uploadSpeed'] ?? 0,
       dlSpeed: response['downloadSpeed'] ?? 0,
@@ -172,21 +173,21 @@ class TransmissionClient
       dlTotal: response['cumulative-stats']?['downloadedBytes'] ?? 0,
     );
   }
-  
+
   @override
   Future<ServerState> getServerState() async {
     final response = await _rpcRequest('session-get');
-    
+
     // Transmission 的可用空间信息在 download-dir-free-space 字段中
     final freeSpace = response['download-dir-free-space'] ?? 0;
-    
+
     return ServerState(
       freeSpaceOnDisk: freeSpace is int
           ? freeSpace
           : FormatUtil.parseInt(freeSpace) ?? 0,
     );
   }
-  
+
   @override
   Future<List<DownloadTask>> getTasks([GetTasksParams? params]) async {
     final arguments = <String, dynamic>{
@@ -283,13 +284,16 @@ class TransmissionClient
   }
 
   @override
-  Future<void> deleteTasks(List<String> hashes, {bool deleteFiles = false}) async {
+  Future<void> deleteTasks(
+    List<String> hashes, {
+    bool deleteFiles = false,
+  }) async {
     final ids = await _hashesToIds(hashes);
     if (ids.isNotEmpty) {
-      await _rpcRequest('torrent-remove', arguments: {
-        'ids': ids,
-        'delete-local-data': deleteFiles,
-      });
+      await _rpcRequest(
+        'torrent-remove',
+        arguments: {'ids': ids, 'delete-local-data': deleteFiles},
+      );
     }
   }
 
@@ -303,9 +307,12 @@ class TransmissionClient
   @override
   Future<List<String>> getTags() async {
     // 获取所有种子的标签
-    final response = await _rpcRequest('torrent-get', arguments: {
-      'fields': ['labels'],
-    });
+    final response = await _rpcRequest(
+      'torrent-get',
+      arguments: {
+        'fields': ['labels'],
+      },
+    );
 
     final List<dynamic> torrents = response['torrents'] as List<dynamic>? ?? [];
     final Set<String> allLabels = {};
@@ -346,9 +353,12 @@ class TransmissionClient
   @override
   Future<List<String>> getPaths() async {
     // 获取所有种子的下载路径
-    final response = await _rpcRequest('torrent-get', arguments: {
-      'fields': ['downloadDir'],
-    });
+    final response = await _rpcRequest(
+      'torrent-get',
+      arguments: {
+        'fields': ['downloadDir'],
+      },
+    );
 
     final List<dynamic> torrents = response['torrents'] as List<dynamic>? ?? [];
     final Set<String> allPaths = {};
@@ -386,9 +396,12 @@ class TransmissionClient
   Future<List<int>> _hashesToIds(List<String> hashes) async {
     if (hashes.isEmpty) return [];
 
-    final response = await _rpcRequest('torrent-get', arguments: {
-      'fields': ['id', 'hashString'],
-    });
+    final response = await _rpcRequest(
+      'torrent-get',
+      arguments: {
+        'fields': ['id', 'hashString'],
+      },
+    );
 
     final List<dynamic> torrents = response['torrents'] as List<dynamic>? ?? [];
     final List<int> ids = [];
@@ -457,11 +470,13 @@ class TransmissionClient
       addedOn: torrent['addedDate'] ?? 0,
       amountLeft: leftUntilDone,
       ratio: (torrent['uploadRatio'] as num? ?? 0).toDouble(),
-      timeActive: (torrent['activityDate'] as int? ?? 0) - (torrent['addedDate'] as int? ?? 0),
+      timeActive:
+          (torrent['activityDate'] as int? ?? 0) -
+          (torrent['addedDate'] as int? ?? 0),
       uploaded: torrent['uploadedEver'] ?? 0,
     );
   }
-  
+
   /// 获取包含版本信息的配置
   /// 如果当前配置中没有版本信息，会自动获取并返回更新后的配置
   Future<TransmissionConfig> getUpdatedConfig() async {
@@ -469,11 +484,11 @@ class TransmissionClient
     if (config.version != null && config.version!.isNotEmpty) {
       return config;
     }
-    
+
     try {
       // 获取版本信息（会自动缓存）
       final version = await getVersion();
-      
+
       // 创建包含版本信息的新配置
       return config.copyWith(version: version);
     } catch (e) {
@@ -481,7 +496,7 @@ class TransmissionClient
       return config;
     }
   }
-  
+
   /// 释放资源
   void dispose() {
     _dio.close();

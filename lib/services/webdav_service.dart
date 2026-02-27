@@ -10,7 +10,7 @@ import 'storage/storage_service.dart';
 class WebDAVTestResult {
   final bool success;
   final String? errorMessage;
-  
+
   WebDAVTestResult({required this.success, this.errorMessage});
 }
 
@@ -18,7 +18,7 @@ class WebDAVService {
   static const String _configKey = 'webdav_config';
   static const String _lastSyncKey = 'webdav_last_sync';
   static const String _autoSyncKey = 'webdav_auto_sync';
-  
+
   WebDAVService._();
   static final WebDAVService instance = WebDAVService._();
 
@@ -30,23 +30,23 @@ class WebDAVService {
   Future<void> saveConfig(WebDAVConfig config, {String? password}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_configKey, jsonEncode(config.toJson()));
-    
+
     // 通过安全存储保存密码
     if (password != null) {
       await _storageService.saveWebDAVPassword(config.id, password);
     }
-    
+
     _currentConfig = config;
     _client = null; // 重置客户端，下次使用时重新创建
   }
 
   Future<WebDAVConfig?> loadConfig() async {
     if (_currentConfig != null) return _currentConfig;
-    
+
     final prefs = await SharedPreferences.getInstance();
     final configStr = prefs.getString(_configKey);
     if (configStr == null) return null;
-    
+
     try {
       final json = jsonDecode(configStr) as Map<String, dynamic>;
       _currentConfig = WebDAVConfig.fromJson(json);
@@ -60,9 +60,10 @@ class WebDAVService {
     final prefs = await SharedPreferences.getInstance();
     final historyStr = prefs.getString('${_configKey}_history');
     if (historyStr == null) return [];
-    
+
     try {
-      final list = (jsonDecode(historyStr) as List).cast<Map<String, dynamic>>();
+      final list = (jsonDecode(historyStr) as List)
+          .cast<Map<String, dynamic>>();
       return list.map((json) => WebDAVConfig.fromJson(json)).toList();
     } catch (e) {
       return [];
@@ -89,7 +90,9 @@ class WebDAVService {
   Future<DateTime?> getLastSyncTime() async {
     final prefs = await SharedPreferences.getInstance();
     final timestamp = prefs.getInt(_lastSyncKey);
-    return timestamp != null ? DateTime.fromMillisecondsSinceEpoch(timestamp) : null;
+    return timestamp != null
+        ? DateTime.fromMillisecondsSinceEpoch(timestamp)
+        : null;
   }
 
   Future<void> _setLastSyncTime(DateTime time) async {
@@ -101,23 +104,25 @@ class WebDAVService {
   Future<webdav.Client?> _getClient() async {
     final config = await loadConfig();
     if (config == null || !config.isEnabled) return null;
-    
+
     // 从安全存储中获取密码
     final password = await _storageService.loadWebDAVPassword(config.id);
     if (password == null || password.isEmpty) return null;
-    
+
     // 检查配置是否发生变化，如果变化则重新创建客户端
     if (_client != null && _currentConfig != null) {
-      final currentPassword = await _storageService.loadWebDAVPassword(_currentConfig!.id);
+      final currentPassword = await _storageService.loadWebDAVPassword(
+        _currentConfig!.id,
+      );
       if (_currentConfig!.serverUrl != config.serverUrl ||
           _currentConfig!.username != config.username ||
           currentPassword != password) {
         _client = null; // 配置变化，重置客户端
       }
     }
-    
+
     if (_client != null) return _client;
-    
+
     _currentConfig = config;
     _client = webdav.newClient(
       config.serverUrl,
@@ -127,26 +132,28 @@ class WebDAVService {
     _client!.setConnectTimeout(30000); // 30秒超时
     _client!.setSendTimeout(30000);
     _client!.setReceiveTimeout(30000);
-    
+
     return _client;
   }
 
-
-
   // 连接测试
-  Future<WebDAVTestResult> testConnection([WebDAVConfig? config, String? password]) async {
+  Future<WebDAVTestResult> testConnection([
+    WebDAVConfig? config,
+    String? password,
+  ]) async {
     try {
       final testConfig = config ?? await loadConfig();
       if (testConfig == null) {
         return WebDAVTestResult(success: false, errorMessage: '未找到WebDAV配置');
       }
-      
+
       // 获取密码：优先使用传入的密码，否则从安全存储中获取
-      final testPassword = password ?? await _storageService.loadWebDAVPassword(testConfig.id);
+      final testPassword =
+          password ?? await _storageService.loadWebDAVPassword(testConfig.id);
       if (testPassword == null || testPassword.isEmpty) {
         return WebDAVTestResult(success: false, errorMessage: '密码不能为空');
       }
-      
+
       final client = webdav.newClient(
         testConfig.serverUrl,
         user: testConfig.username,
@@ -155,7 +162,7 @@ class WebDAVService {
       client.setConnectTimeout(30000); // 30秒超时
       client.setSendTimeout(30000);
       client.setReceiveTimeout(30000);
-      
+
       // 尝试读取根目录
       await client.readDir('/');
       return WebDAVTestResult(success: true);
@@ -163,11 +170,14 @@ class WebDAVService {
       String errorMessage = '连接失败';
       if (e.toString().contains('timeout')) {
         errorMessage = '连接超时，请检查服务器地址和网络连接';
-      } else if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
+      } else if (e.toString().contains('401') ||
+          e.toString().contains('Unauthorized')) {
         errorMessage = '用户名或密码错误';
-      } else if (e.toString().contains('404') || e.toString().contains('Not Found')) {
+      } else if (e.toString().contains('404') ||
+          e.toString().contains('Not Found')) {
         errorMessage = '服务器地址不正确或WebDAV服务未启用';
-      } else if (e.toString().contains('SSL') || e.toString().contains('certificate')) {
+      } else if (e.toString().contains('SSL') ||
+          e.toString().contains('certificate')) {
         errorMessage = 'SSL证书验证失败，请检查HTTPS配置';
       } else {
         errorMessage = '连接失败: ${e.toString()}';
@@ -183,19 +193,20 @@ class WebDAVService {
       if (client == null) {
         throw Exception('无法创建WebDAV客户端，请检查配置');
       }
-      
+
       final config = _currentConfig!;
       final now = DateTime.now();
-      final backupFilename = filename ?? 'pt_mate_backup_${now.millisecondsSinceEpoch}.json';
+      final backupFilename =
+          filename ?? 'pt_mate_backup_${now.millisecondsSinceEpoch}.json';
       final remotePath = '${config.remotePath}/$backupFilename';
-      
+
       // 确保远程目录存在
       await _ensureDirectoryExists(client, config.remotePath);
-      
+
       // 上传备份文件
       final bytes = utf8.encode(backupData);
       await client.write(remotePath, bytes);
-      
+
       await _setLastSyncTime(DateTime.now());
     } catch (e) {
       // 重新抛出异常，让调用方能够获取具体的错误信息
@@ -208,25 +219,27 @@ class WebDAVService {
     try {
       final client = await _getClient();
       if (client == null) return null;
-      
+
       final config = _currentConfig!;
-      
+
       // 列出远程目录中的备份文件
       final files = await client.readDir(config.remotePath);
       final backupFiles = files
           .where((file) => file.name?.endsWith('.json') == true)
           .toList();
-      
+
       if (backupFiles.isEmpty) return null;
-      
+
       // 按修改时间排序，获取最新的备份
-      backupFiles.sort((a, b) => (b.mTime ?? DateTime(0)).compareTo(a.mTime ?? DateTime(0)));
+      backupFiles.sort(
+        (a, b) => (b.mTime ?? DateTime(0)).compareTo(a.mTime ?? DateTime(0)),
+      );
       final latestFile = backupFiles.first;
-      
+
       // 下载最新备份
       final remotePath = '${config.remotePath}/${latestFile.name}';
       final bytes = await client.read(remotePath);
-      
+
       await _setLastSyncTime(DateTime.now());
       return utf8.decode(bytes);
     } catch (e) {
@@ -239,24 +252,29 @@ class WebDAVService {
     try {
       final client = await _getClient();
       if (client == null) return [];
-      
+
       final config = _currentConfig!;
-      
+
       final files = await client.readDir(config.remotePath);
       final backupFiles = files
           .where((file) => file.name?.endsWith('.json') == true)
-          .map((file) => {
-            'name': file.name,
-            'size': file.size,
-            'modifiedTime': file.mTime,
-            'path': '${config.remotePath}/${file.name}',
-          })
+          .map(
+            (file) => {
+              'name': file.name,
+              'size': file.size,
+              'modifiedTime': file.mTime,
+              'path': '${config.remotePath}/${file.name}',
+            },
+          )
           .toList();
-      
+
       // 按修改时间倒序排列
-      backupFiles.sort((a, b) => (b['modifiedTime'] as DateTime? ?? DateTime(0))
-          .compareTo(a['modifiedTime'] as DateTime? ?? DateTime(0)));
-      
+      backupFiles.sort(
+        (a, b) => (b['modifiedTime'] as DateTime? ?? DateTime(0)).compareTo(
+          a['modifiedTime'] as DateTime? ?? DateTime(0),
+        ),
+      );
+
       return backupFiles;
     } catch (e) {
       return [];
@@ -268,7 +286,7 @@ class WebDAVService {
     try {
       final client = await _getClient();
       if (client == null) return null;
-      
+
       final bytes = await client.read(remotePath);
       return utf8.decode(bytes);
     } catch (e) {
@@ -281,7 +299,7 @@ class WebDAVService {
     try {
       final client = await _getClient();
       if (client == null) return false;
-      
+
       await client.remove(remotePath);
       return true;
     } catch (e) {
@@ -294,10 +312,10 @@ class WebDAVService {
     try {
       final backups = await getRemoteBackups();
       if (backups.length <= keepCount) return;
-      
+
       final client = await _getClient();
       if (client == null) return;
-      
+
       // 删除超出保留数量的旧备份
       final toDelete = backups.skip(keepCount);
       for (final backup in toDelete) {
@@ -315,7 +333,7 @@ class WebDAVService {
   // 自动同步
   Future<bool> performAutoSync() async {
     if (!await getAutoSync()) return false;
-    
+
     try {
       // 获取本地最新备份
       // 这里需要与BackupService集成，暂时返回true
@@ -357,20 +375,20 @@ class WebDAVService {
     if (config == null || !config.isEnabled) {
       return WebDAVSyncStatus.idle;
     }
-    
+
     final testResult = await testConnection();
     if (!testResult.success) {
       return WebDAVSyncStatus.error;
     }
-    
+
     final lastSync = await getLastSyncTime();
     if (lastSync == null) {
       return WebDAVSyncStatus.idle;
     }
-    
+
     final now = DateTime.now();
     final timeDiff = now.difference(lastSync);
-    
+
     if (timeDiff.inHours < 1) {
       return WebDAVSyncStatus.success;
     } else if (timeDiff.inDays < 1) {
@@ -387,7 +405,7 @@ class WebDAVService {
       // 删除安全存储中的密码
       await _storageService.deleteWebDAVPassword(config.id);
     }
-    
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_configKey);
     _currentConfig = null;
