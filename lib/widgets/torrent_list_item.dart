@@ -793,14 +793,20 @@ class TorrentListItem extends StatelessWidget {
   Widget _buildDownloadStatusIcon(DownloadStatus status) {
     switch (status) {
       case DownloadStatus.completed:
-        return const Icon(Icons.download_done, color: Colors.green, size: 20);
+        return const Tooltip(
+          message: '已完成',
+          child: Icon(Icons.download_done, color: Colors.green, size: 20),
+        );
       case DownloadStatus.downloading:
-        return const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+        return const Tooltip(
+          message: '下载中',
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+            ),
           ),
         );
       case DownloadStatus.none:
