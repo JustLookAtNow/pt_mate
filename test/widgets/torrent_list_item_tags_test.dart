@@ -46,8 +46,7 @@ void main() {
     final torrent = TorrentItem(
       id: '1',
       name: 'Test Torrent',
-      smallDescr:
-          '4K 1080p HDR H265 WEB-DL DIY Blu-ray 4K 1080p HDR H265 WEB-DL DIY Blu-ray 4K 1080p HDR H265 WEB-DL DIY Blu-ray',
+      smallDescr: 'Test Description',
       sizeBytes: 1024,
       seeders: 10,
       leechers: 5,
@@ -56,13 +55,29 @@ void main() {
       downloadUrl: '',
       imageList: [],
       cover: '',
-
       downloadStatus: DownloadStatus.none,
       discount: DiscountType.normal,
       collection: false,
       isTop: false,
       doubanRating: '0',
       imdbRating: '0',
+      tags: [
+        TagType.fourK,
+        TagType.resolution1080,
+        TagType.hdr,
+        TagType.h265,
+        TagType.webDl,
+        TagType.dovi,
+        TagType.blueRay,
+        TagType.chinese,
+        TagType.complete,
+        TagType.diy,
+        TagType.ep,
+        TagType.hot,
+        TagType.official,
+        TagType.mandarin,
+        TagType.chineseTraditional,
+      ],
     );
 
     // Set screen size to small (e.g., 400px width)
@@ -87,8 +102,7 @@ void main() {
       final torrent = TorrentItem(
         id: '1',
         name: 'Test Torrent',
-        smallDescr:
-            'Tag1 Tag2 Tag3 Tag4 Tag5 Tag6 Tag7 Tag8 Tag9 Tag10 Tag11 Tag12 Tag13 Tag14 Tag15',
+        smallDescr: 'Test Description',
         sizeBytes: 1024,
         seeders: 10,
         leechers: 5,
@@ -97,13 +111,29 @@ void main() {
         downloadUrl: '',
         imageList: [],
         cover: '',
-
         downloadStatus: DownloadStatus.none,
         discount: DiscountType.normal,
         collection: false,
         isTop: false,
         doubanRating: '0',
         imdbRating: '0',
+        tags: [
+          TagType.fourK,
+          TagType.resolution1080,
+          TagType.hdr,
+          TagType.h265,
+          TagType.webDl,
+          TagType.dovi,
+          TagType.blueRay,
+          TagType.chinese,
+          TagType.complete,
+          TagType.diy,
+          TagType.ep,
+          TagType.hot,
+          TagType.official,
+          TagType.mandarin,
+          TagType.chineseTraditional,
+        ],
       );
 
       // Set screen size to large (e.g., 1000px width)
