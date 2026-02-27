@@ -324,6 +324,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                                   ),
                                               suffixIcon: IconButton(
                                                 icon: const Icon(Icons.search),
+                                                tooltip: '搜索',
                                                 onPressed: () => _performSearch(
                                                   _searchController.text,
                                                 ),
