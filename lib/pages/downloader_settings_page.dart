@@ -9,6 +9,7 @@ import '../widgets/qb_speed_indicator.dart';
 import '../widgets/responsive_layout.dart';
 import '../utils/downloader_utils.dart';
 import '../utils/format.dart';
+import 'package:pt_mate/utils/notification_helper.dart';
 
 class DownloaderSettingsPage extends StatefulWidget {
   const DownloaderSettingsPage({super.key});
@@ -91,18 +92,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '保存失败：$e',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onErrorContainer,
-            ),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+            NotificationHelper.showError(context, '保存失败：$e');
     }
   }
 
@@ -145,18 +135,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '删除失败：$e',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onErrorContainer,
-            ),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+            NotificationHelper.showError(context, '删除失败：$e');
     }
   }
 
@@ -175,35 +154,13 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '设置失败：$e',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onErrorContainer,
-            ),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+            NotificationHelper.showError(context, '设置失败：$e');
     }
   }
 
   Future<void> _testDefault() async {
     if (_defaultId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(
-        content: Text(
-          '请先设置默认下载器',
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onErrorContainer,
-          ),
-        ),
-        backgroundColor: Theme.of(context).colorScheme.errorContainer,
-        behavior: SnackBarBehavior.floating,
-      ));
+            NotificationHelper.showError(context, '请先设置默认下载器');
       return;
     }
     final config = _downloaderConfigs.firstWhere((c) => c.id == _defaultId);
@@ -215,18 +172,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       final pwd = await StorageService.instance.loadDownloaderPassword(config.id);
       if ((pwd ?? '').isEmpty) {
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(
-          content: Text(
-            '请先保存密码',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onErrorContainer,
-            ),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-          behavior: SnackBarBehavior.floating,
-        ));
+                NotificationHelper.showError(context, '请先保存密码');
         return;
       }
       
@@ -237,54 +183,10 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       );
       
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                Icons.check_circle,
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  '连接成功',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+            NotificationHelper.showInfo(context, '✅ 连接成功');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                Icons.error_outline,
-                color: Theme.of(context).colorScheme.onErrorContainer,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  '连接失败：$e',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onErrorContainer,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+            NotificationHelper.showError(context, '❌ 连接失败：$e');
     }
   }
 
@@ -571,9 +473,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
     final user = _userCtrl.text.trim();
     final pwd = _pwdCtrl.text.trim();
     if (name.isEmpty || host.isEmpty || port == null || user.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请完整填写名称、主机、端口、用户名')));
+            NotificationHelper.showInfo(context, '请完整填写名称、主机、端口、用户名');
       return;
     }
     final id =

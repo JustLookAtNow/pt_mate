@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:pt_mate/utils/notification_helper.dart';
 
 class WebLoginWidget extends StatefulWidget {
   final String baseUrl;
@@ -288,26 +289,7 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
           setState(() {
             _loginSuccess = true;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Cookie 获取成功！如有二次验证请继续操作，完成后请手动关闭此页面',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-              ),
-              duration: const Duration(seconds: 5),
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              behavior: SnackBarBehavior.floating,
-              action: SnackBarAction(
-                label: '关闭页面',
-                textColor: Theme.of(context).colorScheme.onPrimaryContainer,
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-              ),
-            ),
-          );
+                    NotificationHelper.showInfo(context, 'Cookie 获取成功！如有二次验证请继续操作，完成后请手动关闭此页面', duration: const Duration(seconds: 5));
         }
         return;
       }
@@ -316,47 +298,14 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
         _logger.w('CookieManager未获取到cookie');
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '无法获取cookie，请检查登录状态',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-            ),
-            duration: const Duration(seconds: 3),
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-            behavior: SnackBarBehavior.floating,
-            action: SnackBarAction(
-              label: '知道了',
-              textColor: Theme.of(context).colorScheme.onPrimaryContainer,
-              onPressed: () {},
-            ),
-          ),
-        );
+                NotificationHelper.showInfo(context, '无法获取cookie，请检查登录状态', duration: const Duration(seconds: 3));
       }
     } catch (e) {
       if (kDebugMode) {
         _logger.e('提取cookie时出错: $e');
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Cookie提取失败: $e',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onErrorContainer,
-              ),
-            ),
-            backgroundColor: Theme.of(context).colorScheme.errorContainer,
-            behavior: SnackBarBehavior.floating,
-            action: SnackBarAction(
-              label: '关闭',
-              textColor: Theme.of(context).colorScheme.onErrorContainer,
-              onPressed: () {},
-            ),
-          ),
-        );
+                NotificationHelper.showError(context, 'Cookie提取失败: $e');
       }
     }
   }

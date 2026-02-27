@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/update_service.dart';
+import 'package:pt_mate/utils/notification_helper.dart';
 
 class UpdateNotificationDialog extends StatelessWidget {
   final UpdateCheckResult updateResult;
@@ -113,19 +114,7 @@ class UpdateNotificationDialog extends StatelessWidget {
         // 降级处理：复制URL到剪贴板
         await Clipboard.setData(ClipboardData(text: url.toString()));
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '无法直接打开链接，已复制到剪贴板，请手动粘贴到浏览器',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-              ),
-              duration: const Duration(seconds: 2),
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+                    NotificationHelper.showInfo(context, '无法直接打开链接，已复制到剪贴板，请手动粘贴到浏览器', duration: const Duration(seconds: 2));
         }
       }
     } catch (e) {
@@ -136,25 +125,7 @@ class UpdateNotificationDialog extends StatelessWidget {
   }
 
   void _showErrorSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onErrorContainer,
-          ),
-        ),
-        backgroundColor: Theme.of(context).colorScheme.errorContainer,
-        behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(
-          label: '确定',
-          textColor: Theme.of(context).colorScheme.onErrorContainer,
-          onPressed: () {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          },
-        ),
-      ),
-    );
+        NotificationHelper.showError(context, message);
   }
 
   /// 显示更新通知对话框

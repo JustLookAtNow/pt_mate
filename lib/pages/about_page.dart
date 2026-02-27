@@ -7,6 +7,7 @@ import '../widgets/update_notification_dialog.dart';
 
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/responsive_layout.dart';
+import 'package:pt_mate/utils/notification_helper.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
@@ -80,36 +81,20 @@ class _AboutPageState extends State<AboutPage> {
                     // 降级处理：复制URL到剪贴板
                     await Clipboard.setData(ClipboardData(text: url.toString()));
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '无法直接打开链接，已复制到剪贴板，请手动粘贴到浏览器',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onPrimaryContainer,
-                            ),
-                          ),
-                          duration: const Duration(seconds: 2),
-                          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                          behavior: SnackBarBehavior.floating,
-                        ),
+                      NotificationHelper.showInfo(
+                        context,
+                        '无法直接打开链接，已复制到剪贴板，请手动粘贴到浏览器',
+                        duration: const Duration(seconds: 2),
                       );
                     }
                   }
                 } catch (e) {
                   // 捕获任何异常并显示错误信息
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '操作失败: $e',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onErrorContainer,
-                          ),
-                        ),
-                        duration: const Duration(seconds: 2),
-                        backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                        behavior: SnackBarBehavior.floating,
-                      ),
+                    NotificationHelper.showError(
+                      context,
+                      '操作失败: $e',
+                      duration: const Duration(seconds: 2),
                     );
                   }
                 }
@@ -158,49 +143,17 @@ class _AboutPageState extends State<AboutPage> {
       final result = await UpdateService.instance.manualCheckForUpdates();
       if (!mounted) return;
       if (result == null) {
-        _showErrorSnackBar(context, '检查更新失败，请稍后重试');
+        NotificationHelper.showError(context, '检查更新失败，请稍后重试');
         return;
       }
       if (result.hasUpdate) {
         await UpdateNotificationDialog.show(context, result);
       } else {
-        _showInfoSnackBar(context, '当前已是最新版本');
+        NotificationHelper.showInfo(context, '当前已是最新版本');
       }
     } catch (e) {
       if (!mounted) return;
-      _showErrorSnackBar(context, '检查更新时发生错误：$e');
+      NotificationHelper.showError(context, '检查更新时发生错误：$e');
     }
-  }
-
-  void _showInfoSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onPrimaryContainer,
-          ),
-        ),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _showErrorSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onErrorContainer,
-          ),
-        ),
-        backgroundColor: Theme.of(context).colorScheme.errorContainer,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 }

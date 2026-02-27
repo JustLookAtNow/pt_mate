@@ -4,6 +4,7 @@ import '../services/backup_service.dart';
 import '../services/storage/storage_service.dart';
 import '../services/webdav_service.dart';
 import '../models/app_models.dart';
+import 'package:pt_mate/utils/notification_helper.dart';
 
 class BackupRestorePage extends StatefulWidget {
   const BackupRestorePage({super.key});
@@ -51,23 +52,19 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
       _isError = isError;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(
-            color: isError
-                ? Theme.of(context).colorScheme.onErrorContainer
-                : Theme.of(context).colorScheme.onPrimaryContainer,
-          ),
-        ),
-        backgroundColor: isError
-            ? Theme.of(context).colorScheme.errorContainer
-            : Theme.of(context).colorScheme.primaryContainer,
-        behavior: SnackBarBehavior.floating,
+    if (!isError) {
+      NotificationHelper.showInfo(
+        context,
+        message,
         duration: const Duration(seconds: 3),
-      ),
-    );
+      );
+    } else {
+      NotificationHelper.showError(
+        context,
+        message,
+        duration: const Duration(seconds: 3),
+      );
+    }
   }
 
   void _showWebDAVMessage(String message, {bool isError = false}) {
@@ -78,23 +75,19 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
       _isWebDAVError = isError;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(
-            color: isError
-                ? Theme.of(context).colorScheme.onErrorContainer
-                : Theme.of(context).colorScheme.onPrimaryContainer,
-          ),
-        ),
-        backgroundColor: isError
-            ? Theme.of(context).colorScheme.errorContainer
-            : Theme.of(context).colorScheme.primaryContainer,
-        behavior: SnackBarBehavior.floating,
+    if (!isError) {
+      NotificationHelper.showInfo(
+        context,
+        message,
         duration: const Duration(seconds: 3),
-      ),
-    );
+      );
+    } else {
+      NotificationHelper.showError(
+        context,
+        message,
+        duration: const Duration(seconds: 3),
+      );
+    }
   }
 
   Future<void> _exportBackup() async {
@@ -650,42 +643,18 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                                 backupFiles.removeAt(index);
                               });
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      '已删除 $fileName',
-                                      style: TextStyle(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onPrimaryContainer,
-                                      ),
-                                    ),
-                                    backgroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.primaryContainer,
-                                    behavior: SnackBarBehavior.floating,
-                                    duration: const Duration(seconds: 3),
-                                  ),
+                                NotificationHelper.showInfo(
+                                  context,
+                                  '已删除 $fileName',
+                                  duration: const Duration(seconds: 3),
                                 );
                               }
                             } catch (e) {
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      '删除失败: $e',
-                                      style: TextStyle(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onErrorContainer,
-                                      ),
-                                    ),
-                                    backgroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.errorContainer,
-                                    behavior: SnackBarBehavior.floating,
-                                    duration: const Duration(seconds: 3),
-                                  ),
+                                NotificationHelper.showError(
+                                  context,
+                                  '删除失败: $e',
+                                  duration: const Duration(seconds: 3),
                                 );
                               }
                             }

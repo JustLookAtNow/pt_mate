@@ -30,6 +30,7 @@ import 'widgets/torrent_list_item.dart';
 import 'widgets/tag_filter_bar.dart';
 import 'services/update_service.dart';
 import 'widgets/update_notification_dialog.dart';
+import 'package:pt_mate/utils/notification_helper.dart';
 
 // 全局日志实例，供本文件内多个类使用
 final Logger _logger = Logger();
@@ -859,18 +860,7 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       // 分类加载失败时显示错误信息
       if (mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              '重新加载分类失败: $e',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onErrorContainer,
-              ),
-            ),
-            backgroundColor: Theme.of(context).colorScheme.errorContainer,
-          ),
-        );
+        NotificationHelper.showError(context, '重新加载分类失败: $e');
       }
     }
   }
@@ -1036,18 +1026,7 @@ class _HomePageState extends State<HomePage> {
                         if (_currentSite?.features.supportTorrentSearch ?? true) {
                           _search(reset: true);
                         } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                '当前站点不支持搜索功能',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onErrorContainer,
-                                ),
-                              ),
-                              backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          NotificationHelper.showError(context, '当前站点不支持搜索功能');
                         }
                       },
                     ),
@@ -1064,18 +1043,7 @@ class _HomePageState extends State<HomePage> {
                         if (_currentSite?.features.supportTorrentSearch ?? true) {
                           _search(reset: true);
                         } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                '当前站点不支持搜索功能',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onErrorContainer,
-                                ),
-                              ),
-                              backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          NotificationHelper.showError(context, '当前站点不支持搜索功能');
                         }
                       },
                       icon: Icon(
@@ -1325,20 +1293,7 @@ class _HomePageState extends State<HomePage> {
   void _onTorrentTap(TorrentItem item) async {
     // 检查站点是否支持种子详情功能
     if (_currentSite?.features.supportTorrentDetail == false) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        SnackBar(
-          content: Text(
-            '当前站点不支持种子详情功能',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onErrorContainer,
-            ),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      NotificationHelper.showError(context, '当前站点不支持种子详情功能');
       return;
     }
 
@@ -1407,35 +1362,14 @@ class _HomePageState extends State<HomePage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '已成功发送"${item.name}"到 ${clientConfig.name}',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-            ),
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-            behavior: SnackBarBehavior.floating,
-          ),
+        NotificationHelper.showInfo(
+          context,
+          '已成功发送"${item.name}"到 ${clientConfig.name}',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(
-          SnackBar(
-            content: Text(
-              '下载失败：$e',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onErrorContainer,
-              ),
-            ),
-            backgroundColor: Theme.of(context).colorScheme.errorContainer,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        NotificationHelper.showError(context, '下载失败：$e');
       }
     }
   }
@@ -1487,19 +1421,7 @@ class _HomePageState extends State<HomePage> {
         _search(reset: true);
       } else {
         if (mounted) {
-          final messenger = ScaffoldMessenger.of(context);
-          messenger.showSnackBar(
-            SnackBar(
-              content: Text(
-                '当前站点不支持搜索功能',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onErrorContainer,
-                ),
-              ),
-              backgroundColor: Theme.of(context).colorScheme.errorContainer,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          NotificationHelper.showError(context, '当前站点不支持搜索功能');
         }
       }
     }
@@ -1544,18 +1466,10 @@ class _HomePageState extends State<HomePage> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '收藏操作失败：$e',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onErrorContainer,
-              ),
-            ),
-            backgroundColor: Theme.of(context).colorScheme.errorContainer,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          ),
+        NotificationHelper.showError(
+          context,
+          '收藏操作失败：$e',
+          duration: const Duration(seconds: 2),
         );
       }
     }
@@ -1584,9 +1498,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _setActiveSite(String siteId) async {
     if (!mounted) return;
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final appState = context.read<AppState>();
-    final theme = Theme.of(context);
 
     try {
       await appState.setActiveSite(siteId);
@@ -1595,29 +1507,11 @@ class _HomePageState extends State<HomePage> {
           _currentSite = appState.site;
         });
         await _init(); // 加载新站点的数据
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              '已切换活跃站点',
-              style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
-            ),
-            backgroundColor: theme.colorScheme.primaryContainer,
-            behavior: SnackBarBehavior.fixed,
-          ),
-        );
+        NotificationHelper.showInfo(context, '已切换活跃站点');
       }
     } catch (e) {
       if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              '切换站点失败: $e',
-              style: TextStyle(color: theme.colorScheme.onErrorContainer),
-            ),
-            backgroundColor: theme.colorScheme.errorContainer,
-            behavior: SnackBarBehavior.fixed,
-          ),
-        );
+        NotificationHelper.showError(context, '切换站点失败: $e');
       }
     }
   }
@@ -1715,21 +1609,10 @@ class _HomePageState extends State<HomePage> {
               ScaffoldMessenger.of(context).clearSnackBars();
               
               // 显示提示信息
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    '再按一次返回键退出应用',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                  duration: const Duration(seconds: 3),
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.primaryContainer,
-                  behavior: SnackBarBehavior.floating,
-                  dismissDirection: DismissDirection.horizontal,
-                ),
+              NotificationHelper.showInfo(
+                context,
+                '再按一次返回键退出应用',
+                duration: const Duration(seconds: 3),
               );
               return;
             }
@@ -2241,17 +2124,9 @@ class _HomePageState extends State<HomePage> {
 
     // 显示开始收藏的提示
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '开始批量收藏${selectedItems.length}个项目...',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          behavior: SnackBarBehavior.floating,
-        ),
+      NotificationHelper.showInfo(
+        context,
+        '开始批量收藏${selectedItems.length}个项目...',
       );
     }
 
@@ -2276,18 +2151,7 @@ class _HomePageState extends State<HomePage> {
       } catch (e) {
         failureCount++;
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '收藏失败: ${item.name}, 错误: $e',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onErrorContainer,
-                ),
-              ),
-              backgroundColor: Theme.of(context).colorScheme.errorContainer,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          NotificationHelper.showError(context, '收藏失败: ${item.name}, 错误: $e');
         }
       }
     }
@@ -2297,23 +2161,19 @@ class _HomePageState extends State<HomePage> {
       final total = items.length;
       final message = '已成功收藏/取消收藏 $successCount/$total 个';
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-            style: TextStyle(
-              color: failureCount == 0
-                  ? Theme.of(context).colorScheme.onPrimaryContainer
-                  : Theme.of(context).colorScheme.onErrorContainer,
-            ),
-          ),
-          backgroundColor: failureCount == 0 
-            ? Theme.of(context).colorScheme.primaryContainer 
-            : Theme.of(context).colorScheme.errorContainer,
-          behavior: SnackBarBehavior.floating,
+      if (failureCount == 0) {
+        NotificationHelper.showInfo(
+          context,
+          message,
           duration: const Duration(seconds: 2),
-        ),
-      );
+        );
+      } else {
+        NotificationHelper.showError(
+          context,
+          message,
+          duration: const Duration(seconds: 2),
+        );
+      }
     }
   }
 
@@ -2339,17 +2199,9 @@ class _HomePageState extends State<HomePage> {
     // 显示开始下载的提示
     if (mounted) {
       final clientConfig = result['clientConfig'] as DownloaderConfig;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '开始批量下载${selectedItems.length}个项目到${clientConfig.name}...',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          behavior: SnackBarBehavior.floating,
-        ),
+      NotificationHelper.showInfo(
+        context,
+        '开始批量下载${selectedItems.length}个项目到${clientConfig.name}...',
       );
     }
 
@@ -2412,17 +2264,10 @@ class _HomePageState extends State<HomePage> {
       } catch (e) {
         failureCount++;
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '下载失败: ${item.name}, 错误: $e',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onErrorContainer,
-                ),
-              ),
-              backgroundColor: Theme.of(context).colorScheme.errorContainer,
-              duration: const Duration(seconds: 2),
-            ),
+          NotificationHelper.showError(
+            context,
+            '下载失败: ${item.name}, 错误: $e',
+            duration: const Duration(seconds: 2),
           );
         }
       } finally {
@@ -2436,22 +2281,19 @@ class _HomePageState extends State<HomePage> {
           ? '批量下载完成，成功$successCount个项目'
           : '批量下载完成，成功$successCount个，失败$failureCount个';
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-            style: TextStyle(
-              color: failureCount == 0
-                  ? Theme.of(context).colorScheme.onPrimaryContainer
-                  : Theme.of(context).colorScheme.onErrorContainer,
-            ),
-          ),
-          backgroundColor: failureCount == 0
-              ? Theme.of(context).colorScheme.primaryContainer
-              : Theme.of(context).colorScheme.errorContainer,
+      if (failureCount == 0) {
+        NotificationHelper.showInfo(
+          context,
+          message,
           duration: const Duration(seconds: 2),
-        ),
-      );
+        );
+      } else {
+        NotificationHelper.showError(
+          context,
+          message,
+          duration: const Duration(seconds: 2),
+        );
+      }
     }
   }
 }

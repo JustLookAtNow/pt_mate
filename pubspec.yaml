@@ -70,6 +70,7 @@ dependencies:
   share_plus: ^12.0.1
   xml: ^6.5.0
   flutter_widget_from_html_core: ^0.17.0
+  toastification: ^3.0.3
 
 
 dev_dependencies:

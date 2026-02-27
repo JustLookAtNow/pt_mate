@@ -9,6 +9,7 @@ import '../utils/format.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/qb_speed_indicator.dart';
 import 'downloader_settings_page.dart';
+import 'package:pt_mate/utils/notification_helper.dart';
 
 enum SortField {
   name,
@@ -268,17 +269,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           _loadTasks();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('刷新任务列表',
-              style:TextStyle(
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              )),
-
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+                    NotificationHelper.showInfo(context, '刷新任务列表');
         },
         child: const Icon(Icons.refresh),
       ),
@@ -296,28 +287,10 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
       await client.pauseTask(hash);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '已暂停',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        ),
-      );
+            NotificationHelper.showInfo(context, '已暂停');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '暂停失败: $e',
-            style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-        ),
-      );
+            NotificationHelper.showError(context, '暂停失败: $e');
     }
   }
 
@@ -331,28 +304,10 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
 
       await client.resumeTask(hash);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '已启动',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        ),
-      );
+            NotificationHelper.showInfo(context, '已启动');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '恢复失败: $e',
-            style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-        ),
-      );
+            NotificationHelper.showError(context, '恢复失败: $e');
     }
   }
 
@@ -369,28 +324,10 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
       await client.deleteTask(hash, deleteFiles: deleteFiles);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            deleteFiles ? '已删除任务和文件' : '已删除任务',
-            style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+            NotificationHelper.showInfo(context, deleteFiles ? '已删除任务和文件' : '已删除任务');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '删除任务失败: $e',
-            style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
-          ),
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+            NotificationHelper.showError(context, '删除任务失败: $e');
     }
   }
 

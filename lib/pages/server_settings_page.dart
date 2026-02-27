@@ -14,6 +14,7 @@ import '../widgets/responsive_layout.dart';
 
 import '../utils/format.dart';
 import '../app.dart';
+import 'package:pt_mate/utils/notification_helper.dart';
 
 class _HealthStatus {
   final bool ok;
@@ -186,18 +187,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       await _loadCachedHealthStatuses(triggerRefreshWhenEmpty: true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '加载站点配置失败: $e',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onErrorContainer,
-              ),
-            ),
-            backgroundColor: Theme.of(context).colorScheme.errorContainer,
-            behavior: SnackBarBehavior.fixed,
-          ),
-        );
+                NotificationHelper.showError(context, '加载站点配置失败: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -308,22 +298,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                     // ignore save errors
                   }
                   if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '站点信息获取完成',
-                        style: TextStyle(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onPrimaryContainer,
-                        ),
-                      ),
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.primaryContainer,
-                      behavior: SnackBarBehavior.fixed,
-                    ),
-                  );
+                                    NotificationHelper.showInfo(context, '站点信息获取完成');
                 }
               }
             });
@@ -367,43 +342,19 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
 
   Future<void> _setActiveSite(String siteId) async {
     if (!mounted) return;
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final appState = context.read<AppState>();
 
     try {
       await appState.setActiveSite(siteId);
       setState(() => _activeSiteId = siteId);
       if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              '已切换活跃站点',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-            ),
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-            behavior: SnackBarBehavior.fixed,
-          ),
-        );
-
+                NotificationHelper.showInfo(context, '已切换活跃站点');
         // 切换站点成功后跳转回首页
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              '切换站点失败: $e',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onErrorContainer,
-              ),
-            ),
-            backgroundColor: Theme.of(context).colorScheme.errorContainer,
-            behavior: SnackBarBehavior.fixed,
-          ),
-        );
+                NotificationHelper.showError(context, '切换站点失败: $e');
       }
     }
   }
@@ -438,33 +389,11 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         await StorageService.instance.deleteSiteConfig(site.id);
         await _loadSites();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '站点已删除',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-              ),
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              behavior: SnackBarBehavior.fixed,
-            ),
-          );
+                    NotificationHelper.showInfo(context, '站点已删除');
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '删除站点失败: $e',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onErrorContainer,
-                ),
-              ),
-              backgroundColor: Theme.of(context).colorScheme.errorContainer,
-              behavior: SnackBarBehavior.fixed,
-            ),
-          );
+                    NotificationHelper.showError(context, '删除站点失败: $e');
         }
       }
     }
@@ -694,7 +623,6 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
 
   Future<void> _refreshSingleSite(SiteConfig site) async {
     if (!mounted) return;
-    final theme = Theme.of(context);
     try {
       final activeId = await StorageService.instance.getActiveSiteId();
       if (activeId == site.id) {
@@ -751,28 +679,10 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '站点已刷新',
-            style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
-          ),
-          backgroundColor: theme.colorScheme.primaryContainer,
-          behavior: SnackBarBehavior.fixed,
-        ),
-      );
+            NotificationHelper.showInfo(context, '站点已刷新');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '刷新失败: $e',
-            style: TextStyle(color: theme.colorScheme.onErrorContainer),
-          ),
-          backgroundColor: theme.colorScheme.errorContainer,
-          behavior: SnackBarBehavior.fixed,
-        ),
-      );
+            NotificationHelper.showError(context, '刷新失败: $e');
     }
   }
 
@@ -1215,19 +1125,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                 constraints: const BoxConstraints(),
                 onPressed: () {
                   final msg = hs.message ?? '异常';
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.errorContainer,
-                      content: Text(
-                        msg,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onErrorContainer,
-                        ),
-                      ),
-                    ),
-                  );
+                                    NotificationHelper.showError(context, msg);
                 },
               ),
               const SizedBox(width: 6),
@@ -1355,37 +1253,13 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
               children: [
                 FilledButton.icon(
                   onPressed: () async {
-                    final messenger = ScaffoldMessenger.of(context);
-                    final theme = Theme.of(context);
                     try {
                       await StorageService.instance.saveSiteConfigs(
                         _sites.map((c) => c.copyWith(apiKey: null)).toList(),
                       );
-                      messenger.showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '已保存自定义排序',
-                            style: TextStyle(
-                              color: theme.colorScheme.onPrimaryContainer,
-                            ),
-                          ),
-                          backgroundColor: theme.colorScheme.primaryContainer,
-                          behavior: SnackBarBehavior.fixed,
-                        ),
-                      );
+                                            NotificationHelper.showInfo(context, '已保存自定义排序');
                     } catch (e) {
-                      messenger.showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '保存失败: $e',
-                            style: TextStyle(
-                              color: theme.colorScheme.onErrorContainer,
-                            ),
-                          ),
-                          backgroundColor: theme.colorScheme.errorContainer,
-                          behavior: SnackBarBehavior.fixed,
-                        ),
-                      );
+                                            NotificationHelper.showError(context, '保存失败: $e');
                     } finally {
                       if (mounted) {
                         setState(() {
@@ -1599,18 +1473,7 @@ class _CategoryEditDialogState extends State<_CategoryEditDialog> {
             final name = _nameController.text.trim();
             final parameters = _parametersController.text.trim();
             if (name.isEmpty || parameters.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    '请填写完整信息',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onErrorContainer,
-                    ),
-                  ),
-                  backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                  behavior: SnackBarBehavior.fixed,
-                ),
-              );
+                            NotificationHelper.showError(context, '请填写完整信息');
               return;
             }
             final result = widget.category.copyWith(
@@ -2007,18 +1870,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // nexusphpweb类型需要cookie
       if (_savedCookie == null || _savedCookie!.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '请先完成登录获取Cookie',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onErrorContainer,
-                ),
-              ),
-              backgroundColor: Theme.of(context).colorScheme.errorContainer,
-              behavior: SnackBarBehavior.fixed,
-            ),
-          );
+                    NotificationHelper.showError(context, '请先完成登录获取Cookie');
         }
         return;
       }
@@ -2026,18 +1878,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // 其他类型需要API Key
       if (_apiKeyController.text.trim().isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '请先填写API Key',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onErrorContainer,
-                ),
-              ),
-              backgroundColor: Theme.of(context).colorScheme.errorContainer,
-              behavior: SnackBarBehavior.fixed,
-            ),
-          );
+                    NotificationHelper.showError(context, '请先填写API Key');
         }
         return;
       }
@@ -2057,18 +1898,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
         });
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '已成功加载 ${categories.length} 个分类配置',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-              ),
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              behavior: SnackBarBehavior.fixed,
-            ),
-          );
+                    NotificationHelper.showInfo(context, '已成功加载 ${categories.length} 个分类配置');
         }
       } else {
         throw Exception('无法获取适配器实例');
@@ -2080,18 +1910,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '获取分类配置失败，已使用默认配置: $e',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onErrorContainer,
-              ),
-            ),
-            backgroundColor: Theme.of(context).colorScheme.errorContainer,
-            behavior: SnackBarBehavior.fixed,
-          ),
-        );
+                NotificationHelper.showError(context, '获取分类配置失败，已使用默认配置: $e');
       }
     }
   }
@@ -2323,18 +2142,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.site != null ? '站点已更新' : '站点已添加',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-            ),
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-            behavior: SnackBarBehavior.fixed,
-          ),
-        );
+                NotificationHelper.showInfo(context, widget.site != null ? '站点已更新' : '站点已添加');
         widget.onSaved?.call();
         Navigator.of(context).pop();
       }

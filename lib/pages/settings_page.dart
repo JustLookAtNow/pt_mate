@@ -17,6 +17,7 @@ import 'aggregate_search_settings_page.dart';
 import 'downloader_settings_page.dart';
 import '../services/update_service.dart';
 import '../services/debug/web_debug_service.dart';
+import 'package:pt_mate/utils/notification_helper.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -291,70 +292,33 @@ class _WebDebugToggleTileState extends State<_WebDebugToggleTile> {
     });
     if (value) {
       if (kIsWeb) {
-        final messenger = ScaffoldMessenger.of(context);
-        final scheme = Theme.of(context).colorScheme;
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              '当前为 Web 构建，无法启动本地调试服务',
-              style: TextStyle(color: scheme.onErrorContainer),
-            ),
-            backgroundColor: scheme.errorContainer,
-          ),
-        );
+        NotificationHelper.showError(context, '当前为 Web 构建，无法启动本地调试服务');
         setState(() {
           _enabled = false;
         });
         return;
       }
       try {
-        final messenger = ScaffoldMessenger.of(context);
-        final scheme = Theme.of(context).colorScheme;
         final ok = await WebDebugService.instance.start();
         if (!mounted) return;
         _serviceUrls = WebDebugService.instance.hostUrls;
         setState(() {});
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              ok ? 'Web 调试服务已启动' : 'Web 调试服务启动失败',
-              style: TextStyle(color: scheme.onPrimaryContainer),
-            ),
-            backgroundColor: scheme.primaryContainer,
-          ),
+        NotificationHelper.showInfo(
+          context,
+          ok ? 'Web 调试服务已启动' : 'Web 调试服务启动失败',
         );
       } catch (e) {
-        final messenger = ScaffoldMessenger.of(context);
-        final scheme = Theme.of(context).colorScheme;
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              '启动失败：$e',
-              style: TextStyle(color: scheme.onErrorContainer),
-            ),
-            backgroundColor: scheme.errorContainer,
-          ),
-        );
+        NotificationHelper.showError(context, '启动失败：$e');
         setState(() {
           _enabled = false;
         });
       }
     } else {
-      final messenger = ScaffoldMessenger.of(context);
-      final scheme = Theme.of(context).colorScheme;
       await WebDebugService.instance.stop();
       if (!mounted) return;
       _serviceUrls = [];
       setState(() {});
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            'Web 调试服务已停止',
-            style: TextStyle(color: scheme.onErrorContainer),
-          ),
-          backgroundColor: scheme.errorContainer,
-        ),
-      );
+      NotificationHelper.showError(context, 'Web 调试服务已停止');
     }
   }
 
@@ -376,12 +340,7 @@ class _WebDebugToggleTileState extends State<_WebDebugToggleTile> {
                       (url) => InkWell(
                         onTap: () {
                           Clipboard.setData(ClipboardData(text: url));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('已复制到剪贴板'),
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
+                          NotificationHelper.showInfo(context, '已复制到剪贴板');
                         },
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1208,40 +1167,14 @@ class _LogToFileTileState extends State<_LogToFileTile> {
 
   Future<void> _set(bool value) async {
     try {
-      final messenger = ScaffoldMessenger.of(context);
-      final scheme = Theme.of(context).colorScheme;
-      final onPrimaryContainer = scheme.onPrimaryContainer;
-      final primaryContainer = scheme.primaryContainer;
-
       await StorageService.instance.saveLogToFileEnabled(value);
       await LogFileService.instance.setEnabled(value);
       if (!mounted) return;
       setState(() => _enabled = value);
 
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            value ? '已开启本地日志记录' : '已关闭本地日志记录',
-            style: TextStyle(color: onPrimaryContainer),
-          ),
-          backgroundColor: primaryContainer,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      NotificationHelper.showInfo(context, value ? '已开启本地日志记录' : '已关闭本地日志记录');
     } catch (e) {
-      final messenger = ScaffoldMessenger.of(context);
-      final scheme = Theme.of(context).colorScheme;
-      final onErrorContainer = scheme.onErrorContainer;
-      final errorContainer = scheme.errorContainer;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            '操作失败: $e',
-            style: TextStyle(color: onErrorContainer),
-          ),
-          backgroundColor: errorContainer,
-        ),
-      );
+      NotificationHelper.showError(context, '操作失败: $e');
     }
   }
 
@@ -1273,77 +1206,37 @@ class _ExportLogsTile extends StatelessWidget {
   const _ExportLogsTile();
 
   Future<void> _shareLatest(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final scheme = Theme.of(context).colorScheme;
-    final onErrorContainer = scheme.onErrorContainer;
-    final errorContainer = scheme.errorContainer;
     try {
       if (kIsWeb) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Web 平台不支持文件落盘', style: TextStyle(color: onErrorContainer)),
-            backgroundColor: errorContainer,
-          ),
-        );
+        NotificationHelper.showError(context, 'Web 平台不支持文件落盘');
         return;
       }
 
       final path = await LogFileService.instance.currentLogFilePath();
       if (!context.mounted) return;
       if (path == null || !(await File(path).exists())) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('暂无日志文件或未开启记录', style: TextStyle(color: onErrorContainer)),
-            backgroundColor: errorContainer,
-          ),
-        );
+        NotificationHelper.showError(context, '暂无日志文件或未开启记录');
         return;
       }
       await SharePlus.instance.share(
         ShareParams(files: [XFile(path)], text: 'PT Mate 日志'),
       );
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('分享失败: $e', style: TextStyle(color: onErrorContainer)),
-          backgroundColor: errorContainer,
-        ),
-      );
+      NotificationHelper.showError(context, '分享失败: $e');
     }
   }
 
   Future<void> _openDir(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final scheme = Theme.of(context).colorScheme;
-    final onErrorContainer = scheme.onErrorContainer;
-    final errorContainer = scheme.errorContainer;
-    final onPrimaryContainer = scheme.onPrimaryContainer;
-    final primaryContainer = scheme.primaryContainer;
     try {
       if (kIsWeb) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Web 平台不支持文件落盘', style: TextStyle(color: onErrorContainer)),
-            backgroundColor: errorContainer,
-          ),
-        );
+        NotificationHelper.showError(context, 'Web 平台不支持文件落盘');
         return;
       }
       final dir = await LogFileService.instance.logsDirectoryPath();
       if (!context.mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('日志目录: $dir', style: TextStyle(color: onPrimaryContainer)),
-          backgroundColor: primaryContainer,
-        ),
-      );
+      NotificationHelper.showInfo(context, '日志目录: $dir');
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('打开目录失败: $e', style: TextStyle(color: onErrorContainer)),
-          backgroundColor: errorContainer,
-        ),
-      );
+      NotificationHelper.showError(context, '打开目录失败: $e');
     }
   }
 
@@ -1437,24 +1330,10 @@ class _ClearLogsTile extends StatelessWidget {
     try {
       final count = await LogFileService.instance.clearLogs();
       if (!context.mounted) return;
-      final scheme = Theme.of(context).colorScheme;
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('已清理日志文件 $count 个', style: TextStyle(color: scheme.onPrimaryContainer)),
-          backgroundColor: scheme.primaryContainer,
-        ),
-      );
+      NotificationHelper.showInfo(context, '已清理日志文件 $count 个');
     } catch (e) {
       if (!context.mounted) return;
-      final scheme = Theme.of(context).colorScheme;
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('清理失败: $e', style: TextStyle(color: scheme.onErrorContainer)),
-          backgroundColor: scheme.errorContainer,
-        ),
-      );
+      NotificationHelper.showError(context, '清理失败: $e');
     }
   }
 

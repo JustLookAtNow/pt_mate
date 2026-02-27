@@ -17,6 +17,7 @@ import '../services/downloader/downloader_config.dart';
 import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
 import '../widgets/torrent_download_dialog.dart';
+import 'package:pt_mate/utils/notification_helper.dart';
 
 // 自定义Quote标签处理器
 class CustomQuoteTag extends WrappedStyleTag {
@@ -695,18 +696,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         // 添加短暂延迟，确保对话框完全关闭后再显示SnackBar
         await Future.delayed(const Duration(milliseconds: 100));
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '已成功发送"${widget.torrentItem.name}"到 ${clientConfig.name}',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-              ),
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+                    NotificationHelper.showInfo(context, '已成功发送"${widget.torrentItem.name}"到 ${clientConfig.name}');
         }
       }
     } catch (e) {
@@ -714,18 +704,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         // 添加短暂延迟，确保对话框完全关闭后再显示SnackBar
         await Future.delayed(const Duration(milliseconds: 100));
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '下载失败：$e',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onErrorContainer,
-                ),
-              ),
-              backgroundColor: Theme.of(context).colorScheme.errorContainer,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+                    NotificationHelper.showError(context, '下载失败：$e');
         }
       }
     }
@@ -759,17 +738,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         // 添加短暂延迟，确保UI稳定后再显示SnackBar
         await Future.delayed(const Duration(milliseconds: 50));
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '收藏操作失败：$e',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onErrorContainer,
-                ),
-              ),
-              backgroundColor: Theme.of(context).colorScheme.errorContainer,
-            ),
-          );
+                    NotificationHelper.showError(context, '收藏操作失败：$e');
         }
       }
     }
@@ -1774,21 +1743,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                           // 添加短暂延迟，确保UI稳定后再显示SnackBar
                           await Future.delayed(const Duration(milliseconds: 50));
                           if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  '无法打开链接: $webviewUrl',
-                                  style: TextStyle(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onErrorContainer,
-                                  ),
-                                ),
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.errorContainer,
-                              ),
-                            );
+                                                        NotificationHelper.showError(context, '无法打开链接: $webviewUrl');
                           }
                         }
                       }
@@ -1805,20 +1760,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                       // 添加短暂延迟，确保UI稳定后再显示SnackBar
                       await Future.delayed(const Duration(milliseconds: 50));
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(errorMessage
-                            ,style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onErrorContainer,
-                            ),),
-                            backgroundColor: Theme.of(
-                              context,
-                            ).colorScheme.errorContainer,
-                            duration: const Duration(seconds: 8), // 延长显示时间以便阅读
-                          ),
-                        );
+                                                NotificationHelper.showError(context, errorMessage, duration: const Duration(seconds: 8));
                       }
                     }
                   }
