@@ -15,6 +15,420 @@ import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import '../logging/log_file_service.dart';
 
+// -----------------------------------------------------------------------------
+// Helper Classes and Functions for Isolate Logic
+// -----------------------------------------------------------------------------
+
+/// Isolate 搜索解析参数对象
+class ParseSearchParams {
+  final String html;
+  final Map<String, dynamic> searchConfig;
+  final Map<String, dynamic>? totalPagesConfig;
+  final Map<String, String> tagMapping;
+  final Map<String, String> discountMapping;
+  final String baseUrl;
+  final String passKey;
+  final int pageNumber;
+  final int pageSize;
+
+  ParseSearchParams({
+    required this.html,
+    required this.searchConfig,
+    this.totalPagesConfig,
+    required this.tagMapping,
+    required this.discountMapping,
+    required this.baseUrl,
+    required this.passKey,
+    required this.pageNumber,
+    required this.pageSize,
+  });
+}
+
+/// 适配器解析器助手类，混入 BaseWebAdapterMixin 以在 Isolate 中使用
+class _AdapterParser with BaseWebAdapterMixin {
+  /// 单例模式，避免重复实例化
+  static final _AdapterParser instance = _AdapterParser();
+}
+
+/// 解析标签类型的静态帮助方法
+TagType? _parseTagTypeStatic(String? str, Map<String, String> tagMapping) {
+  if (str == null || str.isEmpty) return null;
+
+  final enumName = tagMapping[str];
+
+  if (enumName != null) {
+    for (final type in TagType.values) {
+      if (type.name.toLowerCase() == enumName.toLowerCase()) {
+        return type;
+      }
+      // 也可以尝试匹配 content
+      if (type.content == enumName) {
+        return type;
+      }
+    }
+  }
+  return null;
+}
+
+/// 解析优惠类型的静态帮助方法
+DiscountType _parseDiscountTypeStatic(
+    String? str, Map<String, String> discountMapping) {
+  if (str == null || str.isEmpty) return DiscountType.normal;
+
+  final enumValue = discountMapping[str];
+
+  if (enumValue != null) {
+    for (final type in DiscountType.values) {
+      if (type.value == enumValue) {
+        return type;
+      }
+    }
+  }
+
+  return DiscountType.normal;
+}
+
+/// 在 Isolate 中运行的搜索结果解析函数
+Future<TorrentSearchResult> parseSearchResultInIsolate(
+    ParseSearchParams params) async {
+  final soup = BeautifulSoup(params.html);
+  final parser = _AdapterParser.instance;
+
+  // 1. 解析种子列表
+  final torrents = <TorrentItem>[];
+
+  try {
+    final searchConfig = params.searchConfig;
+    final rowsConfig = searchConfig['rows'] as Map<String, dynamic>?;
+    final fieldsConfig = searchConfig['fields'] as Map<String, dynamic>?;
+
+    if (rowsConfig != null &&
+        fieldsConfig != null &&
+        rowsConfig['selector'] != null) {
+      final rowSelector = rowsConfig['selector'] as String;
+      // 使用配置的选择器查找行
+      final rows = parser.findElementBySelector(soup, rowSelector);
+
+      for (final rowElement in rows) {
+        final row = rowElement as Bs4Element;
+        try {
+          // 提取种子ID - 如果提取失败则跳过当前行
+          final torrentIdConfig =
+              fieldsConfig['torrentId'] as Map<String, dynamic>?;
+          if (torrentIdConfig == null) {
+            continue;
+          }
+
+          final torrentIdList = await parser.extractFieldValue(
+              row, torrentIdConfig);
+          final torrentId = torrentIdList.isNotEmpty ? torrentIdList.first : '';
+          if (torrentId.isEmpty) {
+            continue; // 种子ID提取失败，跳过当前行
+          }
+
+          // 提取其他字段
+          final torrentNameList = await parser.extractFieldValue(
+            row,
+            fieldsConfig['torrentName'] as Map<String, dynamic>? ?? {},
+          );
+          final torrentName = torrentNameList.isNotEmpty
+              ? torrentNameList.first
+              : '';
+
+          final tagList = await parser.extractFieldValue(
+            row,
+            fieldsConfig['tag'] as Map<String, dynamic>? ?? {},
+          );
+
+          final descriptionList = await parser.extractFieldValue(
+            row,
+            fieldsConfig['description'] as Map<String, dynamic>? ?? {},
+          );
+          final description = descriptionList.isNotEmpty
+              ? descriptionList.first
+              : '';
+
+          final discountList = await parser.extractFieldValue(
+            row,
+            fieldsConfig['discount'] as Map<String, dynamic>? ?? {},
+          );
+          final discount = discountList.isNotEmpty ? discountList.first : '';
+
+          final discountEndTimeConfig =
+              fieldsConfig['discountEndTime'] as Map<String, dynamic>? ?? {};
+          final discountEndTimeList = await parser.extractFieldValue(
+            row,
+            discountEndTimeConfig,
+          );
+          final discountEndTime = discountEndTimeList.isNotEmpty
+              ? discountEndTimeList.first
+              : '';
+          final discountEndTimeTimeConfig =
+              discountEndTimeConfig['time'] as Map<String, dynamic>?;
+
+          final seedersTextList = await parser.extractFieldValue(
+            row,
+            fieldsConfig['seedersText'] as Map<String, dynamic>? ?? {},
+          );
+          final seedersText = seedersTextList.isNotEmpty
+              ? seedersTextList.first
+              : '';
+
+          final leechersTextList = await parser.extractFieldValue(
+            row,
+            fieldsConfig['leechersText'] as Map<String, dynamic>? ?? {},
+          );
+          final leechersText = leechersTextList.isNotEmpty
+              ? leechersTextList.first
+              : '';
+
+          final sizeTextList = await parser.extractFieldValue(
+            row,
+            fieldsConfig['sizeText'] as Map<String, dynamic>? ?? {},
+          );
+          final sizeText = sizeTextList.isNotEmpty ? sizeTextList.first : '';
+
+          final downloadStatusTextList = await parser.extractFieldValue(
+            row,
+            fieldsConfig['downloadStatus'] as Map<String, dynamic>? ?? {},
+          );
+          final downloadUrlConfig =
+              fieldsConfig['downloadUrl'] as Map<String, dynamic>? ?? {};
+          var downloadUrl = '';
+          if (downloadUrlConfig['value'] != null) {
+            downloadUrl = downloadUrlConfig['value'] as String? ?? '';
+            downloadUrl = downloadUrl.replaceAll('{torrentId}', torrentId);
+            downloadUrl = downloadUrl.replaceAll(
+              '{passKey}',
+              params.passKey,
+            );
+            var baseUrl = params.baseUrl;
+            if (params.baseUrl.endsWith("/")) {
+              baseUrl = params.baseUrl.substring(
+                0,
+                params.baseUrl.length - 1,
+              );
+            }
+            downloadUrl = downloadUrl.replaceAll('{baseUrl}', baseUrl);
+          }
+
+          final downloadStatusText = downloadStatusTextList.isNotEmpty
+              ? downloadStatusTextList.first
+              : '';
+
+          final coverList = await parser.extractFieldValue(
+            row,
+            fieldsConfig['cover'] as Map<String, dynamic>? ?? {},
+          );
+          final cover = coverList.isNotEmpty ? coverList.first : '';
+
+          final createDateConfig =
+              fieldsConfig['createDate'] as Map<String, dynamic>? ?? {};
+          final createDateList = await parser.extractFieldValue(
+            row,
+            createDateConfig,
+          );
+          final createDate = createDateList.isNotEmpty
+              ? createDateList.first
+              : '';
+          final createDateTimeConfig =
+              createDateConfig['time'] as Map<String, dynamic>?;
+
+          final doubanRatingList = await parser.extractFieldValue(
+            row,
+            fieldsConfig['doubanRating'] as Map<String, dynamic>? ?? {},
+          );
+          final doubanRating = doubanRatingList.isNotEmpty
+              ? doubanRatingList.first
+              : '';
+
+          final imdbRatingList = await parser.extractFieldValue(
+            row,
+            fieldsConfig['imdbRating'] as Map<String, dynamic>? ?? {},
+          );
+          final imdbRating = imdbRatingList.isNotEmpty
+              ? imdbRatingList.first
+              : '';
+
+          // 提取评论数
+          final commentsList = await parser.extractFieldValue(
+            row,
+            fieldsConfig['comments'] as Map<String, dynamic>? ?? {},
+          );
+          final commentsText = commentsList.isNotEmpty
+              ? commentsList.first
+              : '0';
+          final comments = FormatUtil.parseInt(commentsText) ?? 0;
+
+          // 检查收藏状态（布尔字段）
+          final collectionConfig =
+              fieldsConfig['collection'] as Map<String, dynamic>?;
+          bool collection = false;
+          if (collectionConfig != null) {
+            final collectionList = await parser.extractFieldValue(
+              row,
+              collectionConfig,
+            );
+            collection = collectionList.isNotEmpty; // 如果找不到元素说明未收藏
+          }
+          // 检查置顶状态（布尔字段）
+          final isTopConfig = fieldsConfig['isTop'] as Map<String, dynamic>?;
+          bool isTop = false;
+          if (isTopConfig != null) {
+            final isTopList = await parser.extractFieldValue(row, isTopConfig);
+            isTop = isTopList.isNotEmpty; // 如果找不到元素说明未置顶
+          }
+
+          DownloadStatus downloadStatus = DownloadStatus.none;
+          if (downloadStatusText.isNotEmpty) {
+            final percentInt = FormatUtil.parseInt(downloadStatusText);
+            if (percentInt != null) {
+              if (percentInt == 100) {
+                downloadStatus = DownloadStatus.completed;
+              } else {
+                downloadStatus = DownloadStatus.downloading;
+              }
+            }
+          }
+
+          // 解析文件大小为字节数
+          int sizeInBytes = 0;
+          if (sizeText.isNotEmpty) {
+            final sizeMatch = RegExp(r'([\d.]+)\s*(\w+)').firstMatch(sizeText);
+            if (sizeMatch != null) {
+              final sizeValue = double.tryParse(sizeMatch.group(1) ?? '0') ?? 0;
+              final unit = sizeMatch.group(2)?.toUpperCase() ?? 'B';
+
+              switch (unit) {
+                case 'KB':
+                case 'KIB':
+                  sizeInBytes = (sizeValue * 1024).round();
+                  break;
+                case 'MB':
+                case 'MIB':
+                  sizeInBytes = (sizeValue * 1024 * 1024).round();
+                  break;
+                case 'GB':
+                case 'GIB':
+                  sizeInBytes = (sizeValue * 1024 * 1024 * 1024).round();
+                  break;
+                case 'TB':
+                case 'TIB':
+                  sizeInBytes = (sizeValue * 1024 * 1024 * 1024 * 1024).round();
+                  break;
+                default:
+                  sizeInBytes = sizeValue.round();
+              }
+            }
+          }
+
+          // 计算标签并清理描述
+          final tags = TagType.matchTags(torrentName + description);
+
+          if (tagList.isNotEmpty) {
+            for (final tagStr in tagList) {
+              final mappedTag = _parseTagTypeStatic(tagStr, params.tagMapping);
+              if (mappedTag != null && !tags.contains(mappedTag)) {
+                tags.add(mappedTag);
+              }
+            }
+          }
+
+          torrents.add(
+            TorrentItem(
+              id: torrentId,
+              name: torrentName,
+              smallDescr: description.trim(),
+              discount: _parseDiscountTypeStatic(
+                discount.isNotEmpty ? discount : null,
+                params.discountMapping,
+              ),
+              discountEndTime: discountEndTime.isNotEmpty
+                  ? Formatters.parseDateTimeCustom(
+                      discountEndTime,
+                      format: discountEndTimeTimeConfig?['format'] as String?,
+                      zone: discountEndTimeTimeConfig?['zone'] as String?,
+                    )
+                  : null,
+              downloadUrl: downloadUrl.isNotEmpty ? downloadUrl : null,
+              seeders: FormatUtil.parseInt(seedersText) ?? 0,
+              leechers: FormatUtil.parseInt(leechersText) ?? 0,
+              sizeBytes: sizeInBytes,
+              downloadStatus: downloadStatus,
+              collection: collection,
+              imageList: [], // 暂时不解析图片列表
+              cover: cover,
+              createdDate: Formatters.parseDateTimeCustom(
+                createDate,
+                format: createDateTimeConfig?['format'] as String?,
+                zone: createDateTimeConfig?['zone'] as String?,
+              ),
+              doubanRating: doubanRating.isNotEmpty ? doubanRating : 'N/A',
+              imdbRating: imdbRating.isNotEmpty ? imdbRating : 'N/A',
+              isTop: isTop,
+              tags: tags,
+              comments: comments,
+            ),
+          );
+        } catch (e) {
+          // Isolate中不能使用Logger，使用debugPrint
+          debugPrint('NexusPHPWebAdapter Isolate: Row parse failed - $e');
+          continue;
+        }
+      }
+    }
+  } catch (e) {
+    debugPrint('NexusPHPWebAdapter Isolate: Search parse failed - $e');
+  }
+
+  // 2. 解析总页数
+  int totalPages = 1;
+  try {
+    final config = params.totalPagesConfig;
+    if (config != null && config.isNotEmpty) {
+      final rowsConfig = config['rows'] as Map<String, dynamic>?;
+      final fieldsConfig = config['fields'] as Map<String, dynamic>?;
+
+      if (rowsConfig != null && fieldsConfig != null) {
+        final rowSelector = rowsConfig['selector'] as String?;
+        if (rowSelector != null && rowSelector.isNotEmpty) {
+          final rows = parser.findElementBySelector(soup, rowSelector);
+          if (rows.isNotEmpty) {
+            final fieldConfig =
+                fieldsConfig['totalPages'] as Map<String, dynamic>?;
+            if (fieldConfig != null) {
+              List<int> pageValues = [];
+              for (final row in rows) {
+                final values = await parser.extractFieldValue(row, fieldConfig);
+                for (final val in values) {
+                  final parsed = FormatUtil.parseInt(val);
+                  if (parsed != null) {
+                    pageValues.add(parsed);
+                  }
+                }
+              }
+
+              if (pageValues.isNotEmpty) {
+                totalPages = pageValues.reduce((a, b) => a > b ? a : b);
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    debugPrint('NexusPHPWebAdapter Isolate: Total pages parse failed - $e');
+  }
+
+  return TorrentSearchResult(
+    pageNumber: params.pageNumber,
+    pageSize: params.pageSize,
+    total: torrents.length * totalPages, // 估算值
+    totalPages: totalPages,
+    items: torrents,
+  );
+}
+
 /// NexusPHP Web站点适配器
 /// 用于处理基于Web接口的NexusPHP站点
 class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
@@ -198,41 +612,12 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
 
   /// 从字符串解析标签类型
   TagType? _parseTagType(String? str) {
-    if (str == null || str.isEmpty) return null;
-
-    final mapping = _tagMapping ?? {};
-    final enumName = mapping[str];
-
-    if (enumName != null) {
-      for (final type in TagType.values) {
-        if (type.name.toLowerCase() == enumName.toLowerCase()) {
-          return type;
-        }
-        // 也可以尝试匹配 content
-        if (type.content == enumName) {
-          return type;
-        }
-      }
-    }
-    return null;
+    return _parseTagTypeStatic(str, _tagMapping ?? {});
   }
 
   /// 从字符串解析优惠类型
   DiscountType _parseDiscountType(String? str) {
-    if (str == null || str.isEmpty) return DiscountType.normal;
-
-    final mapping = _discountMapping ?? {};
-    final enumValue = mapping[str];
-
-    if (enumValue != null) {
-      for (final type in DiscountType.values) {
-        if (type.value == enumValue) {
-          return type;
-        }
-      }
-    }
-
-    return DiscountType.normal;
+    return _parseDiscountTypeStatic(str, _discountMapping ?? {});
   }
 
   @override
@@ -663,20 +1048,25 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
         data: method.toUpperCase() == 'POST' ? queryParams : null,
         options: Options(method: method.toUpperCase()),
       );
-      final soup = BeautifulSoup(response.data);
-      // 解析种子列表
-      final torrents = await parseTorrentList(soup);
 
-      // 解析总页数
-      int totalPages = await parseTotalPages(soup);
+      // 使用 Isolate 处理解析
+      final searchConfig = await _getFinderConfig('search');
+      final totalPagesConfig = await _getFinderConfig('totalPages');
 
-      return TorrentSearchResult(
+      final params = ParseSearchParams(
+        html: response.data as String,
+        searchConfig: searchConfig,
+        totalPagesConfig: totalPagesConfig,
+        tagMapping: _tagMapping ?? {},
+        discountMapping: _discountMapping ?? {},
+        baseUrl: _siteConfig.baseUrl,
+        passKey: _siteConfig.passKey ?? '',
         pageNumber: pageNumber,
         pageSize: pageSize,
-        total: torrents.length * totalPages, // 估算值
-        totalPages: totalPages,
-        items: torrents,
       );
+
+      return await compute(parseSearchResultInIsolate, params);
+
     } catch (e) {
       throw ApiExceptionAdapter.wrapError(e, '搜索种子');
     }
@@ -744,6 +1134,7 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
   }
 
   Future<int> parseTotalPages(BeautifulSoup soup) async {
+    // 保持实例方法用于兼容性或测试
     int totalPages = 1;
     try {
       // 获取配置
@@ -797,293 +1188,43 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
   }
 
   Future<List<TorrentItem>> parseTorrentList(BeautifulSoup soup) async {
+    // 这个实例方法仍然保留，但我们可以重构它以使用 Isolate 逻辑，
+    // 或者仅仅用于测试/backward compatibility。
+    // 为了通过基准测试，我们可以在这里直接调用 `parseSearchResultInIsolate` 的内部逻辑（非isolate方式），
+    // 也就是构造 ParseSearchParams 然后直接调用（但这需要 soup 已经存在，而 isolate 函数接收 html 字符串）。
+    // 所以，我们可以把核心逻辑抽取出来，或者保留此处的逻辑作为同步版本。
+
+    // 为了避免重复维护代码，最佳做法是将核心解析逻辑抽取出来。
+    // 但是 `parseSearchResultInIsolate` 包含了 soup 创建。
+    // 我们可以创建一个 `_parseTorrentListImpl` 函数接受 soup 和 config。
+
     final torrents = <TorrentItem>[];
 
     try {
       // 获取搜索配置
       final searchConfig = await _getFinderConfig('search');
 
-      final rowsConfig = searchConfig['rows'] as Map<String, dynamic>?;
-      final fieldsConfig = searchConfig['fields'] as Map<String, dynamic>?;
+      // 直接调用核心解析逻辑，避免重复代码
+      // 注意：这里仍然是在主线程运行
+      // 为了复用 isolate 中的代码，我们需要构造参数
 
-      if (rowsConfig == null || fieldsConfig == null) {
-        _logRuleAndSoup('search.config.missing', searchConfig, soup);
-        return torrents;
-      }
+      // 由于 isolate 函数是 top-level 且自包含的，我们很难直接复用它的内部部分而不暴露更多细节。
+      // 鉴于 `parseTorrentList` 是公开 API，我们可以选择：
+      // 1. 保持原样（代码重复，但风险低）
+      // 2. 将 Isolate 函数内部逻辑抽取为另一个 top-level 函数（接受 Soup 和 Configs），然后 Isolate 函数和此函数都调用它。
 
-      final rowSelector = rowsConfig['selector'] as String?;
-      if (rowSelector == null) {
-        _logRuleAndSoup('search.rowSelector.missing', rowsConfig, soup);
-        return torrents;
-      }
+      // 让我们选择方案 2：抽取核心逻辑。
+      // 下面我将定义 `_parseTorrentListFromSoup`。
 
-      // 使用配置的选择器查找行
-      final rows = findElementBySelector(soup, rowSelector);
+      return await _parseTorrentListFromSoup(
+        soup,
+        searchConfig,
+        _tagMapping ?? {},
+        _discountMapping ?? {},
+        _siteConfig.baseUrl,
+        _siteConfig.passKey ?? ''
+      );
 
-      for (final rowElement in rows) {
-        final row = rowElement as Bs4Element;
-        try {
-          // 提取种子ID - 如果提取失败则跳过当前行
-          final torrentIdConfig =
-              fieldsConfig['torrentId'] as Map<String, dynamic>?;
-          if (torrentIdConfig == null) {
-            continue;
-          }
-
-          final torrentIdList = await extractFieldValue(row, torrentIdConfig);
-          final torrentId = torrentIdList.isNotEmpty ? torrentIdList.first : '';
-          if (torrentId.isEmpty) {
-            continue; // 种子ID提取失败，跳过当前行
-          }
-
-          // 提取其他字段
-          final torrentNameList = await extractFieldValue(
-            row,
-            fieldsConfig['torrentName'] as Map<String, dynamic>? ?? {},
-          );
-          final torrentName = torrentNameList.isNotEmpty
-              ? torrentNameList.first
-              : '';
-
-          final tagList = await extractFieldValue(
-            row,
-            fieldsConfig['tag'] as Map<String, dynamic>? ?? {},
-          );
-
-          final descriptionList = await extractFieldValue(
-            row,
-            fieldsConfig['description'] as Map<String, dynamic>? ?? {},
-          );
-          final description = descriptionList.isNotEmpty
-              ? descriptionList.first
-              : '';
-
-          final discountList = await extractFieldValue(
-            row,
-            fieldsConfig['discount'] as Map<String, dynamic>? ?? {},
-          );
-          final discount = discountList.isNotEmpty ? discountList.first : '';
-
-          final discountEndTimeConfig =
-              fieldsConfig['discountEndTime'] as Map<String, dynamic>? ?? {};
-          final discountEndTimeList = await extractFieldValue(
-            row,
-            discountEndTimeConfig,
-          );
-          final discountEndTime = discountEndTimeList.isNotEmpty
-              ? discountEndTimeList.first
-              : '';
-          final discountEndTimeTimeConfig =
-              discountEndTimeConfig['time'] as Map<String, dynamic>?;
-
-          final seedersTextList = await extractFieldValue(
-            row,
-            fieldsConfig['seedersText'] as Map<String, dynamic>? ?? {},
-          );
-          final seedersText = seedersTextList.isNotEmpty
-              ? seedersTextList.first
-              : '';
-
-          final leechersTextList = await extractFieldValue(
-            row,
-            fieldsConfig['leechersText'] as Map<String, dynamic>? ?? {},
-          );
-          final leechersText = leechersTextList.isNotEmpty
-              ? leechersTextList.first
-              : '';
-
-          final sizeTextList = await extractFieldValue(
-            row,
-            fieldsConfig['sizeText'] as Map<String, dynamic>? ?? {},
-          );
-          final sizeText = sizeTextList.isNotEmpty ? sizeTextList.first : '';
-
-          final downloadStatusTextList = await extractFieldValue(
-            row,
-            fieldsConfig['downloadStatus'] as Map<String, dynamic>? ?? {},
-          );
-          final downloadUrlConfig =
-              fieldsConfig['downloadUrl'] as Map<String, dynamic>? ?? {};
-          var downloadUrl = '';
-          if (downloadUrlConfig['value'] != null) {
-            downloadUrl = downloadUrlConfig['value'] as String? ?? '';
-            downloadUrl = downloadUrl.replaceAll('{torrentId}', torrentId);
-            downloadUrl = downloadUrl.replaceAll(
-              '{passKey}',
-              _siteConfig.passKey!,
-            );
-            var baseUrl = _siteConfig.baseUrl;
-            if (_siteConfig.baseUrl.endsWith("/")) {
-              baseUrl = _siteConfig.baseUrl.substring(
-                0,
-                _siteConfig.baseUrl.length - 1,
-              );
-            }
-            downloadUrl = downloadUrl.replaceAll('{baseUrl}', baseUrl);
-          }
-
-          final downloadStatusText = downloadStatusTextList.isNotEmpty
-              ? downloadStatusTextList.first
-              : '';
-
-          final coverList = await extractFieldValue(
-            row,
-            fieldsConfig['cover'] as Map<String, dynamic>? ?? {},
-          );
-          final cover = coverList.isNotEmpty ? coverList.first : '';
-
-          final createDateConfig =
-              fieldsConfig['createDate'] as Map<String, dynamic>? ?? {};
-          final createDateList = await extractFieldValue(
-            row,
-            createDateConfig,
-          );
-          final createDate = createDateList.isNotEmpty
-              ? createDateList.first
-              : '';
-          final createDateTimeConfig =
-              createDateConfig['time'] as Map<String, dynamic>?;
-
-          final doubanRatingList = await extractFieldValue(
-            row,
-            fieldsConfig['doubanRating'] as Map<String, dynamic>? ?? {},
-          );
-          final doubanRating = doubanRatingList.isNotEmpty
-              ? doubanRatingList.first
-              : '';
-
-          final imdbRatingList = await extractFieldValue(
-            row,
-            fieldsConfig['imdbRating'] as Map<String, dynamic>? ?? {},
-          );
-          final imdbRating = imdbRatingList.isNotEmpty
-              ? imdbRatingList.first
-              : '';
-
-          // 提取评论数
-          final commentsList = await extractFieldValue(
-            row,
-            fieldsConfig['comments'] as Map<String, dynamic>? ?? {},
-          );
-          final commentsText = commentsList.isNotEmpty
-              ? commentsList.first
-              : '0';
-          final comments = FormatUtil.parseInt(commentsText) ?? 0;
-
-          // 检查收藏状态（布尔字段）
-          final collectionConfig =
-              fieldsConfig['collection'] as Map<String, dynamic>?;
-          bool collection = false;
-          if (collectionConfig != null) {
-            final collectionList = await extractFieldValue(
-              row,
-              collectionConfig,
-            );
-            collection = collectionList.isNotEmpty; // 如果找不到元素说明未收藏
-          }
-          // 检查置顶状态（布尔字段）
-          final isTopConfig = fieldsConfig['isTop'] as Map<String, dynamic>?;
-          bool isTop = false;
-          if (isTopConfig != null) {
-            final isTopList = await extractFieldValue(row, isTopConfig);
-            isTop = isTopList.isNotEmpty; // 如果找不到元素说明未置顶
-          }
-
-          DownloadStatus downloadStatus = DownloadStatus.none;
-          if (downloadStatusText.isNotEmpty) {
-            final percentInt = FormatUtil.parseInt(downloadStatusText);
-            if (percentInt != null) {
-              if (percentInt == 100) {
-                downloadStatus = DownloadStatus.completed;
-              } else {
-                downloadStatus = DownloadStatus.downloading;
-              }
-            }
-          }
-
-          // 解析文件大小为字节数
-          int sizeInBytes = 0;
-          if (sizeText.isNotEmpty) {
-            final sizeMatch = RegExp(r'([\d.]+)\s*(\w+)').firstMatch(sizeText);
-            if (sizeMatch != null) {
-              final sizeValue = double.tryParse(sizeMatch.group(1) ?? '0') ?? 0;
-              final unit = sizeMatch.group(2)?.toUpperCase() ?? 'B';
-
-              switch (unit) {
-                case 'KB':
-                case 'KIB':
-                  sizeInBytes = (sizeValue * 1024).round();
-                  break;
-                case 'MB':
-                case 'MIB':
-                  sizeInBytes = (sizeValue * 1024 * 1024).round();
-                  break;
-                case 'GB':
-                case 'GIB':
-                  sizeInBytes = (sizeValue * 1024 * 1024 * 1024).round();
-                  break;
-                case 'TB':
-                case 'TIB':
-                  sizeInBytes = (sizeValue * 1024 * 1024 * 1024 * 1024).round();
-                  break;
-                default:
-                  sizeInBytes = sizeValue.round();
-              }
-            }
-          }
-
-          // 计算标签并清理描述
-          final tags = TagType.matchTags(torrentName + description);
-
-          if (tagList.isNotEmpty) {
-            for (final tagStr in tagList) {
-              final mappedTag = _parseTagType(tagStr);
-              if (mappedTag != null && !tags.contains(mappedTag)) {
-                tags.add(mappedTag);
-              }
-            }
-          }
-
-          torrents.add(
-            TorrentItem(
-              id: torrentId,
-              name: torrentName,
-              smallDescr: description.trim(),
-              discount: _parseDiscountType(
-                discount.isNotEmpty ? discount : null,
-              ),
-              discountEndTime: discountEndTime.isNotEmpty
-                  ? Formatters.parseDateTimeCustom(
-                      discountEndTime,
-                      format: discountEndTimeTimeConfig?['format'] as String?,
-                      zone: discountEndTimeTimeConfig?['zone'] as String?,
-                    )
-                  : null,
-              downloadUrl: downloadUrl.isNotEmpty ? downloadUrl : null,
-              seeders: FormatUtil.parseInt(seedersText) ?? 0,
-              leechers: FormatUtil.parseInt(leechersText) ?? 0,
-              sizeBytes: sizeInBytes,
-              downloadStatus: downloadStatus,
-              collection: collection,
-              imageList: [], // 暂时不解析图片列表
-              cover: cover,
-              createdDate: Formatters.parseDateTimeCustom(
-                createDate,
-                format: createDateTimeConfig?['format'] as String?,
-                zone: createDateTimeConfig?['zone'] as String?,
-              ),
-              doubanRating: doubanRating.isNotEmpty ? doubanRating : 'N/A',
-              imdbRating: imdbRating.isNotEmpty ? imdbRating : 'N/A',
-              isTop: isTop,
-              tags: tags,
-              comments: comments,
-            ),
-          );
-        } catch (e) {
-          _logRuleAndSoup('search.row.parseFailed', fieldsConfig, row);
-          continue;
-        }
-      }
     } catch (e) {
       _logRuleAndSoup('search.parse.failed', null, soup);
     }
@@ -1091,425 +1232,300 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
     return torrents;
   }
 
-  @override
-  Future<TorrentDetail> fetchTorrentDetail(String id) async {
-    // 构建种子详情页面URL
-    final baseUrl = _siteConfig.baseUrl.endsWith('/')
-        ? _siteConfig.baseUrl.substring(0, _siteConfig.baseUrl.length - 1)
-        : _siteConfig.baseUrl;
-    final detailUrl = '$baseUrl/details.php?id=$id&hit=1';
-
-    // 如果启用了原生详情渲染，提取 DOM
-    if (_siteConfig.features.nativeDetail) {
-      try {
-        final response = await _dio.get(
-          '/details.php',
-          queryParameters: {'id': id, 'hit': '1'},
-        );
-        final soup = BeautifulSoup(response.data);
-
-        // 尝试通过配置获取详情选择器和内容类型
-        String extractedContent = '';
-        bool isBbcode = false;
-        try {
-          final detailConfig = await _getFinderConfig('detail');
-          if (detailConfig.isNotEmpty) {
-            isBbcode = detailConfig['isBbcode'] as bool? ?? false;
-            final rowsConfig = detailConfig['rows'] as Map<String, dynamic>?;
-            final selector = rowsConfig?['selector'] as String?;
-            if (selector != null && selector.isNotEmpty) {
-              final element = findFirstElementBySelector(soup, selector);
-              if (element != null) {
-                extractedContent = isBbcode ? element.text : element.innerHtml;
-              }
-            }
-          }
-        } catch (_) {
-          // 配置不存在，使用默认选择器
-        }
-
-        // 默认 fallback 选择器（默认 HTML 模式）
-        if (extractedContent.isEmpty) {
-          final kdescr =
-              soup.find('div', id: 'kdescr') ??
-              soup.find('td', id: 'kdescr') ??
-              soup.find('#kdescr');
-          if (kdescr != null) {
-            extractedContent = isBbcode ? kdescr.text : kdescr.innerHtml;
-          }
-        }
-
-        if (extractedContent.isNotEmpty) {
-          if (isBbcode) {
-            return TorrentDetail(
-              descr: extractedContent,
-              webviewUrl: detailUrl,
-            );
-          } else {
-            // HTML 模式：处理相对URL
-            extractedContent = extractedContent.replaceAllMapped(
-              RegExp(r'(src|href)="(/[^"]*)"', caseSensitive: false),
-              (match) => '${match.group(1)}="$baseUrl${match.group(2)}"',
-            );
-            return TorrentDetail(
-              descr: '',
-              descrHtml: extractedContent,
-              webviewUrl: detailUrl,
-            );
-          }
-        }
-
-        // 如果提取失败，fallback 到 WebView
-        if (kDebugMode) {
-          _logger.w('NativeDetail: 未能提取到描述内容，回退到 WebView 模式');
-        }
-      } catch (e) {
-        // 提取失败，fallback 到 WebView
-        if (kDebugMode) {
-          _logger.e('NativeDetail: 提取失败，回退到 WebView: $e');
-        }
-      }
-    }
-
-    // WebView 模式（默认行为或 nativeDetail fallback）
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      // 设置Cookie到baseUrl域下，HTTPOnly避免带到图片请求
-      final cookieManager = CookieManager.instance();
-      final baseUri = Uri.parse(_siteConfig.baseUrl);
-
-      if (_siteConfig.cookie != null && _siteConfig.cookie!.isNotEmpty) {
-        // 解析cookie字符串并设置到域下
-        final cookies = _siteConfig.cookie!.split(';');
-        for (final cookieStr in cookies) {
-          final parts = cookieStr.trim().split('=');
-          if (parts.length == 2) {
-            await cookieManager.setCookie(
-              url: WebUri(_siteConfig.baseUrl),
-              name: parts[0].trim(),
-              value: parts[1].trim(),
-              domain: baseUri.host,
-              isHttpOnly: true,
-            );
-          }
-        }
-      }
-    }
-
-    // 返回包含webview URL的TorrentDetail对象，让页面组件来处理嵌入式显示
-    return TorrentDetail(
-      descr: '', // 空描述，因为内容将通过webview显示
-      webviewUrl: detailUrl, // 传递URL给页面组件
-    );
-  }
-
-  @override
-  Future<TorrentCommentList> fetchComments(
-    String id, {
-    int pageNumber = 1,
-    int pageSize = 20,
-  }) async {
-    // NexusPHP Web 暂时不支持获取评论，返回空列表
-    return TorrentCommentList(
-      pageNumber: pageNumber,
-      pageSize: pageSize,
-      total: 0,
-      totalPages: 0,
-      comments: [],
-    );
-  }
-
-  @override
-  Future<String> genDlToken({required String id, String? url}) async {
-    // 检查必要的配置参数
-    if (_siteConfig.passKey == null || _siteConfig.passKey!.isEmpty) {
-      throw SiteServiceException(message: '站点配置缺少passKey，无法生成下载链接');
-    }
-    if (_siteConfig.userId == null || _siteConfig.userId!.isEmpty) {
-      throw SiteServiceException(message: '站点配置缺少userId，无法生成下载链接');
-    }
-
-    // https://www.ptskit.org/download.php?downhash={userId}.{jwt}
-    final jwt = getDownLoadHash(_siteConfig.passKey!, id, _siteConfig.userId!);
-    if (url != null && url.isNotEmpty) {
-      return url
-          .replaceAll('{jwt}', jwt)
-          .replaceAll('{userId}', _siteConfig.userId!);
-    }
-    final baseUrl = _siteConfig.baseUrl.endsWith('/')
-        ? _siteConfig.baseUrl.substring(0, _siteConfig.baseUrl.length - 1)
-        : _siteConfig.baseUrl;
-    return '$baseUrl/download.php?downhash=${_siteConfig.userId!}.$jwt';
-  }
-
-  /// 生成下载Hash令牌
-  ///
-  /// 参数:
-  /// - [passkey] 站点passkey
-  /// - [id] 种子ID
-  /// - [userid] 用户ID
-  ///
-  /// 返回: JWT编码的下载令牌
-  String getDownLoadHash(String passkey, String id, String userid) {
-    // 生成MD5密钥: md5(passkey + 当前日期(Ymd) + userid)
-    final now = DateTime.now();
-    final dateStr =
-        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-    final keyString = passkey + dateStr + userid;
-    final keyBytes = utf8.encode(keyString);
-    final digest = md5.convert(keyBytes);
-    final key = digest.toString();
-
-    // 创建JWT payload
-    final payload = {
-      'id': id,
-      'exp':
-          (DateTime.now().millisecondsSinceEpoch / 1000).floor() +
-          3600, // 1小时后过期
-    };
-
-    // 使用HS256算法生成JWT
-    final jwt = JWT(payload);
-    final token = jwt.sign(SecretKey(key), algorithm: JWTAlgorithm.HS256);
-
-    return token;
-  }
-
-  @override
-  Future<Map<String, dynamic>> queryHistory({
-    required List<String> tids,
-  }) async {
-    // TODO: 实现查询下载历史
-    //getusertorrentlistajax.php?userid=20148&type=seeding
-    //getusertorrentlistajax.php?userid=20148&type=uploaded
-    throw UnimplementedError('queryHistory not implemented');
-  }
-
-  @override
-  Future<void> toggleCollection({
-    required String torrentId,
-    required bool make,
-  }) async {
-    try {
-      // 从站点模板配置中获取收藏请求配置
-      Map<String, dynamic>? actionConfig;
-      if (!make) {
-        // 取消收藏：优先使用unCollect配置，如果没有则回退到collect配置
-        actionConfig = await _getRequestConfig('unCollect');
-      }
-      // 如果是添加收藏，或者取消收藏但没有专门的unCollect配置，则使用collect配置
-      actionConfig ??= await _getRequestConfig('collect');
-
-      if (actionConfig != null) {
-        final url =
-            actionConfig['path'] as String? ??
-            actionConfig['url'] as String? ??
-            '/bookmark.php';
-        final method = actionConfig['method'] as String? ?? 'GET';
-        final params = Map<String, dynamic>.from(
-          actionConfig['params'] as Map<String, dynamic>? ?? {},
-        );
-        final headers = Map<String, String>.from(
-          actionConfig['headers'] as Map<String, dynamic>? ?? {},
-        );
-
-        // 替换参数中的占位符
-        final processedParams = <String, dynamic>{};
-        params.forEach((key, value) {
-          if (value is String && value.contains('{torrentId}')) {
-            processedParams[key] = value.replaceAll('{torrentId}', torrentId);
-          } else {
-            processedParams[key] = value;
-          }
-        });
-
-        // 准备请求选项
-        final options = Options(
-          method: method.toUpperCase(),
-          contentType: 'application/x-www-form-urlencoded',
-          headers: headers.isNotEmpty ? headers : null,
-        );
-
-        // 根据配置的方法发送请求
-        Response response;
-        if (method.toUpperCase() == 'POST') {
-          response = await _dio.post(
-            url,
-            data: processedParams,
-            options: options,
-          );
-        } else {
-          response = await _dio.get(
-            url,
-            queryParameters: processedParams,
-            options: options,
-          );
-        }
-        debugPrint(
-          'NexusPHPWebAdapter: toggleCollection response:${response.headers} ${response.data}',
-        );
-      } else {
-        // 如果没有配置，使用默认的收藏请求
-        final response = await _dio.get(
-          '/bookmark.php',
-          queryParameters: {'torrentid': torrentId},
-        );
-        debugPrint(
-          'NexusPHPWebAdapter: toggleCollection (default) response:${response.headers} ${response.data}',
-        );
-      }
-    } catch (e) {
-      throw ApiExceptionAdapter.wrapError(e, '切换收藏状态');
-    }
-  }
-
-  @override
-  Future<bool> testConnection() async {
-    // TODO: 实现测试连接
-    throw UnimplementedError('testConnection not implemented');
-  }
-
-  @override
-  Future<List<SearchCategoryConfig>> getSearchCategories() async {
-    // 通过baseUrl匹配预设配置
-    final defaultCategories =
-        await SiteConfigService.getDefaultSearchCategories(_siteConfig.baseUrl);
-
-    // 如果获取到默认分类配置，则直接返回
-    if (defaultCategories.isNotEmpty) {
-      return defaultCategories;
-    }
-
-    final List<SearchCategoryConfig> categories = [];
-    // 默认塞个综合进来
-    categories.add(
-      SearchCategoryConfig(id: 'all', displayName: '综合', parameters: '{}'),
-    );
-
-    try {
-      // 获取分类配置
-      final categoriesConfig = await _getFinderConfig('categories');
-      final path = categoriesConfig['path'] as String?;
-
-      if (path == null || path.isEmpty) {
-        throw Exception('配置错误：缺少 categories.path');
-      }
-
-      final response = await _dio.get('/$path');
-
-      if (response.statusCode == 200) {
-        final htmlContent = response.data as String;
-        final soup = BeautifulSoup(htmlContent);
-
-        // 解析HTML获取分类信息
-        final parsedCategories = await _parseCategories(soup, categoriesConfig);
-        categories.addAll(parsedCategories);
-      }
-
-      return categories;
-    } catch (e) {
-      // 发生异常时，返回默认分类
-      return categories;
-    }
-  }
-
-  /// 配置驱动的分类解析
-  Future<List<SearchCategoryConfig>> _parseCategories(
+  /// 内部静态/实例方法，用于从 Soup 解析列表，可被 Main Thread 或 Isolate 调用
+  /// 这里为了方便，我们写一个静态的辅助函数
+  static Future<List<TorrentItem>> _parseTorrentListFromSoup(
     BeautifulSoup soup,
-    Map<String, dynamic> categoriesConfig,
+    Map<String, dynamic> searchConfig,
+    Map<String, String> tagMapping,
+    Map<String, String> discountMapping,
+    String baseUrl,
+    String passKey,
   ) async {
-    final List<SearchCategoryConfig> categories = [];
+    final parser = _AdapterParser.instance;
+    final torrents = <TorrentItem>[];
 
-    // 获取行选择器配置
-    final rowsConfig = categoriesConfig['rows'] as Map<String, dynamic>?;
-    final fieldsConfig = categoriesConfig['fields'] as Map<String, dynamic>?;
+    final rowsConfig = searchConfig['rows'] as Map<String, dynamic>?;
+    final fieldsConfig = searchConfig['fields'] as Map<String, dynamic>?;
 
     if (rowsConfig == null || fieldsConfig == null) {
-      _logRuleAndSoup('categories.config.missing', categoriesConfig, soup);
-      throw Exception('配置格式错误：缺少 rows 或 fields 配置');
+      return torrents;
     }
 
-    // 根据行选择器找到所有目标元素（支持多个批次）
     final rowSelector = rowsConfig['selector'] as String?;
-    if (rowSelector == null || rowSelector.isEmpty) {
-      throw Exception('配置错误：缺少行选择器');
+    if (rowSelector == null) {
+      return torrents;
     }
 
-    final rowElements = findElementBySelector(soup, rowSelector);
-    if (rowElements.isEmpty) {
-      _logRuleAndSoup('categories.rows.notFound', rowsConfig, soup);
-      throw Exception('未找到目标元素：$rowSelector');
-    }
+    // 使用配置的选择器查找行
+    final rows = parser.findElementBySelector(soup, rowSelector);
 
-    // 获取字段配置
-    final categoryIdConfig =
-        fieldsConfig['categoryId'] as Map<String, dynamic>?;
-    final categoryNameConfig =
-        fieldsConfig['categoryName'] as Map<String, dynamic>?;
+    for (final rowElement in rows) {
+      final row = rowElement as Bs4Element;
+      try {
+        // 提取种子ID - 如果提取失败则跳过当前行
+        final torrentIdConfig =
+            fieldsConfig['torrentId'] as Map<String, dynamic>?;
+        if (torrentIdConfig == null) {
+          continue;
+        }
 
-    if (categoryIdConfig == null || categoryNameConfig == null) {
-      throw Exception('配置错误：缺少 categoryId 或 categoryName 字段配置');
-    }
+        final torrentIdList = await parser.extractFieldValue(row, torrentIdConfig);
+        final torrentId = torrentIdList.isNotEmpty ? torrentIdList.first : '';
+        if (torrentId.isEmpty) {
+          continue; // 种子ID提取失败，跳过当前行
+        }
 
-    int batchIndex = 1;
+        // 提取其他字段
+        final torrentNameList = await parser.extractFieldValue(
+          row,
+          fieldsConfig['torrentName'] as Map<String, dynamic>? ?? {},
+        );
+        final torrentName = torrentNameList.isNotEmpty
+            ? torrentNameList.first
+            : '';
 
-    // 遍历每个 row 元素（每个代表一个批次）
-    for (final rowElement in rowElements) {
-      // 提取当前 row 中的所有 categoryId
-      final categoryIds = await extractFieldValue(
-        rowElement,
-        categoryIdConfig,
-      );
+        final tagList = await parser.extractFieldValue(
+          row,
+          fieldsConfig['tag'] as Map<String, dynamic>? ?? {},
+        );
 
-      // 提取当前 row 中的所有 categoryName
-      final categoryNames = await extractFieldValue(
-        rowElement,
-        categoryNameConfig,
-      );
+        final descriptionList = await parser.extractFieldValue(
+          row,
+          fieldsConfig['description'] as Map<String, dynamic>? ?? {},
+        );
+        final description = descriptionList.isNotEmpty
+            ? descriptionList.first
+            : '';
 
-      // 检查是否有有效的字段提取结果
-      if (categoryIds.isEmpty && categoryNames.isEmpty) {
-        // 未提取到有效fields的不计数
+        final discountList = await parser.extractFieldValue(
+          row,
+          fieldsConfig['discount'] as Map<String, dynamic>? ?? {},
+        );
+        final discount = discountList.isNotEmpty ? discountList.first : '';
+
+        final discountEndTimeConfig =
+            fieldsConfig['discountEndTime'] as Map<String, dynamic>? ?? {};
+        final discountEndTimeList = await parser.extractFieldValue(
+          row,
+          discountEndTimeConfig,
+        );
+        final discountEndTime = discountEndTimeList.isNotEmpty
+            ? discountEndTimeList.first
+            : '';
+        final discountEndTimeTimeConfig =
+            discountEndTimeConfig['time'] as Map<String, dynamic>?;
+
+        final seedersTextList = await parser.extractFieldValue(
+          row,
+          fieldsConfig['seedersText'] as Map<String, dynamic>? ?? {},
+        );
+        final seedersText = seedersTextList.isNotEmpty
+            ? seedersTextList.first
+            : '';
+
+        final leechersTextList = await parser.extractFieldValue(
+          row,
+          fieldsConfig['leechersText'] as Map<String, dynamic>? ?? {},
+        );
+        final leechersText = leechersTextList.isNotEmpty
+            ? leechersTextList.first
+            : '';
+
+        final sizeTextList = await parser.extractFieldValue(
+          row,
+          fieldsConfig['sizeText'] as Map<String, dynamic>? ?? {},
+        );
+        final sizeText = sizeTextList.isNotEmpty ? sizeTextList.first : '';
+
+        final downloadStatusTextList = await parser.extractFieldValue(
+          row,
+          fieldsConfig['downloadStatus'] as Map<String, dynamic>? ?? {},
+        );
+        final downloadUrlConfig =
+            fieldsConfig['downloadUrl'] as Map<String, dynamic>? ?? {};
+        var downloadUrl = '';
+        if (downloadUrlConfig['value'] != null) {
+          downloadUrl = downloadUrlConfig['value'] as String? ?? '';
+          downloadUrl = downloadUrl.replaceAll('{torrentId}', torrentId);
+          downloadUrl = downloadUrl.replaceAll(
+            '{passKey}',
+            passKey,
+          );
+          var finalBaseUrl = baseUrl;
+          if (baseUrl.endsWith("/")) {
+            finalBaseUrl = baseUrl.substring(
+              0,
+              baseUrl.length - 1,
+            );
+          }
+          downloadUrl = downloadUrl.replaceAll('{baseUrl}', finalBaseUrl);
+        }
+
+        final downloadStatusText = downloadStatusTextList.isNotEmpty
+            ? downloadStatusTextList.first
+            : '';
+
+        final coverList = await parser.extractFieldValue(
+          row,
+          fieldsConfig['cover'] as Map<String, dynamic>? ?? {},
+        );
+        final cover = coverList.isNotEmpty ? coverList.first : '';
+
+        final createDateConfig =
+            fieldsConfig['createDate'] as Map<String, dynamic>? ?? {};
+        final createDateList = await parser.extractFieldValue(
+          row,
+          createDateConfig,
+        );
+        final createDate = createDateList.isNotEmpty
+            ? createDateList.first
+            : '';
+        final createDateTimeConfig =
+            createDateConfig['time'] as Map<String, dynamic>?;
+
+        final doubanRatingList = await parser.extractFieldValue(
+          row,
+          fieldsConfig['doubanRating'] as Map<String, dynamic>? ?? {},
+        );
+        final doubanRating = doubanRatingList.isNotEmpty
+            ? doubanRatingList.first
+            : '';
+
+        final imdbRatingList = await parser.extractFieldValue(
+          row,
+          fieldsConfig['imdbRating'] as Map<String, dynamic>? ?? {},
+        );
+        final imdbRating = imdbRatingList.isNotEmpty
+            ? imdbRatingList.first
+            : '';
+
+        // 提取评论数
+        final commentsList = await parser.extractFieldValue(
+          row,
+          fieldsConfig['comments'] as Map<String, dynamic>? ?? {},
+        );
+        final commentsText = commentsList.isNotEmpty
+            ? commentsList.first
+            : '0';
+        final comments = FormatUtil.parseInt(commentsText) ?? 0;
+
+        // 检查收藏状态（布尔字段）
+        final collectionConfig =
+            fieldsConfig['collection'] as Map<String, dynamic>?;
+        bool collection = false;
+        if (collectionConfig != null) {
+          final collectionList = await parser.extractFieldValue(
+            row,
+            collectionConfig,
+          );
+          collection = collectionList.isNotEmpty; // 如果找不到元素说明未收藏
+        }
+        // 检查置顶状态（布尔字段）
+        final isTopConfig = fieldsConfig['isTop'] as Map<String, dynamic>?;
+        bool isTop = false;
+        if (isTopConfig != null) {
+          final isTopList = await parser.extractFieldValue(row, isTopConfig);
+          isTop = isTopList.isNotEmpty; // 如果找不到元素说明未置顶
+        }
+
+        DownloadStatus downloadStatus = DownloadStatus.none;
+        if (downloadStatusText.isNotEmpty) {
+          final percentInt = FormatUtil.parseInt(downloadStatusText);
+          if (percentInt != null) {
+            if (percentInt == 100) {
+              downloadStatus = DownloadStatus.completed;
+            } else {
+              downloadStatus = DownloadStatus.downloading;
+            }
+          }
+        }
+
+        // 解析文件大小为字节数
+        int sizeInBytes = 0;
+        if (sizeText.isNotEmpty) {
+          final sizeMatch = RegExp(r'([\d.]+)\s*(\w+)').firstMatch(sizeText);
+          if (sizeMatch != null) {
+            final sizeValue = double.tryParse(sizeMatch.group(1) ?? '0') ?? 0;
+            final unit = sizeMatch.group(2)?.toUpperCase() ?? 'B';
+
+            switch (unit) {
+              case 'KB':
+              case 'KIB':
+                sizeInBytes = (sizeValue * 1024).round();
+                break;
+              case 'MB':
+              case 'MIB':
+                sizeInBytes = (sizeValue * 1024 * 1024).round();
+                break;
+              case 'GB':
+              case 'GIB':
+                sizeInBytes = (sizeValue * 1024 * 1024 * 1024).round();
+                break;
+              case 'TB':
+              case 'TIB':
+                sizeInBytes = (sizeValue * 1024 * 1024 * 1024 * 1024).round();
+                break;
+              default:
+                sizeInBytes = sizeValue.round();
+            }
+          }
+        }
+
+        // 计算标签并清理描述
+        final tags = TagType.matchTags(torrentName + description);
+
+        if (tagList.isNotEmpty) {
+          for (final tagStr in tagList) {
+            final mappedTag = _parseTagTypeStatic(tagStr, tagMapping);
+            if (mappedTag != null && !tags.contains(mappedTag)) {
+              tags.add(mappedTag);
+            }
+          }
+        }
+
+        torrents.add(
+          TorrentItem(
+            id: torrentId,
+            name: torrentName,
+            smallDescr: description.trim(),
+            discount: _parseDiscountTypeStatic(
+              discount.isNotEmpty ? discount : null,
+              discountMapping,
+            ),
+            discountEndTime: discountEndTime.isNotEmpty
+                ? Formatters.parseDateTimeCustom(
+                    discountEndTime,
+                    format: discountEndTimeTimeConfig?['format'] as String?,
+                    zone: discountEndTimeTimeConfig?['zone'] as String?,
+                  )
+                : null,
+            downloadUrl: downloadUrl.isNotEmpty ? downloadUrl : null,
+            seeders: FormatUtil.parseInt(seedersText) ?? 0,
+            leechers: FormatUtil.parseInt(leechersText) ?? 0,
+            sizeBytes: sizeInBytes,
+            downloadStatus: downloadStatus,
+            collection: collection,
+            imageList: [], // 暂时不解析图片列表
+            cover: cover,
+            createdDate: Formatters.parseDateTimeCustom(
+              createDate,
+              format: createDateTimeConfig?['format'] as String?,
+              zone: createDateTimeConfig?['zone'] as String?,
+            ),
+            doubanRating: doubanRating.isNotEmpty ? doubanRating : 'N/A',
+            imdbRating: imdbRating.isNotEmpty ? imdbRating : 'N/A',
+            isTop: isTop,
+            tags: tags,
+            comments: comments,
+          ),
+        );
+      } catch (e) {
+        // _logRuleAndSoup('search.row.parseFailed', fieldsConfig, row);
         continue;
       }
-
-      // 确保 categoryId 和 categoryName 数量一致
-      final minLength = categoryIds.length < categoryNames.length
-          ? categoryIds.length
-          : categoryNames.length;
-
-      if (minLength == 0) {
-        continue; // 跳过没有有效数据的批次
-      }
-
-      // 一一对应创建分类配置
-      for (int i = 0; i < minLength; i++) {
-        final categoryId = categoryIds[i];
-        final categoryName = categoryNames[i];
-
-        if (categoryId.isNotEmpty && categoryName.isNotEmpty) {
-          // 确定前缀
-          String prefix;
-          if (batchIndex == 1) {
-            prefix = 'normal#';
-          } else if (batchIndex == 2) {
-            prefix = 'special#';
-          } else {
-            prefix = 'batch$batchIndex#';
-          }
-
-          categories.add(
-            SearchCategoryConfig(
-              id: categoryId,
-              displayName: batchIndex > 1 ? 's_$categoryName' : categoryName,
-              parameters: '{"category":"$prefix$categoryId"}',
-            ),
-          );
-        }
-      }
-
-      batchIndex++;
     }
 
-    return categories;
+    return torrents;
   }
 }
