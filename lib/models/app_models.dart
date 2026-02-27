@@ -586,13 +586,6 @@ class AggregateSearchConfig {
           .map((item) => SiteSearchItem.fromJson(item as Map<String, dynamic>))
           .toList();
     }
-    // 兼容旧格式：enabledSiteIds TODO：删掉
-    else if (json['enabledSiteIds'] != null) {
-      enabledSites = (json['enabledSiteIds'] as List<dynamic>)
-          .cast<String>()
-          .map((id) => SiteSearchItem(id: id))
-          .toList();
-    }
 
     return AggregateSearchConfig(
       id:
