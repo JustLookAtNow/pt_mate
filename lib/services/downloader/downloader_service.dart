@@ -12,8 +12,17 @@ import '../storage/storage_service.dart';
 /// 
 /// 管理下载器配置，提供统一的下载器访问接口
 class DownloaderService {
-  DownloaderService._();
+  final StorageService _storageService;
+
+  DownloaderService._([StorageService? storageService])
+      : _storageService = storageService ?? StorageService.instance;
+
   static final DownloaderService instance = DownloaderService._();
+
+  @visibleForTesting
+  DownloaderService.test({StorageService? storageService})
+      : _storageService = storageService ?? StorageService.instance;
+
   static final Logger _logger = Logger();
   
   /// 配置变更通知流
@@ -54,15 +63,14 @@ class DownloaderService {
       onConfigUpdated: (updatedConfig) async {
         // 当配置更新时（比如获取到版本信息），持久化到存储中
         try {
-          final storageService = StorageService.instance;
-          final configs = await storageService.loadDownloaderConfigs();
-          final currentDefaultId = await storageService.loadDefaultDownloaderId();
+          final configs = await _storageService.loadDownloaderConfigs();
+          final currentDefaultId = await _storageService.loadDefaultDownloaderId();
           
           // 找到对应的配置并更新
           final configIndex = configs.indexWhere((c) => c['id'] == updatedConfig.id);
           if (configIndex != -1) {
             configs[configIndex] = updatedConfig.toJson();
-            await storageService.saveDownloaderConfigs(
+            await _storageService.saveDownloaderConfigs(
               configs.map((c) => DownloaderConfig.fromJson(c)).toList(),
               defaultId: currentDefaultId, // 保留当前的默认下载器ID
             );
@@ -288,9 +296,9 @@ class DownloaderService {
   Future<void> _saveUpdatedConfig(DownloaderConfig updatedConfig) async {
     try {
       // 加载当前所有配置
-      final allConfigMaps = await StorageService.instance.loadDownloaderConfigs();
+      final allConfigMaps = await _storageService.loadDownloaderConfigs();
       final allConfigs = allConfigMaps.map((configMap) => DownloaderConfig.fromJson(configMap)).toList();
-      final defaultId = await StorageService.instance.loadDefaultDownloaderId();
+      final defaultId = await _storageService.loadDefaultDownloaderId();
       
       // 查找并更新对应的配置
       bool configUpdated = false;
@@ -304,7 +312,7 @@ class DownloaderService {
       
       // 如果找到了配置并且有更新，保存到存储
       if (configUpdated) {
-        await StorageService.instance.saveDownloaderConfigs(
+        await _storageService.saveDownloaderConfigs(
           allConfigs,
           defaultId: defaultId,
         );
