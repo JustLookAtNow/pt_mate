@@ -1174,6 +1174,7 @@ class _LogToFileTileState extends State<_LogToFileTile> {
 
       NotificationHelper.showInfo(context, value ? '已开启本地日志记录' : '已关闭本地日志记录');
     } catch (e) {
+      if (!mounted) return;
       NotificationHelper.showError(context, '操作失败: $e');
     }
   }
@@ -1215,6 +1216,7 @@ class _ExportLogsTile extends StatelessWidget {
       final path = await LogFileService.instance.currentLogFilePath();
       if (!context.mounted) return;
       if (path == null || !(await File(path).exists())) {
+        if (!context.mounted) return;
         NotificationHelper.showError(context, '暂无日志文件或未开启记录');
         return;
       }
@@ -1222,6 +1224,7 @@ class _ExportLogsTile extends StatelessWidget {
         ShareParams(files: [XFile(path)], text: 'PT Mate 日志'),
       );
     } catch (e) {
+      if (!context.mounted) return;
       NotificationHelper.showError(context, '分享失败: $e');
     }
   }

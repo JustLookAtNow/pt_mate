@@ -1526,7 +1526,9 @@ class _HomePageState extends State<HomePage> {
           _fabVisible = true;
         });
         await _init(); // 加载新站点的数据
-        NotificationHelper.showInfo(context, '已切换活跃站点');
+        if (mounted) {
+          NotificationHelper.showInfo(context, '已切换活跃站点');
+        }
       }
     } catch (e) {
       if (mounted) {

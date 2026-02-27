@@ -1257,9 +1257,13 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                       await StorageService.instance.saveSiteConfigs(
                         _sites.map((c) => c.copyWith(apiKey: null)).toList(),
                       );
-                                            NotificationHelper.showInfo(context, '已保存自定义排序');
+                      if (mounted) {
+                        NotificationHelper.showInfo(context, '已保存自定义排序');
+                      }
                     } catch (e) {
-                                            NotificationHelper.showError(context, '保存失败: $e');
+                      if (mounted) {
+                        NotificationHelper.showError(context, '保存失败: $e');
+                      }
                     } finally {
                       if (mounted) {
                         setState(() {
