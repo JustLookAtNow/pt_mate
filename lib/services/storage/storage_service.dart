@@ -481,8 +481,6 @@ class StorageService {
       await _saveSiteApiKey(config.id, config.apiKey);
       _siteApiKeysCache[config.id] = config.apiKey; // 更新缓存
     }
-    // 站点配置已变更，标记缓存需重新解析（下次 loadSiteConfigs ）
-    _siteConfigsCacheDirty = true;
   }
 
   Future<void> updateSiteConfig(SiteConfig config) async {
@@ -498,7 +496,6 @@ class StorageService {
         _siteApiKeysCache[config.id] = config.apiKey; // 更新缓存
       }
     }
-    _siteConfigsCacheDirty = true; // 标记缓存失效
   }
 
   Future<void> deleteSiteConfig(String siteId) async {
@@ -517,7 +514,6 @@ class StorageService {
     if (activeSiteId == siteId) {
       await setActiveSiteId(null);
     }
-    _siteConfigsCacheDirty = true; // 标记缓存失效
   }
 
   Future<void> setActiveSiteId(String? siteId) async {
