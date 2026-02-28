@@ -10,6 +10,11 @@ on:
         description: 'Tag version (e.g., v1.0.0)'
         required: true
         type: string
+      release_notes:
+        description: 'Release notes (leave empty to use commit message)'
+        required: false
+        type: string
+        default: ''
 permissions:
   contents: write
 jobs:
@@ -20,7 +25,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event_name == 'workflow_dispatch' && 'master' || github.ref }}
+        ref: ${{ github.ref }}
       
     - name: Extract version from tag
       id: version
@@ -195,7 +200,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event_name == 'workflow_dispatch' && 'master' || github.ref }}
+        ref: ${{ github.ref }}
         
     - name: Extract version from tag
       id: version
@@ -271,7 +276,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event_name == 'workflow_dispatch' && 'master' || github.ref }}
+        ref: ${{ github.ref }}
         
     - name: Extract version from tag
       id: version
@@ -390,7 +395,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event_name == 'workflow_dispatch' && 'master' || github.ref }}
+        ref: ${{ github.ref }}
         
     - name: Extract version from tag
       id: version
@@ -411,15 +416,19 @@ jobs:
           echo "is_prerelease=false" >> $GITHUB_OUTPUT
         fi
         
-    - name: Get latest commit message
+    - name: Get release message
       id: commit_message
       run: |
-        # Get the latest commit message (full message including body)
-        COMMIT_MESSAGE=$(git log -1 --pretty=format:"%B")
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.release_notes }}" ]; then
+          RELEASE_MSG="${{ github.event.inputs.release_notes }}"
+        else
+          # Get the latest commit message (full message including body)
+          RELEASE_MSG=$(git log -1 --pretty=format:"%B")
+        fi
         
         # Save to output using multiline format
         echo "message<<EOF" >> $GITHUB_OUTPUT
-        echo "$COMMIT_MESSAGE" >> $GITHUB_OUTPUT
+        echo "$RELEASE_MSG" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
         
     - name: Download all artifacts
