@@ -158,6 +158,20 @@
       return p.toString();
     }
 
+      async function request(url, options = {}) {
+        const resp = await fetch(url, {
+          ...options,
+          headers: { ...authHeaders(), ...options.headers }
+        });
+        if (resp.status === 401) {
+          localStorage.removeItem(tokenKey);
+          window.location.href = '/admin/login';
+          return new Promise(() => { }); // 停止后续处理
+        }
+        return resp;
+      }
+    
+
     const App = {
       data(){
         return { window:'7d', from:'', to:'', kpi:{dauToday:0,mau30d:0,totalDevices:0}, windowDevices:0,
@@ -172,10 +186,10 @@
       methods:{
         logout(){ localStorage.removeItem(tokenKey); window.location.href='/admin/login'; },
         async refreshAll(){ await Promise.all([this.fetchKPI(), this.fetchPlatforms(), this.fetchVersions(), this.fetchDevices(), this.fetchDauTrend()]); },
-        async fetchKPI(){ const r = await fetch('/api/v1/admin/stats/overview',{ headers:authHeaders()}); const j = await r.json(); this.kpi = j; },
-        async fetchPlatforms(){ const r = await fetch('/api/v1/admin/stats/platforms',{ headers:authHeaders()}); const j = await r.json(); this.renderPie('platformChart', j.items.map(x=>x.platform), j.items.map(x=>x.count), 'platform'); },
+        async fetchKPI() { const r = await request('/api/v1/admin/stats/overview'); const j = await r.json(); this.kpi = j; },
+        async fetchPlatforms() { const r = await request('/api/v1/admin/stats/platforms'); const j = await r.json(); this.renderPie('platformChart', j.items.map(x => x.platform), j.items.map(x => x.count), 'platform'); },
         async fetchVersions(){
-          const r = await fetch('/api/v1/admin/stats/versions',{ headers:authHeaders()});
+          const r = await request('/api/v1/admin/stats/versions');
           const j = await r.json();
           const total = (j.items || []).reduce((sum, x) => sum + (x.count || 0), 0);
           let labels = [];
@@ -207,11 +221,11 @@
           if(this.filterPlatform) p.set('platform', this.filterPlatform);
           if(this.filterVersion) p.set('version', this.filterVersion);
           if(this.q) p.set('q', this.q);
-          const r = await fetch('/api/v1/admin/stats/devices?'+p.toString(), { headers:authHeaders()});
+          const r = await request('/api/v1/admin/stats/devices?' + p.toString());
           const j = await r.json(); this.devices = j; },
         applyFilters(){ this.page = 1; this.fetchDevices(); },
         async fetchDauTrend(){ const qs = buildRange(this.window, this.from, this.to);
-          const r = await fetch('/api/v1/admin/stats/trend/dau?'+qs, { headers:authHeaders()}); const j = await r.json();
+          const r = await request('/api/v1/admin/stats/trend/dau?' + qs); const j = await r.json();
           this.windowDevices = j.windowDevices || 0;
           const labels = j.items.map(x=> new Date(x.date).toLocaleDateString('zh-CN', { timeZone:'Asia/Shanghai' }));
           this.renderLine('dauChart', labels, j.items.map(x=>x.count)); },
