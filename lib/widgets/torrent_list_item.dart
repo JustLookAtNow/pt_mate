@@ -14,11 +14,14 @@ import '../utils/screen_utils.dart';
 final Logger _logger = Logger();
 
 // Helper method to parse rating
+// Using a static final RegExp to avoid recompiling the pattern on every call, improving performance.
+final RegExp _ratingRegExp = RegExp(r'([0-9]+(?:\.[0-9]+)?)');
+
 bool _hasRatingValue(String? r) {
   if (r == null) return false;
   final t = r.trim();
   if (t.isEmpty || t == 'N/A') return false;
-  final m = RegExp(r'([0-9]+(?:\.[0-9]+)?)').firstMatch(t);
+  final m = _ratingRegExp.firstMatch(t);
   if (m == null) return false;
   final v = double.tryParse(m.group(1)!);
   return v != null && v > 0;
