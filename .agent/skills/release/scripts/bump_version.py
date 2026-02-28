@@ -4,27 +4,39 @@ import re
 import os
 
 def bump_version(current_version, new_version=None):
+    # 解析当前的 build 编号
+    build_num = None
+    if '+' in current_version:
+        try:
+            build_num = int(current_version.split('+')[1])
+        except ValueError:
+            pass
+
     if new_version:
-        return new_version
+        if '+' in new_version:
+            return new_version
+        else:
+            if build_num is not None:
+                return f"{new_version}+{build_num + 1}"
+            return new_version
     
     # 简单的语义化版本自增逻辑 (major.minor.patch+build)
-    # Flutter 格式通常是 1.0.0+1
     base_part = current_version.split('+')[0]
-    parts = base_part.split('.')
+    
+    # 分离出 prerelease 后缀，例如 -beta
+    base_parts = base_part.split('-', 1)
+    version_core = base_parts[0]
+    prerelease = "-" + base_parts[1] if len(base_parts) > 1 else ""
+
+    parts = version_core.split('.')
     while len(parts) < 3:
         parts.append('0')
     
     parts[-1] = str(int(parts[-1]) + 1)
-    new_base = '.'.join(parts)
+    new_base = '.'.join(parts) + prerelease
     
-    # 如果有 build number，也尝试增加它
-    if '+' in current_version:
-        build_num = current_version.split('+')[1]
-        try:
-            new_build = str(int(build_num) + 1)
-            return f"{new_base}+{new_build}"
-        except ValueError:
-            return new_base
+    if build_num is not None:
+        return f"{new_base}+{build_num + 1}"
     
     return new_base
 
