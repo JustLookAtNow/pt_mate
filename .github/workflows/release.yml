@@ -11,7 +11,7 @@ on:
         required: true
         type: string
       release_notes:
-        description: 'Release notes (leave empty to use commit message)'
+        description: 'Release notes (Use \n for new lines, leave empty to use commit message)'
         required: false
         type: string
         default: ''
@@ -418,17 +418,23 @@ jobs:
         
     - name: Get release message
       id: commit_message
+      env:
+        # Use environment variable to safely pass the input
+        INPUT_NOTES: ${{ github.event.inputs.release_notes }}
       run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.release_notes }}" ]; then
-          RELEASE_MSG="${{ github.event.inputs.release_notes }}"
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$INPUT_NOTES" ]; then
+          # Support manual \n for new lines in UI input
+          # Use sed for replacement
+          echo -e "$INPUT_NOTES" | sed 's/\\n/\n/g' > /tmp/release_msg.txt
         else
           # Get the latest commit message (full message including body)
-          RELEASE_MSG=$(git log -1 --pretty=format:"%B")
+          git log -1 --pretty=format:"%B" > /tmp/release_msg.txt
         fi
         
         # Save to output using multiline format
         echo "message<<EOF" >> $GITHUB_OUTPUT
-        echo "$RELEASE_MSG" >> $GITHUB_OUTPUT
+        cat /tmp/release_msg.txt >> $GITHUB_OUTPUT
+        echo "" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
         
     - name: Download all artifacts
