@@ -76,11 +76,14 @@ class TorrentListItem extends StatelessWidget {
     if (r == null) return false;
     final t = r.trim();
     if (t.isEmpty || t == 'N/A') return false;
-    final m = RegExp(r'([0-9]+(?:\.[0-9]+)?)').firstMatch(t);
+    final m = _ratingRegExp.firstMatch(t);
     if (m == null) return false;
     final v = double.tryParse(m.group(1)!);
     return v != null && v > 0;
   }
+
+  // Cache RegExp instance to prevent recompiling regex during frequent list item builds, improving scrolling performance.
+  static final RegExp _ratingRegExp = RegExp(r'([0-9]+(?:\.[0-9]+)?)');
 
   @override
   Widget build(BuildContext context) {
