@@ -10,8 +10,6 @@ import 'base_web_adapter.dart';
 import 'package:dio/dio.dart';
 import 'package:beautiful_soup_dart/beautiful_soup.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
-import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import '../logging/log_file_service.dart';
 import 'nexusphp_helper.dart';
