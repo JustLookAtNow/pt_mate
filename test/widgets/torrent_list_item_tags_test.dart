@@ -42,7 +42,12 @@ void main() {
   testWidgets('Expand button should be visible on small screen when overflow', (
     WidgetTester tester,
   ) async {
-    // Create a torrent with a long description to force tags overflow
+    // Create a torrent with explicit tags to force overflow
+    final tags = List.generate(
+      20,
+      (index) => TagType.diy,
+    ); // Use many tags to ensure overflow
+
     final torrent = TorrentItem(
       id: '1',
       name: 'Test Torrent',
@@ -55,6 +60,7 @@ void main() {
       downloadUrl: '',
       imageList: [],
       cover: '',
+      tags: tags, // Explicitly pass tags
       downloadStatus: DownloadStatus.none,
       discount: DiscountType.normal,
       collection: false,
@@ -99,10 +105,16 @@ void main() {
   testWidgets(
     'Expand button should NOT be visible on large screen even when overflow',
     (WidgetTester tester) async {
+      // Create a torrent with explicit tags to force overflow
+      final tags = List.generate(
+        20,
+        (index) => TagType.diy,
+      ); // Use many tags to ensure overflow
+
       final torrent = TorrentItem(
         id: '1',
         name: 'Test Torrent',
-        smallDescr: 'Test Description',
+        smallDescr: 'Description',
         sizeBytes: 1024,
         seeders: 10,
         leechers: 5,
@@ -111,6 +123,7 @@ void main() {
         downloadUrl: '',
         imageList: [],
         cover: '',
+        tags: tags, // Explicitly pass tags
         downloadStatus: DownloadStatus.none,
         discount: DiscountType.normal,
         collection: false,
