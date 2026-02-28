@@ -30,6 +30,12 @@ func (s *AppService) CheckUpdate(c *gin.Context) {
 
     // Process statistics and activity in background
     go func(deviceID, platform, appVersion, ip string) {
+        defer func() {
+            if r := recover(); r != nil {
+                log.Printf("Recovered from panic in background analytics task: %v", r)
+            }
+        }()
+
         // Update or insert statistics
         if err := s.updateStatistics(deviceID, platform, appVersion, ip); err != nil {
             log.Printf("Failed to update statistics: %v", err)
