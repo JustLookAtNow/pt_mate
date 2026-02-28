@@ -14,14 +14,21 @@ import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import '../logging/log_file_service.dart';
+import 'nexusphp_helper.dart';
 
 /// NexusPHP Web站点适配器
 /// 用于处理基于Web接口的NexusPHP站点
-class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
+class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin, NexusPHPHelper {
   late SiteConfig _siteConfig;
   late Dio _dio;
   Map<String, String>? _discountMapping;
   Map<String, String>? _tagMapping;
+
+  @override
+  Map<String, String>? get tagMapping => _tagMapping;
+
+  @override
+  Map<String, String>? get discountMapping => _discountMapping;
   SiteConfigTemplate? _customTemplate;
   static final Logger _logger = Logger();
   static const int _maxHtmlDumpLength = 200 * 1024; // 200KB 截断
@@ -194,45 +201,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
     } catch (e) {
       _tagMapping = {};
     }
-  }
-
-  /// 从字符串解析标签类型
-  TagType? _parseTagType(String? str) {
-    if (str == null || str.isEmpty) return null;
-
-    final mapping = _tagMapping ?? {};
-    final enumName = mapping[str];
-
-    if (enumName != null) {
-      for (final type in TagType.values) {
-        if (type.name.toLowerCase() == enumName.toLowerCase()) {
-          return type;
-        }
-        // 也可以尝试匹配 content
-        if (type.content == enumName) {
-          return type;
-        }
-      }
-    }
-    return null;
-  }
-
-  /// 从字符串解析优惠类型
-  DiscountType _parseDiscountType(String? str) {
-    if (str == null || str.isEmpty) return DiscountType.normal;
-
-    final mapping = _discountMapping ?? {};
-    final enumValue = mapping[str];
-
-    if (enumValue != null) {
-      for (final type in DiscountType.values) {
-        if (type.value == enumValue) {
-          return type;
-        }
-      }
-    }
-
-    return DiscountType.normal;
   }
 
   @override
@@ -1037,7 +1005,7 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
 
           if (tagList.isNotEmpty) {
             for (final tagStr in tagList) {
-              final mappedTag = _parseTagType(tagStr);
+              final mappedTag = parseTagType(tagStr);
               if (mappedTag != null && !tags.contains(mappedTag)) {
                 tags.add(mappedTag);
               }
@@ -1049,7 +1017,7 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               id: torrentId,
               name: torrentName,
               smallDescr: description.trim(),
-              discount: _parseDiscountType(
+              discount: parseDiscountType(
                 discount.isNotEmpty ? discount : null,
               ),
               discountEndTime: discountEndTime.isNotEmpty
@@ -1245,39 +1213,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
         ? _siteConfig.baseUrl.substring(0, _siteConfig.baseUrl.length - 1)
         : _siteConfig.baseUrl;
     return '$baseUrl/download.php?downhash=${_siteConfig.userId!}.$jwt';
-  }
-
-  /// 生成下载Hash令牌
-  ///
-  /// 参数:
-  /// - [passkey] 站点passkey
-  /// - [id] 种子ID
-  /// - [userid] 用户ID
-  ///
-  /// 返回: JWT编码的下载令牌
-  String getDownLoadHash(String passkey, String id, String userid) {
-    // 生成MD5密钥: md5(passkey + 当前日期(Ymd) + userid)
-    final now = DateTime.now();
-    final dateStr =
-        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-    final keyString = passkey + dateStr + userid;
-    final keyBytes = utf8.encode(keyString);
-    final digest = md5.convert(keyBytes);
-    final key = digest.toString();
-
-    // 创建JWT payload
-    final payload = {
-      'id': id,
-      'exp':
-          (DateTime.now().millisecondsSinceEpoch / 1000).floor() +
-          3600, // 1小时后过期
-    };
-
-    // 使用HS256算法生成JWT
-    final jwt = JWT(payload);
-    final token = jwt.sign(SecretKey(key), algorithm: JWTAlgorithm.HS256);
-
-    return token;
   }
 
   @override
