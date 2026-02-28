@@ -29,7 +29,7 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
       final storage = Provider.of<StorageService>(context, listen: false);
       final settings = await storage.loadAggregateSearchSettings();
       final sites = await storage.loadSiteConfigs();
-      
+
       // 确保存在默认的"所有站点"配置
       var updatedSettings = settings;
       final hasAllSitesConfig = settings.searchConfigs.any((config) => config.isAllSitesType);
@@ -41,7 +41,7 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
         // 保存更新后的设置
         await storage.saveAggregateSearchSettings(updatedSettings);
       }
-      
+
       if (mounted) {
         setState(() {
           _settings = updatedSettings;
@@ -76,17 +76,17 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
     return Scaffold(
       appBar: AppBar(
         title: const Text('聚合搜索设置'),
-        backgroundColor: Theme.of(context).brightness == Brightness.light 
-            ? Theme.of(context).colorScheme.primary 
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? Theme.of(context).colorScheme.primary
             : Theme.of(context).colorScheme.surface,
         iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.light 
-              ? Theme.of(context).colorScheme.onPrimary 
+          color: Theme.of(context).brightness == Brightness.light
+              ? Theme.of(context).colorScheme.onPrimary
               : Theme.of(context).colorScheme.onSurface,
         ),
         titleTextStyle: TextStyle(
-          color: Theme.of(context).brightness == Brightness.light 
-              ? Theme.of(context).colorScheme.onPrimary 
+          color: Theme.of(context).brightness == Brightness.light
+              ? Theme.of(context).colorScheme.onPrimary
               : Theme.of(context).colorScheme.onSurface,
           fontSize: 20,
           fontWeight: FontWeight.w500,
@@ -208,7 +208,7 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
                     child: ListTile(
                       leading: Icon(
                         config.isActive ? Icons.search : Icons.search_off,
-                        color: config.isActive 
+                        color: config.isActive
                             ? Theme.of(context).colorScheme.primary
                             : Theme.of(context).colorScheme.outline,
                       ),
@@ -233,8 +233,8 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
                           ],
                         ],
                       ),
-                      subtitle: Text(config.isAllSitesType 
-                          ? '包含所有已配置的站点' 
+                      subtitle: Text(config.isAllSitesType
+                          ? '包含所有已配置的站点'
                           : '${config.enabledSites.length} 个站点'),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -347,7 +347,7 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
 
   void _showConfigDialog(AggregateSearchConfig? existingConfig) {
     final nameController = TextEditingController(text: existingConfig?.name ?? '');
-    
+
     // 初始化选中的站点ID
     Set<String> selectedSiteIds;
     if (existingConfig?.isAllSitesType == true) {
@@ -356,10 +356,10 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
     } else {
       selectedSiteIds = Set<String>.from(existingConfig?.enabledSites.map((site) => site.id) ?? []);
     }
-    
+
     // 存储每个站点的分类选择
     final Map<String, Set<String>> siteCategories = {};
-    
+
     // 初始化现有配置的分类选择
     if (existingConfig != null) {
       for (final siteItem in existingConfig.enabledSites) {
@@ -407,7 +407,7 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
                       children: _allSites.map((site) {
                         final isSelected = selectedSiteIds.contains(site.id);
                         final selectedCategories = siteCategories[site.id] ?? <String>{};
-                        
+
                         return ExpansionTile(
                           leading: Checkbox(
                             value: isSelected,
@@ -526,7 +526,7 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
       enabledSites: siteIds.map((id) {
         final selectedCategories = siteCategories[id];
         Map<String, dynamic>? additionalParams;
-        
+
         // 只有当用户选择了特定分类时才保存分类信息
         if (selectedCategories != null && selectedCategories.isNotEmpty) {
           // 过滤掉不存在的分类ID
@@ -546,7 +546,7 @@ class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPag
               'selectedCategories': validSelectedCategories};
           }
         }
-        
+
         return SiteSearchItem(
           id: id,
           additionalParams: additionalParams,

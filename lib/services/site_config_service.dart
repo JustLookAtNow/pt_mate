@@ -105,7 +105,7 @@ class SiteConfigService {
     if (kDebugMode) {
       _logger.d('SiteConfigService.loadPresetSiteTemplates: 加载模板数量=${presetTemplates.length}, 总耗时=${swTotal.elapsedMilliseconds}ms');
     }
-    
+
     return presetTemplates;
   }
 

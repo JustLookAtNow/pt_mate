@@ -56,7 +56,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   double _headerProgress = 1.0; // 1.0=完全显示, 0.0=完全隐藏
   double _lastScrollOffset = 0.0;
   final double _maxHideDistance = 200.0; // 滚动多少距离完全隐藏
-  
+
   // 封面图片显示设置（用户偏好）
   bool _showCoverSetting = true; // 默认自动显示
 
@@ -90,7 +90,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     _loadSearchConfigs();
     _listController.addListener(() {
       if (!_listController.hasClients) return;
-      
+
       final currentOffset = _listController.offset;
       final delta = currentOffset - _lastScrollOffset;
 
@@ -122,7 +122,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         });
       }
       _lastScrollOffset = currentOffset;
-      
+
       // 一旦开始滑动，就隐藏错误提示
       if (_showErrorWidget && _listController.offset > 0) {
         setState(() {
@@ -157,7 +157,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         );
         provider.setLoading(false);
         provider.initializeDefaultStrategy();
-        
+
         // 加载封面图片显示设置
         final showCoverSetting = await storage.loadShowCoverImages();
         if (mounted) {
@@ -1346,7 +1346,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           HardwareKeyboard.instance.logicalKeysPressed.contains(
             LogicalKeyboardKey.shiftRight,
           );
-                             
+
       setState(() {
         if (isShiftPressed && _lastSelectedIndex != null) {
           final minIndex = math.min(_lastSelectedIndex!, index);
@@ -1627,7 +1627,7 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
     );
     if (section == _SiteSection.empty) return;
     _overlayTimer?.cancel();
-    
+
     // 仅当状态只有变化时才调用 setState
     if (_overlaySiteName != section.siteName || _overlayOpacity != 1.0) {
       setState(() {
@@ -1635,7 +1635,7 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
         _overlayOpacity = 1.0;
       });
     }
-    
+
     if (initial) {
       if (widget.controller.hasClients) {
         final fraction = section.start / totalHeight;
@@ -1661,7 +1661,7 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
     if (!widget.controller.hasClients) return;
     // 增加安全性检查，防止 NaN 导致断言错误
     if (f.isNaN || f.isInfinite) return;
-    
+
     final max = widget.controller.position.maxScrollExtent;
     final clampedF = f.clamp(0.0, 1.0);
     final target = max * clampedF;

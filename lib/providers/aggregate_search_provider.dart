@@ -12,7 +12,7 @@ class AggregateSearchProvider extends ChangeNotifier {
   bool _sortAscending = false;
   List<AggregateSearchConfig> _searchConfigs = [];
   bool _loading = true;
-  
+
   // 搜索结果状态
   bool _searching = false;
   List<AggregateSearchResultItem> _searchResults = [];

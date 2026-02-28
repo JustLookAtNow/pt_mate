@@ -1952,7 +1952,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // 临时设置站点进行测试
       await ApiService.instance.setActiveSite(site);
       final profile = await ApiService.instance.fetchMemberProfile();
-      
+
       try {
         final statuses = await StorageService.instance.loadHealthStatuses();
         statuses[site.id] = _HealthStatus(
@@ -2063,7 +2063,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
       if (widget.site != null) {
         await StorageService.instance.updateSiteConfig(finalSite);
-        
+
         // 同步更新聚合搜索配置，移除已删除的分类
         final storage = StorageService.instance;
         final aggregateSettings = await storage.loadAggregateSearchSettings();
