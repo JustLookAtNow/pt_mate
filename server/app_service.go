@@ -1,13 +1,13 @@
 package main
 
 import (
-    "log"
-    "net/http"
-    "strings"
-    "time"
+	"log"
+	"net/http"
+	"strings"
+	"time"
 
-    "github.com/gin-gonic/gin"
-    "gorm.io/gorm"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type AppService struct {
@@ -143,7 +143,7 @@ func (s *AppService) recordDailyActivity(deviceID, platform, appVersion string) 
 
 func (s *AppService) getLatestVersion(includeBeta bool) (*AppVersion, error) {
     var version AppVersion
-    q := s.db.Model(&AppVersion{}).Where("is_latest = ?", true)
+    q := s.db.Model(&AppVersion{}).Where("is_latest = ? AND is_published = ?", true, true)
     if !includeBeta {
         q = q.Where("is_beta = ?", false)
     }

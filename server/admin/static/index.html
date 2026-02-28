@@ -25,6 +25,29 @@
     .pager { display:flex; gap:8px; align-items:center; margin-top:8px; }
     .link { color: var(--primary); cursor:pointer; }
     .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    /* Tabs */
+    .tabs { display:flex; gap:16px; margin-bottom:16px; border-bottom:1px solid #e2e8f0; }
+    .tab { padding:8px 16px; cursor:pointer; border-bottom:2px solid transparent; font-weight:500; }
+    .tab.active { border-bottom-color:var(--primary); color:var(--primary); }
+    /* Badges */
+    .badge { padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600; }
+    .bg-blue { background:#dbeafe; color:#1e40af; }
+    .bg-green { background:#dcfce7; color:#166534; }
+    .bg-gray { background:#f1f5f9; color:#475569; }
+    .bg-red { background:#fee2e2; color:#991b1b; }
+    /* Modal */
+    .modal-v { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:100; }
+    .modal-content { background:#fff; padding:24px; border-radius:12px; width:100%; max-width:500px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+    .form-group { margin-bottom:12px; }
+    .form-group label { display:block; margin-bottom:4px; font-size:13px; font-weight:500; }
+    .form-group input, .form-group textarea { width:100%; padding:8px; border:1px solid #e2e8f0; border-radius:6px; box-sizing: border-box; }
+    .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+    .btn { padding:8px 16px; border-radius:6px; border:none; cursor:pointer; font-weight:500; }
+    .btn-primary { background:var(--primary); color:#fff; }
+    .btn-secondary { background:#f1f5f9; color:#475569; }
+    .btn-outline { background:transparent; border:1px solid #e2e8f0; color:var(--muted); }
+    .btn-sm { padding:4px 8px; font-size:12px; }
+
     /* 固定图表容器高度，避免 Chart.js 按父元素高度无限扩展 */
     .chart-box { position: relative; height: 220px; }
     .chart-box canvas { width: 100% !important; height: 100% !important; }
@@ -50,11 +73,15 @@
     <h1>PTMate 管理看板</h1>
 
     <div class="card">
-      <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div class="tabs" style="margin-bottom:0; border-bottom:none;">
+          <div class="tab" :class="{active: view === 'stats'}" @click="view = 'stats'">数据统计</div>
+          <div class="tab" :class="{active: view === 'updates'}" @click="view = 'updates'">更新管理</div>
+        </div>
         <span class="link" @click="logout">退出登录</span>
       </div>
 
-      <div class="kpi">
+      <div v-if="view === 'stats'" class="kpi">
         <div class="item">
           <div>今日 DAU</div>
           <div class="num">{{kpi.dauToday}}</div>
@@ -70,80 +97,171 @@
       </div>
     </div>
 
-    <div class="grid" style="margin-top:16px;">
-      <div class="card">
-        <h3>平台占比</h3>
-        <div class="chart-box"><canvas id="platformChart"></canvas></div>
+    <!-- Stats View -->
+    <div v-if="view === 'stats'">
+      <div class="grid" style="margin-top:16px;">
+        <div class="card">
+          <h3>平台占比</h3>
+          <div class="chart-box"><canvas id="platformChart"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>版本占比</h3>
+          <div class="chart-box"><canvas id="versionChart"></canvas></div>
+        </div>
       </div>
-      <div class="card">
-        <h3>版本占比</h3>
-        <div class="chart-box"><canvas id="versionChart"></canvas></div>
-      </div>
-    </div>
 
-    <div class="card" style="margin-top:16px;">
-      <div class="filters">
-        <label>平台筛选</label>
-        <select v-model="filterPlatform" @change="applyFilters">
-          <option value="">全部</option>
-          <option value="android">android</option>
-          <option value="ios">ios</option>
-          <option value="linux">linux</option>
-          <option value="macos">macos</option>
-          <option value="windows">windows</option>
-          <option value="web">web</option>
-        </select>
-        <label>版本筛选</label>
-        <input v-model="filterVersion" @keyup.enter="applyFilters" placeholder="例如 2.13.0" />
-        <label>搜索</label>
-        <input v-model="q" @keyup.enter="applyFilters" placeholder="device id 或 IP" />
-      </div>
-      <div class="table-responsive">
-      <table>
-        <thead>
-          <tr>
-            <th>DeviceID</th><th>平台</th><th>版本</th><th>首次见</th><th>最后见</th><th>启动次数</th><th>IP</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="it in devices.items" :key="it.device_id">
-            <td>{{it.device_id}}</td>
-            <td>{{it.platform}}</td>
-            <td>{{it.app_version}}</td>
-            <td>{{formatDate(it.first_seen)}}</td>
-            <td>{{formatDate(it.last_seen)}}</td>
-            <td>{{it.total_launches}}</td>
-            <td>{{it.ip}}</td>
-          </tr>
-        </tbody>
-      </table>
-      </div>
-      <div class="pager">
-        <button @click="prevPage" :disabled="page<=1">上一页</button>
-        <span>第 {{page}} 页 / 共 {{Math.ceil(devices.total/pageSize)}} 页</span>
-        <button @click="nextPage" :disabled="page>=Math.ceil(devices.total/pageSize)">下一页</button>
-      </div>
-    </div>
+      <div class="card" style="margin-top:16px;">
+        <div class="filters">
+          <label>平台筛选</label>
+          <select v-model="filterPlatform" @change="applyFilters">
+            <option value="">全部</option>
+            <option value="android">android</option>
+            <option value="ios">ios</option>
+            <option value="linux">linux</option>
+            <option value="macos">macos</option>
+            <option value="windows">windows</option>
+            <option value="web">web</option>
+          </select>
+          <label>版本筛选</label>
+          <input v-model="filterVersion" @keyup.enter="applyFilters" placeholder="例如 2.13.0" />
+          <label>搜索</label>
+          <input v-model="q" @keyup.enter="applyFilters" placeholder="device id 或 IP" />
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>DeviceID</th>
+                <th>平台</th>
+                <th>版本</th>
+                <th>首次见</th>
+                <th>最后见</th>
+                <th>启动次数</th>
+                <th>IP</th>
+                </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="it in devices.items" :key="it.device_id">
+                    <td>{{it.device_id}}</td>
+                    <td>{{it.platform}}</td>
+                    <td>{{it.app_version}}</td>
+                    <td>{{formatDate(it.first_seen)}}</td>
+                    <td>{{formatDate(it.last_seen)}}</td>
+                    <td>{{it.total_launches}}</td>
+                    <td>{{it.ip}}</td>
+                  </tr>
+                </tbody>
+                </table>
+                </div>
+                <div class="pager">
+                  <button @click="prevPage" :disabled="page<=1">上一页</button>
+                  <span>第 {{page}} 页 / 共 {{Math.ceil(devices.total/pageSize)}} 页</span>
+                  <button @click="nextPage" :disabled="page>=Math.ceil(devices.total/pageSize)">下一页</button>
+                </div>
+                </div>
 
-    <div class="card" style="margin-top:16px;">
-      <div class="filters">
-        <h3 style="margin:0;">日活趋势</h3>
-        <span style="flex:1"></span>
-        <label>时间范围</label>
-        <select v-model="window">
-          <option value="7d">最近 7 天</option>
-          <option value="30d">最近 30 天</option>
-          <option value="custom">自定义</option>
-        </select>
-        <template v-if="window==='custom'">
-          <input type="date" v-model="from" />
-          <input type="date" v-model="to" />
-        </template>
-        <span style="margin-left:8px; color: var(--muted);">窗口设备：{{windowDevices}}</span>
+      <div class="card" style="margin-top:16px;">
+        <div class="filters">
+          <h3 style="margin:0;">日活趋势</h3>
+          <span style="flex:1"></span>
+          <label>时间范围</label>
+          <select v-model="window">
+            <option value="7d">最近 7 天</option>
+            <option value="30d">最近 30 天</option>
+            <option value="custom">自定义</option>
+          </select>
+          <template v-if="window==='custom'">
+            <input type="date" v-model="from" />
+            <input type="date" v-model="to" />
+          </template>
+          <span style="margin-left:8px; color: var(--muted);">窗口设备：{{windowDevices}}</span>
+        </div>
+        <div class="chart-box"><canvas id="dauChart"></canvas></div>
       </div>
-      <div class="chart-box"><canvas id="dauChart"></canvas></div>
+      </div>
+
+    <!-- Update Management View -->
+    <div v-if="view === 'updates'" style="margin-top:16px;">
+      <div class="card">
+        <h3>更新版本列表</h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>版本号</th>
+                <th>状态</th>
+                <th>发布说明</th>
+                <th>下载地址</th>
+                <th>发布时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="v in versions" :key="v.id">
+                <td>
+                  <b>{{v.version}}</b>
+                  <div style="margin-top:4px;">
+                    <span v-if="v.is_latest" class="badge bg-blue" style="margin-right:4px;">Latest</span>
+                    <span v-if="v.is_beta" class="badge bg-gray">Beta</span>
+                  </div>
+                </td>
+                <td>
+                  <span :class="v.is_published ? 'badge bg-green' : 'badge bg-red'">
+                    {{v.is_published ? '已上架' : '已下架'}}
+                  </span>
+                </td>
+                <td style="max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  {{v.release_notes}}
+                </td>
+                <td style="max-width:150px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  <a :href="v.download_url" target="_blank">{{v.download_url}}</a>
+                </td>
+                <td>{{formatDate(v.created_at)}}</td>
+                <td>
+                  <div style="display:flex; gap:8px;">
+                    <button class="btn btn-outline btn-sm" @click="editVersion(v)">编辑</button>
+                    <button class="btn btn-sm" :class="v.is_published ? 'btn-secondary' : 'btn-primary'"
+                      @click="togglePublish(v)">
+                      {{v.is_published ? '下架' : '上架'}}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pager">
+          <button @click="prevUpdatesPage" :disabled="updatesPage<=1">上一页</button>
+          <span>第 {{updatesPage}} 页 / 共 {{Math.ceil(updatesTotal/updatesPageSize)}} 页 (共 {{updatesTotal}} 条)</span>
+          <button @click="nextUpdatesPage" :disabled="updatesPage>=Math.ceil(updatesTotal/updatesPageSize)">下一页</button>
+        </div>
+      </div>
     </div>
-  </div>
+    
+    <!-- Edit Modal -->
+    <div v-if="showEditModal" class="modal-v" @click.self="showEditModal = false">
+      <div class="modal-content">
+        <h3>编辑版本: {{editingVersion.version}}</h3>
+        <div class="form-group">
+          <label>发布说明</label>
+          <textarea v-model="editingVersion.release_notes" rows="4"></textarea>
+        </div>
+        <div class="form-group">
+          <label>下载地址</label>
+          <input v-model="editingVersion.download_url" type="text" />
+        </div>
+        <div class="form-group" style="display:flex; gap:16px;">
+          <label><input type="checkbox" v-model="editingVersion.is_latest" /> 设为最新</label>
+          <label><input type="checkbox" v-model="editingVersion.is_beta" /> Beta版本</label>
+          <label><input type="checkbox" v-model="editingVersion.is_published" /> 已上架</label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="showEditModal = false">取消</button>
+          <button class="btn btn-primary" @click="saveVersion">保存</button>
+        </div>
+      </div>
+    </div>
+    </div>
 
   <script>
     const tokenKey = 'ptmate_admin_token';
@@ -174,21 +292,37 @@
 
     const App = {
       data(){
-        return { window:'7d', from:'', to:'', kpi:{dauToday:0,mau30d:0,totalDevices:0}, windowDevices:0,
+        return {
+          view: 'stats', // 'stats' or 'updates'
+          window: '7d', from: '', to: '', kpi: { dauToday: 0, mau30d: 0, totalDevices: 0 }, windowDevices: 0,
           platformChart:null, versionChart:null, dauChart:null,
-          filterPlatform:'', filterVersion:'', q:'', devices:{total:0,items:[]}, page:1, pageSize:20, loading:false };
+          filterPlatform: '', filterVersion: '', q: '', devices: { total: 0, items: [] }, page: 1, pageSize: 20, loading: false,
+          versions: [], updatesTotal: 0, updatesPage: 1, updatesPageSize: 30,
+          showEditModal: false, editingVersion: {}
+        };
       },
       mounted(){
         if(!localStorage.getItem(tokenKey)) { window.location.href = '/admin/login'; return; }
         this.refreshAll();
       },
-      watch:{ window(){ this.fetchDauTrend(); }, from(){ if(this.window==='custom') this.fetchDauTrend(); }, to(){ if(this.window==='custom') this.fetchDauTrend(); } },
+      watch: {
+        window() { if (this.view === 'stats') this.fetchDauTrend(); },
+        from() { if (this.view === 'stats' && this.window === 'custom') this.fetchDauTrend(); },
+        to() { if (this.view === 'stats' && this.window === 'custom') this.fetchDauTrend(); },
+        view(v) { if (v === 'updates') this.fetchVersions(); else if (v === 'stats') this.$nextTick(() => this.refreshAll()); }
+      },
       methods:{
         logout(){ localStorage.removeItem(tokenKey); window.location.href='/admin/login'; },
-        async refreshAll(){ await Promise.all([this.fetchKPI(), this.fetchPlatforms(), this.fetchVersions(), this.fetchDevices(), this.fetchDauTrend()]); },
+        async refreshAll() {
+          if (this.view === 'stats') {
+            await Promise.all([this.fetchKPI(), this.fetchPlatforms(), this.fetchVersionsStats(), this.fetchDevices(), this.fetchDauTrend()]);
+          } else {
+            await this.fetchVersions();
+          }
+        },
         async fetchKPI() { const r = await request('/api/v1/admin/stats/overview'); const j = await r.json(); this.kpi = j; },
         async fetchPlatforms() { const r = await request('/api/v1/admin/stats/platforms'); const j = await r.json(); this.renderPie('platformChart', j.items.map(x => x.platform), j.items.map(x => x.count), 'platform'); },
-        async fetchVersions(){
+        async fetchVersionsStats() {
           const r = await request('/api/v1/admin/stats/versions');
           const j = await r.json();
           const total = (j.items || []).reduce((sum, x) => sum + (x.count || 0), 0);
@@ -199,17 +333,10 @@
             // 将占比 <10% 的版本合并为“其它”
             for(const it of j.items){
               const pct = (it.count || 0) / total;
-              if(pct < 0.10){
-                others += it.count || 0;
-              } else {
-                labels.push(it.version);
-                data.push(it.count || 0);
-              }
+              if (pct < 0.10) { others += it.count || 0; }
+              else { labels.push(it.version); data.push(it.count || 0); }
             }
-            if(others > 0){
-              labels.push('其它');
-              data.push(others);
-            }
+            if (others > 0) { labels.push('其它'); data.push(others); }
           } else {
             labels = (j.items || []).map(x=>x.version);
             data = (j.items || []).map(x=>x.count || 0);
@@ -224,32 +351,77 @@
           const r = await request('/api/v1/admin/stats/devices?' + p.toString());
           const j = await r.json(); this.devices = j; },
         applyFilters(){ this.page = 1; this.fetchDevices(); },
-        async fetchDauTrend(){ const qs = buildRange(this.window, this.from, this.to);
+        async fetchDauTrend() {
+          const qs = buildRange(this.window, this.from, this.to);
           const r = await request('/api/v1/admin/stats/trend/dau?' + qs); const j = await r.json();
           this.windowDevices = j.windowDevices || 0;
           const labels = j.items.map(x=> new Date(x.date).toLocaleDateString('zh-CN', { timeZone:'Asia/Shanghai' }));
-          this.renderLine('dauChart', labels, j.items.map(x=>x.count)); },
+          this.renderLine('dauChart', labels, j.items.map(x => x.count));
+        },
+
+        // Update Management Methods
+        async fetchVersions() {
+          const p = new URLSearchParams();
+          p.set('page', this.updatesPage);
+          p.set('pageSize', this.updatesPageSize);
+          const r = await request('/api/v1/admin/versions?' + p.toString());
+          const j = await r.json();
+          this.versions = j.items || [];
+          this.updatesTotal = j.total || 0;
+        },
+        prevUpdatesPage() { if (this.updatesPage > 1) { this.updatesPage--; this.fetchVersions(); } },
+        nextUpdatesPage() {
+          const totalPages = Math.ceil(this.updatesTotal / this.updatesPageSize);
+          if (this.updatesPage < totalPages) { this.updatesPage++; this.fetchVersions(); }
+        },
+        editVersion(v) {
+          this.editingVersion = JSON.parse(JSON.stringify(v));
+          this.showEditModal = true;
+        },
+        async saveVersion() {
+          const id = this.editingVersion.id;
+          const r = await request('/api/v1/admin/versions/' + id, {
+            method: 'POST',
+            body: JSON.stringify(this.editingVersion)
+          });
+          if (r.ok) {
+            this.showEditModal = false;
+            this.fetchVersions();
+          } else {
+            const j = await r.json();
+            alert('保存失败: ' + (j.error || '未知错误'));
+          }
+        },
+        async togglePublish(v) {
+          const r = await request('/api/v1/admin/versions/' + v.id, {
+            method: 'POST',
+            body: JSON.stringify({ is_published: !v.is_published })
+          });
+          if (r.ok) { this.fetchVersions(); }
+        },
+
         renderPie(id, labels, data, kind){
           const ctx = document.getElementById(id);
+          if (!ctx) return;
           if(this[id+'Instance']) { this[id+'Instance'].destroy(); }
           const colors = ['#3b82f6','#f59e0b','#10b981','#ef4444','#6366f1','#22d3ee','#84cc16','#e11d48'];
           const chart = new Chart(ctx, { type:'pie', data:{ labels, datasets:[{ data, backgroundColor: colors }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } }, onClick:(evt, elements)=>{
             if(elements.length>0){
               const idx = elements[0].index;
               const label = labels[idx];
-              if(kind==='platform') {
-                this.filterPlatform = label;
-              } else if(kind==='version') {
-                // 点击“其它”不触发版本筛选
-                if(label !== '其它') this.filterVersion = label;
-              }
-              this.page = 1;
-              this.fetchDevices();
+              if (kind === 'platform') { this.filterPlatform = label; }
+              else if (kind === 'version') { if (label !== '其它') this.filterVersion = label; }
+              this.page = 1; this.fetchDevices();
             }
           } } });
           this[id+'Instance'] = chart;
         },
-        renderLine(id, labels, data){ const ctx = document.getElementById(id); if(this[id+'Instance']) this[id+'Instance'].destroy(); this[id+'Instance']= new Chart(ctx, { type:'line', data:{ labels, datasets:[{ label:'DAU', data, borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.15)', tension:0.2 }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ maxRotation:0, autoSkip:true } }, y:{ beginAtZero:true } } } }); },
+        renderLine(id, labels, data) {
+          const ctx = document.getElementById(id);
+          if (!ctx) return;
+          if (this[id + 'Instance']) this[id + 'Instance'].destroy();
+          this[id + 'Instance'] = new Chart(ctx, { type: 'line', data: { labels, datasets: [{ label: 'DAU', data, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.15)', tension: 0.2 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxRotation: 0, autoSkip: true } }, y: { beginAtZero: true } } } });
+        },
         prevPage(){ if(this.page>1){ this.page--; this.fetchDevices(); } },
         nextPage(){ const totalPages = Math.ceil(this.devices.total/this.pageSize); if(this.page<totalPages){ this.page++; this.fetchDevices(); } },
         formatDate(s){ if(!s) return ''; const d = new Date(s); return d.toLocaleString('zh-CN', { timeZone:'Asia/Shanghai' }).replace(/\//g,'-'); },
