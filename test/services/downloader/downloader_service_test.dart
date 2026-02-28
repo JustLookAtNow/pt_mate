@@ -7,7 +7,7 @@ import 'package:pt_mate/services/storage/storage_service.dart';
 
 // Mock DownloaderService to override getVersion and avoid network calls
 class MockDownloaderService extends DownloaderService {
-  final String? versionToReturn;
+  final String versionToReturn;
   final bool shouldThrow;
 
   MockDownloaderService({
@@ -24,7 +24,7 @@ class MockDownloaderService extends DownloaderService {
     if (shouldThrow) {
       throw Exception('Network error');
     }
-    return versionToReturn!;
+    return versionToReturn;
   }
 }
 
