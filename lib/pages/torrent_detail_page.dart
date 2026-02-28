@@ -18,6 +18,7 @@ import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
 import '../widgets/torrent_download_dialog.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
+import '../utils/screen_utils.dart';
 
 // 自定义Quote标签处理器
 class CustomQuoteTag extends WrappedStyleTag {
@@ -2241,11 +2242,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
             : const Center(child: Text('暂无详情')),
         floatingActionButton: Builder(
           builder: (context) {
-            final platform = Theme.of(context).platform;
-            final isDesktop =
-                platform == TargetPlatform.windows ||
-                platform == TargetPlatform.macOS ||
-                platform == TargetPlatform.linux;
+            final isDesktop = ScreenUtils.isLargeScreen(context);
             return Column(
               mainAxisAlignment: MainAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,

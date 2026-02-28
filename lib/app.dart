@@ -31,6 +31,7 @@ import 'widgets/tag_filter_bar.dart';
 import 'services/update_service.dart';
 import 'widgets/update_notification_dialog.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
+import 'utils/screen_utils.dart';
 
 // 全局日志实例，供本文件内多个类使用
 final Logger _logger = Logger();
@@ -2000,11 +2001,7 @@ class _HomePageState extends State<HomePage> {
                       opacity: _fabVisible ? 1.0 : 0.0,
                       child: Builder(
                         builder: (context) {
-                          final platform = Theme.of(context).platform;
-                          final isDesktop =
-                              platform == TargetPlatform.windows ||
-                              platform == TargetPlatform.macOS ||
-                              platform == TargetPlatform.linux;
+                          final isDesktop = ScreenUtils.isLargeScreen(context);
                           return isDesktop
                               ? FloatingActionButton.extended(
                                   onPressed: _fabVisible

@@ -10,6 +10,7 @@ import '../widgets/responsive_layout.dart';
 import '../widgets/qb_speed_indicator.dart';
 import 'downloader_settings_page.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
+import '../utils/screen_utils.dart';
 
 enum SortField {
   name,
@@ -268,11 +269,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
             ),
       floatingActionButton: Builder(
         builder: (context) {
-          final platform = Theme.of(context).platform;
-          final isDesktop =
-              platform == TargetPlatform.windows ||
-              platform == TargetPlatform.macOS ||
-              platform == TargetPlatform.linux;
+          final isDesktop = ScreenUtils.isLargeScreen(context);
           return isDesktop
               ? FloatingActionButton.extended(
                   onPressed: () {
