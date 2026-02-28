@@ -15,6 +15,80 @@ import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import '../logging/log_file_service.dart';
 
+/// 参数对象，用于 Isolate 搜索解析
+class ParseSearchParams {
+  final String html;
+  final Map<String, dynamic> searchConfig;
+  final Map<String, dynamic> totalPagesConfig;
+  final Map<String, String> discountMapping;
+  final Map<String, String> tagMapping;
+  final String baseUrl;
+  final String passKey;
+  final String userId;
+  final int pageNumber;
+  final int pageSize;
+
+  ParseSearchParams({
+    required this.html,
+    required this.searchConfig,
+    required this.totalPagesConfig,
+    required this.discountMapping,
+    required this.tagMapping,
+    required this.baseUrl,
+    required this.passKey,
+    required this.userId,
+    required this.pageNumber,
+    required this.pageSize,
+  });
+}
+
+/// 解析结果对象
+class ParsedTorrentResult {
+  final List<TorrentItem> items;
+  final int totalPages;
+  final List<String> logs;
+
+  ParsedTorrentResult({
+    required this.items,
+    required this.totalPages,
+    this.logs = const [],
+  });
+}
+
+/// Helper class for Isolate usage
+class _AdapterHelper with BaseWebAdapterMixin {}
+
+/// Isolate entry point for parsing search results
+Future<ParsedTorrentResult> _parseSearchResponseInIsolate(
+  ParseSearchParams params,
+) async {
+  final soup = BeautifulSoup(params.html);
+  final logs = <String>[];
+
+  final torrents = await NexusPHPWebAdapter._staticParseTorrentList(
+    soup,
+    params.searchConfig,
+    params.discountMapping,
+    params.tagMapping,
+    params.baseUrl,
+    params.passKey,
+    params.userId,
+    logs,
+  );
+
+  final totalPages = await NexusPHPWebAdapter._staticParseTotalPages(
+    soup,
+    params.totalPagesConfig,
+    logs,
+  );
+
+  return ParsedTorrentResult(
+    items: torrents,
+    totalPages: totalPages,
+    logs: logs,
+  );
+}
+
 /// NexusPHP Web站点适配器
 /// 用于处理基于Web接口的NexusPHP站点
 class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
@@ -198,9 +272,16 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
 
   /// 从字符串解析标签类型
   TagType? _parseTagType(String? str) {
+    return _staticParseTagType(str, _tagMapping ?? {});
+  }
+
+  /// 从字符串解析标签类型（静态方法）
+  static TagType? _staticParseTagType(
+    String? str,
+    Map<String, String> mapping,
+  ) {
     if (str == null || str.isEmpty) return null;
 
-    final mapping = _tagMapping ?? {};
     final enumName = mapping[str];
 
     if (enumName != null) {
@@ -219,9 +300,16 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
 
   /// 从字符串解析优惠类型
   DiscountType _parseDiscountType(String? str) {
+    return _staticParseDiscountType(str, _discountMapping ?? {});
+  }
+
+  /// 从字符串解析优惠类型（静态方法）
+  static DiscountType _staticParseDiscountType(
+    String? str,
+    Map<String, String> mapping,
+  ) {
     if (str == null || str.isEmpty) return DiscountType.normal;
 
-    final mapping = _discountMapping ?? {};
     final enumValue = mapping[str];
 
     if (enumValue != null) {
@@ -246,7 +334,8 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
       final soup = BeautifulSoup(response.data);
 
       // 根据配置提取用户信息
-      final userInfo = _extractUserInfoByConfig(soup, config);
+      final userInfo = await _extractUserInfoByConfig(soup, config);
+
 
       // 提取PassKey（如果配置了）
       String? passKey = await _extractPassKeyByConfig();
@@ -411,10 +500,11 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
   }
 
   /// 根据配置提取用户信息
-  Map<String, String?> _extractUserInfoByConfig(
+  Future<Map<String, String?>> _extractUserInfoByConfig(
     BeautifulSoup soup,
     Map<String, dynamic> config,
-  ) {
+  ) async {
+
     final result = <String, String?>{};
 
     // 获取行选择器配置
@@ -443,7 +533,8 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
       final fieldConfig = fieldEntry.value as Map<String, dynamic>;
 
       try {
-        final value = extractFirstFieldValue(targetElement, fieldConfig);
+        final value = await extractFirstFieldValue(targetElement, fieldConfig);
+
         result[fieldName] = value;
       } catch (e) {
         // 如果某个字段提取失败，记录但继续处理其他字段
@@ -492,7 +583,8 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
         throw Exception('配置错误：缺少 bonusPerHour 字段');
       }
 
-      final value = extractFirstFieldValue(targetElement, field);
+      final value = await extractFirstFieldValue(targetElement, field);
+
       if (value == null || value.isEmpty) return null;
 
       final parsed = double.tryParse(value.replaceAll(',', ''));
@@ -542,10 +634,8 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
       final passKeyField = fields?['passKey'] as Map<String, dynamic>?;
 
       if (passKeyField != null) {
-        final value = extractFirstFieldValue(
-          targetElement,
-          passKeyField,
-        );
+        final value = await extractFirstFieldValue(targetElement, passKeyField);
+
         if (value != null && value.isNotEmpty) {
           return value.trim();
         } else {
@@ -641,7 +731,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           } else {
             queryParams[key] = val;
           }
-
         } else {
           queryParams[key] = value;
         }
@@ -663,19 +752,44 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
         data: method.toUpperCase() == 'POST' ? queryParams : null,
         options: Options(method: method.toUpperCase()),
       );
-      final soup = BeautifulSoup(response.data);
-      // 解析种子列表
-      final torrents = await parseTorrentList(soup);
 
-      // 解析总页数
-      int totalPages = await parseTotalPages(soup);
+      // 准备在 Isolate 中进行解析的参数
+      final searchConfig = await _getFinderConfig('search');
+      final totalPagesConfig = await _getFinderConfig('totalPages');
+
+      // 如果搜索配置为空，直接返回空结果，不启动 Isolate
+      if (searchConfig.isEmpty) {
+        return TorrentSearchResult(
+          pageNumber: pageNumber,
+          pageSize: pageSize,
+          total: 0,
+          totalPages: 0,
+          items: [],
+        );
+      }
+
+      final parseParams = ParseSearchParams(
+        html: response.data.toString(),
+        searchConfig: searchConfig,
+        totalPagesConfig: totalPagesConfig,
+        discountMapping: _discountMapping ?? {},
+        tagMapping: _tagMapping ?? {},
+        baseUrl: _siteConfig.baseUrl,
+        passKey: _siteConfig.passKey ?? '',
+        userId: _siteConfig.userId ?? '',
+        pageNumber: pageNumber,
+        pageSize: pageSize,
+      );
+
+      // 在 Isolate 中执行解析
+      final result = await compute(_parseSearchResponseInIsolate, parseParams);
 
       return TorrentSearchResult(
         pageNumber: pageNumber,
         pageSize: pageSize,
-        total: torrents.length * totalPages, // 估算值
-        totalPages: totalPages,
-        items: torrents,
+        total: result.items.length * result.totalPages, // 估算值
+        totalPages: result.totalPages,
+        items: result.items,
       );
     } catch (e) {
       throw ApiExceptionAdapter.wrapError(e, '搜索种子');
@@ -744,14 +858,21 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
   }
 
   Future<int> parseTotalPages(BeautifulSoup soup) async {
+    final config = await _getFinderConfig('totalPages');
+    if (config.isEmpty) {
+      return 1;
+    }
+    return _staticParseTotalPages(soup, config);
+  }
+
+  static Future<int> _staticParseTotalPages(
+    BeautifulSoup soup,
+    Map<String, dynamic> config, [
+    List<String>? logs,
+  ]) async {
+    final helper = _AdapterHelper();
     int totalPages = 1;
     try {
-      // 获取配置
-      final config = await _getFinderConfig('totalPages');
-      if (config.isEmpty) {
-        return 1;
-      }
-
       final rowsConfig = config['rows'] as Map<String, dynamic>?;
       final fieldsConfig = config['fields'] as Map<String, dynamic>?;
 
@@ -766,7 +887,7 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
       }
 
       // 找到目标行
-      final rows = findElementBySelector(soup, rowSelector);
+      final rows = helper.findElementBySelector(soup, rowSelector);
       if (rows.isEmpty) {
         return 1;
       }
@@ -778,7 +899,9 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
 
       List<int> pageValues = [];
       for (final row in rows) {
-        final values = extractFieldValue(row, fieldConfig);
+        final values = await helper.extractFieldValue(row, fieldConfig);
+
+
         for (final val in values) {
           final parsed = FormatUtil.parseInt(val);
           if (parsed != null) {
@@ -791,34 +914,62 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
         totalPages = pageValues.reduce((a, b) => a > b ? a : b);
       }
     } catch (e) {
-      _logger.e('解析总页数失败: $e');
+      logs?.add('解析总页数失败: $e');
+      if (logs == null) {
+        // 在静态上下文中直接调用 _logger 是安全的，因为它是 static final
+        _logger.e('解析总页数失败: $e');
+      }
     }
     return totalPages;
   }
 
   Future<List<TorrentItem>> parseTorrentList(BeautifulSoup soup) async {
+    // 获取搜索配置
+    final searchConfig = await _getFinderConfig('search');
+    // 如果没有配置，返回空列表
+    if (searchConfig.isEmpty) return [];
+
+    return _staticParseTorrentList(
+      soup,
+      searchConfig,
+      _discountMapping ?? {},
+      _tagMapping ?? {},
+      _siteConfig.baseUrl,
+      _siteConfig.passKey ?? '',
+      _siteConfig.userId ?? '',
+    );
+  }
+
+  static Future<List<TorrentItem>> _staticParseTorrentList(
+    BeautifulSoup soup,
+    Map<String, dynamic> searchConfig,
+    Map<String, String> discountMapping,
+    Map<String, String> tagMapping,
+    String baseUrl,
+    String passKey,
+    String userId, [
+    List<String>? logs,
+  ]) async {
+    final helper = _AdapterHelper();
     final torrents = <TorrentItem>[];
 
     try {
-      // 获取搜索配置
-      final searchConfig = await _getFinderConfig('search');
-
       final rowsConfig = searchConfig['rows'] as Map<String, dynamic>?;
       final fieldsConfig = searchConfig['fields'] as Map<String, dynamic>?;
 
       if (rowsConfig == null || fieldsConfig == null) {
-        _logRuleAndSoup('search.config.missing', searchConfig, soup);
+        logs?.add('search.config.missing: $searchConfig');
         return torrents;
       }
 
       final rowSelector = rowsConfig['selector'] as String?;
       if (rowSelector == null) {
-        _logRuleAndSoup('search.rowSelector.missing', rowsConfig, soup);
+        logs?.add('search.rowSelector.missing: $rowsConfig');
         return torrents;
       }
 
       // 使用配置的选择器查找行
-      final rows = findElementBySelector(soup, rowSelector);
+      final rows = helper.findElementBySelector(soup, rowSelector);
 
       for (final rowElement in rows) {
         final row = rowElement as Bs4Element;
@@ -830,14 +981,20 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
             continue;
           }
 
-          final torrentIdList = extractFieldValue(row, torrentIdConfig);
+          final torrentIdList = await helper.extractFieldValue(
+            row,
+            torrentIdConfig,
+          );
+
+
           final torrentId = torrentIdList.isNotEmpty ? torrentIdList.first : '';
           if (torrentId.isEmpty) {
             continue; // 种子ID提取失败，跳过当前行
           }
 
           // 提取其他字段
-          final torrentNameList = extractFieldValue(
+          final torrentNameList = await helper.extractFieldValue(
+
             row,
             fieldsConfig['torrentName'] as Map<String, dynamic>? ?? {},
           );
@@ -845,12 +1002,14 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               ? torrentNameList.first
               : '';
 
-          final tagList = extractFieldValue(
+          final tagList = await helper.extractFieldValue(
+
             row,
             fieldsConfig['tag'] as Map<String, dynamic>? ?? {},
           );
 
-          final descriptionList = extractFieldValue(
+          final descriptionList = await helper.extractFieldValue(
+
             row,
             fieldsConfig['description'] as Map<String, dynamic>? ?? {},
           );
@@ -858,7 +1017,8 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               ? descriptionList.first
               : '';
 
-          final discountList = extractFieldValue(
+          final discountList = await helper.extractFieldValue(
+
             row,
             fieldsConfig['discount'] as Map<String, dynamic>? ?? {},
           );
@@ -866,7 +1026,8 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
 
           final discountEndTimeConfig =
               fieldsConfig['discountEndTime'] as Map<String, dynamic>? ?? {};
-          final discountEndTimeList = extractFieldValue(
+          final discountEndTimeList = await helper.extractFieldValue(
+
             row,
             discountEndTimeConfig,
           );
@@ -876,7 +1037,8 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           final discountEndTimeTimeConfig =
               discountEndTimeConfig['time'] as Map<String, dynamic>?;
 
-          final seedersTextList = extractFieldValue(
+          final seedersTextList = await helper.extractFieldValue(
+
             row,
             fieldsConfig['seedersText'] as Map<String, dynamic>? ?? {},
           );
@@ -884,7 +1046,8 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               ? seedersTextList.first
               : '';
 
-          final leechersTextList = extractFieldValue(
+          final leechersTextList = await helper.extractFieldValue(
+
             row,
             fieldsConfig['leechersText'] as Map<String, dynamic>? ?? {},
           );
@@ -892,13 +1055,15 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               ? leechersTextList.first
               : '';
 
-          final sizeTextList = extractFieldValue(
+          final sizeTextList = await helper.extractFieldValue(
+
             row,
             fieldsConfig['sizeText'] as Map<String, dynamic>? ?? {},
           );
           final sizeText = sizeTextList.isNotEmpty ? sizeTextList.first : '';
 
-          final downloadStatusTextList = extractFieldValue(
+          final downloadStatusTextList = await helper.extractFieldValue(
+
             row,
             fieldsConfig['downloadStatus'] as Map<String, dynamic>? ?? {},
           );
@@ -908,25 +1073,20 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           if (downloadUrlConfig['value'] != null) {
             downloadUrl = downloadUrlConfig['value'] as String? ?? '';
             downloadUrl = downloadUrl.replaceAll('{torrentId}', torrentId);
-            downloadUrl = downloadUrl.replaceAll(
-              '{passKey}',
-              _siteConfig.passKey!,
-            );
-            var baseUrl = _siteConfig.baseUrl;
-            if (_siteConfig.baseUrl.endsWith("/")) {
-              baseUrl = _siteConfig.baseUrl.substring(
-                0,
-                _siteConfig.baseUrl.length - 1,
-              );
+            downloadUrl = downloadUrl.replaceAll('{passKey}', passKey);
+            var finalBaseUrl = baseUrl;
+            if (baseUrl.endsWith("/")) {
+              finalBaseUrl = baseUrl.substring(0, baseUrl.length - 1);
             }
-            downloadUrl = downloadUrl.replaceAll('{baseUrl}', baseUrl);
+            downloadUrl = downloadUrl.replaceAll('{baseUrl}', finalBaseUrl);
           }
 
           final downloadStatusText = downloadStatusTextList.isNotEmpty
               ? downloadStatusTextList.first
               : '';
 
-          final coverList = extractFieldValue(
+          final coverList = await helper.extractFieldValue(
+
             row,
             fieldsConfig['cover'] as Map<String, dynamic>? ?? {},
           );
@@ -934,7 +1094,8 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
 
           final createDateConfig =
               fieldsConfig['createDate'] as Map<String, dynamic>? ?? {};
-          final createDateList = extractFieldValue(
+          final createDateList = await helper.extractFieldValue(
+
             row,
             createDateConfig,
           );
@@ -944,7 +1105,8 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           final createDateTimeConfig =
               createDateConfig['time'] as Map<String, dynamic>?;
 
-          final doubanRatingList = extractFieldValue(
+          final doubanRatingList = await helper.extractFieldValue(
+
             row,
             fieldsConfig['doubanRating'] as Map<String, dynamic>? ?? {},
           );
@@ -952,7 +1114,8 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               ? doubanRatingList.first
               : '';
 
-          final imdbRatingList = extractFieldValue(
+          final imdbRatingList = await helper.extractFieldValue(
+
             row,
             fieldsConfig['imdbRating'] as Map<String, dynamic>? ?? {},
           );
@@ -961,7 +1124,8 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               : '';
 
           // 提取评论数
-          final commentsList = extractFieldValue(
+          final commentsList = await helper.extractFieldValue(
+
             row,
             fieldsConfig['comments'] as Map<String, dynamic>? ?? {},
           );
@@ -975,7 +1139,8 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               fieldsConfig['collection'] as Map<String, dynamic>?;
           bool collection = false;
           if (collectionConfig != null) {
-            final collectionList = extractFieldValue(
+            final collectionList = await helper.extractFieldValue(
+
               row,
               collectionConfig,
             );
@@ -985,7 +1150,9 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           final isTopConfig = fieldsConfig['isTop'] as Map<String, dynamic>?;
           bool isTop = false;
           if (isTopConfig != null) {
-            final isTopList = extractFieldValue(row, isTopConfig);
+            final isTopList = await helper.extractFieldValue(row, isTopConfig);
+
+
             isTop = isTopList.isNotEmpty; // 如果找不到元素说明未置顶
           }
 
@@ -1037,7 +1204,7 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
 
           if (tagList.isNotEmpty) {
             for (final tagStr in tagList) {
-              final mappedTag = _parseTagType(tagStr);
+              final mappedTag = _staticParseTagType(tagStr, tagMapping);
               if (mappedTag != null && !tags.contains(mappedTag)) {
                 tags.add(mappedTag);
               }
@@ -1049,8 +1216,9 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               id: torrentId,
               name: torrentName,
               smallDescr: description.trim(),
-              discount: _parseDiscountType(
+              discount: _staticParseDiscountType(
                 discount.isNotEmpty ? discount : null,
+                discountMapping,
               ),
               discountEndTime: discountEndTime.isNotEmpty
                   ? Formatters.parseDateTimeCustom(
@@ -1080,12 +1248,12 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
             ),
           );
         } catch (e) {
-          _logRuleAndSoup('search.row.parseFailed', fieldsConfig, row);
+          logs?.add('search.row.parseFailed: ${fieldsConfig.toString()}');
           continue;
         }
       }
     } catch (e) {
-      _logRuleAndSoup('search.parse.failed', null, soup);
+      logs?.add('search.parse.failed: $e');
     }
 
     return torrents;
@@ -1148,8 +1316,10 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           } else {
             // HTML 模式：处理相对URL
             extractedContent = extractedContent.replaceAllMapped(
-              RegExp(r'(src|href)="((?!https?://|//|data:|javascript:|#)[^"]+)"',
-                  caseSensitive: false),
+              RegExp(
+                r'(src|href)="((?!https?://|//|data:|javascript:|#)[^"]+)"',
+                caseSensitive: false,
+              ),
               (match) {
                 final attr = match.group(1);
                 final path = match.group(2)!;
@@ -1407,7 +1577,8 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
         final soup = BeautifulSoup(htmlContent);
 
         // 解析HTML获取分类信息
-        final parsedCategories = _parseCategories(soup, categoriesConfig);
+        final parsedCategories = await _parseCategories(soup, categoriesConfig);
+
         categories.addAll(parsedCategories);
       }
 
@@ -1419,10 +1590,11 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
   }
 
   /// 配置驱动的分类解析
-  List<SearchCategoryConfig> _parseCategories(
+  Future<List<SearchCategoryConfig>> _parseCategories(
     BeautifulSoup soup,
     Map<String, dynamic> categoriesConfig,
-  ) {
+  ) async {
+
     final List<SearchCategoryConfig> categories = [];
 
     // 获取行选择器配置
@@ -1461,16 +1633,14 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
     // 遍历每个 row 元素（每个代表一个批次）
     for (final rowElement in rowElements) {
       // 提取当前 row 中的所有 categoryId
-      final categoryIds = extractFieldValue(
-        rowElement,
-        categoryIdConfig,
-      );
+      final categoryIds = await extractFieldValue(rowElement, categoryIdConfig);
 
       // 提取当前 row 中的所有 categoryName
-      final categoryNames = extractFieldValue(
+      final categoryNames = await extractFieldValue(
         rowElement,
         categoryNameConfig,
       );
+
 
       // 检查是否有有效的字段提取结果
       if (categoryIds.isEmpty && categoryNames.isEmpty) {

@@ -421,10 +421,11 @@ mixin BaseWebAdapterMixin {
   }
 
   /// 根据字段配置提取字段值列表
-  List<String> extractFieldValue(
+  Future<List<String>> extractFieldValue(
     dynamic element,
     Map<String, dynamic> fieldConfig,
-  ) {
+  ) async {
+
     final selector = fieldConfig['selector'] as String?;
     final attribute = fieldConfig['attribute'] as String?;
     final filter = fieldConfig['filter'] as Map<String, dynamic>?;
@@ -470,13 +471,14 @@ mixin BaseWebAdapterMixin {
   }
 
   /// 根据字段配置提取第一个字段值（向前兼容）
-  String? extractFirstFieldValue(
+  Future<String?> extractFirstFieldValue(
     dynamic element,
     Map<String, dynamic> fieldConfig,
-  ) {
-    final values = extractFieldValue(element, fieldConfig);
+  ) async {
+    final values = await extractFieldValue(element, fieldConfig);
     return values.isNotEmpty ? values.first : null;
   }
+
 
   /// 标准化href属性用于比较
   /// 将绝对URL转换为相对路径格式，便于与配置中的路径进行比较
