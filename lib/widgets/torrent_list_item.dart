@@ -94,8 +94,7 @@ class TorrentListItem extends StatelessWidget {
     final siteShowCover = currentSite?.features.showCover ?? true;
     final showCover = siteShowCover && (showCoverSetting ?? true);
 
-    // 统一计算标签与清理后的描述，避免重复调用
-    final tags = torrent.tags;
+
 
     final hasDouban = _hasRatingValue(torrent.doubanRating);
     final hasImdb = _hasRatingValue(torrent.imdbRating);

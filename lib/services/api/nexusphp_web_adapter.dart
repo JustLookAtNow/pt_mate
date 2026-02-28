@@ -270,10 +270,7 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
     }
   }
 
-  /// 从字符串解析标签类型
-  TagType? _parseTagType(String? str) {
-    return _staticParseTagType(str, _tagMapping ?? {});
-  }
+
 
   /// 从字符串解析标签类型（静态方法）
   static TagType? _staticParseTagType(
@@ -298,10 +295,7 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
     return null;
   }
 
-  /// 从字符串解析优惠类型
-  DiscountType _parseDiscountType(String? str) {
-    return _staticParseDiscountType(str, _discountMapping ?? {});
-  }
+
 
   /// 从字符串解析优惠类型（静态方法）
   static DiscountType _staticParseDiscountType(

@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pt_mate/services/downloader/downloader_service.dart';
 import 'package:pt_mate/services/downloader/downloader_config.dart';
-import 'package:pt_mate/services/downloader/downloader_models.dart';
+
 import 'package:pt_mate/services/storage/storage_service.dart';
 
 // Mock DownloaderService to override getVersion and avoid network calls
@@ -11,10 +11,11 @@ class MockDownloaderService extends DownloaderService {
   final bool shouldThrow;
 
   MockDownloaderService({
-    StorageService? storageService,
+    super.storageService,
     this.versionToReturn = '4.5.2',
     this.shouldThrow = false,
-  }) : super.test(storageService: storageService);
+  }) : super.test();
+
 
   @override
   Future<String> getVersion({

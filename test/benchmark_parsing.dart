@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+
 import 'package:beautiful_soup_dart/beautiful_soup.dart';
 import 'package:pt_mate/services/api/nexusphp_web_adapter.dart';
 import 'package:pt_mate/models/app_models.dart';
@@ -109,7 +111,10 @@ void main() {
     final result = await adapter.parseTorrentList(soup);
     stopwatch.stop();
 
-    print('Parsed ${result.length} items in ${stopwatch.elapsedMilliseconds} ms (Main Thread)');
+    debugPrint(
+      'Parsed ${result.length} items in ${stopwatch.elapsedMilliseconds} ms (Main Thread)',
+    );
+
 
     // Expect 2000 because of nested trs and non-strict selector
     expect(result.length, 2000);
