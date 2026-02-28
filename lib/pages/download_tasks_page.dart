@@ -351,6 +351,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear, size: 16),
+                              tooltip: '清除搜索',
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() {
