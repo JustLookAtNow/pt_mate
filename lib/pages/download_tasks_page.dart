@@ -266,12 +266,30 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _loadTasks();
+      floatingActionButton: Builder(
+        builder: (context) {
+          final platform = Theme.of(context).platform;
+          final isDesktop =
+              platform == TargetPlatform.windows ||
+              platform == TargetPlatform.macOS ||
+              platform == TargetPlatform.linux;
+          return isDesktop
+              ? FloatingActionButton.extended(
+                  onPressed: () {
+                    _loadTasks();
                     NotificationHelper.showInfo(context, '刷新任务列表');
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('刷新'),
+                )
+              : FloatingActionButton(
+                  onPressed: () {
+                    _loadTasks();
+                    NotificationHelper.showInfo(context, '刷新任务列表');
+                  },
+                  child: const Icon(Icons.refresh),
+                );
         },
-        child: const Icon(Icons.refresh),
       ),
     );
   }

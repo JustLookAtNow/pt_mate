@@ -1998,18 +1998,34 @@ class _HomePageState extends State<HomePage> {
                       duration: const Duration(milliseconds: 300),
                       curve: Curves.easeInOut,
                       opacity: _fabVisible ? 1.0 : 0.0,
-                      child: FloatingActionButton.extended(
-                        onPressed: _fabVisible
-                            ? _showSiteSelectionDialog
-                            : null,
-                        icon: const Icon(Icons.swap_horiz),
-                        label: const Text('切换站点'),
+                      child: Builder(
+                        builder: (context) {
+                          final platform = Theme.of(context).platform;
+                          final isDesktop =
+                              platform == TargetPlatform.windows ||
+                              platform == TargetPlatform.macOS ||
+                              platform == TargetPlatform.linux;
+                          return isDesktop
+                              ? FloatingActionButton.extended(
+                                  onPressed: _fabVisible
+                                      ? _showSiteSelectionDialog
+                                      : null,
+                                  icon: const Icon(Icons.swap_horiz),
+                                  label: const Text('切换站点'),
+                                )
+                              : FloatingActionButton(
+                                  onPressed: _fabVisible
+                                      ? _showSiteSelectionDialog
+                                      : null,
+                                  child: const Icon(Icons.swap_horiz),
+                                );
+                        },
                       ),
                     ),
                   )
                 : null,
             floatingActionButtonLocation:
-                FloatingActionButtonLocation.centerFloat,
+                FloatingActionButtonLocation.endFloat,
           ),
         );
       },

@@ -2239,79 +2239,159 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
             : _detail?.webviewUrl != null
             ? buildWebViewContent(_detail!.webviewUrl!)
             : const Center(child: Text('暂无详情')),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-          mainAxisSize: MainAxisSize.min,
-        children: [
-            // 在浏览器中打开按钮 - 当原生渲染（HTML或BBCode）且webviewUrl可用时显示
-            if (_detail?.webviewUrl != null &&
-                ((_detail?.descrHtml != null &&
-                        _detail!.descrHtml!.isNotEmpty) ||
-                    (_detail?.descr != null &&
-                        _detail!.descr.toString().isNotEmpty))) ...[
-              FloatingActionButton(
-                heroTag: "openBrowser",
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => Scaffold(
-                        appBar: AppBar(
-                          title: Text(
-                            widget.torrentItem.name,
-                            style: const TextStyle(fontSize: 16),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+        floatingActionButton: Builder(
+          builder: (context) {
+            final platform = Theme.of(context).platform;
+            final isDesktop =
+                platform == TargetPlatform.windows ||
+                platform == TargetPlatform.macOS ||
+                platform == TargetPlatform.linux;
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // 在浏览器中打开按钮 - 当原生渲染（HTML或BBCode）且webviewUrl可用时显示
+                if (_detail?.webviewUrl != null &&
+                    ((_detail?.descrHtml != null &&
+                            _detail!.descrHtml!.isNotEmpty) ||
+                        (_detail?.descr != null &&
+                            _detail!.descr.toString().isNotEmpty))) ...[
+                  isDesktop
+                      ? FloatingActionButton.extended(
+                          heroTag: "openBrowser",
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => Scaffold(
+                                  appBar: AppBar(
+                                    title: Text(
+                                      widget.torrentItem.name,
+                                      style: const TextStyle(fontSize: 16),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  body: buildWebViewContent(
+                                    _detail!.webviewUrl!,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                          tooltip: '在浏览器中打开',
+                          icon: const Icon(Icons.open_in_browser),
+                          label: const Text('在浏览器中打开'),
+                        )
+                      : FloatingActionButton(
+                          heroTag: "openBrowser",
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => Scaffold(
+                                  appBar: AppBar(
+                                    title: Text(
+                                      widget.torrentItem.name,
+                                      style: const TextStyle(fontSize: 16),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  body: buildWebViewContent(
+                                    _detail!.webviewUrl!,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                          tooltip: '在浏览器中打开',
+                          child: const Icon(Icons.open_in_browser),
+                        ),
+                  const SizedBox(height: 16),
+                ],
+                // 评论按钮 - 仅在支持评论详情时显示
+                if (widget.siteFeatures.supportCommentDetail) ...[
+                  isDesktop
+                      ? FloatingActionButton.extended(
+                          heroTag: "comment",
+                          onPressed: () {
+                            final ctx = _commentsKey.currentContext;
+                            if (ctx != null) {
+                              Scrollable.ensureVisible(
+                                ctx,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                              );
+                            }
+                          },
+                          tooltip: '评论',
+                          icon: const Icon(Icons.comment),
+                          label: const Text('评论'),
+                        )
+                      : FloatingActionButton(
+                          heroTag: "comment",
+                          onPressed: () {
+                            final ctx = _commentsKey.currentContext;
+                            if (ctx != null) {
+                              Scrollable.ensureVisible(
+                                ctx,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                              );
+                            }
+                          },
+                          tooltip: '评论',
+                          child: const Icon(Icons.comment),
+                        ),
+                  const SizedBox(height: 16),
+                ],
+                // 收藏按钮
+                isDesktop
+                    ? FloatingActionButton.extended(
+                        heroTag: "favorite",
+                        onPressed: _onToggleCollection,
+                        backgroundColor: _isCollected ? Colors.red : null,
+                        tooltip: _isCollected ? '取消收藏' : '收藏',
+                        icon: Icon(
+                          _isCollected ? Icons.favorite : Icons.favorite_border,
+                          color: _isCollected ? Colors.white : null,
+                        ),
+                        label: Text(
+                          _isCollected ? '取消收藏' : '收藏',
+                          style: TextStyle(
+                            color: _isCollected ? Colors.white : null,
                           ),
                         ),
-                        body: buildWebViewContent(_detail!.webviewUrl!),
+                      )
+                    : FloatingActionButton(
+                        heroTag: "favorite",
+                        onPressed: _onToggleCollection,
+                        backgroundColor: _isCollected ? Colors.red : null,
+                        tooltip: _isCollected ? '取消收藏' : '收藏',
+                        child: Icon(
+                          _isCollected ? Icons.favorite : Icons.favorite_border,
+                          color: _isCollected ? Colors.white : null,
+                        ),
                       ),
-                    ),
-                  );
-                },
-                tooltip: '在浏览器中打开',
-                child: const Icon(Icons.open_in_browser),
-              ),
-              const SizedBox(height: 16),
-            ],
-            // 评论按钮 - 仅在支持评论详情时显示
-            if (widget.siteFeatures.supportCommentDetail) ...[
-              FloatingActionButton(
-                heroTag: "comment",
-                onPressed: () {
-                  final context = _commentsKey.currentContext;
-                  if (context != null) {
-                    Scrollable.ensureVisible(
-                      context,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    );
-                  }
-                },
-                tooltip: '评论',
-                child: const Icon(Icons.comment),
-              ),
-              const SizedBox(height: 16),
-            ],
-          // 收藏按钮
-          FloatingActionButton(
-            heroTag: "favorite",
-            onPressed: _onToggleCollection,
-            backgroundColor: _isCollected ? Colors.red : null,
-            tooltip: _isCollected ? '取消收藏' : '收藏',
-            child: Icon(
-              _isCollected ? Icons.favorite : Icons.favorite_border,
-              color: _isCollected ? Colors.white : null,
-            ),
-          ),
-          const SizedBox(height: 16),
-          // 下载按钮
-          FloatingActionButton(
-            heroTag: "download",
-            onPressed: _onDownload,
-            tooltip: '下载',
-            child: const Icon(Icons.download_outlined),
-          ),
-        ],
+                const SizedBox(height: 16),
+                // 下载按钮
+                isDesktop
+                    ? FloatingActionButton.extended(
+                        heroTag: "download",
+                        onPressed: _onDownload,
+                        tooltip: '下载',
+                        icon: const Icon(Icons.download_outlined),
+                        label: const Text('下载'),
+                      )
+                    : FloatingActionButton(
+                        heroTag: "download",
+                        onPressed: _onDownload,
+                        tooltip: '下载',
+                        child: const Icon(Icons.download_outlined),
+                      ),
+              ],
+            );
+          },
       ),
     ));
   }
