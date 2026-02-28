@@ -210,7 +210,7 @@ class TorrentListItem extends StatelessWidget {
       return _SwipeableItem(
         onTap: onTap,
         onLongPress: onLongPress,
-        actions: _buildSwipeActions(context),
+        actionBuilder: (context, close) => _buildSwipeActions(context, close),
         isAggregateMode: isAggregateMode,
         child: mainContent,
       );
@@ -226,7 +226,7 @@ class TorrentListItem extends StatelessWidget {
   }
 
   // 构建左滑动作按钮
-  List<Widget> _buildSwipeActions(BuildContext context) {
+  List<Widget> _buildSwipeActions(BuildContext context, VoidCallback close) {
     List<Widget> actions = [];
 
     // 添加收藏按钮（如果支持）
@@ -248,7 +248,10 @@ class TorrentListItem extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
-              onTap: onToggleCollection,
+              onTap: () {
+                close();
+                if (onToggleCollection != null) onToggleCollection!();
+              },
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -283,7 +286,10 @@ class TorrentListItem extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
-              onTap: onDownload,
+              onTap: () {
+                close();
+                if (onDownload != null) onDownload!();
+              },
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -905,14 +911,15 @@ class _AggregateSiteChip extends StatelessWidget {
 // 自定义左滑组件，支持固定显示按钮
 class _SwipeableItem extends StatefulWidget {
   final Widget child;
-  final List<Widget> actions;
+  final List<Widget> Function(BuildContext context, VoidCallback close)
+  actionBuilder;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final bool isAggregateMode;
 
   const _SwipeableItem({
     required this.child,
-    required this.actions,
+    required this.actionBuilder,
     required this.isAggregateMode,
     this.onTap,
     this.onLongPress,
@@ -929,10 +936,13 @@ class _SwipeableItemState extends State<_SwipeableItem>
   double _dragExtent = 0;
   bool _isOpen = false;
 
+  // 缓存 actions 列表以在拖拽回调中使用
+  List<Widget> _actions = [];
+
   // 计算动作按钮的总宽度
   double get _actionsWidth {
-    if (widget.actions.isEmpty) return 0;
-    return widget.actions.length * 64.0; // 每个按钮60px + 4px间距
+    if (_actions.isEmpty) return 0;
+    return _actions.length * 64.0; // 每个按钮60px + 4px间距
   }
 
   @override
@@ -949,6 +959,22 @@ class _SwipeableItemState extends State<_SwipeableItem>
 
     // 添加动画监听器，只添加一次
     _animation.addListener(_updateDragExtent);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateActions();
+  }
+
+  @override
+  void didUpdateWidget(_SwipeableItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _updateActions();
+  }
+
+  void _updateActions() {
+    _actions = widget.actionBuilder(context, _close);
   }
 
   @override
@@ -969,7 +995,7 @@ class _SwipeableItemState extends State<_SwipeableItem>
   }
 
   void _handleDragUpdate(DragUpdateDetails details) {
-    if (widget.actions.isEmpty) return;
+    if (_actions.isEmpty) return;
 
     final delta = details.primaryDelta ?? 0;
     final newDragExtent = _dragExtent + delta;
@@ -981,7 +1007,7 @@ class _SwipeableItemState extends State<_SwipeableItem>
   }
 
   void _handleDragEnd(DragEndDetails details) {
-    if (widget.actions.isEmpty) return;
+    if (_actions.isEmpty) return;
 
     final velocity = details.primaryVelocity ?? 0;
     final threshold = _actionsWidth * 0.3;
@@ -1054,7 +1080,7 @@ class _SwipeableItemState extends State<_SwipeableItem>
           child: Stack(
             children: [
               // 背景动作按钮
-              if (widget.actions.isNotEmpty)
+              if (_actions.isNotEmpty)
                 Positioned(
                   right: -_actionsWidth + _dragExtent.abs(),
                   top: 0,
@@ -1062,7 +1088,7 @@ class _SwipeableItemState extends State<_SwipeableItem>
                   width: _actionsWidth,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
-                    children: widget.actions,
+                    children: _actions,
                   ),
                 ),
               // 主要内容
