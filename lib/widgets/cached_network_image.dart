@@ -96,7 +96,7 @@ class _CachedNetworkImageState extends State<CachedNetworkImage> {
         height: widget.height,
         fit: widget.fit,
       );
-      
+
       return widget.loadingBuilder?.call(context, image, null) ?? image;
     }
 

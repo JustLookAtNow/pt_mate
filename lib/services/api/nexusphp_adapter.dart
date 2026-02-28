@@ -60,7 +60,7 @@ class NexusPHPAdapter implements SiteAdapter {
             if (base.endsWith('/')) base = base.substring(0, base.length - 1);
             options.baseUrl = base;
           }
-          
+
           // 动态构建请求头
           options.headers.addAll(_buildHeaders(_siteConfig.apiKey));
 
@@ -358,7 +358,7 @@ class NexusPHPAdapter implements SiteAdapter {
       leechers: item['leechers'] as int,
       sizeBytes: item['size'] as int,
       downloadStatus: status,
-      collection: item['has_bookmarked'] as bool? ?? false, 
+      collection: item['has_bookmarked'] as bool? ?? false,
       imageList: const [], // 暂时没有图片列表
       cover: item['cover'] as String? ?? '',
       createdDate: Formatters.parseDateTimeCustom(

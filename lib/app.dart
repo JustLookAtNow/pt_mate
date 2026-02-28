@@ -89,7 +89,7 @@ class AppState extends ChangeNotifier {
       if (kDebugMode) {
         _logger.d('AppState: 数据迁移耗时=${swMigrate.elapsedMilliseconds}ms');
       }
-      
+
       // 加载活跃站点配置
       final swLoadSite = Stopwatch()..start();
       try {
@@ -139,10 +139,10 @@ class AppState extends ChangeNotifier {
         );
         // Don't rethrow here, as it's not critical
       }
-      
+
       // 应用启动时检查自动同步
       Future.microtask(() => _checkAutoSync());
-      
+
       _initCompleter!.complete();
     } catch (e) {
       _initCompleter!.completeError(e);
@@ -186,15 +186,15 @@ class AppState extends ChangeNotifier {
     try {
       final webdavService = WebDAVService.instance;
       final config = await webdavService.loadConfig();
-      
+
       // 检查是否启用了自动同步
       if (config != null && config.autoSync) {
         if (kDebugMode) {
           _logger.i('AppState: 检测到启用自动同步，开始执行自动同步检查');
         }
-        
+
         final backupService = BackupService(StorageService.instance);
-        
+
         // 异步执行自动同步，不阻塞应用启动
          Future.microtask(() async {
            try {
@@ -204,11 +204,11 @@ class AppState extends ChangeNotifier {
                  if (kDebugMode) {
                    _logger.i('AppState: 发现${remoteBackups.length}个远程备份，准备自动同步最新的');
                  }
-               
+
                // 获取最新的备份文件路径
                final latestBackup = remoteBackups.first;
                final backupPath = latestBackup['path'] as String;
-               
+
                // 下载并恢复最新的备份
                final backupData = await backupService.downloadWebDAVBackup(backupPath);
                if (backupData != null) {
@@ -645,7 +645,7 @@ class _HomePageState extends State<HomePage> {
   final List<TorrentItem> _items = [];
   int _pageNumber = 1;
   final int _pageSize = 30;
-  
+
   // 标签筛选状态
   final Set<TagType> _includedTags = {};
   final Set<TagType> _excludedTags = {};
@@ -698,28 +698,28 @@ class _HomePageState extends State<HomePage> {
 
   // 当前站点配置
   SiteConfig? _currentSite;
-  
+
   // 配置版本号跟踪
   int _lastConfigVersion = -1;
-  
+
   // 防止重复处理重新初始化的标志
   bool _isProcessingReload = false;
-  
+
   // didChangeDependencies中一次性预同步标志，避免首次构建时出现null/-1
   bool _didSyncFromAppState = false; // 首帧前从AppState预同步，避免首次渲染null/-1
   bool _didInitialLoad = false; // 首次进入页面后的初始化是否已完成
-  
+
   // 统一头部（用户信息 + 搜索栏）滚动进度控制
   double _headerProgress = 1.0; // 0.0=隐藏, 1.0=完全显示
   double _lastScrollOffset = 0.0; // 上次滚动位置
   static const double _maxHideDistance = 200.0; // 累计滚动200px完全隐藏/显示
-  
+
   // 封面图片显示设置（用户偏好）
   bool _showCoverSetting = true; // 默认自动显示
-  
+
   // 切换站点 FAB 按钮的显示状态（向上滑动隐藏，向下滑动显示）
   bool _fabVisible = true;
-  
+
   @override
   void initState() {
     super.initState();
@@ -824,10 +824,10 @@ class _HomePageState extends State<HomePage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-    
+
     // 检查应用更新（异步执行，不阻塞界面）
     _checkForUpdates();
-    
+
     // 仅在站点支持种子搜索功能时执行默认搜索
     if (_currentSite?.features.supportTorrentSearch ?? true) {
       await _search(reset: true);
@@ -842,11 +842,11 @@ class _HomePageState extends State<HomePage> {
       final categories = activeSite?.searchCategories.isNotEmpty == true
           ? activeSite!.searchCategories
           : SearchCategoryConfig.getDefaultConfigs();
-      
+
       if (kDebugMode) {
         _logger.d('HomePage: _reloadCategories - 重新加载分类，分类数量: ${categories.length}');
       }
-      
+
       if (mounted) {
         setState(() {
           _categories = categories;
@@ -872,7 +872,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _checkForUpdates() async {
     try {
       final updateResult = await UpdateService.instance.checkForUpdates();
-      
+
       if (updateResult != null && updateResult.hasUpdate && mounted) {
         // 延迟显示更新对话框，避免与其他初始化对话框冲突
         Future.delayed(const Duration(seconds: 2), () {
@@ -1324,7 +1324,7 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
-    
+
     // 从详情页返回后，刷新列表页状态以确保收藏状态同步
     if (mounted) {
       setState(() {});
@@ -1545,11 +1545,11 @@ class _HomePageState extends State<HomePage> {
         if (!_isProcessingReload) {
           bool needsReload = false;
           String reloadReason = '';
-          
+
           if (kDebugMode) {
             _logger.d('HomePage Consumer: 当前站点=${_currentSite?.id}, AppState站点=${appState.site?.id}, 配置版本=${appState.configVersion}, 上次版本=$_lastConfigVersion');
           }
-          
+
           if (appState.site != null) {
             final isFirstSync = (_currentSite == null && _lastConfigVersion == -1);
             // 首次同步：仅同步站点与版本，不触发重新加载
@@ -1589,7 +1589,7 @@ class _HomePageState extends State<HomePage> {
               }
             }
           }
-          
+
           if (needsReload) {
             if (kDebugMode) {
               _logger.i('HomePage: 检测到$reloadReason，重新初始化 - 配置版本: ${appState.configVersion}, 上次版本: $_lastConfigVersion');
@@ -1628,7 +1628,7 @@ class _HomePageState extends State<HomePage> {
 
               // 先清除之前的 SnackBar
               ScaffoldMessenger.of(context).clearSnackBars();
-              
+
               // 显示提示信息
               NotificationHelper.showInfo(
                 context,
@@ -2101,7 +2101,7 @@ class _HomePageState extends State<HomePage> {
           HardwareKeyboard.instance.logicalKeysPressed.contains(
             LogicalKeyboardKey.shiftRight,
           );
-                             
+
       setState(() {
         if (isShiftPressed && _lastSelectedIndex != null) {
           final minIndex = math.min(_lastSelectedIndex!, index);

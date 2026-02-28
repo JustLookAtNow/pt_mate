@@ -1,5 +1,5 @@
 /// 通用下载器数据模型
-/// 
+///
 /// 这些模型提供了统一的接口，用于不同下载器实现之间的数据交换
 library;
 import '../../utils/format.dart';
@@ -31,14 +31,14 @@ class TransferInfo {
   final int dlSpeed;
   final int upTotal;
   final int dlTotal;
-  
+
   const TransferInfo({
     required this.upSpeed,
     required this.dlSpeed,
     required this.upTotal,
     required this.dlTotal,
   });
-  
+
   factory TransferInfo.fromJson(Map<String, dynamic> json) {
     return TransferInfo(
       upSpeed: json['upSpeed'] ?? 0,
@@ -47,7 +47,7 @@ class TransferInfo {
       dlTotal: json['dlTotal'] ?? 0,
     );
   }
-  
+
   Map<String, dynamic> toJson() {
     return {
       'upSpeed': upSpeed,
@@ -61,17 +61,17 @@ class TransferInfo {
 /// 服务器状态
 class ServerState {
   final int freeSpaceOnDisk;
-  
+
   const ServerState({
     required this.freeSpaceOnDisk,
   });
-  
+
   factory ServerState.fromJson(Map<String, dynamic> json) {
     return ServerState(
       freeSpaceOnDisk: json['freeSpaceOnDisk'] ?? 0,
     );
   }
-  
+
   Map<String, dynamic> toJson() {
     return {
       'freeSpaceOnDisk': freeSpaceOnDisk,
@@ -101,12 +101,12 @@ class DownloadTaskState {
   static const String checkingResumeData = 'checkingResumeData';
   static const String moving = 'moving';
   static const String unknown = 'unknown';
-  
+
   static bool isDownloading(String state) {
-    return state == downloading || state == forcedDL || 
+    return state == downloading || state == forcedDL ||
            state == metaDL || state == stalledDL;
   }
-  
+
   static bool isPaused(String state) {
     return state == pausedDL || state == pausedUP;
   }
@@ -131,7 +131,7 @@ class DownloadTask {
   final double ratio;
   final int timeActive;
   final int uploaded;
-  
+
   const DownloadTask({
     required this.hash,
     required this.name,
@@ -151,7 +151,7 @@ class DownloadTask {
     required this.timeActive,
     required this.uploaded
   });
-  
+
   factory DownloadTask.fromJson(Map<String, dynamic> json) {
     return DownloadTask(
       hash: json['hash'] ?? '',
@@ -171,8 +171,8 @@ class DownloadTask {
           ? json['eta'] as int
           : FormatUtil.parseInt(json['eta']) ?? 0,
       category: json['category'] ?? '',
-      tags: json['tags'] is String 
-          ? (json['tags'] as String).split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList() 
+      tags: json['tags'] is String
+          ? (json['tags'] as String).split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
           : (json['tags'] is List ? (json['tags'] as List).map((e) => e.toString()).toList() : <String>[]),
       completionOn: json['completionOn'] is int
           ? json['completionOn'] as int
@@ -215,7 +215,7 @@ class DownloadTask {
       'uploaded': uploaded,
     };
   }
-  
+
   bool get isDownloading => DownloadTaskState.isDownloading(state);
   bool get isPaused => DownloadTaskState.isPaused(state);
 }
@@ -229,7 +229,7 @@ class AddTaskParams {
   final bool? autoTMM;
   /// 是否添加后暂停（不立即开始），默认空表示遵循下载器默认行为
   final bool? startPaused;
-  
+
   const AddTaskParams({
     required this.url,
     this.category,
@@ -238,7 +238,7 @@ class AddTaskParams {
     this.autoTMM,
     this.startPaused,
   });
-  
+
   factory AddTaskParams.fromJson(Map<String, dynamic> json) {
     return AddTaskParams(
       url: json['url'] ?? '',
@@ -249,7 +249,7 @@ class AddTaskParams {
       startPaused: json['startPaused'] is bool ? json['startPaused'] : (json['startPaused']?.toString() == 'true' ? true : null),
     );
   }
-  
+
   Map<String, dynamic> toJson() {
     return {
       'url': url,
@@ -271,7 +271,7 @@ class GetTasksParams {
   final bool? reverse;
   final int? limit;
   final int? offset;
-  
+
   const GetTasksParams({
     this.filter,
     this.category,
@@ -281,7 +281,7 @@ class GetTasksParams {
     this.limit,
     this.offset,
   });
-  
+
   factory GetTasksParams.fromJson(Map<String, dynamic> json) {
     return GetTasksParams(
       filter: json['filter'],
@@ -293,7 +293,7 @@ class GetTasksParams {
       offset: json['offset'],
     );
   }
-  
+
   Map<String, dynamic> toJson() {
     return {
       if (filter != null) 'filter': filter,

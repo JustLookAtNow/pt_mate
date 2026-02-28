@@ -508,13 +508,13 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
       }
       return _sortAscending ? cmp : -cmp;
     });
-    
+
     if (filteredTasks.isEmpty) {
       return const Center(
         child: Text('没有下载任务'),
       );
     }
-    
+
     return RefreshIndicator(
       onRefresh: _loadTasks,
       child: ListView.builder(

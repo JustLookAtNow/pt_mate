@@ -51,7 +51,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
       final clientsData = await StorageService.instance.loadDownloaderConfigs();
       final defaultId = await StorageService.instance.loadDefaultDownloaderId();
       final startPaused = await StorageService.instance.loadDefaultDownloadStartPaused();
-      
+
       final clients = clientsData.map((data) => DownloaderConfig.fromJson(data)).toList();
 
       if (mounted) {
@@ -205,10 +205,10 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
   @override
   Widget build(BuildContext context) {
     final isBatchMode = widget.itemCount != null;
-    final title = isBatchMode 
+    final title = isBatchMode
         ? '批量下载设置 (${widget.itemCount}个项目)'
         : '下载种子';
-    
+
     return AlertDialog(
       title: Text(title),
       scrollable: true,
@@ -284,14 +284,14 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
             return _clients.map((client) {
               final screenWidth = MediaQuery.of(context).size.width;
               // 响应式宽度：手机上限制最大宽度，大屏上基于对话框容器宽度计算
-              final maxWidth = screenWidth > 600 
+              final maxWidth = screenWidth > 600
                   ? 400.0 * 0.6  // 大屏上使用对话框容器宽度的60%
                   : 240.0;  // 小屏上限制240px
-              
+
               return SizedBox(
                 width: maxWidth,
                 child: Text(
-                  client is QbittorrentConfig 
+                  client is QbittorrentConfig
                     ? '${client.name} (${client.host}:${client.port})'
                     : client.name,
                   overflow: TextOverflow.ellipsis,
@@ -307,14 +307,14 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                 builder: (context) {
                   final screenWidth = MediaQuery.of(context).size.width;
                   // 响应式宽度：手机上限制最大宽度，大屏上允许更宽
-                  final maxWidth = screenWidth > 600 
+                  final maxWidth = screenWidth > 600
                       ? screenWidth * 0.6  // 大屏上使用60%宽度
                       : 240.0;  // 小屏上限制200px
-                  
+
                   return SizedBox(
                     width: maxWidth,
                     child: Text(
-                      client is QbittorrentConfig 
+                      client is QbittorrentConfig
                         ? '${client.name} (${client.host}:${client.port})'
                         : client.name,
                       overflow: TextOverflow.ellipsis,

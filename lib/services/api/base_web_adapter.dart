@@ -421,10 +421,10 @@ mixin BaseWebAdapterMixin {
   }
 
   /// 根据字段配置提取字段值列表
-  Future<List<String>> extractFieldValue(
+  List<String> extractFieldValue(
     dynamic element,
     Map<String, dynamic> fieldConfig,
-  ) async {
+  ) {
     final selector = fieldConfig['selector'] as String?;
     final attribute = fieldConfig['attribute'] as String?;
     final filter = fieldConfig['filter'] as Map<String, dynamic>?;
@@ -470,11 +470,11 @@ mixin BaseWebAdapterMixin {
   }
 
   /// 根据字段配置提取第一个字段值（向前兼容）
-  Future<String?> extractFirstFieldValue(
+  String? extractFirstFieldValue(
     dynamic element,
     Map<String, dynamic> fieldConfig,
-  ) async {
-    final values = await extractFieldValue(element, fieldConfig);
+  ) {
+    final values = extractFieldValue(element, fieldConfig);
     return values.isNotEmpty ? values.first : null;
   }
 

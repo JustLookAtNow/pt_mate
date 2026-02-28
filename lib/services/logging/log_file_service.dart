@@ -47,12 +47,12 @@ class LogFileService {
   void append(String line) {
     if (!_enabled || kIsWeb) return;
     final now = DateTime.now();
-    
+
     // Check if rotation is needed
     if (_currentDate == null || !_isSameDay(_currentDate!, now)) {
       _rotateTo(now);
     }
-    
+
     // If locked (initializing/rotating), we might lose this log or need to buffer.
     // For simplicity and safety, we just try to write if sink is available.
     // Ideally we should buffer, but let's first prevent the crash.
@@ -174,4 +174,3 @@ class LogFileService {
     return '$y-$m-$d $hh:$mm:$ss';
   }
 }
-
