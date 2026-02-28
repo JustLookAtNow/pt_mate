@@ -51,7 +51,7 @@ void main() {
     final torrent = TorrentItem(
       id: '1',
       name: 'Test Torrent',
-      smallDescr: 'Description',
+      smallDescr: 'Test Description',
       sizeBytes: 1024,
       seeders: 10,
       leechers: 5,
@@ -67,6 +67,23 @@ void main() {
       isTop: false,
       doubanRating: '0',
       imdbRating: '0',
+      tags: [
+        TagType.fourK,
+        TagType.resolution1080,
+        TagType.hdr,
+        TagType.h265,
+        TagType.webDl,
+        TagType.dovi,
+        TagType.blueRay,
+        TagType.chinese,
+        TagType.complete,
+        TagType.diy,
+        TagType.ep,
+        TagType.hot,
+        TagType.official,
+        TagType.mandarin,
+        TagType.chineseTraditional,
+      ],
     );
 
     // Set screen size to small (e.g., 400px width)
@@ -113,6 +130,23 @@ void main() {
         isTop: false,
         doubanRating: '0',
         imdbRating: '0',
+        tags: [
+          TagType.fourK,
+          TagType.resolution1080,
+          TagType.hdr,
+          TagType.h265,
+          TagType.webDl,
+          TagType.dovi,
+          TagType.blueRay,
+          TagType.chinese,
+          TagType.complete,
+          TagType.diy,
+          TagType.ep,
+          TagType.hot,
+          TagType.official,
+          TagType.mandarin,
+          TagType.chineseTraditional,
+        ],
       );
 
       // Set screen size to large (e.g., 1000px width)

@@ -1148,8 +1148,14 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           } else {
             // HTML 模式：处理相对URL
             extractedContent = extractedContent.replaceAllMapped(
-              RegExp(r'(src|href)="(/[^"]*)"', caseSensitive: false),
-              (match) => '${match.group(1)}="$baseUrl${match.group(2)}"',
+              RegExp(r'(src|href)="((?!https?://|//|data:|javascript:|#)[^"]+)"',
+                  caseSensitive: false),
+              (match) {
+                final attr = match.group(1);
+                final path = match.group(2)!;
+                final separator = path.startsWith('/') ? '' : '/';
+                return '$attr="$baseUrl$separator$path"';
+              },
             );
             return TorrentDetail(
               descr: '',
