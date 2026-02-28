@@ -72,13 +72,11 @@ class DownloaderFactory {
             config: config,
             password: password,
             onConfigUpdated: onConfigUpdated != null
-                ? (updatedConfig) => onConfigUpdated(updatedConfig)
-                : null,
+              ? (updatedConfig) => onConfigUpdated(updatedConfig)
+              : null,
           );
         } else {
-          throw ArgumentError(
-            'Invalid config type for qBittorrent: ${config.runtimeType}',
-          );
+          throw ArgumentError('Invalid config type for qBittorrent: ${config.runtimeType}');
         }
       case DownloaderType.transmission:
         if (config is TransmissionConfig) {
@@ -86,13 +84,11 @@ class DownloaderFactory {
             config: config,
             password: password,
             onConfigUpdated: onConfigUpdated != null
-                ? (updatedConfig) => onConfigUpdated(updatedConfig)
-                : null,
+              ? (updatedConfig) => onConfigUpdated(updatedConfig)
+              : null,
           );
         } else {
-          throw ArgumentError(
-            'Invalid config type for Transmission: ${config.runtimeType}',
-          );
+          throw ArgumentError('Invalid config type for Transmission: ${config.runtimeType}');
         }
       case DownloaderType.rutorrent:
         if (config is RuTorrentConfig) {
@@ -100,13 +96,11 @@ class DownloaderFactory {
             config: config,
             password: password,
             onConfigUpdated: onConfigUpdated != null
-                ? (updatedConfig) => onConfigUpdated(updatedConfig)
-                : null,
+              ? (updatedConfig) => onConfigUpdated(updatedConfig)
+              : null,
           );
         } else {
-          throw ArgumentError(
-            'Invalid config type for ruTorrent: ${config.runtimeType}',
-          );
+          throw ArgumentError('Invalid config type for ruTorrent: ${config.runtimeType}');
         }
     }
   }

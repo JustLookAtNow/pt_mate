@@ -104,9 +104,7 @@ class AppState extends ChangeNotifier {
       }
       swLoadSite.stop();
       if (kDebugMode) {
-        _logger.d(
-          'AppState: 加载活跃站点耗时=${swLoadSite.elapsedMilliseconds}ms, siteId=${_site?.id}',
-        );
+        _logger.d('AppState: 加载活跃站点耗时=${swLoadSite.elapsedMilliseconds}ms, siteId=${_site?.id}');
       }
 
       // 初始化API服务（适配器）
@@ -126,9 +124,7 @@ class AppState extends ChangeNotifier {
       _configVersion++; // 增加配置版本号
       swTotal.stop();
       if (kDebugMode) {
-        _logger.i(
-          'AppState: _performInitialLoad完成，总耗时=${swTotal.elapsedMilliseconds}ms，配置版本号: $_configVersion, 强制重新加载: $forceReload',
-        );
+        _logger.i('AppState: _performInitialLoad完成，总耗时=${swTotal.elapsedMilliseconds}ms，配置版本号: $_configVersion, 强制重新加载: $forceReload');
       }
       notifyListeners();
 
@@ -200,47 +196,45 @@ class AppState extends ChangeNotifier {
         final backupService = BackupService(StorageService.instance);
 
         // 异步执行自动同步，不阻塞应用启动
-        Future.microtask(() async {
-          try {
-            // 检查是否有远程备份可以下载
-            final remoteBackups = await backupService.listWebDAVBackups();
-            if (remoteBackups.isNotEmpty) {
-              if (kDebugMode) {
-                _logger.i('AppState: 发现${remoteBackups.length}个远程备份，准备自动同步最新的');
-              }
+         Future.microtask(() async {
+           try {
+             // 检查是否有远程备份可以下载
+             final remoteBackups = await backupService.listWebDAVBackups();
+               if (remoteBackups.isNotEmpty) {
+                 if (kDebugMode) {
+                   _logger.i('AppState: 发现${remoteBackups.length}个远程备份，准备自动同步最新的');
+                 }
 
-              // 获取最新的备份文件路径
-              final latestBackup = remoteBackups.first;
-              final backupPath = latestBackup['path'] as String;
+               // 获取最新的备份文件路径
+               final latestBackup = remoteBackups.first;
+               final backupPath = latestBackup['path'] as String;
 
-              // 下载并恢复最新的备份
-              final backupData = await backupService.downloadWebDAVBackup(
-                backupPath,
-              );
-              if (backupData != null) {
-                final result = await backupService.restoreBackup(backupData);
-                if (result.success) {
-                  if (kDebugMode) {
-                    _logger.i('AppState: 自动同步完成');
-                  }
-                } else {
-                  if (kDebugMode) {
-                    _logger.e('AppState: 自动同步失败: ${result.message}');
-                  }
-                }
-              }
-            } else {
-              if (kDebugMode) {
-                _logger.i('AppState: 未发现远程备份，跳过自动同步');
-              }
-            }
-          } catch (e) {
-            if (kDebugMode) {
-              _logger.e('AppState: 自动同步失败: $e');
-            }
-            // 自动同步失败不影响应用正常启动
-          }
-        });
+               // 下载并恢复最新的备份
+               final backupData = await backupService.downloadWebDAVBackup(backupPath);
+               if (backupData != null) {
+                 final result = await backupService.restoreBackup(backupData);
+                 if (result.success) {
+                   if (kDebugMode) {
+                     _logger.i('AppState: 自动同步完成');
+                   }
+                 } else {
+                   if (kDebugMode) {
+                     _logger.e('AppState: 自动同步失败: ${result.message}');
+                   }
+                 }
+               }
+             } else {
+                 if (kDebugMode) {
+                   _logger.i('AppState: 未发现远程备份，跳过自动同步');
+                 }
+               }
+             } catch (e) {
+               if (kDebugMode) {
+                 _logger.e('AppState: 自动同步失败: $e');
+               }
+             // 自动同步失败不影响应用正常启动
+           }
+         });
       } else {
         if (kDebugMode) {
           _logger.i('AppState: 自动同步未启用或配置不存在');
@@ -476,93 +470,93 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
               SizedBox(
                 height: 300,
                 child: ListView.builder(
-                  itemCount: _filteredSites.length,
-                  itemBuilder: (context, index) {
-                    final site = _filteredSites[index];
-                    final isSelected = site.id == _selectedSiteId;
-                    final Color? siteColor = site.siteColor != null
-                        ? Color(site.siteColor!)
-                        : null;
+                    itemCount: _filteredSites.length,
+                    itemBuilder: (context, index) {
+                      final site = _filteredSites[index];
+                      final isSelected = site.id == _selectedSiteId;
+                      final Color? siteColor = site.siteColor != null
+                          ? Color(site.siteColor!)
+                          : null;
 
-                    Widget buildImage(String path, Color fgColor) {
-                      if (path.isEmpty) {
-                        return Icon(Icons.dns, size: 24, color: fgColor);
+                      Widget buildImage(String path, Color fgColor) {
+                        if (path.isEmpty) {
+                          return Icon(Icons.dns, size: 24, color: fgColor);
+                        }
+                        return ClipOval(
+                          child: Image.asset(
+                            path,
+                            width: 24,
+                            height: 24,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Image.asset(
+                                'assets/sites_icon/_default_nexusphp.png',
+                                width: 24,
+                                height: 24,
+                                fit: BoxFit.cover,
+                              );
+                            },
+                          ),
+                        );
                       }
-                      return ClipOval(
-                        child: Image.asset(
-                          path,
-                          width: 24,
-                          height: 24,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Image.asset(
-                              'assets/sites_icon/_default_nexusphp.png',
-                              width: 24,
-                              height: 24,
-                              fit: BoxFit.cover,
-                            );
-                          },
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : siteColor?.withValues(alpha: 0.2) ??
+                                    Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerHighest,
+                          child: Builder(
+                            builder: (context) {
+                              final fgColor = isSelected
+                                  ? Theme.of(context).colorScheme.onPrimary
+                                  : siteColor ??
+                                        Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant;
+
+                              final cached = _logoPathCache[site.id];
+                              if (cached != null) {
+                                return buildImage(cached, fgColor);
+                              }
+
+                              return FutureBuilder<String>(
+                                future: _resolveLogoPath(site),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState !=
+                                          ConnectionState.done ||
+                                      (snapshot.data == null ||
+                                          snapshot.data!.isEmpty)) {
+                                    return Icon(
+                                      Icons.dns,
+                                      size: 24,
+                                      color: fgColor,
+                                    );
+                                  }
+                                  return buildImage(snapshot.data!, fgColor);
+                                },
+                              );
+                            },
+                          ),
+                      ),
+                        title: Text(site.name),
+                        subtitle: Text(
+                          site.baseUrl,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
+                        selected: isSelected,
+                        selectedTileColor: Theme.of(
+                          context,
+                        ).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                        onTap: () {
+                          Navigator.of(context).pop(site.id);
+                        },
                       );
-                    }
-
-                    return ListTile(
-                      leading: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: isSelected
-                            ? Theme.of(context).colorScheme.primary
-                            : siteColor?.withValues(alpha: 0.2) ??
-                                  Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHighest,
-                        child: Builder(
-                          builder: (context) {
-                            final fgColor = isSelected
-                                ? Theme.of(context).colorScheme.onPrimary
-                                : siteColor ??
-                                      Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant;
-
-                            final cached = _logoPathCache[site.id];
-                            if (cached != null) {
-                              return buildImage(cached, fgColor);
-                            }
-
-                            return FutureBuilder<String>(
-                              future: _resolveLogoPath(site),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState !=
-                                        ConnectionState.done ||
-                                    (snapshot.data == null ||
-                                        snapshot.data!.isEmpty)) {
-                                  return Icon(
-                                    Icons.dns,
-                                    size: 24,
-                                    color: fgColor,
-                                  );
-                                }
-                                return buildImage(snapshot.data!, fgColor);
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                      title: Text(site.name),
-                      subtitle: Text(
-                        site.baseUrl,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      selected: isSelected,
-                      selectedTileColor: Theme.of(
-                        context,
-                      ).colorScheme.primaryContainer.withValues(alpha: 0.3),
-                      onTap: () {
-                        Navigator.of(context).pop(site.id);
-                      },
-                    );
-                  },
+                    },
                 ),
               ),
           ],
@@ -613,11 +607,13 @@ class _MTeamAppState extends State<MTeamApp> {
             locale: const Locale('zh', 'CN'), // 默认使用中文简体
             home: !appState.isInitialized
                 ? const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
+                    body: Center(
+                      child: CircularProgressIndicator(),
+                    ),
                   )
                 : appState.site == null
-                ? const ServerSettingsPage()
-                : const HomePage(),
+                    ? const ServerSettingsPage()
+                    : const HomePage(),
           );
         },
       ),
@@ -740,9 +736,7 @@ class _HomePageState extends State<HomePage> {
         _currentSite = appState.site;
         _lastConfigVersion = appState.configVersion;
         if (kDebugMode) {
-          _logger.d(
-            'HomePage: didChangeDependencies预同步 - 站点: ${_currentSite?.id}, 版本: $_lastConfigVersion',
-          );
+          _logger.d('HomePage: didChangeDependencies预同步 - 站点: ${_currentSite?.id}, 版本: $_lastConfigVersion');
         }
       }
       _didSyncFromAppState = true;
@@ -808,11 +802,8 @@ class _HomePageState extends State<HomePage> {
       }
 
       // 加载下载器配置
-      final downloaderConfigsData = await StorageService.instance
-          .loadDownloaderConfigs();
-      final downloaderConfigs = downloaderConfigsData
-          .map((data) => DownloaderConfig.fromJson(data))
-          .toList();
+      final downloaderConfigsData = await StorageService.instance.loadDownloaderConfigs();
+      final downloaderConfigs = downloaderConfigsData.map((data) => DownloaderConfig.fromJson(data)).toList();
       if (mounted) setState(() => _downloaderConfigs = downloaderConfigs);
 
       // 加载封面图片显示设置
@@ -853,9 +844,7 @@ class _HomePageState extends State<HomePage> {
           : SearchCategoryConfig.getDefaultConfigs();
 
       if (kDebugMode) {
-        _logger.d(
-          'HomePage: _reloadCategories - 重新加载分类，分类数量: ${categories.length}',
-        );
+        _logger.d('HomePage: _reloadCategories - 重新加载分类，分类数量: ${categories.length}');
       }
 
       if (mounted) {
@@ -1002,20 +991,15 @@ class _HomePageState extends State<HomePage> {
                       },
                       icon: const Icon(Icons.category, size: 20),
                       style: IconButton.styleFrom(
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.primaryContainer,
-                        foregroundColor: Theme.of(
-                          context,
-                        ).colorScheme.onPrimaryContainer,
+                        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                        foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
                         elevation: 2,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         padding: const EdgeInsets.all(8),
                       ),
-                      tooltip:
-                          _categories.isNotEmpty &&
+                      tooltip: _categories.isNotEmpty &&
                               _selectedCategoryIndex >= 0 &&
                               _selectedCategoryIndex < _categories.length
                           ? _categories[_selectedCategoryIndex].displayName
@@ -1029,51 +1013,34 @@ class _HomePageState extends State<HomePage> {
                       focusNode: _searchFocusNode,
                       onTapOutside: (event) => FocusScope.of(context).unfocus(),
                       textInputAction: TextInputAction.search,
-                      enabled:
-                          _currentSite?.features.supportTorrentSearch ?? true,
+                      enabled: _currentSite?.features.supportTorrentSearch ?? true,
                       decoration: InputDecoration(
-                        hintText:
-                            (_currentSite?.features.supportTorrentSearch ??
-                                true)
+                        hintText: (_currentSite?.features.supportTorrentSearch ?? true)
                             ? '输入关键词（可选）'
                             : '当前站点不支持搜索功能',
                         border: OutlineInputBorder(
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(25),
-                          ),
+                          borderRadius: const BorderRadius.all(Radius.circular(25)),
                           borderSide: BorderSide(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.3),
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
                           ),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(25),
-                          ),
+                          borderRadius: const BorderRadius.all(Radius.circular(25)),
                           borderSide: BorderSide(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.3),
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(25),
-                          ),
+                          borderRadius: const BorderRadius.all(Radius.circular(25)),
                           borderSide: BorderSide(
                             color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       ),
                       onSubmitted: (_) {
-                        if (_currentSite?.features.supportTorrentSearch ??
-                            true) {
+                        if (_currentSite?.features.supportTorrentSearch ?? true) {
                           _search(reset: true);
                         } else {
                           NotificationHelper.showError(context, '当前站点不支持搜索功能');
@@ -1090,8 +1057,7 @@ class _HomePageState extends State<HomePage> {
                             _onlyFavorites = !_onlyFavorites;
                           });
                         }
-                        if (_currentSite?.features.supportTorrentSearch ??
-                            true) {
+                        if (_currentSite?.features.supportTorrentSearch ?? true) {
                           _search(reset: true);
                         } else {
                           NotificationHelper.showError(context, '当前站点不支持搜索功能');
@@ -1099,9 +1065,7 @@ class _HomePageState extends State<HomePage> {
                       },
                       icon: Icon(
                         _onlyFavorites ? Icons.favorite : Icons.favorite_border,
-                        color: _onlyFavorites
-                            ? Theme.of(context).colorScheme.secondary
-                            : null,
+                        color: _onlyFavorites ? Theme.of(context).colorScheme.secondary : null,
                       ),
                       tooltip: _onlyFavorites ? '显示全部' : '仅显示收藏',
                     ),
@@ -1110,9 +1074,7 @@ class _HomePageState extends State<HomePage> {
                     onSelected: _onSortSelected,
                     icon: Icon(
                       _sortBy == 'none' ? Icons.sort : Icons.sort,
-                      color: _sortBy == 'none'
-                          ? null
-                          : Theme.of(context).colorScheme.secondary,
+                      color: _sortBy == 'none' ? null : Theme.of(context).colorScheme.secondary,
                     ),
                     tooltip: '排序',
                     itemBuilder: (context) => [
@@ -1121,23 +1083,16 @@ class _HomePageState extends State<HomePage> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: _sortBy == 'none'
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
+                                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
                                 : null,
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           child: Row(
                             children: [
                               Icon(
                                 Icons.clear,
-                                color: _sortBy == 'none'
-                                    ? Theme.of(context).colorScheme.secondary
-                                    : null,
+                                color: _sortBy == 'none' ? Theme.of(context).colorScheme.secondary : null,
                               ),
                               const SizedBox(width: 8),
                               const Text('默认排序'),
@@ -1150,25 +1105,16 @@ class _HomePageState extends State<HomePage> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: _sortBy == 'size'
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
+                                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
                                 : null,
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           child: Row(
                             children: [
                               Icon(
-                                _sortBy == 'size' && _sortAscending
-                                    ? Icons.arrow_upward
-                                    : Icons.arrow_downward,
-                                color: _sortBy == 'size'
-                                    ? Theme.of(context).colorScheme.secondary
-                                    : null,
+                                _sortBy == 'size' && _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                                color: _sortBy == 'size' ? Theme.of(context).colorScheme.secondary : null,
                               ),
                               const SizedBox(width: 8),
                               const Text('按大小排序'),
@@ -1181,25 +1127,16 @@ class _HomePageState extends State<HomePage> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: _sortBy == 'upload'
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
+                                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
                                 : null,
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           child: Row(
                             children: [
                               Icon(
-                                _sortBy == 'upload' && _sortAscending
-                                    ? Icons.arrow_upward
-                                    : Icons.arrow_downward,
-                                color: _sortBy == 'upload'
-                                    ? Theme.of(context).colorScheme.secondary
-                                    : null,
+                                _sortBy == 'upload' && _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                                color: _sortBy == 'upload' ? Theme.of(context).colorScheme.secondary : null,
                               ),
                               const SizedBox(width: 8),
                               const Text('按上传量排序'),
@@ -1212,25 +1149,16 @@ class _HomePageState extends State<HomePage> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: _sortBy == 'download'
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
+                                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
                                 : null,
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           child: Row(
                             children: [
                               Icon(
-                                _sortBy == 'download' && _sortAscending
-                                    ? Icons.arrow_upward
-                                    : Icons.arrow_downward,
-                                color: _sortBy == 'download'
-                                    ? Theme.of(context).colorScheme.secondary
-                                    : null,
+                                _sortBy == 'download' && _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                                color: _sortBy == 'download' ? Theme.of(context).colorScheme.secondary : null,
                               ),
                               const SizedBox(width: 8),
                               const Text('按下载量排序'),
@@ -1334,6 +1262,8 @@ class _HomePageState extends State<HomePage> {
       if (mounted) setState(() => _loading = false);
     }
   }
+
+
 
   void _onSortSelected(String sortType) {
     if (mounted) {
@@ -1563,6 +1493,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _showSiteSelectionDialog() async {
+
     final sitesData = await StorageService.instance.loadSiteConfigs(
       includeApiKeys: false,
     );
@@ -1616,20 +1547,15 @@ class _HomePageState extends State<HomePage> {
           String reloadReason = '';
 
           if (kDebugMode) {
-            _logger.d(
-              'HomePage Consumer: 当前站点=${_currentSite?.id}, AppState站点=${appState.site?.id}, 配置版本=${appState.configVersion}, 上次版本=$_lastConfigVersion',
-            );
+            _logger.d('HomePage Consumer: 当前站点=${_currentSite?.id}, AppState站点=${appState.site?.id}, 配置版本=${appState.configVersion}, 上次版本=$_lastConfigVersion');
           }
 
           if (appState.site != null) {
-            final isFirstSync =
-                (_currentSite == null && _lastConfigVersion == -1);
+            final isFirstSync = (_currentSite == null && _lastConfigVersion == -1);
             // 首次同步：仅同步站点与版本，不触发重新加载
             if (isFirstSync) {
               if (kDebugMode) {
-                _logger.d(
-                  'HomePage: 首次同步（不重载） - 同步站点: ${appState.site!.id}, 版本: ${appState.configVersion}',
-                );
+                _logger.d('HomePage: 首次同步（不重载） - 同步站点: ${appState.site!.id}, 版本: ${appState.configVersion}');
               }
               final currentSite = appState.site;
               final currentConfigVersion = appState.configVersion;
@@ -1638,9 +1564,7 @@ class _HomePageState extends State<HomePage> {
                 _currentSite = currentSite;
                 _lastConfigVersion = currentConfigVersion;
                 // 若尚未进行过首次初始化，则触发一次初始化
-                if (!_didInitialLoad &&
-                    !_isProcessingReload &&
-                    _currentSite != null) {
+                if (!_didInitialLoad && !_isProcessingReload && _currentSite != null) {
                   _isProcessingReload = true;
                   await _init();
                   _didInitialLoad = true;
@@ -1649,34 +1573,26 @@ class _HomePageState extends State<HomePage> {
               });
             }
             // 站点变化（排除首次同步情形）
-            else if (_currentSite != null &&
-                _currentSite!.id != appState.site!.id) {
+            else if (_currentSite != null && _currentSite!.id != appState.site!.id) {
               needsReload = true;
               reloadReason = '站点变化';
               if (kDebugMode) {
-                _logger.i(
-                  'HomePage: 站点变化检测 - 当前站点: ${_currentSite?.id}, 新站点: ${appState.site!.id}',
-                );
+                _logger.i('HomePage: 站点变化检测 - 当前站点: ${_currentSite?.id}, 新站点: ${appState.site!.id}');
               }
             }
             // 配置版本变化（排除首次同步情形）
-            else if (_lastConfigVersion != -1 &&
-                _lastConfigVersion != appState.configVersion) {
+            else if (_lastConfigVersion != -1 && _lastConfigVersion != appState.configVersion) {
               needsReload = true;
               reloadReason = '配置更新';
               if (kDebugMode) {
-                _logger.i(
-                  'HomePage: 配置更新检测 - 上次版本: $_lastConfigVersion, 当前版本: ${appState.configVersion}',
-                );
+                _logger.i('HomePage: 配置更新检测 - 上次版本: $_lastConfigVersion, 当前版本: ${appState.configVersion}');
               }
             }
           }
 
           if (needsReload) {
             if (kDebugMode) {
-              _logger.i(
-                'HomePage: 检测到$reloadReason，重新初始化 - 配置版本: ${appState.configVersion}, 上次版本: $_lastConfigVersion',
-              );
+              _logger.i('HomePage: 检测到$reloadReason，重新初始化 - 配置版本: ${appState.configVersion}, 上次版本: $_lastConfigVersion');
             }
             // 设置标志，防止重复处理
             _isProcessingReload = true;
@@ -1729,118 +1645,109 @@ class _HomePageState extends State<HomePage> {
             currentRoute: '/',
             onSettingsChanged: _reloadCategories,
             appBar: AppBar(
-              title: GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const ServerSettingsPage(),
-                    ),
-                  );
-                },
-                child: Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(text: appState.site?.name ?? 'PT Mate'),
-                      TextSpan(
-                        text: ' - PT Mate',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ],
+            title: GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ServerSettingsPage(),
                   ),
+                );
+              },
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: appState.site?.name ?? 'PT Mate'),
+                    TextSpan(
+                      text: ' - PT Mate',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ],
                 ),
-              ),
-              actions: const [QbSpeedIndicator()],
-              backgroundColor: Theme.of(context).brightness == Brightness.light
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.surface,
-              iconTheme: IconThemeData(
-                color: Theme.of(context).brightness == Brightness.light
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onSurface,
-              ),
-              titleTextStyle: TextStyle(
-                color: Theme.of(context).brightness == Brightness.light
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onSurface,
-                fontSize: 20,
-                fontWeight: FontWeight.w500,
               ),
             ),
-            body: Column(
-              children: [
-                // 统一头部（用户信息 + 搜索栏），使用进度控制：向下滚动逐步隐藏，向上滚动逐步显示
-                ClipRect(
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    heightFactor: _headerProgress,
-                    child: Opacity(
-                      opacity: _headerProgress,
-                      child: _buildHeaderPanel(context, appState),
-                    ),
+            actions: const [QbSpeedIndicator()],
+            backgroundColor: Theme.of(context).brightness == Brightness.light
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.surface,
+            iconTheme: IconThemeData(
+              color: Theme.of(context).brightness == Brightness.light
+                  ? Theme.of(context).colorScheme.onPrimary
+                  : Theme.of(context).colorScheme.onSurface,
+            ),
+            titleTextStyle: TextStyle(
+              color: Theme.of(context).brightness == Brightness.light
+                  ? Theme.of(context).colorScheme.onPrimary
+                  : Theme.of(context).colorScheme.onSurface,
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          body: Column(
+            children: [
+              // 统一头部（用户信息 + 搜索栏），使用进度控制：向下滚动逐步隐藏，向上滚动逐步显示
+              ClipRect(
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  heightFactor: _headerProgress,
+                  child: Opacity(
+                    opacity: _headerProgress,
+                    child: _buildHeaderPanel(context, appState),
                   ),
                 ),
-                if (_loading) const LinearProgressIndicator(),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
+              ),
+              if (_loading) const LinearProgressIndicator(),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.red),
                   ),
-                Expanded(
-                  child: _currentSite == null
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32.0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.settings_outlined,
-                                  size: 64,
-                                  color: Theme.of(context).colorScheme.primary,
+                ),
+              Expanded(
+                child: _currentSite == null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.settings_outlined,
+                                size: 64,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(height: 24),
+                              Text(
+                                '尚未配置站点信息',
+                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurface,
                                 ),
-                                const SizedBox(height: 24),
-                                Text(
-                                  '尚未配置站点信息',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurface,
-                                      ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                '请先配置站点信息以开始使用应用',
+                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  '请先配置站点信息以开始使用应用',
-                                  style: Theme.of(context).textTheme.bodyLarge
-                                      ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
-                                      ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 32),
-                                FilledButton.icon(
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const ServerSettingsPage(),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('配置站点'),
-                                ),
-                              ],
-                            ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 32),
+                              FilledButton.icon(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => const ServerSettingsPage(),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.add),
+                                label: const Text('配置站点'),
+                              ),
+                            ],
                           ),
-                        )
+                        ),
+                      )
                       : Builder(
                           builder: (context) {
                             final filteredItems = _filteredItems;
@@ -1968,26 +1875,26 @@ class _HomePageState extends State<HomePage> {
                             );
                           },
                         ),
-                ),
-                // 选中模式下的操作栏
-                if (_isSelectionMode)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      border: Border(
-                        top: BorderSide(
-                          color: Theme.of(context).dividerColor,
-                          width: 1,
-                        ),
+              ),
+              // 选中模式下的操作栏
+              if (_isSelectionMode)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    border: Border(
+                      top: BorderSide(
+                        color: Theme.of(context).dividerColor,
+                        width: 1,
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Expanded(
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
                           child: TextButton(
-                            onPressed: _onCancelSelection,
+                          onPressed: _onCancelSelection,
                             style: TextButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 0,
@@ -1997,10 +1904,10 @@ class _HomePageState extends State<HomePage> {
                                 color: Theme.of(context).colorScheme.outline,
                                 width: 1.0,
                               ),
-                            ),
-                            child: const Text('取消'),
                           ),
+                          child: const Text('取消'),
                         ),
+                      ),
                         const SizedBox(width: 8),
                         // 全选按钮
                         Expanded(
@@ -2035,54 +1942,53 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // 批量收藏按钮 - 仅在站点支持收藏功能时显示
-                        if (_currentSite?.features.supportCollection ??
-                            true) ...[
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: _selectedItems.isNotEmpty
-                                  ? _onBatchFavorite
-                                  : null,
-                              style: ElevatedButton.styleFrom(
+                      // 批量收藏按钮 - 仅在站点支持收藏功能时显示
+                      if (_currentSite?.features.supportCollection ?? true) ...[
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _selectedItems.isNotEmpty
+                                ? _onBatchFavorite
+                                : null,
+                            style: ElevatedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 0,
                                 ),
                                 textStyle: const TextStyle(fontSize: 13),
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                              ),
-                              child: Text('收藏 (${_selectedItems.length})'),
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
                             ),
+                            child: Text('收藏 (${_selectedItems.length})'),
                           ),
-                          const SizedBox(width: 12),
-                        ],
-                        // 批量下载按钮 - 仅在站点支持下载功能时显示
-                        if (_currentSite?.features.supportDownload ?? true)
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: _selectedItems.isNotEmpty
-                                  ? _onBatchDownload
-                                  : null,
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 0,
-                                ),
-                                textStyle: const TextStyle(fontSize: 13),
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.primary,
-                                foregroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimary,
-                              ),
-                              child: Text('下载 (${_selectedItems.length})'),
-                            ),
-                          ),
+                        ),
+                        const SizedBox(width: 12),
                       ],
-                    ),
+                      // 批量下载按钮 - 仅在站点支持下载功能时显示
+                      if (_currentSite?.features.supportDownload ?? true)
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _selectedItems.isNotEmpty
+                                ? _onBatchDownload
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 0,
+                                ),
+                                textStyle: const TextStyle(fontSize: 13),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.onPrimary,
+                            ),
+                            child: Text('下载 (${_selectedItems.length})'),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
-            ),
+                ),
+            ],
+          ),
             floatingActionButton: !_isSelectionMode
                 ? AnimatedSlide(
                     duration: const Duration(milliseconds: 300),

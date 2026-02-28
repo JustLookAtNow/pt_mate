@@ -34,9 +34,7 @@ class NexusPHPAdapter implements SiteAdapter {
     await _loadTagMapping();
     swDiscount.stop();
     if (kDebugMode) {
-      _logger.d(
-        'NexusPHPAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms',
-      );
+      _logger.d('NexusPHPAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms');
     }
 
     _dio = Dio(
@@ -72,9 +70,7 @@ class NexusPHPAdapter implements SiteAdapter {
     );
     swInterceptors.stop();
     if (kDebugMode) {
-      _logger.d(
-        'NexusPHPAdapter.init: 配置Dio与拦截器耗时=${swInterceptors.elapsedMilliseconds}ms',
-      );
+      _logger.d('NexusPHPAdapter.init: 配置Dio与拦截器耗时=${swInterceptors.elapsedMilliseconds}ms');
     }
     swTotal.stop();
     if (kDebugMode) {
@@ -90,7 +86,9 @@ class NexusPHPAdapter implements SiteAdapter {
         SiteType.nexusphp,
       );
       if (template?.discountMapping != null) {
-        _discountMapping = Map<String, String>.from(template!.discountMapping);
+        _discountMapping = Map<String, String>.from(
+          template!.discountMapping,
+        );
       }
       final specialMapping = await SiteConfigService.getDiscountMapping(
         _siteConfig.baseUrl,
@@ -319,6 +317,8 @@ class NexusPHPAdapter implements SiteAdapter {
       }
     }
 
+
+
     final name = item['name'] as String;
     final smallDescr = item['small_descr'] as String? ?? '';
 
@@ -344,6 +344,8 @@ class NexusPHPAdapter implements SiteAdapter {
         }
       }
     }
+
+
 
     return TorrentItem(
       id: (item['id'] as int).toString(),
@@ -394,11 +396,7 @@ class NexusPHPAdapter implements SiteAdapter {
   }
 
   @override
-  Future<TorrentCommentList> fetchComments(
-    String id, {
-    int pageNumber = 1,
-    int pageSize = 20,
-  }) async {
+  Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20}) async {
     try {
       final response = await _dio.get(
         '/api/v1/comments',
@@ -568,7 +566,9 @@ class NexusPHPAdapter implements SiteAdapter {
   Future<List<SearchCategoryConfig>> getSearchCategories() async {
     // 通过baseUrl匹配预设配置
     final defaultCategories =
-        await SiteConfigService.getDefaultSearchCategories(_siteConfig.baseUrl);
+        await SiteConfigService.getDefaultSearchCategories(
+          _siteConfig.baseUrl,
+        );
 
     // 如果获取到默认分类配置，则直接返回
     if (defaultCategories.isNotEmpty) {

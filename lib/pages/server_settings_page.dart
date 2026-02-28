@@ -187,7 +187,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       await _loadCachedHealthStatuses(triggerRefreshWhenEmpty: true);
     } catch (e) {
       if (mounted) {
-        NotificationHelper.showError(context, '加载站点配置失败: $e');
+                NotificationHelper.showError(context, '加载站点配置失败: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -298,7 +298,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                     // ignore save errors
                   }
                   if (!mounted) return;
-                  NotificationHelper.showInfo(context, '站点信息获取完成');
+                                    NotificationHelper.showInfo(context, '站点信息获取完成');
                 }
               }
             });
@@ -348,13 +348,13 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       await appState.setActiveSite(siteId);
       setState(() => _activeSiteId = siteId);
       if (mounted) {
-        NotificationHelper.showInfo(context, '已切换活跃站点');
+                NotificationHelper.showInfo(context, '已切换活跃站点');
         // 切换站点成功后跳转回首页
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       if (mounted) {
-        NotificationHelper.showError(context, '切换站点失败: $e');
+                NotificationHelper.showError(context, '切换站点失败: $e');
       }
     }
   }
@@ -389,11 +389,11 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         await StorageService.instance.deleteSiteConfig(site.id);
         await _loadSites();
         if (mounted) {
-          NotificationHelper.showInfo(context, '站点已删除');
+                    NotificationHelper.showInfo(context, '站点已删除');
         }
       } catch (e) {
         if (mounted) {
-          NotificationHelper.showError(context, '删除站点失败: $e');
+                    NotificationHelper.showError(context, '删除站点失败: $e');
         }
       }
     }
@@ -679,10 +679,10 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       }
 
       if (!mounted) return;
-      NotificationHelper.showInfo(context, '站点已刷新');
+            NotificationHelper.showInfo(context, '站点已刷新');
     } catch (e) {
       if (!mounted) return;
-      NotificationHelper.showError(context, '刷新失败: $e');
+            NotificationHelper.showError(context, '刷新失败: $e');
     }
   }
 
@@ -1125,7 +1125,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                 constraints: const BoxConstraints(),
                 onPressed: () {
                   final msg = hs.message ?? '异常';
-                  NotificationHelper.showError(context, msg);
+                                    NotificationHelper.showError(context, msg);
                 },
               ),
               const SizedBox(width: 6),
@@ -1477,7 +1477,7 @@ class _CategoryEditDialogState extends State<_CategoryEditDialog> {
             final name = _nameController.text.trim();
             final parameters = _parametersController.text.trim();
             if (name.isEmpty || parameters.isEmpty) {
-              NotificationHelper.showError(context, '请填写完整信息');
+                            NotificationHelper.showError(context, '请填写完整信息');
               return;
             }
             final result = widget.category.copyWith(
@@ -1669,6 +1669,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
       // 清空之前的错误和用户信息
       _error = null;
+
     });
   }
 
@@ -1691,6 +1692,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
       // 清空之前的错误和用户信息
       _error = null;
+
     });
   }
 
@@ -1872,7 +1874,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // nexusphpweb类型需要cookie
       if (_savedCookie == null || _savedCookie!.isEmpty) {
         if (mounted) {
-          NotificationHelper.showError(context, '请先完成登录获取Cookie');
+                    NotificationHelper.showError(context, '请先完成登录获取Cookie');
         }
         return;
       }
@@ -1880,7 +1882,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // 其他类型需要API Key
       if (_apiKeyController.text.trim().isEmpty) {
         if (mounted) {
-          NotificationHelper.showError(context, '请先填写API Key');
+                    NotificationHelper.showError(context, '请先填写API Key');
         }
         return;
       }
@@ -1900,10 +1902,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
         });
 
         if (mounted) {
-          NotificationHelper.showInfo(
-            context,
-            '已成功加载 ${categories.length} 个分类配置',
-          );
+                    NotificationHelper.showInfo(context, '已成功加载 ${categories.length} 个分类配置');
         }
       } else {
         throw Exception('无法获取适配器实例');
@@ -1915,7 +1914,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       });
 
       if (mounted) {
-        NotificationHelper.showError(context, '获取分类配置失败，已使用默认配置: $e');
+                NotificationHelper.showError(context, '获取分类配置失败，已使用默认配置: $e');
       }
     }
   }
@@ -2021,6 +2020,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       setState(() {
         _loading = true;
         _error = null;
+
       });
 
       try {
@@ -2041,6 +2041,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
     setState(() {
       _loading = true;
       _error = null;
+
     });
 
     try {
@@ -2145,10 +2146,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       }
 
       if (mounted) {
-        NotificationHelper.showInfo(
-          context,
-          widget.site != null ? '站点已更新' : '站点已添加',
-        );
+                NotificationHelper.showInfo(context, widget.site != null ? '站点已更新' : '站点已添加');
         widget.onSaved?.call();
         Navigator.of(context).pop();
       }
@@ -3033,7 +3031,10 @@ class _SiteEditPageState extends State<SiteEditPage> {
               const SizedBox(height: 24),
 
               // 操作按钮（只有在用户做出选择时才显示）
+
               const SizedBox(height: 16),
+
+
 
               // 错误信息
               if (_error != null) ...[
@@ -3067,6 +3068,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
               ],
 
               // 用户信息显示
+
             ],
           ),
         ),

@@ -542,7 +542,10 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
       final passKeyField = fields?['passKey'] as Map<String, dynamic>?;
 
       if (passKeyField != null) {
-        final value = extractFirstFieldValue(targetElement, passKeyField);
+        final value = extractFirstFieldValue(
+          targetElement,
+          passKeyField,
+        );
         if (value != null && value.isNotEmpty) {
           return value.trim();
         } else {
@@ -638,6 +641,7 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           } else {
             queryParams[key] = val;
           }
+
         } else {
           queryParams[key] = value;
         }
@@ -930,7 +934,10 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
 
           final createDateConfig =
               fieldsConfig['createDate'] as Map<String, dynamic>? ?? {};
-          final createDateList = extractFieldValue(row, createDateConfig);
+          final createDateList = extractFieldValue(
+            row,
+            createDateConfig,
+          );
           final createDate = createDateList.isNotEmpty
               ? createDateList.first
               : '';
@@ -968,7 +975,10 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               fieldsConfig['collection'] as Map<String, dynamic>?;
           bool collection = false;
           if (collectionConfig != null) {
-            final collectionList = extractFieldValue(row, collectionConfig);
+            final collectionList = extractFieldValue(
+              row,
+              collectionConfig,
+            );
             collection = collectionList.isNotEmpty; // 如果找不到元素说明未收藏
           }
           // 检查置顶状态（布尔字段）
@@ -1445,10 +1455,16 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
     // 遍历每个 row 元素（每个代表一个批次）
     for (final rowElement in rowElements) {
       // 提取当前 row 中的所有 categoryId
-      final categoryIds = extractFieldValue(rowElement, categoryIdConfig);
+      final categoryIds = extractFieldValue(
+        rowElement,
+        categoryIdConfig,
+      );
 
       // 提取当前 row 中的所有 categoryName
-      final categoryNames = extractFieldValue(rowElement, categoryNameConfig);
+      final categoryNames = extractFieldValue(
+        rowElement,
+        categoryNameConfig,
+      );
 
       // 检查是否有有效的字段提取结果
       if (categoryIds.isEmpty && categoryNames.isEmpty) {

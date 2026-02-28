@@ -24,6 +24,8 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
   bool _loading = true;
   String? _error;
 
+
+
   @override
   void initState() {
     super.initState();
@@ -37,9 +39,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
     });
     try {
       final configMaps = await StorageService.instance.loadDownloaderConfigs();
-      final configs = configMaps
-          .map((configMap) => DownloaderConfig.fromJson(configMap))
-          .toList();
+      final configs = configMaps.map((configMap) => DownloaderConfig.fromJson(configMap)).toList();
       final defaultId = await StorageService.instance.loadDefaultDownloaderId();
       if (!mounted) return;
       setState(() {
@@ -73,10 +73,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       } else {
         updated.add(cfg);
       }
-      await StorageService.instance.saveDownloaderConfigs(
-        updated,
-        defaultId: _defaultId,
-      );
+      await StorageService.instance.saveDownloaderConfigs(updated, defaultId: _defaultId);
       if (_defaultId == null && updated.isNotEmpty) {
         setState(() {
           _defaultId = cfg.id;
@@ -95,7 +92,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      NotificationHelper.showError(context, '保存失败：$e');
+            NotificationHelper.showError(context, '保存失败：$e');
     }
   }
 
@@ -138,7 +135,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      NotificationHelper.showError(context, '删除失败：$e');
+            NotificationHelper.showError(context, '删除失败：$e');
     }
   }
 
@@ -157,13 +154,13 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      NotificationHelper.showError(context, '设置失败：$e');
+            NotificationHelper.showError(context, '设置失败：$e');
     }
   }
 
   Future<void> _testDefault() async {
     if (_defaultId == null) {
-      NotificationHelper.showError(context, '请先设置默认下载器');
+            NotificationHelper.showError(context, '请先设置默认下载器');
       return;
     }
     final config = _downloaderConfigs.firstWhere((c) => c.id == _defaultId);
@@ -172,12 +169,10 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
 
   Future<void> _test(DownloaderConfig config) async {
     try {
-      final pwd = await StorageService.instance.loadDownloaderPassword(
-        config.id,
-      );
+      final pwd = await StorageService.instance.loadDownloaderPassword(config.id);
       if ((pwd ?? '').isEmpty) {
         if (!mounted) return;
-        NotificationHelper.showError(context, '请先保存密码');
+                NotificationHelper.showError(context, '请先保存密码');
         return;
       }
 
@@ -188,10 +183,10 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       );
 
       if (!mounted) return;
-      NotificationHelper.showInfo(context, '✅ 连接成功');
+            NotificationHelper.showInfo(context, '✅ 连接成功');
     } catch (e) {
       if (!mounted) return;
-      NotificationHelper.showError(context, '❌ 连接失败：$e');
+            NotificationHelper.showError(context, '❌ 连接失败：$e');
     }
   }
 
@@ -408,8 +403,7 @@ class _DownloaderEditorDialog extends StatefulWidget {
   const _DownloaderEditorDialog({this.existing});
 
   @override
-  State<_DownloaderEditorDialog> createState() =>
-      _DownloaderEditorDialogState();
+  State<_DownloaderEditorDialog> createState() => _DownloaderEditorDialogState();
 }
 
 class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
@@ -470,6 +464,8 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
     super.dispose();
   }
 
+
+
   Future<void> _onSubmit() async {
     final name = _nameCtrl.text.trim();
     final host = _hostCtrl.text.trim();
@@ -477,7 +473,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
     final user = _userCtrl.text.trim();
     final pwd = _pwdCtrl.text.trim();
     if (name.isEmpty || host.isEmpty || port == null || user.isEmpty) {
-      NotificationHelper.showInfo(context, '请完整填写名称、主机、端口、用户名');
+            NotificationHelper.showInfo(context, '请完整填写名称、主机、端口、用户名');
       return;
     }
     final id =
@@ -498,8 +494,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
     // 如果密码为空且是编辑现有配置，则尝试从已保存的配置中读取密码
     if (pwd.isEmpty && widget.existing != null) {
       // 获取保存的密码
-      final savedPassword = await StorageService.instance
-          .loadDownloaderPassword(id);
+      final savedPassword = await StorageService.instance.loadDownloaderPassword(id);
 
       // 检查组件是否仍然挂载
       if (!mounted) return;
@@ -508,9 +503,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
       Navigator.of(context).pop(_DownloaderEditorResult(cfg, savedPassword));
     } else {
       // 无需异步操作，直接返回结果
-      Navigator.of(
-        context,
-      ).pop(_DownloaderEditorResult(cfg, pwd.isEmpty ? null : pwd));
+      Navigator.of(context).pop(_DownloaderEditorResult(cfg, pwd.isEmpty ? null : pwd));
     }
   }
 
@@ -727,8 +720,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
                                 Text(
                                   _selectedType == DownloaderType.transmission
                                       ? 'Transmission 必须启用本地中转（种子文件需要先下载到本地）'
-                                      : _selectedType ==
-                                            DownloaderType.rutorrent
+                                      : _selectedType == DownloaderType.rutorrent
                                       ? 'ruTorrent 必须启用本地中转（种子文件需要先下载到本地）'
                                       : '启用后先下载种子文件到本地，再提交给下载器',
                                   style: Theme.of(context).textTheme.bodySmall
@@ -739,8 +731,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
                           ),
                           Switch(
                             value: _useLocalRelay,
-                            onChanged:
-                                (_selectedType == DownloaderType.transmission ||
+                            onChanged: (_selectedType == DownloaderType.transmission ||
                                     _selectedType == DownloaderType.rutorrent)
                                 ? null // Transmission 和 ruTorrent 类型时禁用开关
                                 : (value) {
@@ -770,9 +761,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
                                   children: [
                                     Text(
                                       '允许自签名证书',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleSmall,
+                                      style: Theme.of(context).textTheme.titleSmall,
                                     ),
                                     const SizedBox(width: 8),
                                     Icon(
@@ -803,21 +792,19 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
                       ),
                     ),
                     if (_testMsg != null) ...[
-                      Builder(
-                        builder: (context) {
-                          // 当测试消息显示时，滚动到底部
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (_scrollController.hasClients) {
-                              _scrollController.animateTo(
-                                _scrollController.position.maxScrollExtent,
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeOut,
-                              );
-                            }
-                          });
-                          return const SizedBox(height: 16);
-                        },
-                      ),
+                      Builder(builder: (context) {
+                        // 当测试消息显示时，滚动到底部
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (_scrollController.hasClients) {
+                            _scrollController.animateTo(
+                              _scrollController.position.maxScrollExtent,
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOut,
+                            );
+                          }
+                        });
+                        return const SizedBox(height: 16);
+                      }),
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
@@ -990,10 +977,7 @@ class _QbCategoriesTagsDialogState extends State<_QbCategoriesTagsDialog> {
         _error = null;
       });
       // 成功后写入本地缓存
-      await StorageService.instance.saveDownloaderCategories(
-        widget.config.id,
-        cats,
-      );
+      await StorageService.instance.saveDownloaderCategories(widget.config.id, cats);
       await StorageService.instance.saveDownloaderTags(widget.config.id, tags);
     } catch (e) {
       if (!mounted) return;

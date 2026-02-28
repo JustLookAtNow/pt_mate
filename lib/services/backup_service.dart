@@ -152,8 +152,7 @@ class BackupService {
     data['downloaderTagsCache'] = downloaderTagsCache;
 
     // 收集聚合搜索设置
-    final aggregateSearchSettings = await _storageService
-        .loadAggregateSearchSettings();
+    final aggregateSearchSettings = await _storageService.loadAggregateSearchSettings();
     data['aggregateSearchSettings'] = aggregateSearchSettings.toJson();
 
     return BackupData(
@@ -169,8 +168,7 @@ class BackupService {
     try {
       final backup = await createBackup();
       final timestamp = backup.timestamp.toIso8601String().replaceAll(':', '-');
-      final fileName =
-          '$_backupFilePrefix${backup.version}_$timestamp$_backupFileExtension';
+      final fileName = '$_backupFilePrefix${backup.version}_$timestamp$_backupFileExtension';
       final backupContent = jsonEncode(backup.toJson());
 
       String? result;
@@ -218,10 +216,10 @@ class BackupService {
         var json = jsonDecode(content) as Map<String, dynamic>;
 
         // 检查是否需要数据迁移
-        final backupVersion = json['version'] as String? ?? '1.0.0';
-        if (backupVersion != BackupVersion.current) {
-          json = BackupMigrationManager.migrate(json, BackupVersion.current);
-        }
+         final backupVersion = json['version'] as String? ?? '1.0.0';
+         if (backupVersion != BackupVersion.current) {
+           json = BackupMigrationManager.migrate(json, BackupVersion.current);
+         }
 
         return BackupData.fromJson(json);
       }
@@ -243,15 +241,17 @@ class BackupService {
       var migratedData = backup.data;
       if (backup.version != BackupVersion.current) {
         try {
-          final backupDataJson = {'version': backup.version, ...backup.data};
-          final migratedJson = BackupMigrationManager.migrate(
-            backupDataJson,
-            BackupVersion.current,
-          );
-          migratedData = Map<String, dynamic>.from(migratedJson)
-            ..remove('version');
+          final backupDataJson = {
+            'version': backup.version,
+            ...backup.data,
+          };
+          final migratedJson = BackupMigrationManager.migrate(backupDataJson, BackupVersion.current);
+          migratedData = Map<String, dynamic>.from(migratedJson)..remove('version');
         } catch (e) {
-          return BackupRestoreResult(success: false, message: '数据迁移失败: $e');
+          return BackupRestoreResult(
+            success: false,
+            message: '数据迁移失败: $e',
+          );
         }
       }
 
@@ -265,20 +265,14 @@ class BackupService {
 
       // 恢复当前激活的站点ID
       if (migratedData['activeSiteId'] != null) {
-        await _storageService.setActiveSiteId(
-          migratedData['activeSiteId'] as String?,
-        );
+        await _storageService.setActiveSiteId(migratedData['activeSiteId'] as String?);
       }
 
       // 恢复下载器配置
       if (migratedData['downloaderConfigs'] != null) {
-        final downloaderConfigList =
-            migratedData['downloaderConfigs'] as List<dynamic>;
-        final downloaderConfigMaps = downloaderConfigList
-            .cast<Map<String, dynamic>>();
-        final downloaderConfigs = downloaderConfigMaps
-            .map((configMap) => DownloaderConfig.fromJson(configMap))
-            .toList();
+        final downloaderConfigList = migratedData['downloaderConfigs'] as List<dynamic>;
+        final downloaderConfigMaps = downloaderConfigList.cast<Map<String, dynamic>>();
+        final downloaderConfigs = downloaderConfigMaps.map((configMap) => DownloaderConfig.fromJson(configMap)).toList();
 
         // 恢复默认下载器ID
         String? defaultDownloaderId;
@@ -286,16 +280,12 @@ class BackupService {
           defaultDownloaderId = migratedData['defaultDownloaderId'] as String?;
         }
 
-        await _storageService.saveDownloaderConfigs(
-          downloaderConfigs,
-          defaultId: defaultDownloaderId,
-        );
+        await _storageService.saveDownloaderConfigs(downloaderConfigs, defaultId: defaultDownloaderId);
       }
 
       // 恢复下载器密码
       if (migratedData['downloaderPasswords'] != null) {
-        final downloaderPasswords =
-            migratedData['downloaderPasswords'] as Map<String, dynamic>;
+        final downloaderPasswords = migratedData['downloaderPasswords'] as Map<String, dynamic>;
         for (final entry in downloaderPasswords.entries) {
           final clientId = entry.key;
           final password = entry.value as String;
@@ -311,58 +301,45 @@ class BackupService {
           await _storageService.saveThemeMode(prefs['themeMode'] as String);
         }
         if (prefs['dynamicColor'] != null) {
-          await _storageService.saveUseDynamicColor(
-            prefs['dynamicColor'] as bool,
-          );
+          await _storageService.saveUseDynamicColor(prefs['dynamicColor'] as bool);
         }
         if (prefs['seedColor'] != null) {
           await _storageService.saveSeedColor(prefs['seedColor'] as int);
         }
         if (prefs['autoLoadImages'] != null) {
-          await _storageService.saveAutoLoadImages(
-            prefs['autoLoadImages'] as bool,
-          );
+          await _storageService.saveAutoLoadImages(prefs['autoLoadImages'] as bool);
         }
 
         // 恢复默认下载设置
         if (prefs['defaultDownloadSettings'] != null) {
-          final downloadSettings =
-              prefs['defaultDownloadSettings'] as Map<String, dynamic>;
+          final downloadSettings = prefs['defaultDownloadSettings'] as Map<String, dynamic>;
           if (downloadSettings['category'] != null) {
-            await _storageService.saveDefaultDownloadCategory(
-              downloadSettings['category'] as String,
-            );
+            await _storageService.saveDefaultDownloadCategory(downloadSettings['category'] as String);
           }
           if (downloadSettings['tags'] != null) {
             final tags = downloadSettings['tags'] as dynamic;
             if (tags is String) {
               await _storageService.saveDefaultDownloadTags([tags]);
             } else if (tags is List) {
-              await _storageService.saveDefaultDownloadTags(
-                tags.cast<String>(),
-              );
+              await _storageService.saveDefaultDownloadTags(tags.cast<String>());
             }
           }
           if (downloadSettings['savePath'] != null) {
-            await _storageService.saveDefaultDownloadSavePath(
-              downloadSettings['savePath'] as String,
-            );
+            await _storageService.saveDefaultDownloadSavePath(downloadSettings['savePath'] as String);
           }
         }
       }
 
       // 恢复下载器的分类和标签缓存
       if (migratedData['downloaderCategoriesCache'] != null) {
-        final categoriesCache =
-            migratedData['downloaderCategoriesCache'] as Map<String, dynamic>;
+        final categoriesCache = migratedData['downloaderCategoriesCache'] as Map<String, dynamic>;
         for (final entry in categoriesCache.entries) {
           final categories = (entry.value as List).cast<String>();
           await _storageService.saveDownloaderCategories(entry.key, categories);
         }
       }
       if (migratedData['downloaderTagsCache'] != null) {
-        final tagsCache =
-            migratedData['downloaderTagsCache'] as Map<String, dynamic>;
+        final tagsCache = migratedData['downloaderTagsCache'] as Map<String, dynamic>;
         for (final entry in tagsCache.entries) {
           final tags = (entry.value as List).cast<String>();
           await _storageService.saveDownloaderTags(entry.key, tags);
@@ -373,20 +350,24 @@ class BackupService {
       if (migratedData['aggregateSearchSettings'] != null) {
         try {
           final aggregateSearchSettings = AggregateSearchSettings.fromJson(
-            migratedData['aggregateSearchSettings'] as Map<String, dynamic>,
+            migratedData['aggregateSearchSettings'] as Map<String, dynamic>
           );
-          await _storageService.saveAggregateSearchSettings(
-            aggregateSearchSettings,
-          );
+          await _storageService.saveAggregateSearchSettings(aggregateSearchSettings);
         } catch (e) {
           // 如果恢复聚合搜索设置失败，记录错误但不影响整体恢复过程
           // 这样可以确保其他数据的恢复不受影响
         }
       }
 
-      return BackupRestoreResult(success: true, message: '数据恢复成功');
+      return BackupRestoreResult(
+        success: true,
+        message: '数据恢复成功',
+      );
     } catch (e) {
-      return BackupRestoreResult(success: false, message: '恢复失败: $e');
+      return BackupRestoreResult(
+        success: false,
+        message: '恢复失败: $e',
+      );
     }
   }
 
@@ -521,5 +502,8 @@ class BackupRestoreResult {
   final bool success;
   final String message;
 
-  BackupRestoreResult({required this.success, required this.message});
+  BackupRestoreResult({
+    required this.success,
+    required this.message,
+  });
 }

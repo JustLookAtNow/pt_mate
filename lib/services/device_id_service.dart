@@ -4,6 +4,7 @@ import 'storage/storage_service.dart';
 import 'package:uuid/uuid.dart';
 
 class DeviceIdService {
+
   static DeviceIdService? _instance;
   static DeviceIdService get instance => _instance ??= DeviceIdService._();
 
@@ -58,30 +59,19 @@ class DeviceIdService {
 
       if (Platform.isAndroid) {
         AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-        deviceIdentifier =
-            '${androidInfo.model}_${androidInfo.id}_${androidInfo.fingerprint}'
-                .hashCode
-                .toString();
+        deviceIdentifier = '${androidInfo.model}_${androidInfo.id}_${androidInfo.fingerprint}'.hashCode.toString();
       } else if (Platform.isIOS) {
         IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
-        deviceIdentifier =
-            '${iosInfo.model}_${iosInfo.identifierForVendor}_${iosInfo.systemVersion}'
-                .hashCode
-                .toString();
+        deviceIdentifier = '${iosInfo.model}_${iosInfo.identifierForVendor}_${iosInfo.systemVersion}'.hashCode.toString();
       } else if (Platform.isLinux) {
         LinuxDeviceInfo linuxInfo = await deviceInfo.linuxInfo;
-        deviceIdentifier = '${linuxInfo.machineId}_${linuxInfo.name}'.hashCode
-            .toString();
+        deviceIdentifier = '${linuxInfo.machineId}_${linuxInfo.name}'.hashCode.toString();
       } else if (Platform.isMacOS) {
         MacOsDeviceInfo macInfo = await deviceInfo.macOsInfo;
-        deviceIdentifier = '${macInfo.systemGUID}_${macInfo.computerName}'
-            .hashCode
-            .toString();
+        deviceIdentifier = '${macInfo.systemGUID}_${macInfo.computerName}'.hashCode.toString();
       } else if (Platform.isWindows) {
         WindowsDeviceInfo windowsInfo = await deviceInfo.windowsInfo;
-        deviceIdentifier = '${windowsInfo.computerName}_${windowsInfo.userName}'
-            .hashCode
-            .toString();
+        deviceIdentifier = '${windowsInfo.computerName}_${windowsInfo.userName}'.hashCode.toString();
       } else {
         // Web或其他平台
         const uuid = Uuid();

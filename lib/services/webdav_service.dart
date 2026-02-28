@@ -62,8 +62,7 @@ class WebDAVService {
     if (historyStr == null) return [];
 
     try {
-      final list = (jsonDecode(historyStr) as List)
-          .cast<Map<String, dynamic>>();
+      final list = (jsonDecode(historyStr) as List).cast<Map<String, dynamic>>();
       return list.map((json) => WebDAVConfig.fromJson(json)).toList();
     } catch (e) {
       return [];
@@ -90,9 +89,7 @@ class WebDAVService {
   Future<DateTime?> getLastSyncTime() async {
     final prefs = await SharedPreferences.getInstance();
     final timestamp = prefs.getInt(_lastSyncKey);
-    return timestamp != null
-        ? DateTime.fromMillisecondsSinceEpoch(timestamp)
-        : null;
+    return timestamp != null ? DateTime.fromMillisecondsSinceEpoch(timestamp) : null;
   }
 
   Future<void> _setLastSyncTime(DateTime time) async {
@@ -111,9 +108,7 @@ class WebDAVService {
 
     // 检查配置是否发生变化，如果变化则重新创建客户端
     if (_client != null && _currentConfig != null) {
-      final currentPassword = await _storageService.loadWebDAVPassword(
-        _currentConfig!.id,
-      );
+      final currentPassword = await _storageService.loadWebDAVPassword(_currentConfig!.id);
       if (_currentConfig!.serverUrl != config.serverUrl ||
           _currentConfig!.username != config.username ||
           currentPassword != password) {
@@ -136,11 +131,10 @@ class WebDAVService {
     return _client;
   }
 
+
+
   // 连接测试
-  Future<WebDAVTestResult> testConnection([
-    WebDAVConfig? config,
-    String? password,
-  ]) async {
+  Future<WebDAVTestResult> testConnection([WebDAVConfig? config, String? password]) async {
     try {
       final testConfig = config ?? await loadConfig();
       if (testConfig == null) {
@@ -148,8 +142,7 @@ class WebDAVService {
       }
 
       // 获取密码：优先使用传入的密码，否则从安全存储中获取
-      final testPassword =
-          password ?? await _storageService.loadWebDAVPassword(testConfig.id);
+      final testPassword = password ?? await _storageService.loadWebDAVPassword(testConfig.id);
       if (testPassword == null || testPassword.isEmpty) {
         return WebDAVTestResult(success: false, errorMessage: '密码不能为空');
       }
@@ -170,14 +163,11 @@ class WebDAVService {
       String errorMessage = '连接失败';
       if (e.toString().contains('timeout')) {
         errorMessage = '连接超时，请检查服务器地址和网络连接';
-      } else if (e.toString().contains('401') ||
-          e.toString().contains('Unauthorized')) {
+      } else if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
         errorMessage = '用户名或密码错误';
-      } else if (e.toString().contains('404') ||
-          e.toString().contains('Not Found')) {
+      } else if (e.toString().contains('404') || e.toString().contains('Not Found')) {
         errorMessage = '服务器地址不正确或WebDAV服务未启用';
-      } else if (e.toString().contains('SSL') ||
-          e.toString().contains('certificate')) {
+      } else if (e.toString().contains('SSL') || e.toString().contains('certificate')) {
         errorMessage = 'SSL证书验证失败，请检查HTTPS配置';
       } else {
         errorMessage = '连接失败: ${e.toString()}';
@@ -196,8 +186,7 @@ class WebDAVService {
 
       final config = _currentConfig!;
       final now = DateTime.now();
-      final backupFilename =
-          filename ?? 'pt_mate_backup_${now.millisecondsSinceEpoch}.json';
+      final backupFilename = filename ?? 'pt_mate_backup_${now.millisecondsSinceEpoch}.json';
       final remotePath = '${config.remotePath}/$backupFilename';
 
       // 确保远程目录存在
@@ -231,9 +220,7 @@ class WebDAVService {
       if (backupFiles.isEmpty) return null;
 
       // 按修改时间排序，获取最新的备份
-      backupFiles.sort(
-        (a, b) => (b.mTime ?? DateTime(0)).compareTo(a.mTime ?? DateTime(0)),
-      );
+      backupFiles.sort((a, b) => (b.mTime ?? DateTime(0)).compareTo(a.mTime ?? DateTime(0)));
       final latestFile = backupFiles.first;
 
       // 下载最新备份
@@ -258,22 +245,17 @@ class WebDAVService {
       final files = await client.readDir(config.remotePath);
       final backupFiles = files
           .where((file) => file.name?.endsWith('.json') == true)
-          .map(
-            (file) => {
-              'name': file.name,
-              'size': file.size,
-              'modifiedTime': file.mTime,
-              'path': '${config.remotePath}/${file.name}',
-            },
-          )
+          .map((file) => {
+            'name': file.name,
+            'size': file.size,
+            'modifiedTime': file.mTime,
+            'path': '${config.remotePath}/${file.name}',
+          })
           .toList();
 
       // 按修改时间倒序排列
-      backupFiles.sort(
-        (a, b) => (b['modifiedTime'] as DateTime? ?? DateTime(0)).compareTo(
-          a['modifiedTime'] as DateTime? ?? DateTime(0),
-        ),
-      );
+      backupFiles.sort((a, b) => (b['modifiedTime'] as DateTime? ?? DateTime(0))
+          .compareTo(a['modifiedTime'] as DateTime? ?? DateTime(0)));
 
       return backupFiles;
     } catch (e) {

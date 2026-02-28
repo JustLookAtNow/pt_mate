@@ -48,7 +48,8 @@ class AppDrawer extends StatelessWidget {
               ),
             ),
           // 固定菜单模式下添加一些顶部间距
-          if (isFixedSidebar) const SizedBox(height: 16),
+          if (isFixedSidebar)
+            const SizedBox(height: 16),
           _DrawerItem(
             icon: Icons.home_outlined,
             title: '主页',
@@ -62,8 +63,7 @@ class AppDrawer extends StatelessWidget {
                 if (isFixedSidebar) {
                   Navigator.of(context).pushReplacement(
                     PageRouteBuilder(
-                      pageBuilder: (context, animation1, animation2) =>
-                          const HomePage(),
+                      pageBuilder: (context, animation1, animation2) => const HomePage(),
                       settings: const RouteSettings(name: '/'),
                       transitionDuration: Duration.zero,
                       reverseTransitionDuration: Duration.zero,
@@ -93,8 +93,7 @@ class AppDrawer extends StatelessWidget {
                 if (isFixedSidebar) {
                   Navigator.of(context).pushReplacement(
                     PageRouteBuilder(
-                      pageBuilder: (context, animation1, animation2) =>
-                          const AggregateSearchPage(),
+                      pageBuilder: (context, animation1, animation2) => const AggregateSearchPage(),
                       settings: const RouteSettings(name: '/aggregate_search'),
                       transitionDuration: Duration.zero,
                       reverseTransitionDuration: Duration.zero,
@@ -123,8 +122,7 @@ class AppDrawer extends StatelessWidget {
                 if (isFixedSidebar) {
                   Navigator.of(context).pushReplacement(
                     PageRouteBuilder(
-                      pageBuilder: (context, animation1, animation2) =>
-                          const DownloadTasksPage(),
+                      pageBuilder: (context, animation1, animation2) => const DownloadTasksPage(),
                       settings: const RouteSettings(name: '/download_tasks'),
                       transitionDuration: Duration.zero,
                       reverseTransitionDuration: Duration.zero,
@@ -153,8 +151,7 @@ class AppDrawer extends StatelessWidget {
                 if (isFixedSidebar) {
                   Navigator.of(context).pushReplacement(
                     PageRouteBuilder(
-                      pageBuilder: (context, animation1, animation2) =>
-                          const ServerSettingsPage(),
+                      pageBuilder: (context, animation1, animation2) => const ServerSettingsPage(),
                       settings: const RouteSettings(name: '/server_settings'),
                       transitionDuration: Duration.zero,
                       reverseTransitionDuration: Duration.zero,
@@ -183,8 +180,7 @@ class AppDrawer extends StatelessWidget {
                 if (isFixedSidebar) {
                   await Navigator.of(context).pushReplacement(
                     PageRouteBuilder(
-                      pageBuilder: (context, animation1, animation2) =>
-                          const SettingsPage(),
+                      pageBuilder: (context, animation1, animation2) => const SettingsPage(),
                       settings: const RouteSettings(name: '/settings'),
                       transitionDuration: Duration.zero,
                       reverseTransitionDuration: Duration.zero,
@@ -215,8 +211,7 @@ class AppDrawer extends StatelessWidget {
                 if (isFixedSidebar) {
                   Navigator.of(context).pushReplacement(
                     PageRouteBuilder(
-                      pageBuilder: (context, animation1, animation2) =>
-                          const AboutPage(),
+                      pageBuilder: (context, animation1, animation2) => const AboutPage(),
                       settings: const RouteSettings(name: '/about'),
                       transitionDuration: Duration.zero,
                       reverseTransitionDuration: Duration.zero,
@@ -265,9 +260,7 @@ class _DrawerItem extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: isActive
-            ? Theme.of(
-                context,
-              ).colorScheme.primaryContainer.withValues(alpha: 0.3)
+            ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
             : null,
         borderRadius: BorderRadius.circular(8),
       ),

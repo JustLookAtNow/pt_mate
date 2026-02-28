@@ -50,12 +50,9 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
     try {
       final clientsData = await StorageService.instance.loadDownloaderConfigs();
       final defaultId = await StorageService.instance.loadDefaultDownloaderId();
-      final startPaused = await StorageService.instance
-          .loadDefaultDownloadStartPaused();
+      final startPaused = await StorageService.instance.loadDefaultDownloadStartPaused();
 
-      final clients = clientsData
-          .map((data) => DownloaderConfig.fromJson(data))
-          .toList();
+      final clients = clientsData.map((data) => DownloaderConfig.fromJson(data)).toList();
 
       if (mounted) {
         setState(() {
@@ -84,8 +81,9 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
     setState(() => _loading = true);
     try {
       // 优先读取缓存
-      final cachedCategories = await StorageService.instance
-          .loadDownloaderCategories(_selectedClient!.id);
+      final cachedCategories = await StorageService.instance.loadDownloaderCategories(
+        _selectedClient!.id,
+      );
       final cachedTags = await StorageService.instance.loadDownloaderTags(
         _selectedClient!.id,
       );
@@ -146,10 +144,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
         _selectedClient!.id,
         categories,
       );
-      await StorageService.instance.saveDownloaderTags(
-        _selectedClient!.id,
-        tags,
-      );
+      await StorageService.instance.saveDownloaderTags(_selectedClient!.id, tags);
       await StorageService.instance.saveDownloaderPaths(
         _selectedClient!.id,
         paths,
@@ -210,7 +205,9 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
   @override
   Widget build(BuildContext context) {
     final isBatchMode = widget.itemCount != null;
-    final title = isBatchMode ? '批量下载设置 (${widget.itemCount}个项目)' : '下载种子';
+    final title = isBatchMode
+        ? '批量下载设置 (${widget.itemCount}个项目)'
+        : '下载种子';
 
     return AlertDialog(
       title: Text(title),
@@ -228,10 +225,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (!isBatchMode && widget.torrentName != null) ...[
-                  Text(
-                    '种子：${widget.torrentName}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  Text('种子：${widget.torrentName}', style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
                 ],
                 const SizedBox(height: 8),
@@ -242,10 +236,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                       color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
+                    child: Text(_error!, style: const TextStyle(color: Colors.red)),
                   )
                 else if (_clients.isEmpty)
                   const Text('未配置下载器，请先添加下载器配置')
@@ -294,16 +285,15 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
               final screenWidth = MediaQuery.of(context).size.width;
               // 响应式宽度：手机上限制最大宽度，大屏上基于对话框容器宽度计算
               final maxWidth = screenWidth > 600
-                  ? 400.0 *
-                        0.6 // 大屏上使用对话框容器宽度的60%
-                  : 240.0; // 小屏上限制240px
+                  ? 400.0 * 0.6  // 大屏上使用对话框容器宽度的60%
+                  : 240.0;  // 小屏上限制240px
 
               return SizedBox(
                 width: maxWidth,
                 child: Text(
                   client is QbittorrentConfig
-                      ? '${client.name} (${client.host}:${client.port})'
-                      : client.name,
+                    ? '${client.name} (${client.host}:${client.port})'
+                    : client.name,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
@@ -318,16 +308,15 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                   final screenWidth = MediaQuery.of(context).size.width;
                   // 响应式宽度：手机上限制最大宽度，大屏上允许更宽
                   final maxWidth = screenWidth > 600
-                      ? screenWidth *
-                            0.6 // 大屏上使用60%宽度
-                      : 240.0; // 小屏上限制200px
+                      ? screenWidth * 0.6  // 大屏上使用60%宽度
+                      : 240.0;  // 小屏上限制200px
 
                   return SizedBox(
                     width: maxWidth,
                     child: Text(
                       client is QbittorrentConfig
-                          ? '${client.name} (${client.host}:${client.port})'
-                          : client.name,
+                        ? '${client.name} (${client.host}:${client.port})'
+                        : client.name,
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                     ),
@@ -348,6 +337,8 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
           },
         ),
         const SizedBox(height: 16),
+
+
 
         // 分类选择
         Row(
@@ -382,7 +373,10 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
           ),
           isExpanded: true,
           items: [
-            const DropdownMenuItem<String?>(value: null, child: Text('不使用分类')),
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('不使用分类'),
+            ),
             ..._categories.map(
               (cat) => DropdownMenuItem<String?>(
                 value: cat,
@@ -464,19 +458,15 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
         Row(
           children: [
             Expanded(
-              child: Text(
-                '不立即开始（添加后暂停）',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
+              child: Text('不立即开始（添加后暂停）',
+                  style: Theme.of(context).textTheme.titleSmall),
             ),
             Switch(
               value: _startPaused,
               onChanged: (val) async {
                 setState(() => _startPaused = val);
                 // 保存用户偏好以便下次打开默认状态
-                await StorageService.instance.saveDefaultDownloadStartPaused(
-                  val,
-                );
+                await StorageService.instance.saveDefaultDownloadStartPaused(val);
               },
             ),
           ],

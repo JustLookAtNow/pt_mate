@@ -10,12 +10,10 @@ class AggregateSearchSettingsPage extends StatefulWidget {
   const AggregateSearchSettingsPage({super.key});
 
   @override
-  State<AggregateSearchSettingsPage> createState() =>
-      _AggregateSearchSettingsPageState();
+  State<AggregateSearchSettingsPage> createState() => _AggregateSearchSettingsPageState();
 }
 
-class _AggregateSearchSettingsPageState
-    extends State<AggregateSearchSettingsPage> {
+class _AggregateSearchSettingsPageState extends State<AggregateSearchSettingsPage> {
   AggregateSearchSettings _settings = const AggregateSearchSettings();
   List<SiteConfig> _allSites = [];
   bool _loading = true;
@@ -34,9 +32,7 @@ class _AggregateSearchSettingsPageState
 
       // 确保存在默认的"所有站点"配置
       var updatedSettings = settings;
-      final hasAllSitesConfig = settings.searchConfigs.any(
-        (config) => config.isAllSitesType,
-      );
+      final hasAllSitesConfig = settings.searchConfigs.any((config) => config.isAllSitesType);
       if (!hasAllSitesConfig) {
         final defaultConfig = AggregateSearchConfig.createDefaultConfig([]);
         updatedSettings = settings.copyWith(
@@ -56,7 +52,7 @@ class _AggregateSearchSettingsPageState
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
-        NotificationHelper.showError(context, '加载设置失败: $e');
+                NotificationHelper.showError(context, '加载设置失败: $e');
       }
     }
   }
@@ -66,11 +62,11 @@ class _AggregateSearchSettingsPageState
       final storage = Provider.of<StorageService>(context, listen: false);
       await storage.saveAggregateSearchSettings(_settings);
       if (mounted) {
-        NotificationHelper.showInfo(context, '设置已保存');
+                NotificationHelper.showInfo(context, '设置已保存');
       }
     } catch (e) {
       if (mounted) {
-        NotificationHelper.showError(context, '保存设置失败: $e');
+                NotificationHelper.showError(context, '保存设置失败: $e');
       }
     }
   }
@@ -103,7 +99,10 @@ class _AggregateSearchSettingsPageState
               padding: const EdgeInsets.all(16),
               children: [
                 // 搜索线程设置
-                Text('搜索设置', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  '搜索设置',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: 8),
                 Card(
                   child: Padding(
@@ -147,10 +146,9 @@ class _AggregateSearchSettingsPageState
                         ),
                         Text(
                           '同时搜索的站点数量，建议设置为3-5',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.outline,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
                         ),
                       ],
                     ),
@@ -190,116 +188,101 @@ class _AggregateSearchSettingsPageState
                           const SizedBox(height: 16),
                           Text(
                             '暂无搜索配置',
-                            style: Theme.of(context).textTheme.bodyLarge
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.outline,
-                                ),
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             '点击上方"添加配置"按钮创建第一个搜索配置',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.outline,
-                                ),
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
                           ),
                         ],
                       ),
                     ),
                   )
                 else
-                  ...(_settings.searchConfigs.map(
-                    (config) => Card(
-                      child: ListTile(
-                        leading: Icon(
-                          config.isActive ? Icons.search : Icons.search_off,
-                          color: config.isActive
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.outline,
-                        ),
-                        title: Row(
-                          children: [
-                            Text(config.name),
-                            if (config.isAllSitesType) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  '默认',
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onPrimaryContainer,
-                                      ),
+                  ...(_settings.searchConfigs.map((config) => Card(
+                    child: ListTile(
+                      leading: Icon(
+                        config.isActive ? Icons.search : Icons.search_off,
+                        color: config.isActive
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.outline,
+                      ),
+                      title: Row(
+                        children: [
+                          Text(config.name),
+                          if (config.isAllSitesType) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '默认',
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
                                 ),
                               ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      subtitle: Text(config.isAllSitesType
+                          ? '包含所有已配置的站点'
+                          : '${config.enabledSites.length} 个站点'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Switch(
+                            value: config.isActive,
+                            onChanged: (value) => _toggleConfig(config.id, value),
+                          ),
+                          PopupMenuButton<String>(
+                            onSelected: (action) {
+                              switch (action) {
+                                case 'edit':
+                                  _showEditConfigDialog(config);
+                                  break;
+                                case 'delete':
+                                  _deleteConfig(config.id);
+                                  break;
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              if (config.canEdit)
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit),
+                                      SizedBox(width: 8),
+                                      Text('编辑'),
+                                    ],
+                                  ),
+                                ),
+                              if (config.canDelete)
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete),
+                                      SizedBox(width: 8),
+                                      Text('删除'),
+                                    ],
+                                  ),
+                                ),
                             ],
-                          ],
-                        ),
-                        subtitle: Text(
-                          config.isAllSitesType
-                              ? '包含所有已配置的站点'
-                              : '${config.enabledSites.length} 个站点',
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Switch(
-                              value: config.isActive,
-                              onChanged: (value) =>
-                                  _toggleConfig(config.id, value),
-                            ),
-                            PopupMenuButton<String>(
-                              onSelected: (action) {
-                                switch (action) {
-                                  case 'edit':
-                                    _showEditConfigDialog(config);
-                                    break;
-                                  case 'delete':
-                                    _deleteConfig(config.id);
-                                    break;
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                if (config.canEdit)
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.edit),
-                                        SizedBox(width: 8),
-                                        Text('编辑'),
-                                      ],
-                                    ),
-                                  ),
-                                if (config.canDelete)
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.delete),
-                                        SizedBox(width: 8),
-                                        Text('删除'),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                  )),
+                  ))),
               ],
             ),
     );
@@ -363,9 +346,7 @@ class _AggregateSearchSettingsPageState
   }
 
   void _showConfigDialog(AggregateSearchConfig? existingConfig) {
-    final nameController = TextEditingController(
-      text: existingConfig?.name ?? '',
-    );
+    final nameController = TextEditingController(text: existingConfig?.name ?? '');
 
     // 初始化选中的站点ID
     Set<String> selectedSiteIds;
@@ -373,9 +354,7 @@ class _AggregateSearchSettingsPageState
       // 对于"所有站点"配置，默认选中所有站点
       selectedSiteIds = Set<String>.from(_allSites.map((site) => site.id));
     } else {
-      selectedSiteIds = Set<String>.from(
-        existingConfig?.enabledSites.map((site) => site.id) ?? [],
-      );
+      selectedSiteIds = Set<String>.from(existingConfig?.enabledSites.map((site) => site.id) ?? []);
     }
 
     // 存储每个站点的分类选择
@@ -386,9 +365,7 @@ class _AggregateSearchSettingsPageState
       for (final siteItem in existingConfig.enabledSites) {
         final params = siteItem.additionalParams;
         if (params != null && params['selectedCategories'] != null) {
-          siteCategories[siteItem.id] = Set<String>.from(
-            params['selectedCategories'] as List,
-          );
+          siteCategories[siteItem.id] = Set<String>.from(params['selectedCategories'] as List);
         } else {
           siteCategories[siteItem.id] = <String>{};
         }
@@ -415,21 +392,21 @@ class _AggregateSearchSettingsPageState
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text('选择站点和分类', style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  '选择站点和分类',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
                 const SizedBox(height: 8),
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
+                      border: Border.all(color: Theme.of(context).colorScheme.outline),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: ListView(
                       children: _allSites.map((site) {
                         final isSelected = selectedSiteIds.contains(site.id);
-                        final selectedCategories =
-                            siteCategories[site.id] ?? <String>{};
+                        final selectedCategories = siteCategories[site.id] ?? <String>{};
 
                         return ExpansionTile(
                           leading: Checkbox(
@@ -454,74 +431,43 @@ class _AggregateSearchSettingsPageState
                           children: site.searchCategories.isNotEmpty
                               ? [
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 8,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                     child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         if (!isSelected)
                                           Text(
                                             '请先选择站点才能配置分类',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodySmall
-                                                ?.copyWith(
-                                                  color: Theme.of(
-                                                    context,
-                                                  ).colorScheme.outline,
-                                                ),
+                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              color: Theme.of(context).colorScheme.outline,
+                                            ),
                                           )
                                         else ...[
                                           Text(
                                             '选择分类（不选择表示使用所有分类）',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodySmall
-                                                ?.copyWith(
-                                                  color: Theme.of(
-                                                    context,
-                                                  ).colorScheme.outline,
-                                                ),
+                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              color: Theme.of(context).colorScheme.outline,
+                                            ),
                                           ),
                                           const SizedBox(height: 8),
                                           Wrap(
                                             spacing: 8,
                                             runSpacing: 4,
-                                            children: site.searchCategories.map((
-                                              category,
-                                            ) {
-                                              final isCategorySelected =
-                                                  selectedCategories.contains(
-                                                    category.id,
-                                                  );
+                                            children: site.searchCategories.map((category) {
+                                              final isCategorySelected = selectedCategories.contains(category.id);
                                               return FilterChip(
-                                                label: Text(
-                                                  category.displayName,
-                                                ),
+                                                label: Text(category.displayName),
                                                 selected: isCategorySelected,
-                                                onSelected: isSelected
-                                                    ? (selected) {
-                                                        setDialogState(() {
-                                                          if (selected) {
-                                                            selectedCategories
-                                                                .add(
-                                                                  category.id,
-                                                                );
-                                                          } else {
-                                                            selectedCategories
-                                                                .remove(
-                                                                  category.id,
-                                                                );
-                                                          }
-                                                          siteCategories[site
-                                                                  .id] =
-                                                              selectedCategories;
-                                                        });
-                                                      }
-                                                    : null, // 未选中站点时禁用分类选择
+                                                onSelected: isSelected ? (selected) {
+                                                  setDialogState(() {
+                                                    if (selected) {
+                                                      selectedCategories.add(category.id);
+                                                    } else {
+                                                      selectedCategories.remove(category.id);
+                                                    }
+                                                    siteCategories[site.id] = selectedCategories;
+                                                  });
+                                                } : null, // 未选中站点时禁用分类选择
                                               );
                                             }).toList(),
                                           ),
@@ -553,21 +499,16 @@ class _AggregateSearchSettingsPageState
             FilledButton(
               onPressed: () {
                 if (nameController.text.trim().isEmpty) {
-                  NotificationHelper.showError(context, '请输入配置名称');
+                                    NotificationHelper.showError(context, '请输入配置名称');
                   return;
                 }
                 if (selectedSiteIds.isEmpty) {
-                  NotificationHelper.showError(context, '请至少选择一个站点');
+                                    NotificationHelper.showError(context, '请至少选择一个站点');
                   return;
                 }
 
                 Navigator.pop(context);
-                _saveConfig(
-                  existingConfig,
-                  nameController.text.trim(),
-                  selectedSiteIds.toList(),
-                  siteCategories,
-                );
+                _saveConfig(existingConfig, nameController.text.trim(), selectedSiteIds.toList(), siteCategories);
               },
               child: const Text('保存'),
             ),
@@ -577,16 +518,9 @@ class _AggregateSearchSettingsPageState
     );
   }
 
-  void _saveConfig(
-    AggregateSearchConfig? existingConfig,
-    String name,
-    List<String> siteIds,
-    Map<String, Set<String>> siteCategories,
-  ) {
+  void _saveConfig(AggregateSearchConfig? existingConfig, String name, List<String> siteIds, Map<String, Set<String>> siteCategories) {
     final config = AggregateSearchConfig(
-      id:
-          existingConfig?.id ??
-          'config-${DateTime.now().millisecondsSinceEpoch}',
+      id: existingConfig?.id ?? 'config-${DateTime.now().millisecondsSinceEpoch}',
       name: name,
       type: existingConfig?.type ?? 'custom', // 保持原有类型
       enabledSites: siteIds.map((id) {
@@ -608,11 +542,15 @@ class _AggregateSearchSettingsPageState
               .toList();
 
           if (validSelectedCategories.isNotEmpty) {
-            additionalParams = {'selectedCategories': validSelectedCategories};
+            additionalParams = {
+              'selectedCategories': validSelectedCategories};
           }
         }
 
-        return SiteSearchItem(id: id, additionalParams: additionalParams);
+        return SiteSearchItem(
+          id: id,
+          additionalParams: additionalParams,
+        );
       }).toList(),
       isActive: existingConfig?.isActive ?? true,
     );

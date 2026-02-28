@@ -65,22 +65,21 @@ class _AboutPageState extends State<AboutPage> {
             const SizedBox(height: 8),
             Text(
               _version,
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
+              style: const TextStyle(
+                fontSize: 16,
+                color: Colors.grey,
+              ),
             ),
             const SizedBox(height: 16),
             InkWell(
               onTap: () async {
                 try {
-                  final Uri url = Uri.parse(
-                    'https://github.com/JustLookAtNow/pt_mate',
-                  );
+                  final Uri url = Uri.parse('https://github.com/JustLookAtNow/pt_mate');
                   if (await canLaunchUrl(url)) {
                     await launchUrl(url, mode: LaunchMode.externalApplication);
                   } else {
                     // 降级处理：复制URL到剪贴板
-                    await Clipboard.setData(
-                      ClipboardData(text: url.toString()),
-                    );
+                    await Clipboard.setData(ClipboardData(text: url.toString()));
                     if (context.mounted) {
                       NotificationHelper.showInfo(
                         context,

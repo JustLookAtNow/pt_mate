@@ -169,44 +169,39 @@ class MTeamAdapter extends SiteAdapter {
           responseData: data,
         );
       }
-      // 先解析基础资料
-      final baseProfile = _parseMemberProfile(
-        data['data'] as Map<String, dynamic>,
-      );
+    // 先解析基础资料
+    final baseProfile = _parseMemberProfile(data['data'] as Map<String, dynamic>);
 
-      // 追加获取时魔（每小时魔力增长）与做种体积（字节）
-      double? bonusPerHour;
-      int? seedingSizeBytes;
+    // 追加获取时魔（每小时魔力增长）与做种体积（字节）
+    double? bonusPerHour;
+    int? seedingSizeBytes;
 
-      try {
-        final bonusResp = await _dio.post('/api/tracker/mybonus');
-        final bonusData = bonusResp.data as Map<String, dynamic>;
-        if (bonusData['code']?.toString() == '0') {
-          final formulaParams =
-              (bonusData['data'] as Map<String, dynamic>?)?['formulaParams']
-                  as Map<String, dynamic>?;
-          final finalBs = formulaParams?['finalBs'];
-          if (finalBs != null) {
-            bonusPerHour = double.tryParse(finalBs.toString());
-          }
+    try {
+      final bonusResp = await _dio.post('/api/tracker/mybonus');
+      final bonusData = bonusResp.data as Map<String, dynamic>;
+      if (bonusData['code']?.toString() == '0') {
+        final formulaParams = (bonusData['data'] as Map<String, dynamic>?)?['formulaParams'] as Map<String, dynamic>?;
+        final finalBs = formulaParams?['finalBs'];
+        if (finalBs != null) {
+          bonusPerHour = double.tryParse(finalBs.toString());
         }
-      } catch (_) {
-        // 忽略错误，保持为null
       }
+    } catch (_) {
+      // 忽略错误，保持为null
+    }
 
-      try {
-        final seedResp = await _dio.post('/api/tracker/myPeerStatistics');
-        final seedData = seedResp.data as Map<String, dynamic>;
-        if (seedData['code']?.toString() == '0') {
-          final seederSize =
-              (seedData['data'] as Map<String, dynamic>?)?['seederSize'];
-          if (seederSize != null) {
-            seedingSizeBytes = FormatUtil.parseInt(seederSize.toString());
-          }
+    try {
+      final seedResp = await _dio.post('/api/tracker/myPeerStatistics');
+      final seedData = seedResp.data as Map<String, dynamic>;
+      if (seedData['code']?.toString() == '0') {
+        final seederSize = (seedData['data'] as Map<String, dynamic>?)?['seederSize'];
+        if (seederSize != null) {
+          seedingSizeBytes = FormatUtil.parseInt(seederSize.toString());
         }
-      } catch (_) {
-        // 忽略错误，保持为null
       }
+    } catch (_) {
+      // 忽略错误，保持为null
+    }
 
       return MemberProfile(
         username: baseProfile.username,
@@ -292,29 +287,29 @@ class MTeamAdapter extends SiteAdapter {
         );
       }
 
-      final searchData = data['data'] as Map<String, dynamic>;
-      final rawList = (searchData['data'] as List? ?? []);
+    final searchData = data['data'] as Map<String, dynamic>;
+    final rawList = (searchData['data'] as List? ?? []);
 
-      Map<String, dynamic> historyMap = {};
-      Map<String, dynamic> peerMap = {};
+    Map<String, dynamic> historyMap = {};
+    Map<String, dynamic> peerMap = {};
 
-      // Query download history for all torrent IDs
-      if (rawList.isNotEmpty) {
-        try {
-          final tids = rawList.map((e) => (e['id'] ?? '').toString()).toList();
-          final historyData = await queryHistory(tids: tids);
-          historyMap = historyData['historyMap'] as Map<String, dynamic>? ?? {};
-          peerMap = historyData['peerMap'] as Map<String, dynamic>? ?? {};
-        } catch (e) {
-          // If history query fails, continue with empty history
-        }
+    // Query download history for all torrent IDs
+    if (rawList.isNotEmpty) {
+      try {
+        final tids = rawList.map((e) => (e['id'] ?? '').toString()).toList();
+        final historyData = await queryHistory(tids: tids);
+        historyMap = historyData['historyMap'] as Map<String, dynamic>? ?? {};
+        peerMap = historyData['peerMap'] as Map<String, dynamic>? ?? {};
+      } catch (e) {
+        // If history query fails, continue with empty history
       }
+    }
 
-      return _parseTorrentSearchResult(
-        searchData,
-        historyMap: historyMap,
-        peerMap: peerMap,
-      );
+    return _parseTorrentSearchResult(
+      searchData,
+      historyMap: historyMap,
+      peerMap: peerMap,
+    );
     } catch (e) {
       throw ApiExceptionAdapter.wrapError(e, '搜索种子');
     }
@@ -428,6 +423,7 @@ class MTeamAdapter extends SiteAdapter {
       }
     }
 
+
     final id = (json['id'] ?? '').toString();
     DownloadStatus downloadStatus = DownloadStatus.none;
     if (historyMap != null && historyMap.containsKey(id)) {
@@ -464,7 +460,7 @@ class MTeamAdapter extends SiteAdapter {
       imdbRating: (json['imdbRating'] ?? 'N/A').toString(),
       isTop: (toppingLevel ?? 0) > 0,
       tags: nameTags,
-      comments: parseInt(status['comments'] ?? 0),
+      comments: parseInt(status['comments'] ?? 0)
     );
   }
 
@@ -556,11 +552,7 @@ class MTeamAdapter extends SiteAdapter {
   }
 
   @override
-  Future<TorrentCommentList> fetchComments(
-    String id, {
-    int pageNumber = 1,
-    int pageSize = 20,
-  }) async {
+  Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20}) async {
     try {
       final requestData = {
         'type': 'TORRENT',
@@ -588,6 +580,7 @@ class MTeamAdapter extends SiteAdapter {
       throw ApiExceptionAdapter.wrapError(e, '获取评论');
     }
   }
+
 
   @override
   Future<List<SearchCategoryConfig>> getSearchCategories() async {

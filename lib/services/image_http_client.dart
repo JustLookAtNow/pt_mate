@@ -8,21 +8,19 @@ class ImageHttpClient {
   static const int _maxCacheSize = 500; // 最大缓存图片数量
   static const int _maxCacheSizeBytes = 100 * 1024 * 1024; // 最大缓存大小 100MB
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 30),
-      sendTimeout: const Duration(seconds: 30),
-      headers: {
+  final Dio _dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 15),
+    receiveTimeout: const Duration(seconds: 30),
+    sendTimeout: const Duration(seconds: 30),
+    headers: {
         'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
-        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-      },
-    ),
-  );
+      'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+    },
+  ));
 
   // 内存缓存，存储图片数据
   final Map<String, List<int>> _imageCache = {};
@@ -89,7 +87,9 @@ class ImageHttpClient {
       url,
       options: Options(
         responseType: ResponseType.bytes,
-        headers: {'Referer': referer},
+        headers: {
+          'Referer': referer,
+        },
       ),
     );
   }

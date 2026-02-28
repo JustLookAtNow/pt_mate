@@ -7,7 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'device_id_service.dart';
 
 class UpdateService {
-  static const String _baseUrl = 'https://ptmate.fly2sky.dpdns.org';
+  static const String _baseUrl =
+      'https://ptmate.fly2sky.dpdns.org';
   static const String _lastCheckKey = 'last_update_check';
   static const String _betaOptInKey = 'enable_beta_updates';
   static const Duration _checkInterval = Duration(hours: 24); // 24小时检查一次

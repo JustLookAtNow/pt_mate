@@ -114,11 +114,7 @@ class UpdateNotificationDialog extends StatelessWidget {
         // 降级处理：复制URL到剪贴板
         await Clipboard.setData(ClipboardData(text: url.toString()));
         if (context.mounted) {
-          NotificationHelper.showInfo(
-            context,
-            '无法直接打开链接，已复制到剪贴板，请手动粘贴到浏览器',
-            duration: const Duration(seconds: 2),
-          );
+                    NotificationHelper.showInfo(context, '无法直接打开链接，已复制到剪贴板，请手动粘贴到浏览器', duration: const Duration(seconds: 2));
         }
       }
     } catch (e) {
@@ -129,7 +125,7 @@ class UpdateNotificationDialog extends StatelessWidget {
   }
 
   void _showErrorSnackBar(BuildContext context, String message) {
-    NotificationHelper.showError(context, message);
+        NotificationHelper.showError(context, message);
   }
 
   /// 显示更新通知对话框

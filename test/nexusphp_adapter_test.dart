@@ -34,8 +34,7 @@ void main() {
 
       // 验证JWT内容
       final now = DateTime.now();
-      final dateStr =
-          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+      final dateStr = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
       final keyString = passkey + dateStr + userid;
       final keyBytes = utf8.encode(keyString);
       final digest = md5.convert(keyBytes);
@@ -50,55 +49,49 @@ void main() {
         expect(payload['exp'], isA<int>());
 
         // 验证过期时间（应该是当前时间+3600秒）
-        final currentTime = (DateTime.now().millisecondsSinceEpoch / 1000)
-            .floor();
+        final currentTime = (DateTime.now().millisecondsSinceEpoch / 1000).floor();
         final expTime = payload['exp'] as int;
         expect(expTime, greaterThan(currentTime));
         expect(expTime, lessThanOrEqualTo(currentTime + 3600));
+
       } catch (e) {
         fail('JWT verification failed: $e');
       }
     });
 
-    test(
-      'getDownLoadHash should generate different tokens for different inputs',
-      () {
-        const passkey1 = 'passkey1';
-        const passkey2 = 'passkey2';
-        const id = '12345';
-        const userid = '67890';
+    test('getDownLoadHash should generate different tokens for different inputs', () {
+      const passkey1 = 'passkey1';
+      const passkey2 = 'passkey2';
+      const id = '12345';
+      const userid = '67890';
 
-        final token1 = adapter.getDownLoadHash(passkey1, id, userid);
-        final token2 = adapter.getDownLoadHash(passkey2, id, userid);
+      final token1 = adapter.getDownLoadHash(passkey1, id, userid);
+      final token2 = adapter.getDownLoadHash(passkey2, id, userid);
 
-        print('Token for passkey1: $token1');
-        print('Token for passkey2: $token2');
+      print('Token for passkey1: $token1');
+      print('Token for passkey2: $token2');
 
-        // 不同的passkey应该生成不同的token
-        expect(token1, isNot(equals(token2)));
-      },
-    );
+      // 不同的passkey应该生成不同的token
+      expect(token1, isNot(equals(token2)));
+    });
 
-    test(
-      'getDownLoadHash should generate different tokens for different dates',
-      () async {
-        const passkey = 'test_passkey';
-        const id = '12345';
-        const userid = '67890';
+    test('getDownLoadHash should generate different tokens for different dates', () async {
+      const passkey = 'test_passkey';
+      const id = '12345';
+      const userid = '67890';
 
-        final token1 = adapter.getDownLoadHash(passkey, id, userid);
+      final token1 = adapter.getDownLoadHash(passkey, id, userid);
 
-        // 等待一毫秒确保时间不同（虽然日期可能相同）
-        await Future.delayed(const Duration(milliseconds: 1));
+      // 等待一毫秒确保时间不同（虽然日期可能相同）
+      await Future.delayed(const Duration(milliseconds: 1));
 
-        final token2 = adapter.getDownLoadHash(passkey, id, userid);
+      final token2 = adapter.getDownLoadHash(passkey, id, userid);
 
-        print('Token1: $token1');
-        print('Token2: $token2');
+      print('Token1: $token1');
+      print('Token2: $token2');
 
-        // 在同一天内，token应该相同（因为日期格式是Ymd）
-        expect(token1, equals(token2));
-      },
-    );
+      // 在同一天内，token应该相同（因为日期格式是Ymd）
+      expect(token1, equals(token2));
+    });
   });
 }
