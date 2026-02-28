@@ -12,12 +12,22 @@ import '../storage/storage_service.dart';
 ///
 /// 管理下载器配置，提供统一的下载器访问接口
 class DownloaderService {
-  DownloaderService._();
+  final StorageService _storageService;
+
+  DownloaderService._([StorageService? storageService])
+    : _storageService = storageService ?? StorageService.instance;
+
   static final DownloaderService instance = DownloaderService._();
+
+  @visibleForTesting
+  DownloaderService.test({StorageService? storageService})
+    : _storageService = storageService ?? StorageService.instance;
+
   static final Logger _logger = Logger();
 
   /// 配置变更通知流
-  final StreamController<String> _configChangeController = StreamController<String>.broadcast();
+  final StreamController<String> _configChangeController =
+      StreamController<String>.broadcast();
 
   /// 配置变更通知流
   Stream<String> get configChangeStream => _configChangeController.stream;
@@ -54,21 +64,25 @@ class DownloaderService {
       onConfigUpdated: (updatedConfig) async {
         // 当配置更新时（比如获取到版本信息），持久化到存储中
         try {
-          final storageService = StorageService.instance;
-          final configs = await storageService.loadDownloaderConfigs();
-          final currentDefaultId = await storageService.loadDefaultDownloaderId();
+          final configs = await _storageService.loadDownloaderConfigs();
+          final currentDefaultId = await _storageService
+              .loadDefaultDownloaderId();
 
           // 找到对应的配置并更新
-          final configIndex = configs.indexWhere((c) => c['id'] == updatedConfig.id);
+          final configIndex = configs.indexWhere(
+            (c) => c['id'] == updatedConfig.id,
+          );
           if (configIndex != -1) {
             configs[configIndex] = updatedConfig.toJson();
-            await storageService.saveDownloaderConfigs(
+            await _storageService.saveDownloaderConfigs(
               configs.map((c) => DownloaderConfig.fromJson(c)).toList(),
               defaultId: currentDefaultId, // 保留当前的默认下载器ID
             );
 
             if (kDebugMode) {
-              _logger.i('配置已更新并持久化: ${updatedConfig.id}, 版本: ${updatedConfig is QbittorrentConfig ? updatedConfig.version : 'N/A'}');
+              _logger.i(
+                '配置已更新并持久化: ${updatedConfig.id}, 版本: ${updatedConfig is QbittorrentConfig ? updatedConfig.version : 'N/A'}',
+              );
             }
           }
         } catch (e) {
@@ -88,10 +102,7 @@ class DownloaderService {
     required DownloaderConfig config,
     required String password,
   }) async {
-    await DownloaderFactory.testConnection(
-      config: config,
-      password: password,
-    );
+    await DownloaderFactory.testConnection(config: config, password: password);
   }
 
   /// 获取传输信息
@@ -102,7 +113,10 @@ class DownloaderService {
     required DownloaderConfig config,
     required String password,
   }) async {
-    final client = DownloaderFactory.getClient(config: config, password: password);
+    final client = DownloaderFactory.getClient(
+      config: config,
+      password: password,
+    );
     return await client.getTransferInfo();
   }
 
@@ -114,7 +128,10 @@ class DownloaderService {
     required DownloaderConfig config,
     required String password,
   }) async {
-    final client = DownloaderFactory.getClient(config: config, password: password);
+    final client = DownloaderFactory.getClient(
+      config: config,
+      password: password,
+    );
     return await client.getServerState();
   }
 
@@ -128,7 +145,10 @@ class DownloaderService {
     required String password,
     GetTasksParams? params,
   }) async {
-    final client = DownloaderFactory.getClient(config: config, password: password);
+    final client = DownloaderFactory.getClient(
+      config: config,
+      password: password,
+    );
     return await client.getTasks(params);
   }
 
@@ -143,7 +163,10 @@ class DownloaderService {
     required AddTaskParams params,
     SiteConfig? siteConfig,
   }) async {
-    final client = DownloaderFactory.getClient(config: config, password: password);
+    final client = DownloaderFactory.getClient(
+      config: config,
+      password: password,
+    );
     await client.addTask(params, siteConfig: siteConfig);
   }
 
@@ -157,7 +180,10 @@ class DownloaderService {
     required String password,
     required List<String> hashes,
   }) async {
-    final client = DownloaderFactory.getClient(config: config, password: password);
+    final client = DownloaderFactory.getClient(
+      config: config,
+      password: password,
+    );
     await client.pauseTasks(hashes);
   }
 
@@ -171,7 +197,10 @@ class DownloaderService {
     required String password,
     required List<String> hashes,
   }) async {
-    final client = DownloaderFactory.getClient(config: config, password: password);
+    final client = DownloaderFactory.getClient(
+      config: config,
+      password: password,
+    );
     await client.resumeTasks(hashes);
   }
 
@@ -187,7 +216,10 @@ class DownloaderService {
     required List<String> hashes,
     bool deleteFiles = false,
   }) async {
-    final client = DownloaderFactory.getClient(config: config, password: password);
+    final client = DownloaderFactory.getClient(
+      config: config,
+      password: password,
+    );
     await client.deleteTasks(hashes, deleteFiles: deleteFiles);
   }
 
@@ -199,7 +231,10 @@ class DownloaderService {
     required DownloaderConfig config,
     required String password,
   }) async {
-    final client = DownloaderFactory.getClient(config: config, password: password);
+    final client = DownloaderFactory.getClient(
+      config: config,
+      password: password,
+    );
     return await client.getCategories();
   }
 
@@ -211,7 +246,10 @@ class DownloaderService {
     required DownloaderConfig config,
     required String password,
   }) async {
-    final client = DownloaderFactory.getClient(config: config, password: password);
+    final client = DownloaderFactory.getClient(
+      config: config,
+      password: password,
+    );
     return await client.getTags();
   }
 
@@ -223,7 +261,10 @@ class DownloaderService {
     required DownloaderConfig config,
     required String password,
   }) async {
-    final client = DownloaderFactory.getClient(config: config, password: password);
+    final client = DownloaderFactory.getClient(
+      config: config,
+      password: password,
+    );
     return await client.getVersion();
   }
 
@@ -235,7 +276,10 @@ class DownloaderService {
     required DownloaderConfig config,
     required String password,
   }) async {
-    final client = DownloaderFactory.getClient(config: config, password: password);
+    final client = DownloaderFactory.getClient(
+      config: config,
+      password: password,
+    );
     return await client.getPaths();
   }
 
@@ -288,9 +332,11 @@ class DownloaderService {
   Future<void> _saveUpdatedConfig(DownloaderConfig updatedConfig) async {
     try {
       // 加载当前所有配置
-      final allConfigMaps = await StorageService.instance.loadDownloaderConfigs();
-      final allConfigs = allConfigMaps.map((configMap) => DownloaderConfig.fromJson(configMap)).toList();
-      final defaultId = await StorageService.instance.loadDefaultDownloaderId();
+      final allConfigMaps = await _storageService.loadDownloaderConfigs();
+      final allConfigs = allConfigMaps
+          .map((configMap) => DownloaderConfig.fromJson(configMap))
+          .toList();
+      final defaultId = await _storageService.loadDefaultDownloaderId();
 
       // 查找并更新对应的配置
       bool configUpdated = false;
@@ -304,7 +350,7 @@ class DownloaderService {
 
       // 如果找到了配置并且有更新，保存到存储
       if (configUpdated) {
-        await StorageService.instance.saveDownloaderConfigs(
+        await _storageService.saveDownloaderConfigs(
           allConfigs,
           defaultId: defaultId,
         );
@@ -313,9 +359,9 @@ class DownloaderService {
         clearConfigCache(updatedConfig.id);
       }
     } catch (e) {
-       // 保存失败时不抛出异常，避免影响主要功能
-       debugPrint('保存配置失败: $e');
-     }
+      // 保存失败时不抛出异常，避免影响主要功能
+      debugPrint('保存配置失败: $e');
+    }
   }
 
   /// 暂停单个任务
@@ -328,11 +374,7 @@ class DownloaderService {
     required String password,
     required String hash,
   }) async {
-    await pauseTasks(
-      config: config,
-      password: password,
-      hashes: [hash],
-    );
+    await pauseTasks(config: config, password: password, hashes: [hash]);
   }
 
   /// 恢复单个任务
@@ -345,11 +387,7 @@ class DownloaderService {
     required String password,
     required String hash,
   }) async {
-    await resumeTasks(
-      config: config,
-      password: password,
-      hashes: [hash],
-    );
+    await resumeTasks(config: config, password: password, hashes: [hash]);
   }
 
   /// 删除单个任务
