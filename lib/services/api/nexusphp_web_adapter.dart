@@ -14,6 +14,7 @@ import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import '../logging/log_file_service.dart';
+import 'nexusphp_helper.dart';
 
 /// 参数对象，用于 Isolate 搜索解析
 class ParseSearchParams {
@@ -91,11 +92,18 @@ Future<ParsedTorrentResult> _parseSearchResponseInIsolate(
 
 /// NexusPHP Web站点适配器
 /// 用于处理基于Web接口的NexusPHP站点
-class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
+class NexusPHPWebAdapter extends SiteAdapter
+    with BaseWebAdapterMixin, NexusPHPHelper {
   late SiteConfig _siteConfig;
   late Dio _dio;
   Map<String, String>? _discountMapping;
   Map<String, String>? _tagMapping;
+
+  @override
+  Map<String, String>? get tagMapping => _tagMapping;
+
+  @override
+  Map<String, String>? get discountMapping => _discountMapping;
   SiteConfigTemplate? _customTemplate;
   static final Logger _logger = Logger();
   static const int _maxHtmlDumpLength = 200 * 1024; // 200KB 截断
@@ -270,8 +278,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
     }
   }
 
-
-
   /// 从字符串解析标签类型（静态方法）
   static TagType? _staticParseTagType(
     String? str,
@@ -294,8 +300,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
     }
     return null;
   }
-
-
 
   /// 从字符串解析优惠类型（静态方法）
   static DiscountType _staticParseDiscountType(
@@ -329,7 +333,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
 
       // 根据配置提取用户信息
       final userInfo = await _extractUserInfoByConfig(soup, config);
-
 
       // 提取PassKey（如果配置了）
       String? passKey = await _extractPassKeyByConfig();
@@ -498,7 +501,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
     BeautifulSoup soup,
     Map<String, dynamic> config,
   ) async {
-
     final result = <String, String?>{};
 
     // 获取行选择器配置
@@ -895,7 +897,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
       for (final row in rows) {
         final values = await helper.extractFieldValue(row, fieldConfig);
 
-
         for (final val in values) {
           final parsed = FormatUtil.parseInt(val);
           if (parsed != null) {
@@ -980,7 +981,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
             torrentIdConfig,
           );
 
-
           final torrentId = torrentIdList.isNotEmpty ? torrentIdList.first : '';
           if (torrentId.isEmpty) {
             continue; // 种子ID提取失败，跳过当前行
@@ -988,7 +988,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
 
           // 提取其他字段
           final torrentNameList = await helper.extractFieldValue(
-
             row,
             fieldsConfig['torrentName'] as Map<String, dynamic>? ?? {},
           );
@@ -997,13 +996,11 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               : '';
 
           final tagList = await helper.extractFieldValue(
-
             row,
             fieldsConfig['tag'] as Map<String, dynamic>? ?? {},
           );
 
           final descriptionList = await helper.extractFieldValue(
-
             row,
             fieldsConfig['description'] as Map<String, dynamic>? ?? {},
           );
@@ -1012,7 +1009,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               : '';
 
           final discountList = await helper.extractFieldValue(
-
             row,
             fieldsConfig['discount'] as Map<String, dynamic>? ?? {},
           );
@@ -1021,7 +1017,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           final discountEndTimeConfig =
               fieldsConfig['discountEndTime'] as Map<String, dynamic>? ?? {};
           final discountEndTimeList = await helper.extractFieldValue(
-
             row,
             discountEndTimeConfig,
           );
@@ -1032,7 +1027,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               discountEndTimeConfig['time'] as Map<String, dynamic>?;
 
           final seedersTextList = await helper.extractFieldValue(
-
             row,
             fieldsConfig['seedersText'] as Map<String, dynamic>? ?? {},
           );
@@ -1041,7 +1035,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               : '';
 
           final leechersTextList = await helper.extractFieldValue(
-
             row,
             fieldsConfig['leechersText'] as Map<String, dynamic>? ?? {},
           );
@@ -1050,14 +1043,12 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               : '';
 
           final sizeTextList = await helper.extractFieldValue(
-
             row,
             fieldsConfig['sizeText'] as Map<String, dynamic>? ?? {},
           );
           final sizeText = sizeTextList.isNotEmpty ? sizeTextList.first : '';
 
           final downloadStatusTextList = await helper.extractFieldValue(
-
             row,
             fieldsConfig['downloadStatus'] as Map<String, dynamic>? ?? {},
           );
@@ -1080,7 +1071,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               : '';
 
           final coverList = await helper.extractFieldValue(
-
             row,
             fieldsConfig['cover'] as Map<String, dynamic>? ?? {},
           );
@@ -1089,7 +1079,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           final createDateConfig =
               fieldsConfig['createDate'] as Map<String, dynamic>? ?? {};
           final createDateList = await helper.extractFieldValue(
-
             row,
             createDateConfig,
           );
@@ -1100,7 +1089,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               createDateConfig['time'] as Map<String, dynamic>?;
 
           final doubanRatingList = await helper.extractFieldValue(
-
             row,
             fieldsConfig['doubanRating'] as Map<String, dynamic>? ?? {},
           );
@@ -1109,7 +1097,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
               : '';
 
           final imdbRatingList = await helper.extractFieldValue(
-
             row,
             fieldsConfig['imdbRating'] as Map<String, dynamic>? ?? {},
           );
@@ -1119,7 +1106,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
 
           // 提取评论数
           final commentsList = await helper.extractFieldValue(
-
             row,
             fieldsConfig['comments'] as Map<String, dynamic>? ?? {},
           );
@@ -1134,7 +1120,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           bool collection = false;
           if (collectionConfig != null) {
             final collectionList = await helper.extractFieldValue(
-
               row,
               collectionConfig,
             );
@@ -1145,7 +1130,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
           bool isTop = false;
           if (isTopConfig != null) {
             final isTopList = await helper.extractFieldValue(row, isTopConfig);
-
 
             isTop = isTopList.isNotEmpty; // 如果找不到元素说明未置顶
           }
@@ -1411,39 +1395,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
     return '$baseUrl/download.php?downhash=${_siteConfig.userId!}.$jwt';
   }
 
-  /// 生成下载Hash令牌
-  ///
-  /// 参数:
-  /// - [passkey] 站点passkey
-  /// - [id] 种子ID
-  /// - [userid] 用户ID
-  ///
-  /// 返回: JWT编码的下载令牌
-  String getDownLoadHash(String passkey, String id, String userid) {
-    // 生成MD5密钥: md5(passkey + 当前日期(Ymd) + userid)
-    final now = DateTime.now();
-    final dateStr =
-        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-    final keyString = passkey + dateStr + userid;
-    final keyBytes = utf8.encode(keyString);
-    final digest = md5.convert(keyBytes);
-    final key = digest.toString();
-
-    // 创建JWT payload
-    final payload = {
-      'id': id,
-      'exp':
-          (DateTime.now().millisecondsSinceEpoch / 1000).floor() +
-          3600, // 1小时后过期
-    };
-
-    // 使用HS256算法生成JWT
-    final jwt = JWT(payload);
-    final token = jwt.sign(SecretKey(key), algorithm: JWTAlgorithm.HS256);
-
-    return token;
-  }
-
   @override
   Future<Map<String, dynamic>> queryHistory({
     required List<String> tids,
@@ -1588,7 +1539,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
     BeautifulSoup soup,
     Map<String, dynamic> categoriesConfig,
   ) async {
-
     final List<SearchCategoryConfig> categories = [];
 
     // 获取行选择器配置
@@ -1634,7 +1584,6 @@ class NexusPHPWebAdapter extends SiteAdapter with BaseWebAdapterMixin {
         rowElement,
         categoryNameConfig,
       );
-
 
       // 检查是否有有效的字段提取结果
       if (categoryIds.isEmpty && categoryNames.isEmpty) {
