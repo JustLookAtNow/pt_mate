@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:logger/logger.dart';
 
@@ -56,30 +55,33 @@ class Unit3dAdapter extends SiteAdapter {
       if (response.statusCode == 200 && response.data != null) {
         var userData = response.data['data']?[0];
         if (response.data['data'] is List) {
-           for(var user in response.data['data']) {
-             if(user['is_me'] == true) {
-                 userData = user;
-                 break;
-             }
-           }
+          for (var user in response.data['data']) {
+            final attrs = user['attributes'] ?? user;
+            if (user['is_me'] == true || attrs['is_me'] == true) {
+              userData = user;
+              break;
+            }
+          }
         }
 
         if (userData == null) {
           throw const SiteServiceException(message: '未找到当前用户数据');
         }
 
-        final uploaded = (userData['uploaded'] as num?)?.toInt() ?? 0;
-        final downloaded = (userData['downloaded'] as num?)?.toInt() ?? 0;
+        final userAttrs = userData['attributes'] ?? userData;
+        final uploaded = (userAttrs['uploaded'] as num?)?.toInt() ?? 0;
+        final downloaded = (userAttrs['downloaded'] as num?)?.toInt() ?? 0;
 
         return MemberProfile(
-          userId: userData['id']?.toString() ?? '',
-          username: userData['username'] ?? 'Unknown',
+          userId:
+              userData['id']?.toString() ?? userAttrs['id']?.toString() ?? '',
+          username: userAttrs['username'] ?? 'Unknown',
           bonus: 0.0,
-          shareRate: (userData['ratio'] as num?)?.toDouble() ?? 0.0,
+          shareRate: (userAttrs['ratio'] as num?)?.toDouble() ?? 0.0,
           uploadedBytes: uploaded,
           downloadedBytes: downloaded,
           uploadedBytesString: uploaded.toString(),
-          downloadedBytesString: downloaded.toString()
+          downloadedBytesString: downloaded.toString(),
         );
       } else {
         throw SiteServiceException(
@@ -151,42 +153,52 @@ class Unit3dAdapter extends SiteAdapter {
   }
 
   TorrentItem _parseTorrentItem(Map<String, dynamic> item) {
-    String title = item['name'] ?? '';
+    // Unit3D API 字段通常嵌套在 'attributes' 中
+    final attributes = (item['attributes'] as Map<String, dynamic>?) ?? item;
+    final meta = (attributes['meta'] as Map<String, dynamic>?) ?? {};
+
+    String title = attributes['name'] ?? '';
+    String subhead = attributes['subhead'] ?? '';
 
     DateTime publishDate = DateTime.now();
-    if (item['created_at'] != null) {
+    if (attributes['created_at'] != null) {
       try {
-        publishDate = DateTime.parse(item['created_at']);
+        publishDate = DateTime.parse(attributes['created_at']);
       } catch (_) {}
     }
 
     DiscountType discount = DiscountType.normal;
-    if (item['freeleech'] == true) {
-       discount = DiscountType.free;
-    } else if (item['doubleup'] == true) {
-       discount = DiscountType.twoXFree;
+    // 处理 Unit3D 特有的促销字段
+    if (attributes['freeleech'] == true ||
+        attributes['freeleech_type'] == 'Free') {
+      discount = DiscountType.free;
+    } else if (attributes['doubleup'] == true ||
+        attributes['freeleech_type'] == 'Double Up') {
+      discount = DiscountType.twoXFree;
     }
 
     List<TagType> tags = [];
 
     return TorrentItem(
-      id: item['id']?.toString() ?? '',
+      id: item['id']?.toString() ?? attributes['id']?.toString() ?? '',
       name: title,
-      smallDescr: '',
-      sizeBytes: (item['size'] as num?)?.toInt() ?? 0,
+      smallDescr: subhead,
+      sizeBytes: (attributes['size'] as num?)?.toInt() ?? 0,
       createdDate: publishDate,
-      seeders: (item['seeders'] as num?)?.toInt() ?? 0,
-      leechers: (item['leechers'] as num?)?.toInt() ?? 0,
+      seeders: (attributes['seeders'] as num?)?.toInt() ?? 0,
+      leechers: (attributes['leechers'] as num?)?.toInt() ?? 0,
       discount: discount,
       discountEndTime: null,
       tags: tags,
-      cover: item['poster'] ?? '',
+      cover: meta['poster'] ?? attributes['poster'] ?? '',
       imageList: [],
       downloadStatus: DownloadStatus.none,
       collection: false,
       isTop: false,
-      comments: 0,
-      downloadUrl: item['download_link'] ?? '${_siteConfig.baseUrl}/api/torrents/download/${item['id']}',
+      comments: (attributes['comments'] as num?)?.toInt() ?? 0,
+      downloadUrl:
+          attributes['download_link'] ??
+          '${_siteConfig.baseUrl}/api/torrents/download/${item['id'] ?? attributes['id']}',
     );
   }
 
@@ -196,12 +208,13 @@ class Unit3dAdapter extends SiteAdapter {
        final response = await _dio.get('/api/torrents/$id');
 
        if (response.statusCode == 200 && response.data != null) {
-           final data = response.data['data'] ?? response.data;
+        final item = response.data['data'] ?? response.data;
+        final attributes = item['attributes'] ?? item;
 
-           return TorrentDetail(
-              descr: data['description'] ?? '',
-              descrHtml: data['description'] ?? '',
-           );
+        return TorrentDetail(
+          descr: attributes['description'] ?? '',
+          descrHtml: attributes['description'] ?? '',
+        );
        } else {
            throw SiteServiceException(message: '获取种子详情失败');
        }
@@ -269,11 +282,12 @@ class Unit3dAdapter extends SiteAdapter {
            List<SearchCategoryConfig> categories = [];
            var data = response.data;
            if(data['data'] is List) {
-               for(var cat in data['data']) {
+          for (var cat in data['data']) {
+            final attrs = cat['attributes'] ?? cat;
                    categories.add(SearchCategoryConfig(
-                       id: cat['id'].toString(),
-                       displayName: cat['name'] ?? '',
-                       parameters: 'categories[]=${cat['id']}',
+                id: (cat['id'] ?? attrs['id']).toString(),
+                displayName: attrs['name'] ?? '',
+                parameters: 'categories[]=${cat['id'] ?? attrs['id']}',
                    ));
                }
            }
