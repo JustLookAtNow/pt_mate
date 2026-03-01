@@ -2071,12 +2071,11 @@ class _SiteEditPageState extends State<SiteEditPage> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // 如果搜索分类为空，先重置分类配置
-    if (_searchCategories.isEmpty) {
+    // 仅在分类搜索功能开启时，如果搜索分类为空，先重置分类配置
+    if (_siteFeatures.supportCategories && _searchCategories.isEmpty) {
       setState(() {
         _loading = true;
         _error = null;
-
       });
 
       try {
@@ -2101,81 +2100,93 @@ class _SiteEditPageState extends State<SiteEditPage> {
     });
 
     try {
-      // 先验证连接并获取用户信息
       await ApiService.instance.setActiveSite(site);
-      final profile = await ApiService.instance.fetchMemberProfile();
 
-      // 创建包含userId、passKey和authKey的最终站点配置
-      // 优先使用用户填写的passKey，如果没有填写则使用从fetchMemberProfile获取的
-      final userPassKey = _passKeyController.text.trim();
-      final finalPassKey = userPassKey.isNotEmpty
-          ? userPassKey
-          : profile.passKey;
-      final finalSite = site.copyWith(
-        userId: profile.userId,
-        passKey: finalPassKey,
-        authKey: profile.authKey, // Gazelle类型站点需要authKey用于下载
-      );
+      final SiteConfig finalSite;
+      if (_siteFeatures.supportMemberProfile) {
+        // 用户资料功能开启时，验证连接并获取用户信息
+        final profile = await ApiService.instance.fetchMemberProfile();
+
+        // 创建包含userId、passKey和authKey的最终站点配置
+        // 优先使用用户填写的passKey，如果没有填写则使用从fetchMemberProfile获取的
+        final userPassKey = _passKeyController.text.trim();
+        final finalPassKey = userPassKey.isNotEmpty
+            ? userPassKey
+            : profile.passKey;
+        finalSite = site.copyWith(
+          userId: profile.userId,
+          passKey: finalPassKey,
+          authKey: profile.authKey, // Gazelle类型站点需要authKey用于下载
+        );
+      } else {
+        // 用户资料功能关闭时，直接使用当前配置保存
+        final userPassKey = _passKeyController.text.trim();
+        finalSite = site.copyWith(
+          passKey: userPassKey.isNotEmpty ? userPassKey : null,
+        );
+      }
 
       if (widget.site != null) {
         await StorageService.instance.updateSiteConfig(finalSite);
 
-        // 同步更新聚合搜索配置，移除已删除的分类
-        final storage = StorageService.instance;
-        final aggregateSettings = await storage.loadAggregateSearchSettings();
-        bool settingsChanged = false;
+        // 仅在分类搜索功能开启时，同步更新聚合搜索配置，移除已删除的分类
+        if (_siteFeatures.supportCategories) {
+          final storage = StorageService.instance;
+          final aggregateSettings = await storage.loadAggregateSearchSettings();
+          bool settingsChanged = false;
 
-        final updatedConfigs = aggregateSettings.searchConfigs.map((config) {
-          // 检查该配置是否包含当前站点
-          final siteIndex = config.enabledSites.indexWhere(
-            (s) => s.id == finalSite.id,
-          );
-          if (siteIndex == -1) return config;
+          final updatedConfigs = aggregateSettings.searchConfigs.map((config) {
+            // 检查该配置是否包含当前站点
+            final siteIndex = config.enabledSites.indexWhere(
+              (s) => s.id == finalSite.id,
+            );
+            if (siteIndex == -1) return config;
 
-          final siteItem = config.enabledSites[siteIndex];
-          final selectedCategories =
-              siteItem.additionalParams?['selectedCategories'] as List?;
+            final siteItem = config.enabledSites[siteIndex];
+            final selectedCategories =
+                siteItem.additionalParams?['selectedCategories'] as List?;
 
-          if (selectedCategories != null && selectedCategories.isNotEmpty) {
-            // 获取当前站点所有有效的分类ID
-            final validCategoryIds = finalSite.searchCategories
-                .map((c) => c.id)
-                .toSet();
-            // 过滤掉不存在的分类
-            final validSelectedCategories = selectedCategories
-                .where((c) => validCategoryIds.contains(c))
-                .toList();
+            if (selectedCategories != null && selectedCategories.isNotEmpty) {
+              // 获取当前站点所有有效的分类ID
+              final validCategoryIds = finalSite.searchCategories
+                  .map((c) => c.id)
+                  .toSet();
+              // 过滤掉不存在的分类
+              final validSelectedCategories = selectedCategories
+                  .where((c) => validCategoryIds.contains(c))
+                  .toList();
 
-            // 如果分类数量发生了变化，说明有分类被删除了
-            if (validSelectedCategories.length != selectedCategories.length) {
-              settingsChanged = true;
+              // 如果分类数量发生了变化，说明有分类被删除了
+              if (validSelectedCategories.length != selectedCategories.length) {
+                settingsChanged = true;
 
-              final Map<String, dynamic>? newParams;
-              if (validSelectedCategories.isNotEmpty) {
-                newParams = {'selectedCategories': validSelectedCategories};
-              } else {
-                newParams = null;
+                final Map<String, dynamic>? newParams;
+                if (validSelectedCategories.isNotEmpty) {
+                  newParams = {'selectedCategories': validSelectedCategories};
+                } else {
+                  newParams = null;
+                }
+
+                final newSiteItem = siteItem.copyWith(
+                  additionalParams: newParams,
+                );
+                final newEnabledSites = List<SiteSearchItem>.from(
+                  config.enabledSites,
+                );
+                newEnabledSites[siteIndex] = newSiteItem;
+
+                return config.copyWith(enabledSites: newEnabledSites);
               }
-
-              final newSiteItem = siteItem.copyWith(
-                additionalParams: newParams,
-              );
-              final newEnabledSites = List<SiteSearchItem>.from(
-                config.enabledSites,
-              );
-              newEnabledSites[siteIndex] = newSiteItem;
-
-              return config.copyWith(enabledSites: newEnabledSites);
             }
+
+            return config;
+          }).toList();
+
+          if (settingsChanged) {
+            await storage.saveAggregateSearchSettings(
+              aggregateSettings.copyWith(searchConfigs: updatedConfigs),
+            );
           }
-
-          return config;
-        }).toList();
-
-        if (settingsChanged) {
-          await storage.saveAggregateSearchSettings(
-            aggregateSettings.copyWith(searchConfigs: updatedConfigs),
-          );
         }
 
         // 更新现有站点后，如果是当前活跃站点，需要重新初始化适配器
