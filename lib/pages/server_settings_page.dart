@@ -720,18 +720,23 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   Widget _buildSiteList() {
     return Expanded(
       child: _reorderMode
-          ? ReorderableListView.builder(
-              buildDefaultDragHandles: false,
-              padding: const EdgeInsets.all(16),
-              itemCount: _sites.length,
-              onReorder: (oldIndex, newIndex) {
-                setState(() {
-                  if (newIndex > oldIndex) newIndex -= 1;
-                  final item = _sites.removeAt(oldIndex);
-                  _sites.insert(newIndex, item);
-                });
-              },
-              itemBuilder: (context, index) => _buildSiteItem(index),
+          ? CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverReorderableList(
+                    itemBuilder: (context, index) => _buildSiteItem(index),
+                    itemCount: _sites.length,
+                    onReorder: (oldIndex, newIndex) {
+                      setState(() {
+                        if (newIndex > oldIndex) newIndex -= 1;
+                        final item = _sites.removeAt(oldIndex);
+                        _sites.insert(newIndex, item);
+                      });
+                    },
+                  ),
+                ),
+              ],
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -739,7 +744,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
               itemBuilder: (context, index) {
                 final site = _filteredSites[index];
                 final isActive = site.id == _activeSiteId;
-                return _buildSiteCard(site, isActive);
+                return _buildSiteCard(site, isActive, index);
               },
             ),
     );
@@ -768,6 +773,27 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: ListTile(
+          leading: Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isActive
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : Theme.of(context).colorScheme.secondaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '${index + 1}',
+              style: TextStyle(
+                color: isActive
+                    ? Theme.of(context).colorScheme.onPrimaryContainer
+                    : Theme.of(context).colorScheme.onSecondaryContainer,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           title: Text(site.name, overflow: TextOverflow.ellipsis),
           subtitle: Text(
             site.baseUrl,
@@ -822,7 +848,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     );
   }
 
-  Widget _buildSiteCard(SiteConfig site, bool isActive) {
+  Widget _buildSiteCard(SiteConfig site, bool isActive, int index) {
     final Color? siteColor = site.siteColor != null
         ? Color(site.siteColor!)
         : null;
@@ -868,6 +894,36 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
+                                Container(
+                                  width: 28,
+                                  height: 28,
+                                  alignment: Alignment.center,
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                    color: isActive
+                                        ? Theme.of(
+                                            context,
+                                          ).colorScheme.primaryContainer
+                                        : Theme.of(
+                                            context,
+                                          ).colorScheme.secondaryContainer,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: TextStyle(
+                                      color: isActive
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.onPrimaryContainer
+                                          : Theme.of(
+                                              context,
+                                            ).colorScheme.onSecondaryContainer,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                                 CircleAvatar(
                                   radius: 14,
                                   backgroundColor: isActive
