@@ -271,6 +271,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
           _loadTasks();
                     NotificationHelper.showInfo(context, '刷新任务列表');
         },
+        tooltip: '刷新任务列表',
         child: const Icon(Icons.refresh),
       ),
     );
@@ -351,6 +352,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear, size: 16),
+                              tooltip: '清除搜索',
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() {
@@ -725,12 +727,14 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                     size: 20,
                     color: Theme.of(context).colorScheme.primary,
                   ),
+                  tooltip: isPaused ? '继续' : '暂停',
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   padding: EdgeInsets.zero,
                   onPressed: () => isPaused ? _resumeTask(task.hash) : _pauseTask(task.hash),
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                  tooltip: '删除任务',
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   padding: EdgeInsets.zero,
                   onPressed: () => _confirmDelete(task),
