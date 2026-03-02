@@ -2884,7 +2884,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
               const SizedBox(height: 8),
 
               // 查询分类配置（只有在用户做出选择时才显示）
-              if (_hasUserMadeSelection)
+              if (_hasUserMadeSelection && _siteFeatures.supportCategories)
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
