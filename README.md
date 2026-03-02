@@ -1,341 +1,62 @@
 # PT Mate（PT伴侣）
 
-基于 Flutter（Material Design 3）开发的私有种子站点客户端，支持多种PT站点的种子浏览、搜索和下载管理。目前支持M-Team和NexusPHP类型的站点。
+基于 Flutter（Material Design 3）开发的私有种子站点客户端，支持多种 PT 站点的种子浏览、搜索和下载管理。
 
----
+📣 官方交流群（Telegram）：[加入 PT Mate 官方交流群](https://t.me/pt_mate)
 
-📣 **官方交流群（Telegram）**
+## 功能概览
 
-[加入 PT Mate 官方交流群](https://t.me/pt_mate) 来获取最新公告、功能讨论与使用帮助。
+- 种子浏览、搜索、详情、收藏、批量操作
+- 多网站聚合搜索
+- 下载器集成（qBittorrent / Transmission）
+- 本地中转下载
+- 数据备份与恢复（含 WebDAV）
 
----
-## 功能特性
+## 当前支持的网站类型
 
-### 核心功能
-- **种子浏览**：支持按分类（综合/电影/电视）浏览最新种子资源
-- **种子收藏**：支持收藏种子，方便后续查看和管理
-- **搜索功能**：关键词搜索，支持分类筛选
-- **动态查询条件**：支持自定义搜索分类和查询参数，灵活配置搜索条件，相当于变相支持了高级搜索
-- **聚合搜索**: 支持多网站多线程聚合搜索
-- **种子详情**：查看种子详细信息、截图预览、文件列表
-- **批量操作**：支持批量收藏和下载种子，长按触发
-- **下载管理**：集成 qBittorrent 与 Transmission，支持一键下载到远程下载器
-- **本地中转**：支持本地中转模式，先下载种子文件再提交给下载器
+- `M-Team`
+- `NexusPHP`
+- `NexusPHPWeb`
+- `RousiPro`
+- `Unit3D`
 
-### 下载器集成
-- **多下载器管理**：支持添加、编辑、删除多个下载器实例（qBittorrent、Transmission）
-- **连接测试**：自动验证下载器连接状态
-- **分类标签**：自动获取下载器的分类和标签配置
-- **实时状态**：显示下载器的上传/下载速度和剩余空间
+## 当前支持的网站
 
-### 用户体验
-- **Material Design 3**：现代化的界面设计
-- **响应式布局**：适配不同屏幕尺寸
-- **图片查看器**：支持缩放、平移的全屏图片浏览
-- **安全存储**：敏感信息（Passkey、密码）安全加密存储
-- **数据备份与恢复**：支持导出应用配置和数据到本地文件，支持webdav
+以下清单基于 `assets/sites/*.json`（共 34 个）：
 
-### 截图
+- `M-Team`（1）：M-Team
+- `NexusPHP`（13）：藏宝阁、天枢、自由农场、好学、垃圾堆、幸运、momentpt、PTFans、PT GTK、PTSKit、PTZone、肉丝、织梦
+- `NexusPHPWeb`（18）：AFUN、末日、Audiences、比特校园、财神、FRDS、HDDolby、HDFans、麒麟、HHanClub、老师、OurBits、青蛙、SSD、TTG、U2Share、UBits、星陨阁
+- `RousiPro`（1）：肉丝Pro(beta)
+- `Unit3D`（1）：MonikaDesign
+
+## 截图预览
+
 <p align="center">
-  <img src="screenshots/1.jpg" width="300" alt="截图1">
-  <img src="screenshots/2.jpg" width="300" alt="截图2">
-  <img src="screenshots/3.jpg" width="300" alt="截图3">
+  <img src="screenshots/1.png" width="600" alt="截图1">
+  <img src="screenshots/2.png" width="300" alt="截图2">
+  <img src="screenshots/3.png" width="300" alt="截图3">
 </p>
-
-
-## 使用说明
-
-### 移动设备左滑操作
-
-在移动设备上，您可以通过左滑种子列表项来快速访问常用操作：
-
-#### 可用操作
-- **收藏/取消收藏**：左滑后点击心形图标可以收藏或取消收藏种子
-- **下载**：左滑后点击下载图标可以直接下载种子到配置的下载器
-
-#### 操作说明
-1. 在种子列表中，向左滑动任意种子项
-2. 滑动后会显示操作按钮（收藏和下载）
-3. 点击对应按钮执行相应操作
-4. 点击列表其他区域或向右滑动可以隐藏操作按钮
-
-> **提示**：左滑操作在聚合搜索和普通搜索页面都可以使用，让您在移动设备上更便捷地管理种子。
-
-### 日志与诊断
-
-为便于问题定位，应用支持将日志写入本地文件并通过系统分享导出。
-
-#### 开启日志记录
-- 进入 `设置 → 日志与诊断`
-- 打开 `记录日志到本地文件`
-- 日志将按天写入应用私有目录（Android/iOS 无需额外存储权限）
-
-#### 导出日志
-- 进入 `设置 → 日志与诊断 → 导出日志`
-- 选择 `分享最新日志文件`，通过系统分享面板发送给开发者
-- 如需查看路径，选择 `显示日志目录路径`
-
-#### 常见问题
-- 未看到日志文件：请确认已开启 `记录日志到本地文件`，并在出现问题后停留片刻以便写入。
-- Web 不支持落盘：Web 端因浏览器限制不写入日志文件，可在控制台查看。
-
-#### Web 调试（仅 NexusPHP Web）
-- 作用：在局域网启动一个本地调试页面，用于快速验证 NexusPHP Web 站点的提取规则与搜索行为。
-- 开启方式：进入 `设置 → 日志与诊断 → Web 调试`，打开后会显示访问地址（例如：`http://<设备IP>:8833/`）。
-- 访问与输入：在浏览器打开该地址，页面包含 3 个输入框：
-  - 站点地址：目标站点的 `baseUrl`（例如 `https://example.com`）
-  - Cookie：登录后的认证 Cookie（如 `uid=...; pass=...`）
-  - 详细配置：在这里编写你的完整网站提取配置。
-- 测试内容：点击“测试”后会初始化 NexusPHP Web 实例，依次调用并返回结果：
-  - `fetchMemberProfile`（用户资料）
-  - `getSearchCategories`（分类列表）
-  - `searchTorrents`（仅展示前 3 条）
-- 模板优先级：页面粘贴的模板优先于预置模板，避免缓存影响；不填时才使用默认提取规则。
-- 注意事项：
-  - 仅支持非 Web 构建（Android/iOS/桌面），Web 构建无法启动本地服务
-  - 调试服务只用于局域网测试，不会写入 Cookie 到日志
-  - 若下载链接需要 `passKey`/`userId`，会在 `fetchMemberProfile` 后临时填充，便于后续链接替换
-  - 端口占用会自动回退为系统分配端口，地址以设置页提示为准
-  - 调试页面启用了基础 CORS 以便跨设备访问
-
-### 动态查询条件配置
-
-应用支持自定义搜索分类和查询参数，让您可以根据需要灵活配置搜索条件。
-
-#### 配置步骤
-1. 进入应用设置页面
-2. 找到「搜索分类配置」部分
-3. 可以点击获取让程序自动获取现有的分类信息
-4. 也可以自定义：点击「添加分类」或编辑现有分类
-5. 配置分类信息：
-   - **显示名称**：在下拉框中显示的分类名称
-   - **查询参数**：搜索时使用的参数配置
-
-#### 参数格式
-
-支持两种参数格式：
-
-**推荐格式：JSON**
-```json
-{"mode":"normal","teams":["44","9","43"]}
-```
-
-**兼容格式：键值对（分号分隔）**
-```
-mode:"normal";teams:["44","9","43"]
-```
-
-#### 参数说明(m-team)
-- `mode`：搜索模式（如 "normal"、"movie" 等）
-- `teams`：制作组ID数组
-- `categories`：分类ID数组 （数组格式，如：["407", "420"]）
-- `discount`：促销（如 "FREE"、"PERCENT_50" 等）
-- 
-#### 参数说明(nexus php api)
-- 直接看接口文档：[NexusPHP API 文档](https://s.apifox.cn/43608c09-bab0-4e2e-9a56-77ffa629c8e0/api-87956324)
-#### 参数说明(nexus php api)
-- 在浏览器中过滤好你的条件打开想要展示的内容，然后观察地址栏的url，最终将请求参数转为json格式。
-- 例如：`https://nexusphp.org/torrents.php?cat=404&inclbookmarked=0&incldead=1&spstate=0&seeders_begin=1&seeders_end=1&page=0`
-- category参数（特别）：它的格式是`分区#分类id`，所以首先观察请求地址是torrents.php还是special.php
-  - 如果是torrents.php，那么category参数的格式就是`narmal#分类id`
-  - 如果是special.php，那么category参数的格式就是`special#分类id`
-  - 这里要注意下分类id前面要加上cat三个字母，例如：`cat407`。举个完整点的例子，如果请求地址为`torrents.php?cat=403`那category的值就是`normal#cat403`
-  - 特殊情况：无分类，这时看一下分区，如果是torrents.php那么可以直接不传category字段，如果是special分区则必须传category字段，值为`special#`
-- 其他参数： 直接按键值对转换就行，如：`{"inclbookmarked":"0","incldead":"1","spstate":"0","seeders_begin":"1","seeders_end":"1"}`
-- 最终的转换结果就是：
-  ```json
-  {"category":"normal#cat404","inclbookmarked":"0","incldead":"1","spstate":"0","seeders_begin":"1","seeders_end":"1"}
-  ```
-- 最后实在看不懂上面的说明也可以使用ai，将你的页面地址还有上面的参数说明一起输入，让ai帮助你生成你要的参数。
-  比如：`我当前的地址是http://xxx，请帮我按以下说明转为json格式。(把上面的说明复制进去)`。
-
-#### 特别注意
-> m-team 的 pageNumber、pageSize、keyword、onlyFav 以及 nexusPHP 的 page、pageSize、search、inclbookmarked 这几个参数不能自定义配置，因为这几个参数是用来动态设置用来分页以及查询的，自定义配置会导致查询结果及分页错误。
-
-#### 使用示例（m-team）
-
-**电影分类配置**
-```json
-{"mode":"movie"}
-```
-
-**特定制作组配置**
-```json
-{"mode":"normal","teams":["44","9"]}
-```
-
-**免费筛选配置**
-```json
-{"mode":"normal","discount":"FREE"}
-```
-
-配置完成后，在主页面的分类下拉框中选择对应分类即可使用自定义的查询条件进行搜索。
-
-### NexusPHP Web 类型站点使用说明
-
-对于 NexusPHP Web 类型的站点，应用会弹出内置的登录界面供用户完成登录认证。
-
-#### 登录流程
-1. 选择 NexusPHP Web 类型站点后，应用会自动弹出登录界面
-2. 在弹出的界面中输入用户名和密码完成登录
-3. 登录成功后，应用会自动获取必要的 Cookie 信息
-4. 正常情况下登录界面会自动关闭
-
-#### 手动关闭登录界面
-如果登录已完成但界面长时间没有自动关闭，您可以：
-- 点击登录界面右上角的关闭按钮手动关闭
-- 手动关闭不会影响 Cookie 的获取和保存
-- 关闭后即可正常使用站点功能
-
-## 项目结构
-
-```
-lib/
-├── app.dart                        # 应用入口、路由配置
-├── main.dart                       # 主函数
-├── models/
-│   └── app_models.dart             # 数据模型定义
-├── pages/
-│   ├── about_page.dart             # 关于页面
-│   ├── aggregate_search_page.dart  # 聚合搜索页面
-│   ├── aggregate_search_settings_page.dart # 聚合搜索设置页面
-│   ├── backup_restore_page.dart    # 备份恢复页面
-│   ├── download_tasks_page.dart    # 下载任务页面
-│   ├── downloader_settings_page.dart # 下载器设置页面
-│   ├── server_settings_page.dart   # 服务器设置页面
-│   ├── settings_page.dart          # 设置页面
-│   └── torrent_detail_page.dart    # 种子详情页面
-├── providers/
-│   └── aggregate_search_provider.dart # 聚合搜索状态管理
-├── services/
-│   ├── api/                        # API 服务
-│   │   ├── api_service.dart        # API 服务基类
-│   │   ├── mteam_adapter.dart      # M-Team 适配器
-│   │   ├── nexusphp_adapter.dart   # NexusPHP 适配器
-│   │   ├── nexusphp_web_adapter.dart # NexusPHP Web 适配器
-│   │   └── site_adapter.dart       # 站点适配器基类
-│   ├── downloader/                 # 下载器相关
-│   │   ├── downloader_client.dart  # 下载器客户端基类
-│   │   ├── downloader_config.dart  # 下载器配置
-│   │   ├── downloader_factory.dart # 下载器工厂
-│   │   ├── downloader_models.dart  # 下载器数据模型
-│   │   ├── downloader_service.dart # 下载器服务
-│   │   ├── qbittorrent_client.dart # qBittorrent 客户端
-│   │   └── transmission_client.dart # Transmission 客户端
-│   ├── storage/                    # 存储服务
-│   │   └── storage_service.dart    # 本地存储服务
-│   ├── theme/                      # 主题服务
-│   │   └── theme_manager.dart      # 主题管理
-│   ├── aggregate_search_service.dart # 聚合搜索服务
-│   ├── backup_service.dart         # 备份恢复服务
-│   ├── image_http_client.dart      # 图片加载客户端
-│   ├── site_config_service.dart    # 站点配置服务
-│   └── webdav_service.dart         # WebDAV 服务
-├── utils/
-│   ├── backup_migrators.dart       # 备份数据迁移器
-│   ├── downloader_utils.dart       # 下载器工具函数
-│   └── format.dart                 # 格式化工具函数
-└── widgets/
-    ├── app_drawer.dart             # 应用侧边栏
-    ├── cached_network_image.dart   # 缓存网络图片组件
-    ├── nexusphp_web_login.dart     # NexusPHP Web 登录组件
-    ├── qb_speed_indicator.dart     # qBittorrent 速度指示器
-    ├── responsive_layout.dart      # 响应式布局组件
-    ├── server_settings_back_button.dart # 服务器设置返回按钮
-    ├── torrent_download_dialog.dart # 种子下载对话框
-    └── torrent_list_item.dart      # 种子列表项组件
-```
-
-## 技术栈
-
-- **Flutter**: 跨平台移动应用框架
-- **Provider**: 状态管理
-- **Dio**: HTTP 客户端
-- **SharedPreferences**: 本地配置存储
-- **FlutterSecureStorage**: 敏感信息安全存储
-- **DeviceFrame**: 设备预览框架
 
 ## 快速开始
 
-### 环境要求
-- Flutter SDK 3.0+
-- Dart SDK 3.0+
-- Android Studio / VS Code
-
-### 安装依赖
 ```bash
 flutter pub get
-```
-如果你新增了网站配置，请手动运行`generate_sites_manifest.sh`脚本来更新站点清单文件，
-或者把以下内容写到你的`.git/hooks/pre-commit`文件中：
-```bash
-#!/bin/sh
-
-# 检查 assets 目录下是否有变动
-if git diff --cached --name-only | grep -q ^assets/; then
-    echo "检测到 assets 目录变动，执行 generate_sites_manifest.sh..."
-    
-    # 执行脚本
-    ./generate_sites_manifest.sh
-    if [ $? -ne 0 ]; then
-        echo "generate_sites_manifest.sh 执行失败，提交已取消。"
-        exit 1
-    fi
-
-    # 自动把生成的文件加入本次 commit
-    if [ -f assets/sites_manifest.json ]; then
-        git add assets/sites_manifest.json
-        echo "assets/sites_manifest.json 已加入本次提交。"
-    else
-        echo "警告: assets/sites_manifest.json 没有生成！"
-    fi
-fi
-
-exit 0
-```
-### 运行应用
-```bash
-# 调试模式
 flutter run
-
-# 发布模式
-flutter run --release
 ```
 
-### 构建 APK
-```bash
-# 调试版本
-flutter build apk --debug
+## 文档
 
-# 发布版本
-flutter build apk --release
-```
-### 适配新网站
-- 新增网站配置文件到 `assets/sites/` 目录
-- 运行 `generate_sites_manifest.sh` 脚本更新清单文件
-- 测试新网站功能是否正常
-详见[网站配置指南](./SITE_CONFIGURATION_GUIDE.md)
-
-
-## 配置说明
-
-### 站点配置
-- 支持多种PT站点类型（M-Team、NexusPHP）
-- 支持自定义站点域名
-- 使用 Passkey 进行身份验证
-- 自动保存登录状态
-
-### 下载器配置（qBittorrent / Transmission）
-- 支持多个下载器实例
-- 自动获取分类和标签
-- 支持本地中转下载模式
-
-## 安全性
-
-- 所有敏感信息（Passkey、密码）使用 FlutterSecureStorage 加密存储
-- 不在日志中记录敏感信息
-- 支持 HTTPS 证书验证
+- [文档目录](./docs/README.md)
+- [使用指南](./docs/USER_GUIDE.md)
+- [开发指南](./docs/DEVELOPMENT_GUIDE.md)
+- [网站配置指南](./docs/SITE_CONFIGURATION_GUIDE.md)
+- [API 文档目录](./docs/api)
 
 ## 许可证
 
-MIT License - 详见 [LICENSE](LICENSE) 文件
+MIT License，详见 [LICENSE](./LICENSE)。
+
+## Star 趋势
+
+[![Star History Chart](https://api.star-history.com/svg?repos=JustLookAtNow/pt_mate&type=Date)](https://star-history.com/#JustLookAtNow/pt_mate&Date)
