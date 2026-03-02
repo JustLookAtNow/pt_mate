@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pt_mate/models/app_models.dart';
 import 'package:pt_mate/services/api/unit3d_adapter.dart';
-import 'package:pt_mate/services/api/api_exceptions.dart';
 
 void main() {
   group('Unit3dAdapter', () {
