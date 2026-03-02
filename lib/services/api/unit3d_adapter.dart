@@ -183,6 +183,7 @@ class Unit3dAdapter extends SiteAdapter {
       id: item['id']?.toString() ?? attributes['id']?.toString() ?? '',
       name: title,
       smallDescr: subhead,
+      description: attributes['description'] ?? '',
       sizeBytes: (attributes['size'] as num?)?.toInt() ?? 0,
       createdDate: publishDate,
       seeders: (attributes['seeders'] as num?)?.toInt() ?? 0,
@@ -196,31 +197,21 @@ class Unit3dAdapter extends SiteAdapter {
       collection: false,
       isTop: false,
       comments: (attributes['comments'] as num?)?.toInt() ?? 0,
-      downloadUrl:
-          attributes['download_link'] ??
-          '${_siteConfig.baseUrl}/api/torrents/download/${item['id'] ?? attributes['id']}',
+      downloadUrl: attributes['download_link'] ?? '',
     );
   }
 
   @override
-  Future<TorrentDetail> fetchTorrentDetail(String id) async {
-     try {
-       final response = await _dio.get('/api/torrents/$id');
+  Future<TorrentDetail> fetchTorrentDetail(
+    String id, {
+    String? description,
+  }) async {
+      // 如果自带了 description，就不需要另外请求
+      if (description != null && description.isNotEmpty) {
+        return TorrentDetail(descr: description);
+      }
 
-       if (response.statusCode == 200 && response.data != null) {
-        final item = response.data['data'] ?? response.data;
-        final attributes = item['attributes'] ?? item;
-
-        return TorrentDetail(
-          descr: attributes['description'] ?? '',
-          descrHtml: attributes['description'] ?? '',
-        );
-       } else {
-           throw SiteServiceException(message: '获取种子详情失败');
-       }
-     } catch (e) {
-       throw ApiExceptionAdapter.wrapError(e, '获取种子详情');
-     }
+      return TorrentDetail(descr: '');
   }
 
   @override
@@ -241,11 +232,9 @@ class Unit3dAdapter extends SiteAdapter {
   @override
   Future<String> genDlToken({required String id, String? url}) async {
     if (url != null && url.isNotEmpty) {
-      if (url.startsWith('http')) return url;
-      return '${_siteConfig.baseUrl}$url';
+      return url;
     }
-
-    return '${_siteConfig.baseUrl}/api/torrents/download/$id';
+    throw const SiteServiceException(message: '获取下载链接失败');
   }
 
   @override
@@ -276,27 +265,6 @@ class Unit3dAdapter extends SiteAdapter {
 
   @override
   Future<List<SearchCategoryConfig>> getSearchCategories() async {
-     try {
-       final response = await _dio.get('/api/categories');
-       if(response.statusCode == 200 && response.data != null) {
-           List<SearchCategoryConfig> categories = [];
-           var data = response.data;
-           if(data['data'] is List) {
-          for (var cat in data['data']) {
-            final attrs = cat['attributes'] ?? cat;
-                   categories.add(SearchCategoryConfig(
-                id: (cat['id'] ?? attrs['id']).toString(),
-                displayName: attrs['name'] ?? '',
-                parameters: 'categories[]=${cat['id'] ?? attrs['id']}',
-                   ));
-               }
-           }
-           return categories;
-       }
-       return [];
-     } catch(e) {
-       _logger.e('Unit3dAdapter.getSearchCategories error', error: e);
-       return [];
-     }
+    return [];
   }
 }

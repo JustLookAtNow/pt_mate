@@ -378,11 +378,24 @@ class GazelleAdapter extends SiteAdapter {
   }
 
   @override
-  Future<TorrentDetail> fetchTorrentDetail(String id) async {
+  Future<TorrentDetail> fetchTorrentDetail(
+    String id, {
+    String? description,
+  }) async {
     // Gazelle 没有专门的详情 API，返回 webviewUrl 供嵌入显示
     final baseUrl = _siteConfig.baseUrl.endsWith('/')
         ? _siteConfig.baseUrl.substring(0, _siteConfig.baseUrl.length - 1)
         : _siteConfig.baseUrl;
+
+    // 如果列表传来了描述，直接使用
+    if (description != null && description.isNotEmpty) {
+      return TorrentDetail(
+        descr: description,
+        descrHtml: description, // Gazelle默认用webview，如果有文字可以当作HTML渲染
+        webviewUrl: '$baseUrl/torrents.php?torrentid=$id',
+      );
+    }
+
     return TorrentDetail(
       descr: '',
       webviewUrl: '$baseUrl/torrents.php?torrentid=$id',

@@ -337,8 +337,15 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
   }
 
   @override
-  Future<TorrentDetail> fetchTorrentDetail(String id) async {
+  Future<TorrentDetail> fetchTorrentDetail(
+    String id, {
+    String? description,
+  }) async {
     try {
+      if (description != null && description.isNotEmpty) {
+        return TorrentDetail(descr: description, descrHtml: description);
+      }
+
       final response = await _dio.get(
         '/api/v1/detail/$id',
         queryParameters: {'includes': 'extra'},

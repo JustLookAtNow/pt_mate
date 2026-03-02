@@ -592,6 +592,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       final detail = await ApiService.instance.fetchTorrentDetail(
         widget.torrentItem.id,
         siteConfig: widget.siteConfig, // 传入站点配置
+        description: widget.torrentItem.description, // 传入列表可能携带的描述
       );
       if (mounted) {
         setState(() {

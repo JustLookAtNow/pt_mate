@@ -140,18 +140,19 @@ class ApiService {
   Future<TorrentDetail> fetchTorrentDetail(
     String id, {
     SiteConfig? siteConfig,
+    String? description,
   }) async {
     // 如果提供了siteConfig，使用临时适配器
     if (siteConfig != null) {
       final adapter = await getAdapter(siteConfig);
-      return adapter.fetchTorrentDetail(id);
+      return adapter.fetchTorrentDetail(id, description: description);
     }
 
     // 否则使用当前活跃适配器
     if (_activeAdapter == null) {
       throw StateError('No active site adapter available');
     }
-    return _activeAdapter!.fetchTorrentDetail(id);
+    return _activeAdapter!.fetchTorrentDetail(id, description: description);
   }
 
   /// 获取种子评论列表

@@ -1236,7 +1236,10 @@ class NexusPHPWebAdapter extends SiteAdapter
   }
 
   @override
-  Future<TorrentDetail> fetchTorrentDetail(String id) async {
+  Future<TorrentDetail> fetchTorrentDetail(
+    String id, {
+    String? description,
+  }) async {
     // 构建种子详情页面URL
     final baseUrl = _siteConfig.baseUrl.endsWith('/')
         ? _siteConfig.baseUrl.substring(0, _siteConfig.baseUrl.length - 1)
@@ -1246,6 +1249,14 @@ class NexusPHPWebAdapter extends SiteAdapter
     // 如果启用了原生详情渲染，提取 DOM
     if (_siteConfig.features.nativeDetail) {
       try {
+        // 如果调用者已经传入了详情描述，则优先尝试使用
+        if (description != null && description.isNotEmpty) {
+          return TorrentDetail(
+            descr: '',
+            descrHtml: description,
+            webviewUrl: detailUrl,
+          );
+        }
         final response = await _dio.get(
           '/details.php',
           queryParameters: {'id': id, 'hit': '1'},
