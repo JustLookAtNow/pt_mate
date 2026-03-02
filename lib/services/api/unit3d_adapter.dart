@@ -43,6 +43,7 @@ class Unit3dAdapter extends SiteAdapter {
     _logger.d('Unit3dAdapter.init: 总耗时=${swTotal.elapsedMilliseconds}ms');
   }
 
+  // 不是所有站点都支持用户资料接口，需要判断，这里默认不支持
   @override
   Future<MemberProfile> fetchMemberProfile({String? apiKey}) async {
     try {
@@ -254,12 +255,26 @@ class Unit3dAdapter extends SiteAdapter {
 
   @override
   Future<bool> testConnection() async {
+    // 若站点不支持用户资料接口，改用 GET /api/torrents 测试连通性
+    if (!_siteConfig.features.supportMemberProfile) {
+      try {
+        final response = await _dio.get(
+          '/api/torrents',
+          queryParameters: {'perPage': 1},
+        );
+        return response.statusCode == 200;
+      } catch (e) {
+        _logger.e('Unit3dAdapter.testConnection (torrents) error', error: e);
+        throw ApiExceptionAdapter.wrapError(e, '测试连接');
+      }
+    }
+
     try {
       await fetchMemberProfile();
       return true;
     } catch (e) {
       _logger.e('Unit3dAdapter.testConnection error', error: e);
-      return false;
+      throw ApiExceptionAdapter.wrapError(e, '测试连接');
     }
   }
 
