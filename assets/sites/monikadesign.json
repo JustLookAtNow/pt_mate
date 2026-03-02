@@ -1,0 +1,25 @@
+{
+  "name": "MonikaDesign",
+  "searchCategories": [],
+  "features": {
+    "userProfile": false,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": false,
+    "downloadHistory": false,
+    "categorySearch": false,
+    "advancedSearch": false,
+    "showCover": true,
+    "commentDetail": false
+  },
+  "discountMapping": {},
+  "tagMapping": {},
+  "id": "monikadesign",
+  "primaryUrl": "https://monikadesign.uk/",
+  "baseUrls": [
+    "https://monikadesign.uk/"
+  ],
+  "siteType": "Unit3D",
+  "logo": "assets/sites_icon/monikadesign.png"
+}

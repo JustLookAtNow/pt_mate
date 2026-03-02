@@ -1,13 +1,13 @@
 package main
 
 import (
-    "log"
-    "net/http"
-    "strings"
-    "time"
+	"log"
+	"net/http"
+	"strings"
+	"time"
 
-    "github.com/gin-gonic/gin"
-    "gorm.io/gorm"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type AppService struct {
@@ -28,17 +28,26 @@ func (s *AppService) CheckUpdate(c *gin.Context) {
     // Record client IP
     clientIP := c.ClientIP()
 
-    // Update or insert statistics
-    if err := s.updateStatistics(req.DeviceID, req.Platform, req.AppVersion, clientIP); err != nil {
-        log.Printf("Failed to update statistics: %v", err)
-        // Don't fail the request if statistics update fails
-    }
+    // Process statistics and activity in background
+    go func(deviceID, platform, appVersion, ip string) {
+        defer func() {
+            if r := recover(); r != nil {
+                log.Printf("Recovered from panic in background analytics task: %v", r)
+            }
+        }()
 
-    // Record daily activity for DAU trend (Asia/Shanghai UTC+8 day window)
-    if err := s.recordDailyActivity(req.DeviceID, req.Platform, req.AppVersion); err != nil {
-        log.Printf("Failed to record daily activity: %v", err)
-        // Do not fail the main request due to analytics logging
-    }
+        // Update or insert statistics
+        if err := s.updateStatistics(deviceID, platform, appVersion, ip); err != nil {
+            log.Printf("Failed to update statistics: %v", err)
+            // Don't fail the request if statistics update fails
+        }
+
+        // Record daily activity for DAU trend (Asia/Shanghai UTC+8 day window)
+        if err := s.recordDailyActivity(deviceID, platform, appVersion); err != nil {
+            log.Printf("Failed to record daily activity: %v", err)
+            // Do not fail the main request due to analytics logging
+        }
+    }(req.DeviceID, req.Platform, req.AppVersion, clientIP)
 
     // Get latest version according to beta opt-in
     latestVersion, err := s.getLatestVersion(req.IsBeta)
@@ -134,7 +143,7 @@ func (s *AppService) recordDailyActivity(deviceID, platform, appVersion string) 
 
 func (s *AppService) getLatestVersion(includeBeta bool) (*AppVersion, error) {
     var version AppVersion
-    q := s.db.Model(&AppVersion{}).Where("is_latest = ?", true)
+    q := s.db.Model(&AppVersion{}).Where("is_latest = ? AND is_published = ?", true, true)
     if !includeBeta {
         q = q.Where("is_beta = ?", false)
     }

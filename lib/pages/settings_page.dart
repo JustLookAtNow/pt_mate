@@ -28,17 +28,17 @@ class SettingsPage extends StatelessWidget {
       currentRoute: '/settings',
       appBar: AppBar(
         title: const Text('设置'),
-        backgroundColor: Theme.of(context).brightness == Brightness.light 
-            ? Theme.of(context).colorScheme.primary 
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? Theme.of(context).colorScheme.primary
             : Theme.of(context).colorScheme.surface,
         iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.light 
-              ? Theme.of(context).colorScheme.onPrimary 
+          color: Theme.of(context).brightness == Brightness.light
+              ? Theme.of(context).colorScheme.onPrimary
               : Theme.of(context).colorScheme.onSurface,
         ),
         titleTextStyle: TextStyle(
-          color: Theme.of(context).brightness == Brightness.light 
-              ? Theme.of(context).colorScheme.onPrimary 
+          color: Theme.of(context).brightness == Brightness.light
+              ? Theme.of(context).colorScheme.onPrimary
               : Theme.of(context).colorScheme.onSurface,
           fontSize: 20,
           fontWeight: FontWeight.w500,
@@ -60,7 +60,7 @@ class _SettingsBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        
+
         // 主题设置
         Text(
           '主题设置',
@@ -139,8 +139,8 @@ class _SettingsBody extends StatelessWidget {
             ],
           ),
         ),
-        
-        
+
+
         // 下载器设置
         Text(
           '下载器设置',
@@ -163,7 +163,7 @@ class _SettingsBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        
+
         // 显示设置
         Text(
           '显示设置',
@@ -182,7 +182,7 @@ class _SettingsBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        
+
         // 聚合搜索设置
         Text(
           '聚合搜索',
@@ -205,7 +205,7 @@ class _SettingsBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        
+
         // 备份恢复
         Text(
           '数据管理',
@@ -236,7 +236,7 @@ class _SettingsBody extends StatelessWidget {
         const SizedBox(height: 8),
         const _BetaUpdateTile(),
         const SizedBox(height: 16),
-        
+
         // 查询条件配置已移至站点配置中，可在站点配置页面管理
         // 日志与诊断（底部）
         const SizedBox(height: 8),
@@ -481,7 +481,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
   double _h = 0.0;
   double _s = 1.0;
   double _v = 1.0;
-  
+
   @override
   void initState() {
     super.initState();
@@ -814,7 +814,7 @@ class _ColorCircle extends StatelessWidget {
   final Color color;
   final bool isSelected;
   final VoidCallback onTap;
-  
+
   const _ColorCircle({
     required this.color,
     required this.isSelected,

@@ -1,14 +1,14 @@
 package main
 
 import (
-    "log"
-    "net/http"
-    "os"
-    "time"
-    _ "embed"
+	_ "embed"
+	"log"
+	"net/http"
+	"os"
+	"time"
 
-    "github.com/gin-gonic/gin"
-    "github.com/joho/godotenv"
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 // Embed static admin pages so they are available regardless of working directory
@@ -69,6 +69,11 @@ func main() {
         admin.GET("/stats/versions", AdminStatsVersions(db))
         admin.GET("/stats/devices", AdminStatsDevices(db))
         admin.GET("/stats/trend/dau", AdminStatsTrendDAU(db))
+
+        // Version management
+        admin.GET("/versions", verSvc.AdminListVersions)
+        admin.POST("/versions/:id", verSvc.AdminUpdateVersion)
+        admin.DELETE("/versions/:id", verSvc.AdminDeleteVersion)
     }
 
     // Root redirect: always to /admin; the page checks token (localStorage)

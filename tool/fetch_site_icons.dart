@@ -277,7 +277,7 @@ Future<void> main() async {
       continue;
     }
   }
-  
+
   // 更新对应站点 JSON，logo 字段统一指向 PNG 资源
   for (final stem in createdStems) {
     final pngFile = File('${outDir.path}/$stem.png');

@@ -25,7 +25,7 @@ abstract class DownloaderConfig {
     this.allowSelfSignedCert = false,
     this.version,
   });
-  
+
   /// 工厂方法，根据类型和数据创建具体的配置实例
   factory DownloaderConfig.fromJson(Map<String, dynamic> json) {
     final typeStr = json['type'] as String? ?? 'qbittorrent';
@@ -40,7 +40,7 @@ abstract class DownloaderConfig {
         return RuTorrentConfig.fromJson(json);
     }
   }
-  
+
   /// 通用的JSON转换方法
   Map<String, dynamic> toJson() {
     return {
@@ -58,7 +58,7 @@ abstract class DownloaderConfig {
       },
     };
   }
-  
+
   /// 复制配置并修改部分字段
   DownloaderConfig copyWith({
     String? id,
@@ -71,7 +71,7 @@ abstract class DownloaderConfig {
     bool? allowSelfSignedCert,
     String? version,
   });
-  
+
   /// 通用的相等性比较
   @override
   bool operator ==(Object other) {
@@ -105,10 +105,10 @@ abstract class DownloaderConfig {
       version,
     );
   }
-  
+
   /// 获取默认端口号（子类可重写）
   int get defaultPort;
-  
+
   /// 从配置数据创建实例的通用方法
   static T _createFromConfig<T extends DownloaderConfig>(
     Map<String, dynamic> json,
@@ -156,7 +156,7 @@ class QbittorrentConfig extends DownloaderConfig {
     super.allowSelfSignedCert = false,
     super.version,
   }) : super(type: DownloaderType.qbittorrent);
-  
+
   @override
   int get defaultPort => 8080;
 
@@ -188,7 +188,7 @@ class QbittorrentConfig extends DownloaderConfig {
       8080,
     );
   }
-  
+
   @override
   QbittorrentConfig copyWith({
     String? id,
@@ -228,7 +228,7 @@ class TransmissionConfig extends DownloaderConfig {
     super.allowSelfSignedCert = false,
     super.version,
   }) : super(type: DownloaderType.transmission);
-  
+
   @override
   int get defaultPort => 9091;
 

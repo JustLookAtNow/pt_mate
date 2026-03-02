@@ -10,7 +10,7 @@ class AppDrawer extends StatelessWidget {
   final VoidCallback? onSettingsChanged;
   final String? currentRoute;
   final bool isFixedSidebar;
-  
+
   const AppDrawer({
     super.key,
     this.onSettingsChanged,
@@ -29,8 +29,8 @@ class AppDrawer extends StatelessWidget {
           if (!isFixedSidebar)
             DrawerHeader(
               decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.light 
-                    ? Theme.of(context).colorScheme.primary 
+                color: Theme.of(context).brightness == Brightness.light
+                    ? Theme.of(context).colorScheme.primary
                     : Theme.of(context).colorScheme.surface,
               ),
               child: Align(
@@ -40,8 +40,8 @@ class AppDrawer extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(context).brightness == Brightness.light 
-                        ? Theme.of(context).colorScheme.onPrimary 
+                    color: Theme.of(context).brightness == Brightness.light
+                        ? Theme.of(context).colorScheme.onPrimary
                         : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
@@ -259,7 +259,7 @@ class _DrawerItem extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: isActive 
+        color: isActive
             ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
             : null,
         borderRadius: BorderRadius.circular(8),
@@ -267,7 +267,7 @@ class _DrawerItem extends StatelessWidget {
       child: ListTile(
         leading: Icon(
           icon,
-          color: isActive 
+          color: isActive
               ? Theme.of(context).colorScheme.primary
               : Theme.of(context).colorScheme.primary,
         ),
@@ -275,7 +275,7 @@ class _DrawerItem extends StatelessWidget {
           title,
           style: TextStyle(
             fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-            color: isActive 
+            color: isActive
                 ? Theme.of(context).colorScheme.onPrimaryContainer
                 : null,
           ),

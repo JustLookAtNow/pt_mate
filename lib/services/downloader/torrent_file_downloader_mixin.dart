@@ -7,7 +7,7 @@ import '../api/nexusphp_web_adapter.dart';
 /// 种子文件下载通用逻辑混入
 mixin TorrentFileDownloaderMixin {
   /// 下载种子文件并返回字节数据（用于本地中转）
-  /// 
+  ///
   /// [dio] Dio实例，用于执行HTTP请求
   /// [url] 种子文件URL
   /// [siteConfig] 站点配置，用于NexusPHPWeb适配器

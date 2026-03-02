@@ -316,8 +316,16 @@ class MTeamAdapter extends SiteAdapter {
   }
 
   @override
-  Future<TorrentDetail> fetchTorrentDetail(String id) async {
+  Future<TorrentDetail> fetchTorrentDetail(
+    String id, {
+    String? description,
+  }) async {
     try {
+      // 如果调用者已经传入了详情描述，则直接使用，不再请求 API
+      if (description != null && description.isNotEmpty) {
+        return TorrentDetail(descr: description, descrHtml: description);
+      }
+
       final formData = FormData.fromMap({'id': id});
 
       final resp = await _dio.post(

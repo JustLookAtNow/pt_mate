@@ -239,8 +239,15 @@ class RousiAdapter implements SiteAdapter {
   }
 
   @override
-  Future<TorrentDetail> fetchTorrentDetail(String id) async {
+  Future<TorrentDetail> fetchTorrentDetail(
+    String id, {
+    String? description,
+  }) async {
     try {
+      if (description != null && description.isNotEmpty) {
+        return TorrentDetail(descr: description, descrHtml: description);
+      }
+
       final response = await _dio.get('/api/v1/torrents/$id');
       final data = response.data;
       if (data['code'] == 0 && data['data'] != null) {

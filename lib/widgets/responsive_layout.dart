@@ -26,7 +26,7 @@ class ResponsiveLayout extends StatelessWidget {
       builder: (context, constraints) {
         // 判断是否为大屏设备（宽度大于 768px）
         final isLargeScreen = ScreenUtils.isLargeScreen(context);
-        
+
         if (isLargeScreen) {
           // 大屏设备：使用固定侧边栏布局
           return Scaffold(

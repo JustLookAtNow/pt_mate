@@ -132,6 +132,7 @@ class TorrentItem {
   final DiscountType discount; // 优惠类型枚举
   final DateTime? discountEndTime; // 优惠结束时间
   final String? downloadUrl; //下载链接，有些网站可以直接通过列表接口获取到
+  final String? description; //描述，有些网站可以直接通过列表接口获取到
   final int seeders;
   final int leechers;
   final int sizeBytes;
@@ -154,6 +155,7 @@ class TorrentItem {
     this.discount = DiscountType.normal,
     required this.discountEndTime,
     required this.downloadUrl,
+    this.description,
     required this.seeders,
     required this.leechers,
     required this.sizeBytes,
@@ -176,6 +178,7 @@ class TorrentItem {
     DiscountType? discount,
     DateTime? discountEndTime,
     String? downloadUrl,
+    String? description,
     int? seeders,
     int? leechers,
     int? sizeBytes,
@@ -195,6 +198,7 @@ class TorrentItem {
       discount: discount ?? this.discount,
       discountEndTime: discountEndTime ?? this.discountEndTime,
       downloadUrl: downloadUrl ?? this.downloadUrl,
+      description: description ?? this.description,
       seeders: seeders ?? this.seeders,
       leechers: leechers ?? this.leechers,
       sizeBytes: sizeBytes ?? this.sizeBytes,
@@ -378,7 +382,8 @@ enum SiteType {
     'paaskey认证',
     '可以在网站的「账户设置」页面查看和重置自己的 Passkey。',
   ),
-  gazelle('Gazelle', 'Gazelle (Alpha)', 'Cookie认证', '通过网页登录获取认证信息')
+  gazelle('Gazelle', 'Gazelle (Alpha)', 'Cookie认证', '通过网页登录获取认证信息'),
+  unit3d('Unit3D', 'Unit3D (beta)', 'API Key', '安全设置 - API Token')
   ;
 
   const SiteType(this.id, this.displayName, this.apiKeyLabel, this.apiKeyHint);
@@ -584,13 +589,6 @@ class AggregateSearchConfig {
     if (json['enabledSites'] != null) {
       enabledSites = (json['enabledSites'] as List<dynamic>)
           .map((item) => SiteSearchItem.fromJson(item as Map<String, dynamic>))
-          .toList();
-    }
-    // 兼容旧格式：enabledSiteIds TODO：删掉
-    else if (json['enabledSiteIds'] != null) {
-      enabledSites = (json['enabledSiteIds'] as List<dynamic>)
-          .cast<String>()
-          .map((id) => SiteSearchItem(id: id))
           .toList();
     }
 

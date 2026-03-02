@@ -10,6 +10,7 @@ import '../widgets/responsive_layout.dart';
 import '../widgets/qb_speed_indicator.dart';
 import 'downloader_settings_page.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
+import '../utils/screen_utils.dart';
 
 enum SortField {
   name,
@@ -266,12 +267,26 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _loadTasks();
+      floatingActionButton: Builder(
+        builder: (context) {
+          final isDesktop = ScreenUtils.isLargeScreen(context);
+          return isDesktop
+              ? FloatingActionButton.extended(
+                  onPressed: () {
+                    _loadTasks();
                     NotificationHelper.showInfo(context, '刷新任务列表');
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('刷新'),
+                )
+              : FloatingActionButton(
+                  onPressed: () {
+                    _loadTasks();
+                    NotificationHelper.showInfo(context, '刷新任务列表');
+                  },
+                  child: const Icon(Icons.refresh),
+                );
         },
-        child: const Icon(Icons.refresh),
       ),
     );
   }
@@ -351,6 +366,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear, size: 16),
+                              tooltip: '清除搜索',
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() {
@@ -508,13 +524,13 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
       }
       return _sortAscending ? cmp : -cmp;
     });
-    
+
     if (filteredTasks.isEmpty) {
       return const Center(
         child: Text('没有下载任务'),
       );
     }
-    
+
     return RefreshIndicator(
       onRefresh: _loadTasks,
       child: ListView.builder(

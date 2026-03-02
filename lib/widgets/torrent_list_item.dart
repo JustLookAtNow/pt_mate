@@ -13,6 +13,20 @@ import '../utils/screen_utils.dart';
 // 文件级日志实例
 final Logger _logger = Logger();
 
+// Helper method to parse rating
+// Using a static final RegExp to avoid recompiling the pattern on every call, improving performance.
+final RegExp _ratingRegExp = RegExp(r'([0-9]+(?:\.[0-9]+)?)');
+
+bool _hasRatingValue(String? r) {
+  if (r == null) return false;
+  final t = r.trim();
+  if (t.isEmpty || t == 'N/A') return false;
+  final m = _ratingRegExp.firstMatch(t);
+  if (m == null) return false;
+  final v = double.tryParse(m.group(1)!);
+  return v != null && v > 0;
+}
+
 /// 种子列表项组件
 ///
 /// 可复用的种子列表项组件，支持：
@@ -72,16 +86,6 @@ class TorrentListItem extends StatelessWidget {
     this.showCoverSetting,
   });
 
-  bool _hasRatingValue(String? r) {
-    if (r == null) return false;
-    final t = r.trim();
-    if (t.isEmpty || t == 'N/A') return false;
-    final m = RegExp(r'([0-9]+(?:\.[0-9]+)?)').firstMatch(t);
-    if (m == null) return false;
-    final v = double.tryParse(m.group(1)!);
-    return v != null && v > 0;
-  }
-
   @override
   Widget build(BuildContext context) {
     // 检测是否为移动设备（屏幕宽度小于600px）
@@ -90,8 +94,7 @@ class TorrentListItem extends StatelessWidget {
     final siteShowCover = currentSite?.features.showCover ?? true;
     final showCover = siteShowCover && (showCoverSetting ?? true);
 
-    // 统一计算标签与清理后的描述，避免重复调用
-    final tags = torrent.tags;
+
 
     final hasDouban = _hasRatingValue(torrent.doubanRating);
     final hasImdb = _hasRatingValue(torrent.imdbRating);
@@ -142,487 +145,44 @@ class TorrentListItem extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.all(4),
                     child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 封面截图和创建时间（在 showCover 为 true 时显示）
-                  if (showCover && (suspendImageLoading != true))
-                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 封面截图
-                        Container(
-                                width: 70,
-                          margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.outline.withValues(alpha: 0.3),
-                              width: 1,
-                            ),
+                        // 封面截图和创建时间（在 showCover 为 true 时显示）
+                        if (showCover && (suspendImageLoading != true))
+                          TorrentCover(
+                            torrent: torrent,
+                            isMobile: isMobile,
+                            hasDouban: hasDouban,
+                            hasImdb: hasImdb,
                           ),
-                          child: GestureDetector(
-                                  onTap: () async {
-                              if (torrent.cover.isNotEmpty) {
-                                      // 先取消当前焦点（如搜索框），防止 Dialog 关闭后恢复
-                                      FocusManager.instance.primaryFocus
-                                          ?.unfocus();
-                                      await showDialog(
-                                  context: context,
-                                        builder: (ctx) => Dialog(
-                                    child: CachedNetworkImage(
-                                      imageUrl: torrent.cover,
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
-                                );
-                                      // Dialog 关闭后焦点恢复机制会在下一帧重新聚焦之前的控件，
-                                      // 必须在 postFrameCallback 中再次取消
-                                      if (context.mounted) {
-                                        WidgetsBinding.instance
-                                            .addPostFrameCallback((_) {
-                                              FocusManager.instance.primaryFocus
-                                                  ?.unfocus();
-                                            });
-                                      }
-                              }
-                            },
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: torrent.cover.isNotEmpty
-                                  ? CachedNetworkImage(
-                                      imageUrl: torrent.cover,
-                                      width: 70,
-                                      height: 100,
-                                      fit: BoxFit.cover,
-                                      loadingBuilder:
-                                          (context, child, loadingProgress) {
-                                            if (loadingProgress == null) {
-                                              return child;
-                                            }
-                                            return Container(
-                                              width: 70,
-                                              height: 100,
-                                              decoration: BoxDecoration(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .surfaceContainerHighest,
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: Column(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.center,
-                                                children: [
-                                                  SizedBox(
-                                                    width: 20,
-                                                    height: 20,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                          strokeWidth: 2,
-                                                          color: Theme.of(
-                                                            context,
-                                                          ).colorScheme.primary,
-                                                        ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    '加载中',
-                                                    style: TextStyle(
-                                                      fontSize: 8,
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .onSurfaceVariant,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                            if (kDebugMode) {
-                                              _logger.w('图片加载失败: $error');
-                                            }
-                                            return Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Icon(
-                                                  Icons.image_outlined,
-                                                  size: 24,
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .onSurfaceVariant,
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  '加载失败',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .onSurfaceVariant,
-                                                  ),
-                                                ),
-                                              ],
-                                            );
-                                          },
-                                    )
-                                  : Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.image_outlined,
-                                          size: 24,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.onSurfaceVariant,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          '暂无',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.onSurfaceVariant,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                            ),
+
+                        Expanded(
+                          child: TorrentInfo(
+                            torrent: torrent,
+                            currentSite: currentSite,
+                            isAggregateMode: isAggregateMode,
+                            siteName: siteName,
+                            isMobile: isMobile,
+                            showCover: showCover,
+                            hasDouban: hasDouban,
+                            hasImdb: hasImdb,
+                            hasAnyRating: hasAnyRating,
+                            rightMinHeight: rightMinHeight,
                           ),
                         ),
-                        // 评分模块（仅移动端左列显示；桌面端在右侧标签后显示）
-                        // const SizedBox(height: 8),
-                        if (isMobile)
-                          Container(
-                            width: 70,
-                            margin: const EdgeInsets.only(right: 8),
-                            child: Column(
-                              children: [
-                                // 豆瓣评分
-                                if (hasDouban)
-                                  Container(
-                                    width: 70,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 2,
-                                    ),
-                                    margin: const EdgeInsets.only(bottom: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF007711),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      '豆 ${torrent.doubanRating}',
-                                      style: const TextStyle(
-                                        fontSize: 8,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                // IMDB评分
-                                if (hasImdb)
-                                  Container(
-                                    width: 70,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF5C518),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      'IMDB ${torrent.imdbRating}',
-                                      style: const TextStyle(
-                                        fontSize: 8,
-                                        color: Colors.black,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-
-                  Expanded(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: rightMinHeight),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // 标签与评分行（桌面端统一追加评分；移动端在关闭封面时追加）
-                          if (tags.isNotEmpty ||
-                              (!isMobile && hasAnyRating) ||
-                              (isMobile && !showCover && hasAnyRating))
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 2),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(child: _TagsView(tags: tags)),
-                                  if (!isMobile || !showCover) ...[
-                                    if (hasDouban)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        margin: const EdgeInsets.only(left: 6),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF007711),
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          '豆 ${torrent.doubanRating}',
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    if (hasImdb)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        margin: const EdgeInsets.only(left: 6),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFF5C518),
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          'IMDB ${torrent.imdbRating}',
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.black,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          // 种子名称（聚合搜索模式下包含站点名称）
-                          if (isAggregateMode && siteName != null)
-                            Tooltip(
-                              message: '$siteName ${torrent.name}',
-                              // 默认触发：桌面/网页为悬停，移动端为长按
-                              waitDuration: const Duration(milliseconds: 400),
-                              showDuration: const Duration(seconds: 5),
-                              child: RichText(
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                text: TextSpan(
-                                  children: [
-                                    WidgetSpan(
-                                      alignment: PlaceholderAlignment.middle,
-                                      child: _AggregateSiteChip(
-                                        siteName: siteName!,
-                                      ),
-                                    ),
-                                    TextSpan(
-                                      text: ' ${torrent.name}',
-                                      style: TextStyle(
-                                        color: Theme.of(
-                                          context,
-                                        ).textTheme.titleMedium?.color,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-
-                                  ],
-                                ),
-                              ),
-                            )
-                          else
-                            Tooltip(
-                              message: torrent.name,
-                              // 默认触发：桌面/网页为悬停，移动端为长按
-                              waitDuration: const Duration(milliseconds: 400),
-                              showDuration: const Duration(seconds: 5),
-                              child: RichText(
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                text: TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: torrent.name,
-                                      style: TextStyle(
-                                        color: Theme.of(
-                                          context,
-                                        ).textTheme.titleMedium?.color,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-
-                                  ],
-                                ),
-                              ),
-                            ),
-                          const SizedBox(height: 4),
-                          // 种子描述（使用清理后的描述）
-                          Text(
-                            torrent.smallDescr,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).textTheme.bodySmall?.color,
-                                  fontSize: 12,
-                                ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '发布于 ${Formatters.formatTorrentCreatedDate(torrent.createdDate)}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 10,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          // 底部信息行（优惠标签、做种/下载数、大小、下载状态）
-                          Row(
-                            children: [
-                              // 优惠标签
-                              if (torrent.discount != DiscountType.normal)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                    vertical: 1,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _discountColor(torrent.discount),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    _discountText(
-                                      torrent.discount,
-                                      torrent.discountEndTime,
-                                    ),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              if (torrent.discount != DiscountType.normal)
-                                const SizedBox(width: 6),
-                              // 做种/下载数信息
-                              _buildSeedLeechInfo(
-                                torrent.seeders,
-                                torrent.leechers,
-                              ),
-                              const SizedBox(width: 10),
-                              // 文件大小
-                              Text(
-                                Formatters.dataFromBytes(torrent.sizeBytes),
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                              // 评论数 - 仅在 mteam 和 nexusphp 类型站点显示
-                              if (currentSite?.siteType == SiteType.mteam ||
-                                  currentSite?.siteType ==
-                                      SiteType.nexusphp) ...[
-                                const SizedBox(width: 10),
-                                Icon(
-                                  Icons.comment,
-                                  size: 12,
-                                  color: Theme.of(context).colorScheme.outline,
-                                ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  '${torrent.comments}',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ],
-                              const Spacer(),
-                              // 下载状态图标 - 仅在站点支持下载历史功能时显示
-                              if (currentSite?.features.supportHistory ?? true)
-                                _buildDownloadStatusIcon(
-                                  torrent.downloadStatus,
-                                ),
-                            ],
+                        // 桌面端显示操作按钮
+                        if (!isMobile) ...[
+                          const SizedBox(width: 4),
+                          TorrentActions(
+                            torrent: torrent,
+                            currentSite: currentSite,
+                            onToggleCollection: onToggleCollection,
+                            onDownload: onDownload,
                           ),
                         ],
-                      ),
-                    ),
-                  ),
-                  // 桌面端显示操作按钮
-                  if (!isMobile) ...[
-                    const SizedBox(width: 4),
-                    Column(
-                      mainAxisSize: MainAxisSize.max,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // 收藏按钮 - 仅在站点支持收藏功能时显示
-                        if (currentSite?.features.supportCollection ?? true)
-                          IconButton(
-                            onPressed: onToggleCollection,
-                            icon: Icon(
-                              torrent.collection
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: torrent.collection ? Colors.red : null,
-                            ),
-                            tooltip: torrent.collection ? '取消收藏' : '收藏',
-                            padding: EdgeInsets.all(10),
-                            constraints: const BoxConstraints(
-                              minWidth: 40,
-                              minHeight: 40,
-                            ),
-                          ),
-                        // 下载按钮 - 仅在站点支持下载功能时显示
-                        if (currentSite?.features.supportDownload ?? true)
-                          IconButton(
-                            onPressed: onDownload,
-                            icon: const Icon(Icons.download_outlined),
-                            tooltip: '下载',
-                            padding: EdgeInsets.all(10),
-                            constraints: const BoxConstraints(
-                              minWidth: 40,
-                              minHeight: 40,
-                            ),
-                          ),
                       ],
                     ),
-                  ],
-                ],
-              ),
-            ),
+                  ),
                 ],
               ),
             ),
@@ -650,7 +210,7 @@ class TorrentListItem extends StatelessWidget {
       return _SwipeableItem(
         onTap: onTap,
         onLongPress: onLongPress,
-        actions: _buildSwipeActions(context),
+        actionBuilder: (context, close) => _buildSwipeActions(context, close),
         isAggregateMode: isAggregateMode,
         child: mainContent,
       );
@@ -666,7 +226,7 @@ class TorrentListItem extends StatelessWidget {
   }
 
   // 构建左滑动作按钮
-  List<Widget> _buildSwipeActions(BuildContext context) {
+  List<Widget> _buildSwipeActions(BuildContext context, VoidCallback close) {
     List<Widget> actions = [];
 
     // 添加收藏按钮（如果支持）
@@ -688,7 +248,10 @@ class TorrentListItem extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
-              onTap: onToggleCollection,
+              onTap: () {
+                close();
+                if (onToggleCollection != null) onToggleCollection!();
+              },
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -723,7 +286,10 @@ class TorrentListItem extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
-              onTap: onDownload,
+              onTap: () {
+                close();
+                if (onDownload != null) onDownload!();
+              },
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -743,6 +309,33 @@ class TorrentListItem extends StatelessWidget {
 
     return actions;
   }
+}
+
+class TorrentInfo extends StatelessWidget {
+  final TorrentItem torrent;
+  final SiteConfig? currentSite;
+  final bool isAggregateMode;
+  final String? siteName;
+  final bool isMobile;
+  final bool showCover;
+  final bool hasDouban;
+  final bool hasImdb;
+  final bool hasAnyRating;
+  final double rightMinHeight;
+
+  const TorrentInfo({
+    super.key,
+    required this.torrent,
+    this.currentSite,
+    required this.isAggregateMode,
+    this.siteName,
+    required this.isMobile,
+    required this.showCover,
+    required this.hasDouban,
+    required this.hasImdb,
+    required this.hasAnyRating,
+    required this.rightMinHeight,
+  });
 
   /// 获取优惠类型对应的颜色
   Color _discountColor(DiscountType discount) {
@@ -793,19 +386,482 @@ class TorrentListItem extends StatelessWidget {
   Widget _buildDownloadStatusIcon(DownloadStatus status) {
     switch (status) {
       case DownloadStatus.completed:
-        return const Icon(Icons.download_done, color: Colors.green, size: 20);
+        return const Tooltip(
+          message: '已完成',
+          child: Icon(Icons.download_done, color: Colors.green, size: 20),
+        );
       case DownloadStatus.downloading:
-        return const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+        return const Tooltip(
+          message: '下载中',
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+            ),
           ),
         );
       case DownloadStatus.none:
         return const SizedBox(width: 20); // 占位，保持布局一致
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: rightMinHeight),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // 标签与评分行（桌面端统一追加评分；移动端在关闭封面时追加）
+          if (torrent.tags.isNotEmpty ||
+              (!isMobile && hasAnyRating) ||
+              (isMobile && !showCover && hasAnyRating))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: _TagsView(tags: torrent.tags)),
+                  if (!isMobile || !showCover) ...[
+                    if (hasDouban)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        margin: const EdgeInsets.only(left: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF007711),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '豆 ${torrent.doubanRating}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    if (hasImdb)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        margin: const EdgeInsets.only(left: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5C518),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'IMDB ${torrent.imdbRating}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.black,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+          // 种子名称（聚合搜索模式下包含站点名称）
+          if (isAggregateMode && siteName != null)
+            Tooltip(
+              message: '$siteName ${torrent.name}',
+              // 默认触发：桌面/网页为悬停，移动端为长按
+              waitDuration: const Duration(milliseconds: 400),
+              showDuration: const Duration(seconds: 5),
+              child: RichText(
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                text: TextSpan(
+                  children: [
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: _AggregateSiteChip(siteName: siteName!),
+                    ),
+                    TextSpan(
+                      text: ' ${torrent.name}',
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.titleMedium?.color,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Tooltip(
+              message: torrent.name,
+              // 默认触发：桌面/网页为悬停，移动端为长按
+              waitDuration: const Duration(milliseconds: 400),
+              showDuration: const Duration(seconds: 5),
+              child: RichText(
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: torrent.name,
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.titleMedium?.color,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 4),
+          // 种子描述（使用清理后的描述）
+          Text(
+            torrent.smallDescr,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).textTheme.bodySmall?.color,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '发布于 ${Formatters.formatTorrentCreatedDate(torrent.createdDate)}',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 10,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          // 底部信息行（优惠标签、做种/下载数、大小、下载状态）
+          Row(
+            children: [
+              // 优惠标签
+              if (torrent.discount != DiscountType.normal)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _discountColor(torrent.discount),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    _discountText(torrent.discount, torrent.discountEndTime),
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              if (torrent.discount != DiscountType.normal)
+                const SizedBox(width: 6),
+              // 做种/下载数信息
+              _buildSeedLeechInfo(torrent.seeders, torrent.leechers),
+              const SizedBox(width: 10),
+              // 文件大小
+              Text(
+                Formatters.dataFromBytes(torrent.sizeBytes),
+                style: const TextStyle(fontSize: 12),
+              ),
+              // 评论数 - 仅在 mteam 和 nexusphp 类型站点显示
+              if (currentSite?.siteType == SiteType.mteam ||
+                  currentSite?.siteType == SiteType.nexusphp) ...[
+                const SizedBox(width: 10),
+                Icon(
+                  Icons.comment,
+                  size: 12,
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+                const SizedBox(width: 2),
+                Text(
+                  '${torrent.comments}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+              const Spacer(),
+              // 下载状态图标 - 仅在站点支持下载历史功能时显示
+              if (currentSite?.features.supportHistory ?? true)
+                _buildDownloadStatusIcon(torrent.downloadStatus),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class TorrentCover extends StatelessWidget {
+  final TorrentItem torrent;
+  final bool isMobile;
+  final bool hasDouban;
+  final bool hasImdb;
+
+  const TorrentCover({
+    super.key,
+    required this.torrent,
+    required this.isMobile,
+    required this.hasDouban,
+    required this.hasImdb,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 封面截图
+        Container(
+          width: 70,
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: Theme.of(
+                context,
+              ).colorScheme.outline.withValues(alpha: 0.3),
+              width: 1,
+            ),
+          ),
+          child: GestureDetector(
+            onTap: () async {
+              if (torrent.cover.isNotEmpty) {
+                // 先取消当前焦点（如搜索框），防止 Dialog 关闭后恢复
+                FocusManager.instance.primaryFocus?.unfocus();
+                await showDialog(
+                  context: context,
+                  builder: (ctx) => Dialog(
+                    child: CachedNetworkImage(
+                      imageUrl: torrent.cover,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                );
+                // Dialog 关闭后焦点恢复机制会在下一帧重新聚焦之前的控件，
+                // 必须在 postFrameCallback 中再次取消
+                if (context.mounted) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                  });
+                }
+              }
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: torrent.cover.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: torrent.cover,
+                      width: 70,
+                      height: 100,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) {
+                          return child;
+                        }
+                        return Container(
+                          width: 70,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '加载中',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        if (kDebugMode) {
+                          _logger.w('图片加载失败: $error');
+                        }
+                        return Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.image_outlined,
+                              size: 24,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '加载失败',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.image_outlined,
+                          size: 24,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '暂无',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+        // 评分模块（仅移动端左列显示；桌面端在右侧标签后显示）
+        if (isMobile)
+          Container(
+            width: 70,
+            margin: const EdgeInsets.only(right: 8),
+            child: Column(
+              children: [
+                // 豆瓣评分
+                if (hasDouban)
+                  Container(
+                    width: 70,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    margin: const EdgeInsets.only(bottom: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF007711),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '豆 ${torrent.doubanRating}',
+                      style: const TextStyle(
+                        fontSize: 8,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                // IMDB评分
+                if (hasImdb)
+                  Container(
+                    width: 70,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5C518),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'IMDB ${torrent.imdbRating}',
+                      style: const TextStyle(
+                        fontSize: 8,
+                        color: Colors.black,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class TorrentActions extends StatelessWidget {
+  final TorrentItem torrent;
+  final SiteConfig? currentSite;
+  final VoidCallback? onToggleCollection;
+  final VoidCallback? onDownload;
+
+  const TorrentActions({
+    super.key,
+    required this.torrent,
+    this.currentSite,
+    this.onToggleCollection,
+    this.onDownload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.max,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // 收藏按钮 - 仅在站点支持收藏功能时显示
+        if (currentSite?.features.supportCollection ?? true)
+          IconButton(
+            onPressed: onToggleCollection,
+            icon: Icon(
+              torrent.collection ? Icons.favorite : Icons.favorite_border,
+              color: torrent.collection ? Colors.red : null,
+            ),
+            tooltip: torrent.collection ? '取消收藏' : '收藏',
+            padding: EdgeInsets.all(10),
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          ),
+        // 下载按钮 - 仅在站点支持下载功能时显示
+        if (currentSite?.features.supportDownload ?? true)
+          IconButton(
+            onPressed: onDownload,
+            icon: const Icon(Icons.download_outlined),
+            tooltip: '下载',
+            padding: EdgeInsets.all(10),
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          ),
+      ],
+    );
   }
 }
 
@@ -840,7 +896,8 @@ class _AggregateSiteChip extends StatelessWidget {
       ),
       child: Text(
         ' $siteName ',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        style:
+            Theme.of(context).textTheme.bodySmall?.copyWith(
               color: color,
               fontWeight: FontWeight.w600,
               fontSize: 13,
@@ -854,14 +911,15 @@ class _AggregateSiteChip extends StatelessWidget {
 // 自定义左滑组件，支持固定显示按钮
 class _SwipeableItem extends StatefulWidget {
   final Widget child;
-  final List<Widget> actions;
+  final List<Widget> Function(BuildContext context, VoidCallback close)
+  actionBuilder;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final bool isAggregateMode;
 
   const _SwipeableItem({
     required this.child,
-    required this.actions,
+    required this.actionBuilder,
     required this.isAggregateMode,
     this.onTap,
     this.onLongPress,
@@ -878,10 +936,13 @@ class _SwipeableItemState extends State<_SwipeableItem>
   double _dragExtent = 0;
   bool _isOpen = false;
 
+  // 缓存 actions 列表以在拖拽回调中使用
+  List<Widget> _actions = [];
+
   // 计算动作按钮的总宽度
   double get _actionsWidth {
-    if (widget.actions.isEmpty) return 0;
-    return widget.actions.length * 64.0; // 每个按钮60px + 4px间距
+    if (_actions.isEmpty) return 0;
+    return _actions.length * 64.0; // 每个按钮60px + 4px间距
   }
 
   @override
@@ -898,6 +959,22 @@ class _SwipeableItemState extends State<_SwipeableItem>
 
     // 添加动画监听器，只添加一次
     _animation.addListener(_updateDragExtent);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateActions();
+  }
+
+  @override
+  void didUpdateWidget(_SwipeableItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _updateActions();
+  }
+
+  void _updateActions() {
+    _actions = widget.actionBuilder(context, _close);
   }
 
   @override
@@ -918,7 +995,7 @@ class _SwipeableItemState extends State<_SwipeableItem>
   }
 
   void _handleDragUpdate(DragUpdateDetails details) {
-    if (widget.actions.isEmpty) return;
+    if (_actions.isEmpty) return;
 
     final delta = details.primaryDelta ?? 0;
     final newDragExtent = _dragExtent + delta;
@@ -930,7 +1007,7 @@ class _SwipeableItemState extends State<_SwipeableItem>
   }
 
   void _handleDragEnd(DragEndDetails details) {
-    if (widget.actions.isEmpty) return;
+    if (_actions.isEmpty) return;
 
     final velocity = details.primaryVelocity ?? 0;
     final threshold = _actionsWidth * 0.3;
@@ -1003,7 +1080,7 @@ class _SwipeableItemState extends State<_SwipeableItem>
           child: Stack(
             children: [
               // 背景动作按钮
-              if (widget.actions.isNotEmpty)
+              if (_actions.isNotEmpty)
                 Positioned(
                   right: -_actionsWidth + _dragExtent.abs(),
                   top: 0,
@@ -1011,7 +1088,7 @@ class _SwipeableItemState extends State<_SwipeableItem>
                   width: _actionsWidth,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
-                    children: widget.actions,
+                    children: _actions,
                   ),
                 ),
               // 主要内容

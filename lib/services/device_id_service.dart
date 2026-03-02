@@ -21,7 +21,7 @@ class DeviceIdService {
     try {
       // 统一由 StorageService 管理设备ID的读写，支持旧存储兼容与自动迁移
       String? storedDeviceId = await StorageService.instance.loadDeviceId();
-      
+
       if (storedDeviceId != null && storedDeviceId.isNotEmpty) {
         _cachedDeviceId = storedDeviceId;
         return storedDeviceId;
@@ -29,10 +29,10 @@ class DeviceIdService {
 
       // 如果没有存储的设备ID，生成一个新的
       String newDeviceId = await _generateDeviceId();
-      
+
       // 保存到安全存储
       await StorageService.instance.saveDeviceId(newDeviceId);
-      
+
       _cachedDeviceId = newDeviceId;
       return newDeviceId;
     } catch (e) {
@@ -45,7 +45,7 @@ class DeviceIdService {
   Future<String> _generateDeviceId() async {
     const uuid = Uuid();
     String baseId = uuid.v4();
-    
+
     // 添加平台前缀以便区分
     String platform = _getPlatformName();
     return '${platform}_$baseId';
@@ -56,7 +56,7 @@ class DeviceIdService {
     try {
       DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
       String deviceIdentifier = '';
-      
+
       if (Platform.isAndroid) {
         AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
         deviceIdentifier = '${androidInfo.model}_${androidInfo.id}_${androidInfo.fingerprint}'.hashCode.toString();
@@ -77,7 +77,7 @@ class DeviceIdService {
         const uuid = Uuid();
         deviceIdentifier = uuid.v4();
       }
-      
+
       String platform = _getPlatformName();
       return '${platform}_fallback_$deviceIdentifier';
     } catch (e) {

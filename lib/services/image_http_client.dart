@@ -24,10 +24,10 @@ class ImageHttpClient {
 
   // 内存缓存，存储图片数据
   final Map<String, List<int>> _imageCache = {};
-  
+
   // LRU访问顺序记录，最近访问的在最后
   final List<String> _accessOrder = [];
-  
+
   // 正在请求的Future缓存，避免重复请求
   final Map<String, Future<Response<List<int>>>> _pendingRequests = {};
 
@@ -104,7 +104,7 @@ class ImageHttpClient {
   void _addToCache(String url, List<int> data) {
     // 检查是否需要清理缓存
     _evictIfNeeded();
-    
+
     // 添加新数据
     _imageCache[url] = data;
     _updateAccessOrder(url);
@@ -122,7 +122,7 @@ class ImageHttpClient {
     while (_imageCache.length >= _maxCacheSize) {
       _evictLeastRecentlyUsed();
     }
-    
+
     // 检查大小限制
     while (_getCurrentCacheSize() > _maxCacheSizeBytes) {
       _evictLeastRecentlyUsed();

@@ -85,10 +85,10 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
           result.password!,
         );
       }
-      
+
       // 通知配置变更
       DownloaderService.instance.notifyConfigChanged(cfg.id);
-      
+
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -128,10 +128,10 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
         defaultId: _defaultId == config.id ? null : _defaultId,
       );
       await StorageService.instance.deleteDownloaderPassword(config.id);
-      
+
       // 通知配置变更
       DownloaderService.instance.notifyConfigChanged(config.id);
-      
+
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -145,10 +145,10 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
         _downloaderConfigs,
         defaultId: config.id,
       );
-      
+
       // 通知配置变更
       DownloaderService.instance.notifyConfigChanged(config.id);
-      
+
       setState(() {
         _defaultId = config.id;
       });
@@ -175,13 +175,13 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
                 NotificationHelper.showError(context, '请先保存密码');
         return;
       }
-      
+
       // 使用新的下载器服务进行测试
       await DownloaderService.instance.testConnection(
         config: config,
         password: pwd!,
       );
-      
+
       if (!mounted) return;
             NotificationHelper.showInfo(context, '✅ 连接成功');
     } catch (e) {
@@ -490,15 +490,15 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
         'allowSelfSignedCert': _allowSelfSignedCert, // 包含自签名证书选项
       },
     };
-    
+
     // 如果密码为空且是编辑现有配置，则尝试从已保存的配置中读取密码
     if (pwd.isEmpty && widget.existing != null) {
       // 获取保存的密码
       final savedPassword = await StorageService.instance.loadDownloaderPassword(id);
-      
+
       // 检查组件是否仍然挂载
       if (!mounted) return;
-      
+
       // 返回结果，使用保存的密码或null
       Navigator.of(context).pop(_DownloaderEditorResult(cfg, savedPassword));
     } else {
@@ -514,7 +514,7 @@ class _DownloaderEditorDialogState extends State<_DownloaderEditorDialog> {
     final port = FormatUtil.parseInt(_portCtrl.text.trim());
     final user = _userCtrl.text.trim();
     final pwd = _pwdCtrl.text.trim();
-    
+
     // 如果密码为空且是编辑现有配置，则尝试从已保存的配置中读取密码
     String? password = pwd;
     if (pwd.isEmpty && widget.existing != null) {

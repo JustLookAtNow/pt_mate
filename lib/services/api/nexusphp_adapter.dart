@@ -1,23 +1,28 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
-import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
-import 'package:crypto/crypto.dart';
-import 'dart:convert';
 import '../../models/app_models.dart';
+
 import 'site_adapter.dart';
 import 'api_exceptions.dart';
 import 'package:pt_mate/services/site_config_service.dart';
 import '../../utils/format.dart';
+import 'nexusphp_helper.dart';
 
 /// NexusPHP 站点适配器
 /// 实现 NexusPHP (1.9+) 站点的 API 调用
-class NexusPHPAdapter implements SiteAdapter {
+class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
   late SiteConfig _siteConfig;
   late Dio _dio;
   Map<String, String>? _discountMapping;
   Map<String, String>? _tagMapping;
   static final Logger _logger = Logger();
+
+  @override
+  Map<String, String>? get discountMapping => _discountMapping;
+
+  @override
+  Map<String, String>? get tagMapping => _tagMapping;
 
   @override
   SiteConfig get siteConfig => _siteConfig;
@@ -60,7 +65,7 @@ class NexusPHPAdapter implements SiteAdapter {
             if (base.endsWith('/')) base = base.substring(0, base.length - 1);
             options.baseUrl = base;
           }
-          
+
           // 动态构建请求头
           options.headers.addAll(_buildHeaders(_siteConfig.apiKey));
 
@@ -115,45 +120,6 @@ class NexusPHPAdapter implements SiteAdapter {
     } catch (e) {
       _tagMapping = {};
     }
-  }
-
-  /// 从字符串解析标签类型
-
-  TagType? _parseTagType(String? str) {
-    if (str == null || str.isEmpty) return null;
-
-    final mapping = _tagMapping ?? {};
-    final enumName = mapping[str];
-
-    if (enumName != null) {
-      for (final type in TagType.values) {
-        if (type.name.toLowerCase() == enumName.toLowerCase()) {
-          return type;
-        }
-        if (type.content == enumName) {
-          return type;
-        }
-      }
-    }
-    return null;
-  }
-
-  /// 从字符串解析优惠类型
-  DiscountType _parseDiscountType(String? str) {
-    if (str == null || str.isEmpty) return DiscountType.normal;
-
-    final mapping = _discountMapping ?? {};
-    final enumValue = mapping[str];
-
-    if (enumValue != null) {
-      for (final type in DiscountType.values) {
-        if (type.value == enumValue) {
-          return type;
-        }
-      }
-    }
-
-    return DiscountType.normal;
   }
 
   /// 构建请求头，包含Bearer Token认证
@@ -335,8 +301,8 @@ class NexusPHPAdapter implements SiteAdapter {
             // 1. matchTags (in case the tag name itself is a known tag keyword)
             // tags.addAll(TagType.matchTags(tagName));
 
-            // 2. _parseTagType (using the mapping config)
-            final mappedTag = _parseTagType(tagName);
+            // 2. parseTagType (using the mapping config)
+            final mappedTag = parseTagType(tagName);
             if (mappedTag != null && !tags.contains(mappedTag)) {
               tags.add(mappedTag);
             }
@@ -351,14 +317,14 @@ class NexusPHPAdapter implements SiteAdapter {
       id: (item['id'] as int).toString(),
       name: name,
       smallDescr: smallDescr,
-      discount: _parseDiscountType(discountText),
+      discount: parseDiscountType(discountText),
       discountEndTime: null, // 暂时没有
       downloadUrl: item['download_url'] as String?,
       seeders: item['seeders'] as int,
       leechers: item['leechers'] as int,
       sizeBytes: item['size'] as int,
       downloadStatus: status,
-      collection: item['has_bookmarked'] as bool? ?? false, 
+      collection: item['has_bookmarked'] as bool? ?? false,
       imageList: const [], // 暂时没有图片列表
       cover: item['cover'] as String? ?? '',
       createdDate: Formatters.parseDateTimeCustom(
@@ -371,8 +337,15 @@ class NexusPHPAdapter implements SiteAdapter {
   }
 
   @override
-  Future<TorrentDetail> fetchTorrentDetail(String id) async {
+  Future<TorrentDetail> fetchTorrentDetail(
+    String id, {
+    String? description,
+  }) async {
     try {
+      if (description != null && description.isNotEmpty) {
+        return TorrentDetail(descr: description, descrHtml: description);
+      }
+
       final response = await _dio.get(
         '/api/v1/detail/$id',
         queryParameters: {'includes': 'extra'},
@@ -527,39 +500,6 @@ class NexusPHPAdapter implements SiteAdapter {
     } catch (e) {
       return false;
     }
-  }
-
-  /// 生成下载哈希值
-  ///
-  /// 参数:
-  /// - [passkey] 用户的passkey
-  /// - [id] 种子ID
-  /// - [userid] 用户ID
-  ///
-  /// 返回: JWT编码的下载令牌
-  String getDownLoadHash(String passkey, String id, String userid) {
-    // 生成MD5密钥: md5(passkey + 当前日期(Ymd) + userid)
-    final now = DateTime.now();
-    final dateStr =
-        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-    final keyString = passkey + dateStr + userid;
-    final keyBytes = utf8.encode(keyString);
-    final digest = md5.convert(keyBytes);
-    final key = digest.toString();
-
-    // 创建JWT payload
-    final payload = {
-      'id': id,
-      'exp':
-          (DateTime.now().millisecondsSinceEpoch / 1000).floor() +
-          3600, // 1小时后过期
-    };
-
-    // 使用HS256算法生成JWT
-    final jwt = JWT(payload);
-    final token = jwt.sign(SecretKey(key), algorithm: JWTAlgorithm.HS256);
-
-    return token;
   }
 
   @override

@@ -18,12 +18,15 @@ import 'package:pt_mate/utils/notification_helper.dart';
 
 class _HealthStatus {
   final bool ok;
+  /// 功能不适用（站点不支持该接口，无需检查，非失败）
+  final bool notApplicable;
   final String? message;
   final String? username;
   final MemberProfile? profile;
   final DateTime updatedAt;
   const _HealthStatus({
     required this.ok,
+    this.notApplicable = false,
     this.message,
     this.username,
     this.profile,
@@ -32,6 +35,8 @@ class _HealthStatus {
 
   factory _HealthStatus.fromJson(Map<String, dynamic> json) {
     final ok = json['ok'] == true || json['ok'] == 'true';
+    final notApplicable =
+        json['notApplicable'] == true || json['notApplicable'] == 'true';
     final message = json['message']?.toString();
     final username = json['username']?.toString();
     final updatedAtStr = json['updatedAt']?.toString();
@@ -54,6 +59,7 @@ class _HealthStatus {
     }
     return _HealthStatus(
       ok: ok,
+      notApplicable: notApplicable,
       message: message,
       username: username,
       profile: profile,
@@ -64,6 +70,7 @@ class _HealthStatus {
   Map<String, dynamic> toJson() {
     return {
       'ok': ok,
+      'notApplicable': notApplicable,
       'message': message,
       'username': username,
       'profile': profile?.toJson(),
@@ -187,7 +194,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       await _loadCachedHealthStatuses(triggerRefreshWhenEmpty: true);
     } catch (e) {
       if (mounted) {
-                NotificationHelper.showError(context, '加载站点配置失败: $e');
+        NotificationHelper.showError(context, '加载站点配置失败: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -298,7 +305,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                     // ignore save errors
                   }
                   if (!mounted) return;
-                                    NotificationHelper.showInfo(context, '站点信息获取完成');
+                  NotificationHelper.showInfo(context, '站点信息获取完成');
                 }
               }
             });
@@ -309,15 +316,29 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   }
 
   Future<_HealthStatus> _checkSingleSite(SiteConfig site) async {
-    // 仅在站点支持用户资料时进行检查，其他标记为不支持
+    // 站点不支持用户资料接口时，改用 testConnection 测试连通性
+    // testConnection 失败会抛出 SiteException，由 catch 块统一处理
     if (!site.features.supportMemberProfile) {
-      return _HealthStatus(
-        ok: false,
-        message: '站点不支持用户资料接口',
-        username: null,
-        profile: null,
-        updatedAt: DateTime.now(),
-      );
+      try {
+        await ApiService.instance.testConnectionWithSite(site);
+        return _HealthStatus(
+          ok: true,
+          notApplicable: true,
+          message: '连接正常（不支持用户资料）',
+          username: null,
+          profile: null,
+          updatedAt: DateTime.now(),
+        );
+      } catch (e) {
+        return _HealthStatus(
+          ok: false,
+          notApplicable: true,
+          message: e.toString(),
+          username: null,
+          profile: null,
+          updatedAt: DateTime.now(),
+        );
+      }
     }
     try {
       final adapter = await ApiService.instance.getAdapter(site);
@@ -348,13 +369,13 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       await appState.setActiveSite(siteId);
       setState(() => _activeSiteId = siteId);
       if (mounted) {
-                NotificationHelper.showInfo(context, '已切换活跃站点');
+        NotificationHelper.showInfo(context, '已切换活跃站点');
         // 切换站点成功后跳转回首页
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       if (mounted) {
-                NotificationHelper.showError(context, '切换站点失败: $e');
+        NotificationHelper.showError(context, '切换站点失败: $e');
       }
     }
   }
@@ -389,11 +410,11 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         await StorageService.instance.deleteSiteConfig(site.id);
         await _loadSites();
         if (mounted) {
-                    NotificationHelper.showInfo(context, '站点已删除');
+          NotificationHelper.showInfo(context, '站点已删除');
         }
       } catch (e) {
         if (mounted) {
-                    NotificationHelper.showError(context, '删除站点失败: $e');
+          NotificationHelper.showError(context, '删除站点失败: $e');
         }
       }
     }
@@ -633,25 +654,15 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         }
         await ApiService.instance.setActiveSite(activeSite);
 
-        try {
-          final profile = await ApiService.instance.fetchMemberProfile();
+        if (!activeSite.features.supportMemberProfile) {
+          // 不支持用户资料接口时，改用 testConnection 测试连通性
+          // 失败会抛出 SiteException，由外层 catch 统一展示错误
+          await ApiService.instance.testConnection();
           setState(() {
             _healthStatuses[site.id] = _HealthStatus(
               ok: true,
-              message: '正常',
-              username: profile.username,
-              profile: profile,
-              updatedAt: DateTime.now(),
-            );
-          });
-          await StorageService.instance.saveHealthStatuses(
-            _healthStatuses.map((k, v) => MapEntry(k, v.toJson())),
-          );
-        } catch (e) {
-          setState(() {
-            _healthStatuses[site.id] = _HealthStatus(
-              ok: false,
-              message: e.toString(),
+              notApplicable: true,
+              message: '连接正常（不支持用户资料）',
               username: null,
               profile: null,
               updatedAt: DateTime.now(),
@@ -660,6 +671,35 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           await StorageService.instance.saveHealthStatuses(
             _healthStatuses.map((k, v) => MapEntry(k, v.toJson())),
           );
+        } else {
+          try {
+            final profile = await ApiService.instance.fetchMemberProfile();
+            setState(() {
+              _healthStatuses[site.id] = _HealthStatus(
+                ok: true,
+                message: '正常',
+                username: profile.username,
+                profile: profile,
+                updatedAt: DateTime.now(),
+              );
+            });
+            await StorageService.instance.saveHealthStatuses(
+              _healthStatuses.map((k, v) => MapEntry(k, v.toJson())),
+            );
+          } catch (e) {
+            setState(() {
+              _healthStatuses[site.id] = _HealthStatus(
+                ok: false,
+                message: e.toString(),
+                username: null,
+                profile: null,
+                updatedAt: DateTime.now(),
+              );
+            });
+            await StorageService.instance.saveHealthStatuses(
+              _healthStatuses.map((k, v) => MapEntry(k, v.toJson())),
+            );
+          }
         }
       } else {
         final allSites = await StorageService.instance.loadSiteConfigs(
@@ -679,10 +719,10 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       }
 
       if (!mounted) return;
-            NotificationHelper.showInfo(context, '站点已刷新');
+      NotificationHelper.showInfo(context, '站点已刷新');
     } catch (e) {
       if (!mounted) return;
-            NotificationHelper.showError(context, '刷新失败: $e');
+      NotificationHelper.showError(context, '刷新失败: $e');
     }
   }
 
@@ -720,18 +760,23 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   Widget _buildSiteList() {
     return Expanded(
       child: _reorderMode
-          ? ReorderableListView.builder(
-              buildDefaultDragHandles: false,
-              padding: const EdgeInsets.all(16),
-              itemCount: _sites.length,
-              onReorder: (oldIndex, newIndex) {
-                setState(() {
-                  if (newIndex > oldIndex) newIndex -= 1;
-                  final item = _sites.removeAt(oldIndex);
-                  _sites.insert(newIndex, item);
-                });
-              },
-              itemBuilder: (context, index) => _buildSiteItem(index),
+          ? CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverReorderableList(
+                    itemBuilder: (context, index) => _buildSiteItem(index),
+                    itemCount: _sites.length,
+                    onReorder: (oldIndex, newIndex) {
+                      setState(() {
+                        if (newIndex > oldIndex) newIndex -= 1;
+                        final item = _sites.removeAt(oldIndex);
+                        _sites.insert(newIndex, item);
+                      });
+                    },
+                  ),
+                ),
+              ],
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -739,7 +784,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
               itemBuilder: (context, index) {
                 final site = _filteredSites[index];
                 final isActive = site.id == _activeSiteId;
-                return _buildSiteCard(site, isActive);
+                return _buildSiteCard(site, isActive, index);
               },
             ),
     );
@@ -768,6 +813,27 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: ListTile(
+          leading: Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isActive
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : Theme.of(context).colorScheme.secondaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '${index + 1}',
+              style: TextStyle(
+                color: isActive
+                    ? Theme.of(context).colorScheme.onPrimaryContainer
+                    : Theme.of(context).colorScheme.onSecondaryContainer,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           title: Text(site.name, overflow: TextOverflow.ellipsis),
           subtitle: Text(
             site.baseUrl,
@@ -822,7 +888,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     );
   }
 
-  Widget _buildSiteCard(SiteConfig site, bool isActive) {
+  Widget _buildSiteCard(SiteConfig site, bool isActive, int index) {
     final Color? siteColor = site.siteColor != null
         ? Color(site.siteColor!)
         : null;
@@ -868,6 +934,36 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
+                                Container(
+                                  width: 28,
+                                  height: 28,
+                                  alignment: Alignment.center,
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                    color: isActive
+                                        ? Theme.of(
+                                            context,
+                                          ).colorScheme.primaryContainer
+                                        : Theme.of(
+                                            context,
+                                          ).colorScheme.secondaryContainer,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: TextStyle(
+                                      color: isActive
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.onPrimaryContainer
+                                          : Theme.of(
+                                              context,
+                                            ).colorScheme.onSecondaryContainer,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                                 CircleAvatar(
                                   radius: 14,
                                   backgroundColor: isActive
@@ -1111,6 +1207,27 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
               children: items,
             );
           }
+        } else if (hs.notApplicable && hs.ok) {
+          // 不支持用户资料但连接正常
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.check_circle_outline,
+                size: 18,
+                color: Theme.of(context).colorScheme.outline,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '连接正常（不支持用户资料）',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ),
+              ),
+            ],
+          );
         } else {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -1125,7 +1242,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                 constraints: const BoxConstraints(),
                 onPressed: () {
                   final msg = hs.message ?? '异常';
-                                    NotificationHelper.showError(context, msg);
+                  NotificationHelper.showError(context, msg);
                 },
               ),
               const SizedBox(width: 6),
@@ -1477,7 +1594,7 @@ class _CategoryEditDialogState extends State<_CategoryEditDialog> {
             final name = _nameController.text.trim();
             final parameters = _parametersController.text.trim();
             if (name.isEmpty || parameters.isEmpty) {
-                            NotificationHelper.showError(context, '请填写完整信息');
+              NotificationHelper.showError(context, '请填写完整信息');
               return;
             }
             final result = widget.category.copyWith(
@@ -1669,7 +1786,6 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
       // 清空之前的错误和用户信息
       _error = null;
-
     });
   }
 
@@ -1692,7 +1808,6 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
       // 清空之前的错误和用户信息
       _error = null;
-
     });
   }
 
@@ -1874,7 +1989,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // nexusphpweb类型需要cookie
       if (_savedCookie == null || _savedCookie!.isEmpty) {
         if (mounted) {
-                    NotificationHelper.showError(context, '请先完成登录获取Cookie');
+          NotificationHelper.showError(context, '请先完成登录获取Cookie');
         }
         return;
       }
@@ -1882,7 +1997,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       // 其他类型需要API Key
       if (_apiKeyController.text.trim().isEmpty) {
         if (mounted) {
-                    NotificationHelper.showError(context, '请先填写API Key');
+          NotificationHelper.showError(context, '请先填写API Key');
         }
         return;
       }
@@ -1902,7 +2017,10 @@ class _SiteEditPageState extends State<SiteEditPage> {
         });
 
         if (mounted) {
-                    NotificationHelper.showInfo(context, '已成功加载 ${categories.length} 个分类配置');
+          NotificationHelper.showInfo(
+            context,
+            '已成功加载 ${categories.length} 个分类配置',
+          );
         }
       } else {
         throw Exception('无法获取适配器实例');
@@ -1914,7 +2032,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       });
 
       if (mounted) {
-                NotificationHelper.showError(context, '获取分类配置失败，已使用默认配置: $e');
+        NotificationHelper.showError(context, '获取分类配置失败，已使用默认配置: $e');
       }
     }
   }
@@ -1943,42 +2061,80 @@ class _SiteEditPageState extends State<SiteEditPage> {
     });
 
     try {
-      // 如果搜索分类为空，先重置分类配置
-      if (_searchCategories.isEmpty) {
+      // 仅在支持分类搜索且分类列表为空时，才获取分类配置
+      if (_siteFeatures.supportCategories && _searchCategories.isEmpty) {
         await _resetSearchCategories();
       }
 
       final site = _composeCurrentSite();
       // 临时设置站点进行测试
       await ApiService.instance.setActiveSite(site);
-      final profile = await ApiService.instance.fetchMemberProfile();
-      
-      try {
-        final statuses = await StorageService.instance.loadHealthStatuses();
-        statuses[site.id] = _HealthStatus(
-          ok: true,
-          message: '正常',
-          username: profile.username,
-          profile: profile,
-          updatedAt: DateTime.now(),
-        ).toJson();
-        await StorageService.instance.saveHealthStatuses(statuses);
-      } catch (_) {}
 
-      if (!mounted) return;
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('测试连接成功'),
-          content: SingleChildScrollView(child: _ProfileView(profile: profile)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('关闭'),
+      if (_siteFeatures.supportMemberProfile) {
+        // 支持用户资料接口：获取并展示用户信息
+        final profile = await ApiService.instance.fetchMemberProfile();
+
+        try {
+          final statuses = await StorageService.instance.loadHealthStatuses();
+          statuses[site.id] = _HealthStatus(
+            ok: true,
+            message: '正常',
+            username: profile.username,
+            profile: profile,
+            updatedAt: DateTime.now(),
+          ).toJson();
+          await StorageService.instance.saveHealthStatuses(statuses);
+        } catch (_) {}
+
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('测试连接成功'),
+            content: SingleChildScrollView(
+              child: _ProfileView(profile: profile),
             ),
-          ],
-        ),
-      );
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('关闭'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        // 不支持用户资料接口：使用 testConnection 测试连通性
+        // 失败会抛出 SiteException，由外层 catch 统一展示错误
+        await ApiService.instance.testConnection();
+
+        try {
+          final statuses = await StorageService.instance.loadHealthStatuses();
+          statuses[site.id] = _HealthStatus(
+            ok: true,
+            notApplicable: true,
+            message: '连接正常（不支持用户资料）',
+            username: null,
+            profile: null,
+            updatedAt: DateTime.now(),
+          ).toJson();
+          await StorageService.instance.saveHealthStatuses(statuses);
+        } catch (_) {}
+
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('测试连接成功'),
+            content: const Text('站点连接正常。\n（当前站点配置不支持用户资料接口）'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('关闭'),
+              ),
+            ],
+          ),
+        );
+      }
     } catch (e) {
       try {
         final site = _composeCurrentSite();
@@ -2015,12 +2171,11 @@ class _SiteEditPageState extends State<SiteEditPage> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // 如果搜索分类为空，先重置分类配置
-    if (_searchCategories.isEmpty) {
+    // 仅在分类搜索功能开启时，如果搜索分类为空，先重置分类配置
+    if (_siteFeatures.supportCategories && _searchCategories.isEmpty) {
       setState(() {
         _loading = true;
         _error = null;
-
       });
 
       try {
@@ -2041,85 +2196,96 @@ class _SiteEditPageState extends State<SiteEditPage> {
     setState(() {
       _loading = true;
       _error = null;
-
     });
 
     try {
-      // 先验证连接并获取用户信息
       await ApiService.instance.setActiveSite(site);
-      final profile = await ApiService.instance.fetchMemberProfile();
 
-      // 创建包含userId、passKey和authKey的最终站点配置
-      // 优先使用用户填写的passKey，如果没有填写则使用从fetchMemberProfile获取的
-      final userPassKey = _passKeyController.text.trim();
-      final finalPassKey = userPassKey.isNotEmpty
-          ? userPassKey
-          : profile.passKey;
-      final finalSite = site.copyWith(
-        userId: profile.userId,
-        passKey: finalPassKey,
-        authKey: profile.authKey, // Gazelle类型站点需要authKey用于下载
-      );
+      final SiteConfig finalSite;
+      if (_siteFeatures.supportMemberProfile) {
+        // 用户资料功能开启时，验证连接并获取用户信息
+        final profile = await ApiService.instance.fetchMemberProfile();
+
+        // 创建包含userId、passKey和authKey的最终站点配置
+        // 优先使用用户填写的passKey，如果没有填写则使用从fetchMemberProfile获取的
+        final userPassKey = _passKeyController.text.trim();
+        final finalPassKey = userPassKey.isNotEmpty
+            ? userPassKey
+            : profile.passKey;
+        finalSite = site.copyWith(
+          userId: profile.userId,
+          passKey: finalPassKey,
+          authKey: profile.authKey, // Gazelle类型站点需要authKey用于下载
+        );
+      } else {
+        // 用户资料功能关闭时，直接使用当前配置保存
+        final userPassKey = _passKeyController.text.trim();
+        finalSite = site.copyWith(
+          passKey: userPassKey.isNotEmpty ? userPassKey : null,
+        );
+      }
 
       if (widget.site != null) {
         await StorageService.instance.updateSiteConfig(finalSite);
-        
-        // 同步更新聚合搜索配置，移除已删除的分类
-        final storage = StorageService.instance;
-        final aggregateSettings = await storage.loadAggregateSearchSettings();
-        bool settingsChanged = false;
 
-        final updatedConfigs = aggregateSettings.searchConfigs.map((config) {
-          // 检查该配置是否包含当前站点
-          final siteIndex = config.enabledSites.indexWhere(
-            (s) => s.id == finalSite.id,
-          );
-          if (siteIndex == -1) return config;
+        // 仅在分类搜索功能开启时，同步更新聚合搜索配置，移除已删除的分类
+        if (_siteFeatures.supportCategories) {
+          final storage = StorageService.instance;
+          final aggregateSettings = await storage.loadAggregateSearchSettings();
+          bool settingsChanged = false;
 
-          final siteItem = config.enabledSites[siteIndex];
-          final selectedCategories =
-              siteItem.additionalParams?['selectedCategories'] as List?;
+          final updatedConfigs = aggregateSettings.searchConfigs.map((config) {
+            // 检查该配置是否包含当前站点
+            final siteIndex = config.enabledSites.indexWhere(
+              (s) => s.id == finalSite.id,
+            );
+            if (siteIndex == -1) return config;
 
-          if (selectedCategories != null && selectedCategories.isNotEmpty) {
-            // 获取当前站点所有有效的分类ID
-            final validCategoryIds = finalSite.searchCategories
-                .map((c) => c.id)
-                .toSet();
-            // 过滤掉不存在的分类
-            final validSelectedCategories = selectedCategories
-                .where((c) => validCategoryIds.contains(c))
-                .toList();
+            final siteItem = config.enabledSites[siteIndex];
+            final selectedCategories =
+                siteItem.additionalParams?['selectedCategories'] as List?;
 
-            // 如果分类数量发生了变化，说明有分类被删除了
-            if (validSelectedCategories.length != selectedCategories.length) {
-              settingsChanged = true;
+            if (selectedCategories != null && selectedCategories.isNotEmpty) {
+              // 获取当前站点所有有效的分类ID
+              final validCategoryIds = finalSite.searchCategories
+                  .map((c) => c.id)
+                  .toSet();
+              // 过滤掉不存在的分类
+              final validSelectedCategories = selectedCategories
+                  .where((c) => validCategoryIds.contains(c))
+                  .toList();
 
-              final Map<String, dynamic>? newParams;
-              if (validSelectedCategories.isNotEmpty) {
-                newParams = {'selectedCategories': validSelectedCategories};
-              } else {
-                newParams = null;
+              // 如果分类数量发生了变化，说明有分类被删除了
+              if (validSelectedCategories.length != selectedCategories.length) {
+                settingsChanged = true;
+
+                final Map<String, dynamic>? newParams;
+                if (validSelectedCategories.isNotEmpty) {
+                  newParams = {'selectedCategories': validSelectedCategories};
+                } else {
+                  newParams = null;
+                }
+
+                final newSiteItem = siteItem.copyWith(
+                  additionalParams: newParams,
+                );
+                final newEnabledSites = List<SiteSearchItem>.from(
+                  config.enabledSites,
+                );
+                newEnabledSites[siteIndex] = newSiteItem;
+
+                return config.copyWith(enabledSites: newEnabledSites);
               }
-
-              final newSiteItem = siteItem.copyWith(
-                additionalParams: newParams,
-              );
-              final newEnabledSites = List<SiteSearchItem>.from(
-                config.enabledSites,
-              );
-              newEnabledSites[siteIndex] = newSiteItem;
-
-              return config.copyWith(enabledSites: newEnabledSites);
             }
+
+            return config;
+          }).toList();
+
+          if (settingsChanged) {
+            await storage.saveAggregateSearchSettings(
+              aggregateSettings.copyWith(searchConfigs: updatedConfigs),
+            );
           }
-
-          return config;
-        }).toList();
-
-        if (settingsChanged) {
-          await storage.saveAggregateSearchSettings(
-            aggregateSettings.copyWith(searchConfigs: updatedConfigs),
-          );
         }
 
         // 更新现有站点后，如果是当前活跃站点，需要重新初始化适配器
@@ -2146,7 +2312,10 @@ class _SiteEditPageState extends State<SiteEditPage> {
       }
 
       if (mounted) {
-                NotificationHelper.showInfo(context, widget.site != null ? '站点已更新' : '站点已添加');
+        NotificationHelper.showInfo(
+          context,
+          widget.site != null ? '站点已更新' : '站点已添加',
+        );
         widget.onSaved?.call();
         Navigator.of(context).pop();
       }
@@ -2817,7 +2986,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
               const SizedBox(height: 8),
 
               // 查询分类配置（只有在用户做出选择时才显示）
-              if (_hasUserMadeSelection)
+              if (_hasUserMadeSelection && _siteFeatures.supportCategories)
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -3031,10 +3200,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
               const SizedBox(height: 24),
 
               // 操作按钮（只有在用户做出选择时才显示）
-
               const SizedBox(height: 16),
-
-
 
               // 错误信息
               if (_error != null) ...[
@@ -3068,48 +3234,86 @@ class _SiteEditPageState extends State<SiteEditPage> {
               ],
 
               // 用户信息显示
-
             ],
           ),
         ),
       ),
 
       floatingActionButton: _hasUserMadeSelection
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                FloatingActionButton(
-                  heroTag: 'test_connection',
-                  onPressed: _loading ? null : _testConnection,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.tertiaryContainer,
-                  foregroundColor: Theme.of(
-                    context,
-                  ).colorScheme.onTertiaryContainer,
-                  tooltip: '测试连接',
-                  child: _loading
-                      ? SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: Theme.of(
+          ? Builder(
+              builder: (context) {
+                final isDesktop = ScreenUtils.isLargeScreen(context);
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    isDesktop
+                        ? FloatingActionButton.extended(
+                            heroTag: 'test_connection',
+                            onPressed: _loading ? null : _testConnection,
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.tertiaryContainer,
+                            foregroundColor: Theme.of(
                               context,
                             ).colorScheme.onTertiaryContainer,
+                            tooltip: '测试',
+                            icon: _loading
+                                ? SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onTertiaryContainer,
+                                    ),
+                                  )
+                                : const Icon(Icons.play_arrow),
+                            label: const Text('测试'),
+                          )
+                        : FloatingActionButton(
+                            heroTag: 'test_connection',
+                            onPressed: _loading ? null : _testConnection,
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.tertiaryContainer,
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.onTertiaryContainer,
+                            tooltip: '测试连接',
+                            child: _loading
+                                ? SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onTertiaryContainer,
+                                    ),
+                                  )
+                                : const Icon(Icons.play_arrow),
                           ),
-                        )
-                      : const Icon(Icons.play_arrow),
-                ),
-                const SizedBox(height: 16),
-                FloatingActionButton(
-                  heroTag: 'save_site',
-                  onPressed: _loading ? null : _save,
-                  tooltip: widget.site != null ? '更新' : '保存',
-                  child: const Icon(Icons.save),
-                ),
-              ],
+                    const SizedBox(height: 16),
+                    isDesktop
+                        ? FloatingActionButton.extended(
+                            heroTag: 'save_site',
+                            onPressed: _loading ? null : _save,
+                            tooltip: widget.site != null ? '更新' : '保存',
+                            icon: const Icon(Icons.save),
+                            label: Text(widget.site != null ? '更新' : '保存'),
+                          )
+                        : FloatingActionButton(
+                            heroTag: 'save_site',
+                            onPressed: _loading ? null : _save,
+                            tooltip: widget.site != null ? '更新' : '保存',
+                            child: const Icon(Icons.save),
+                          ),
+                  ],
+                );
+              },
             )
           : null,
     );

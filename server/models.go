@@ -33,8 +33,18 @@ type AppVersion struct {
     DownloadURL  string    `json:"download_url" gorm:"size:500"`
     IsLatest     bool      `json:"is_latest" gorm:"index"`
     IsBeta       bool      `json:"is_beta" gorm:"index"`
+    IsPublished  bool      `json:"is_published" gorm:"index;default:true"`
     CreatedAt    time.Time `json:"created_at"`
     UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// AdminUpdateVersionRequest represents the request to update a version from admin panel
+type AdminUpdateVersionRequest struct {
+    ReleaseNotes *string `json:"release_notes"`
+    DownloadURL  *string `json:"download_url"`
+    IsLatest     *bool   `json:"is_latest"`
+    IsBeta       *bool   `json:"is_beta"`
+    IsPublished  *bool   `json:"is_published"`
 }
 
 // AppStatistic represents usage statistics in database

@@ -161,6 +161,25 @@
       },
       "tagMapping": {}
     },
+    "Unit3D": {
+      "name": "Unit3D 站点",
+      "baseUrl": "https://",
+      "searchCategories": [],
+      "features": {
+        "userProfile": false,
+        "torrentSearch": true,
+        "torrentDetail": true,
+        "download": true,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": false,
+        "advancedSearch": false,
+        "showCover": true,
+        "commentDetail": false
+      },
+      "discountMapping": {},
+      "tagMapping": {}
+    },
     "NexusPHPWeb": {
       "name": "NexusPHP web",
       "baseUrl": "https://",
