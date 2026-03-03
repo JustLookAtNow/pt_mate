@@ -1,0 +1,4 @@
+interface:
+  display_name: "NexusPHPWeb Site Config"
+  short_description: "生成或更新NexusPHPWeb站点配置与infoFinder字段和manifest"
+  default_prompt: "请根据本技能流程创建或更新 NexusPHPWeb 站点配置，先检查 assets/sites_manifest.json 的 id，缺失则使用 Add Site 技能，再按 docs/SITE_CONFIGURATION_GUIDE.md 和模板完善 infoFinder。"
