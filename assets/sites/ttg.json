@@ -403,12 +403,17 @@
     "passKey": {
       "path": "my.php",
       "rows": {
-        "selector": "form[action==\"takeprofedit.php\"] > table:nth-child(1) > tbody:nth-child(1) > tr:nth-child(7) > td:nth-child(2)"
+        "selector": "form[action==\"takeprofedit.php\"] > table:nth-child(1) > tbody:nth-child(1)"
       },
       "fields": {
         "passKey": {
           "selector": "",
-          "attribute": "text"
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "Passkey:\\s*([a-zA-Z0-9]+)\\s*",
+            "value": "$1"
+          }
         }
       }
     },
