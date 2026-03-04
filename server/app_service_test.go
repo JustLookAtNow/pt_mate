@@ -57,6 +57,7 @@ func TestCheckUpdate(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer db.Close()
+	mock.MatchExpectationsInOrder(false)
 
 	gormDB, err := gorm.Open(postgres.New(postgres.Config{
 		Conn: db,
@@ -101,17 +102,18 @@ func TestCheckUpdate(t *testing.T) {
 					WillReturnResult(sqlmock.NewResult(1, 1))
 
 				// 3. getLatestVersion
-				mock.ExpectQuery(`SELECT \* FROM "app_versions" WHERE is_latest = \$1 AND is_beta = \$2 ORDER BY created_at DESC,"app_versions"."id" LIMIT \$3`).
-					WithArgs(true, false, 1).
-					WillReturnRows(sqlmock.NewRows([]string{"version", "release_notes", "download_url", "is_latest", "is_beta", "created_at"}).
-						AddRow("1.1.0", "New features", "http://example.com/app.apk", true, false, time.Now()))
+				mock.ExpectQuery(`SELECT \* FROM "app_versions" WHERE .*is_latest = \$1 AND is_published = \$2.*is_beta = \$3.* LIMIT \$4`).
+					WithArgs(true, true, false, 1).
+					WillReturnRows(sqlmock.NewRows([]string{"version", "release_notes", "download_url", "android_download_url", "is_latest", "is_beta", "is_published", "created_at"}).
+						AddRow("1.1.0", "New features", "https://example.com/release", "http://example.com/app.apk", true, false, true, time.Now()))
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: CheckUpdateResponse{
-				HasUpdate:     true,
-				LatestVersion: "1.1.0",
-				ReleaseNotes:  "New features",
-				DownloadURL:   "http://example.com/app.apk",
+				HasUpdate:          true,
+				LatestVersion:      "1.1.0",
+				ReleaseNotes:       "New features",
+				DownloadURL:        "http://example.com/app.apk",
+				AndroidDownloadURL: "http://example.com/app.apk",
 			},
 		},
 		{
@@ -139,14 +141,50 @@ func TestCheckUpdate(t *testing.T) {
 					WillReturnResult(sqlmock.NewResult(1, 1))
 
 				// 3. getLatestVersion
-				mock.ExpectQuery(`SELECT \* FROM "app_versions" WHERE is_latest = \$1 AND is_beta = \$2 ORDER BY created_at DESC,"app_versions"."id" LIMIT \$3`).
-					WithArgs(true, false, 1).
-					WillReturnRows(sqlmock.NewRows([]string{"version", "release_notes", "download_url", "is_latest", "is_beta", "created_at"}).
-						AddRow("1.1.0", "New features", "http://example.com/app.apk", true, false, time.Now()))
+				mock.ExpectQuery(`SELECT \* FROM "app_versions" WHERE .*is_latest = \$1 AND is_published = \$2.*is_beta = \$3.* LIMIT \$4`).
+					WithArgs(true, true, false, 1).
+					WillReturnRows(sqlmock.NewRows([]string{"version", "release_notes", "download_url", "android_download_url", "is_latest", "is_beta", "is_published", "created_at"}).
+						AddRow("1.1.0", "New features", "https://example.com/release", "http://example.com/app.apk", true, false, true, time.Now()))
 			},
 			expectedStatus: http.StatusOK,
 			expectedBody: CheckUpdateResponse{
 				HasUpdate: false,
+			},
+		},
+		{
+			name: "Update Available For Non-Android Keeps Generic URL",
+			request: CheckUpdateRequest{
+				DeviceID:   "test-device",
+				Platform:   "ios",
+				AppVersion: "1.0.0",
+				IsBeta:     false,
+			},
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery(`SELECT \* FROM "app_statistics" WHERE device_id = \$1 ORDER BY "app_statistics"."id" LIMIT \$2`).
+					WithArgs("test-device", 1).
+					WillReturnRows(sqlmock.NewRows([]string{"id", "total_launches"}).AddRow(1, 10))
+				mock.ExpectBegin()
+				mock.ExpectExec(`UPDATE "app_statistics" SET`).
+					WillReturnResult(sqlmock.NewResult(1, 1))
+				mock.ExpectCommit()
+
+				mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO app_activity (device_id, platform, app_version, seen_date, seen_at)
+            VALUES ($1, $2, $3, ($4::date), $5)
+            ON CONFLICT (device_id, seen_date) DO NOTHING`)).
+					WillReturnResult(sqlmock.NewResult(1, 1))
+
+				mock.ExpectQuery(`SELECT \* FROM "app_versions" WHERE .*is_latest = \$1 AND is_published = \$2.*is_beta = \$3.* LIMIT \$4`).
+					WithArgs(true, true, false, 1).
+					WillReturnRows(sqlmock.NewRows([]string{"version", "release_notes", "download_url", "android_download_url", "is_latest", "is_beta", "is_published", "created_at"}).
+						AddRow("1.1.0", "New features", "https://example.com/release", "http://example.com/app.apk", true, false, true, time.Now()))
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody: CheckUpdateResponse{
+				HasUpdate:          true,
+				LatestVersion:      "1.1.0",
+				ReleaseNotes:       "New features",
+				DownloadURL:        "https://example.com/release",
+				AndroidDownloadURL: "http://example.com/app.apk",
 			},
 		},
 		{
@@ -174,8 +212,8 @@ func TestCheckUpdate(t *testing.T) {
 					WillReturnResult(sqlmock.NewResult(1, 1))
 
 				// 3. getLatestVersion - RecordNotFound
-				mock.ExpectQuery(`SELECT \* FROM "app_versions" WHERE is_latest = \$1 AND is_beta = \$2 ORDER BY created_at DESC,"app_versions"."id" LIMIT \$3`).
-					WithArgs(true, false, 1).
+				mock.ExpectQuery(`SELECT \* FROM "app_versions" WHERE .*is_latest = \$1 AND is_published = \$2.*is_beta = \$3.* LIMIT \$4`).
+					WithArgs(true, true, false, 1).
 					WillReturnError(gorm.ErrRecordNotFound)
 			},
 			expectedStatus: http.StatusOK,
@@ -199,6 +237,7 @@ func TestCheckUpdate(t *testing.T) {
 
 			// Call handler
 			service.CheckUpdate(c)
+			time.Sleep(20 * time.Millisecond)
 
 			// Assertions
 			assert.Equal(t, tt.expectedStatus, w.Code)

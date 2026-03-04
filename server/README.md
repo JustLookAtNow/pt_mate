@@ -30,7 +30,8 @@ PTMate应用的后端服务，提供自动更新检查和使用统计功能。
   "has_update": true,
   "latest_version": "2.12.0",
   "release_notes": "新功能和修复...",
-  "download_url": "https://github.com/user/repo/releases/tag/v2.12.0"
+  "download_url": "https://github.com/user/repo/releases/tag/v2.12.0",
+  "android_download_url": "https://github.com/user/repo/releases/download/v2.12.0/pt_mate-2.12.0-arm64-v8a.apk"
 }
 ```
 
@@ -43,7 +44,8 @@ PTMate应用的后端服务，提供自动更新检查和使用统计功能。
 {
   "version": "2.12.0",
   "release_notes": "发布说明...",
-  "download_url": "https://github.com/user/repo/releases/tag/v2.12.0"
+  "download_url": "https://github.com/user/repo/releases/tag/v2.12.0",
+  "android_download_url": "https://github.com/user/repo/releases/download/v2.12.0/pt_mate-2.12.0-arm64-v8a.apk"
 }
 ```
 

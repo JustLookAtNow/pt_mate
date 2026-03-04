@@ -214,7 +214,12 @@
                   {{v.release_notes}}
                 </td>
                 <td style="max-width:150px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                  <a :href="v.download_url" target="_blank">{{v.download_url}}</a>
+                  <div v-if="v.download_url">
+                    <a :href="v.download_url" target="_blank">{{v.download_url}}</a>
+                  </div>
+                  <div v-if="v.android_download_url" style="margin-top:4px;">
+                    <a :href="v.android_download_url" target="_blank">{{v.android_download_url}}</a>
+                  </div>
                 </td>
                 <td>{{formatDate(v.created_at)}}</td>
                 <td>
@@ -249,6 +254,10 @@
         <div class="form-group">
           <label>下载地址</label>
           <input v-model="editingVersion.download_url" type="text" />
+        </div>
+        <div class="form-group">
+          <label>Android APK 直链</label>
+          <input v-model="editingVersion.android_download_url" type="text" />
         </div>
         <div class="form-group" style="display:flex; gap:16px;">
           <label><input type="checkbox" v-model="editingVersion.is_latest" /> 设为最新</label>

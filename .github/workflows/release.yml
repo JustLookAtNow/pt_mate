@@ -612,16 +612,19 @@ jobs:
         fi
 
         DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/tag/${VERSION_TAG}"
+        ANDROID_DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${VERSION_TAG}/pt_mate-${VERSION}-arm64-v8a.apk"
         
         # Build JSON payload safely
         JSON_PAYLOAD=$(jq -n \
           --arg version "$VERSION" \
           --arg release_notes "$RELEASE_NOTES" \
           --arg download_url "$DOWNLOAD_URL" \
+          --arg android_download_url "$ANDROID_DOWNLOAD_URL" \
           '{
             version: $version,
             release_notes: $release_notes,
-            download_url: $download_url
+            download_url: $download_url,
+            android_download_url: $android_download_url
           }')
 
         echo "Sending version update to $UPDATE_SERVER_URL/api/v1/github/version-update"

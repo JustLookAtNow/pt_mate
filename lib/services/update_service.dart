@@ -7,8 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'device_id_service.dart';
 
 class UpdateService {
-  static const String _baseUrl =
-      'https://ptmate.fly2sky.dpdns.org';
+  static const String _baseUrl = 'https://ptmate.fly2sky.dpdns.org';
   static const String _lastCheckKey = 'last_update_check';
   static const String _betaOptInKey = 'enable_beta_updates';
   static const Duration _checkInterval = Duration(hours: 24); // 24小时检查一次
@@ -172,6 +171,7 @@ class UpdateCheckResult {
   final String? latestVersion;
   final String? releaseNotes;
   final String? downloadUrl;
+  final String? androidDownloadUrl;
   final bool isPreRelease;
 
   UpdateCheckResult({
@@ -179,6 +179,7 @@ class UpdateCheckResult {
     this.latestVersion,
     this.releaseNotes,
     this.downloadUrl,
+    this.androidDownloadUrl,
     this.isPreRelease = false,
   });
 
@@ -189,6 +190,7 @@ class UpdateCheckResult {
       latestVersion: latest,
       releaseNotes: json['release_notes'],
       downloadUrl: json['download_url'],
+      androidDownloadUrl: json['android_download_url'],
       isPreRelease: _isPreReleaseVersion(latest),
     );
   }
@@ -199,6 +201,7 @@ class UpdateCheckResult {
       'latest_version': latestVersion,
       'release_notes': releaseNotes,
       'download_url': downloadUrl,
+      'android_download_url': androidDownloadUrl,
       'is_pre_release': isPreRelease,
     };
   }

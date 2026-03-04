@@ -4,67 +4,71 @@ import "time"
 
 // CheckUpdateRequest represents the request payload for update checking
 type CheckUpdateRequest struct {
-    DeviceID    string `json:"device_id" binding:"required"`
-    Platform    string `json:"platform" binding:"required"`
-    AppVersion  string `json:"app_version" binding:"required"`
-    IsBeta      bool   `json:"is_beta"`
+	DeviceID   string `json:"device_id" binding:"required"`
+	Platform   string `json:"platform" binding:"required"`
+	AppVersion string `json:"app_version" binding:"required"`
+	IsBeta     bool   `json:"is_beta"`
 }
 
 // CheckUpdateResponse represents the response for update checking
 type CheckUpdateResponse struct {
-	HasUpdate    bool   `json:"has_update"`
-	LatestVersion string `json:"latest_version,omitempty"`
-	ReleaseNotes  string `json:"release_notes,omitempty"`
-	DownloadURL   string `json:"download_url,omitempty"`
+	HasUpdate          bool   `json:"has_update"`
+	LatestVersion      string `json:"latest_version,omitempty"`
+	ReleaseNotes       string `json:"release_notes,omitempty"`
+	DownloadURL        string `json:"download_url,omitempty"`
+	AndroidDownloadURL string `json:"android_download_url,omitempty"`
 }
 
 // VersionUpdateRequest represents the request from GitHub Actions
 type VersionUpdateRequest struct {
-	Version      string `json:"version" binding:"required"`
-	ReleaseNotes string `json:"release_notes"`
-	DownloadURL  string `json:"download_url"`
+	Version            string `json:"version" binding:"required"`
+	ReleaseNotes       string `json:"release_notes"`
+	DownloadURL        string `json:"download_url"`
+	AndroidDownloadURL string `json:"android_download_url"`
 }
 
 // AppVersion represents a version record in database
 type AppVersion struct {
-    ID           int       `json:"id" gorm:"primaryKey"`
-    Version      string    `json:"version" gorm:"uniqueIndex;size:50;not null"`
-    ReleaseNotes string    `json:"release_notes"`
-    DownloadURL  string    `json:"download_url" gorm:"size:500"`
-    IsLatest     bool      `json:"is_latest" gorm:"index"`
-    IsBeta       bool      `json:"is_beta" gorm:"index"`
-    IsPublished  bool      `json:"is_published" gorm:"index;default:true"`
-    CreatedAt    time.Time `json:"created_at"`
-    UpdatedAt    time.Time `json:"updated_at"`
+	ID                 int       `json:"id" gorm:"primaryKey"`
+	Version            string    `json:"version" gorm:"uniqueIndex;size:50;not null"`
+	ReleaseNotes       string    `json:"release_notes"`
+	DownloadURL        string    `json:"download_url" gorm:"size:500"`
+	AndroidDownloadURL string    `json:"android_download_url" gorm:"size:500"`
+	IsLatest           bool      `json:"is_latest" gorm:"index"`
+	IsBeta             bool      `json:"is_beta" gorm:"index"`
+	IsPublished        bool      `json:"is_published" gorm:"index;default:true"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 // AdminUpdateVersionRequest represents the request to update a version from admin panel
 type AdminUpdateVersionRequest struct {
-    ReleaseNotes *string `json:"release_notes"`
-    DownloadURL  *string `json:"download_url"`
-    IsLatest     *bool   `json:"is_latest"`
-    IsBeta       *bool   `json:"is_beta"`
-    IsPublished  *bool   `json:"is_published"`
+	ReleaseNotes       *string `json:"release_notes"`
+	DownloadURL        *string `json:"download_url"`
+	AndroidDownloadURL *string `json:"android_download_url"`
+	IsLatest           *bool   `json:"is_latest"`
+	IsBeta             *bool   `json:"is_beta"`
+	IsPublished        *bool   `json:"is_published"`
 }
 
 // AppStatistic represents usage statistics in database
 type AppStatistic struct {
-    ID            int       `json:"id" gorm:"primaryKey"`
-    DeviceID      string    `json:"device_id" gorm:"uniqueIndex;size:100;not null"`
-    Platform      string    `json:"platform" gorm:"index;size:50;not null"`
-    AppVersion    string    `json:"app_version" gorm:"size:50;not null"`
-    IP            string    `json:"ip" gorm:"size:64"`
-    FirstSeen     time.Time `json:"first_seen"`
-    LastSeen      time.Time `json:"last_seen" gorm:"index"`
-    TotalLaunches int       `json:"total_launches"`
+	ID            int       `json:"id" gorm:"primaryKey"`
+	DeviceID      string    `json:"device_id" gorm:"uniqueIndex;size:100;not null"`
+	Platform      string    `json:"platform" gorm:"index;size:50;not null"`
+	AppVersion    string    `json:"app_version" gorm:"size:50;not null"`
+	IP            string    `json:"ip" gorm:"size:64"`
+	FirstSeen     time.Time `json:"first_seen"`
+	LastSeen      time.Time `json:"last_seen" gorm:"index"`
+	TotalLaunches int       `json:"total_launches"`
 }
 
 // AppActivity records daily activity per device for trend analytics
 type AppActivity struct {
-    ID         int       `json:"id" gorm:"primaryKey"`
-    DeviceID   string    `json:"device_id" gorm:"index;size:100;not null"`
-    Platform   string    `json:"platform" gorm:"index;size:50;not null"`
-    AppVersion string    `json:"app_version" gorm:"index;size:50;not null"`
-    SeenDate   time.Time `json:"seen_date" gorm:"type:date;index;not null"`
-    SeenAt     time.Time `json:"seen_at" gorm:"not null"`
+	ID         int       `json:"id" gorm:"primaryKey"`
+	DeviceID   string    `json:"device_id" gorm:"index;size:100;not null"`
+	Platform   string    `json:"platform" gorm:"index;size:50;not null"`
+	AppVersion string    `json:"app_version" gorm:"index;size:50;not null"`
+	SeenDate   time.Time `json:"seen_date" gorm:"type:date;index;not null"`
+	SeenAt     time.Time `json:"seen_at" gorm:"not null"`
 }
