@@ -173,7 +173,7 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
     }
   }
 
-  Future<void> _extractCookie() async {
+  Future<bool> _extractCookie({bool closeAfter = false}) async {
     try {
       if (kDebugMode) {
         _logger.i('开始提取cookie...');
@@ -183,7 +183,7 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
         if (kDebugMode) {
           _logger.e('WebView控制器未初始化');
         }
-        return;
+        return false;
       }
 
       // 等待页面完全加载
@@ -289,9 +289,22 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
           setState(() {
             _loginSuccess = true;
           });
-                    NotificationHelper.showInfo(context, 'Cookie 获取成功！如有二次验证请继续操作，完成后请手动关闭此页面', duration: const Duration(seconds: 5));
+          if (closeAfter) {
+            NotificationHelper.showInfo(
+              context,
+              'Cookie 获取成功！',
+              duration: const Duration(seconds: 3),
+            );
+            Navigator.of(context).pop();
+          } else {
+            NotificationHelper.showInfo(
+              context,
+              'Cookie 获取成功！如有二次验证请继续操作，完成后请手动关闭此页面',
+              duration: const Duration(seconds: 5),
+            );
+          }
         }
-        return;
+        return true;
       }
 
       if (kDebugMode) {
@@ -300,6 +313,7 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
       if (mounted) {
                 NotificationHelper.showInfo(context, '无法获取cookie，请检查登录状态', duration: const Duration(seconds: 3));
       }
+      return false;
     } catch (e) {
       if (kDebugMode) {
         _logger.e('提取cookie时出错: $e');
@@ -307,6 +321,7 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
       if (mounted) {
                 NotificationHelper.showError(context, 'Cookie提取失败: $e');
       }
+      return false;
     }
   }
 
@@ -334,7 +349,7 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
             icon: const Icon(Icons.download),
             tooltip: '手动获取Cookie',
             onPressed: () {
-              _extractCookie();
+              _extractCookie(closeAfter: true);
             },
           ),
         ],
