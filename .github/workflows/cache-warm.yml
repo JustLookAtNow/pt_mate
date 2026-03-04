@@ -162,10 +162,10 @@ jobs:
           cache-key: 'flutter-:os:-:channel:-:version:-:arch:'
           cache-path: '${{ runner.tool_cache }}/flutter'
 
-      - name: Flutter precache (macOS)
+      - name: Flutter precache (macOS & iOS)
         run: |
           flutter config --enable-macos-desktop
-          flutter precache --macos
+          flutter precache --macos --ios
 
       - name: Get dependencies
         run: |
