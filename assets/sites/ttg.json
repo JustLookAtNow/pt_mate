@@ -411,7 +411,7 @@
           "attribute": "text",
           "filter": {
             "name": "regexp",
-            "args": "Passkey:\\s*([a-zA-Z0-9]+)\\s*",
+            "args": "Passkey\\s*([a-zA-Z0-9]+)\\s*",
             "value": "$1"
           }
         }
