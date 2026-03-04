@@ -28,6 +28,7 @@ class AppUpdateDownloader {
     'https://gh-proxy.com/',
     'https://mirror.ghproxy.com/',
     'https://ghproxy.net/',
+    'https://github.abskoop.workers.dev/',
   ];
 
   final Dio _probeDio = Dio(
