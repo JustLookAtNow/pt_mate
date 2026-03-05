@@ -130,7 +130,10 @@ class _AboutPageState extends State<AboutPage> {
     try {
       final result = await UpdateService.instance.manualCheckForUpdates();
       if (!mounted || result == null) return;
-      if (result.hasUpdate) {
+      final suppressed = await UpdateService.instance
+          .isAutoUpdateDialogSuppressed();
+      if (!mounted) return;
+      if (result.hasUpdate && !suppressed) {
         await UpdateNotificationDialog.show(context, result);
       }
     } catch (e) {

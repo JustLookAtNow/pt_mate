@@ -875,6 +875,10 @@ class _HomePageState extends State<HomePage> {
       final updateResult = await UpdateService.instance.checkForUpdates();
 
       if (updateResult != null && updateResult.hasUpdate && mounted) {
+        final suppressed = await UpdateService.instance
+            .isAutoUpdateDialogSuppressed();
+        if (suppressed || !mounted) return;
+
         // 延迟显示更新对话框，避免与其他初始化对话框冲突
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {

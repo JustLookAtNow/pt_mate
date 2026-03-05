@@ -10,6 +10,7 @@ class UpdateService {
   static const String _baseUrl = 'https://ptmate.fly2sky.dpdns.org';
   static const String _lastCheckKey = 'last_update_check';
   static const String _betaOptInKey = 'enable_beta_updates';
+  static const String _suppressAutoDialogKey = 'suppress_auto_update_dialog';
   static const Duration _checkInterval = Duration(hours: 24); // 24小时检查一次
 
   static UpdateService? _instance;
@@ -159,6 +160,26 @@ class UpdateService {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_betaOptInKey, enabled);
+    } catch (e) {
+      // 忽略错误
+    }
+  }
+
+  /// 是否屏蔽自动更新提醒弹窗（仅影响自动检查，不影响手动“检查更新”）
+  Future<bool> isAutoUpdateDialogSuppressed() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_suppressAutoDialogKey) ?? false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 设置是否屏蔽自动更新提醒弹窗
+  Future<void> setAutoUpdateDialogSuppressed(bool suppressed) async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_suppressAutoDialogKey, suppressed);
     } catch (e) {
       // 忽略错误
     }

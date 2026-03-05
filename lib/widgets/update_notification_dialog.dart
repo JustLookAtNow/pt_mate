@@ -106,23 +106,44 @@ class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
           ],
         ),
       ),
+      actionsAlignment: MainAxisAlignment.spaceBetween,
       actions: [
         TextButton(
-          onPressed: _isUpdating ? null : () => Navigator.of(context).pop(),
+          onPressed: _isUpdating ? null : _onNeverRemindPressed,
           style: TextButton.styleFrom(
-            side: BorderSide(
-              color: Theme.of(context).colorScheme.outline,
-              width: 1.0,
-            ),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            foregroundColor: Theme.of(context).colorScheme.onError,
           ),
-          child: const Text('稍后提醒'),
+          child: const Text('永不提醒'),
         ),
-        FilledButton(
-          onPressed: _isUpdating ? null : _onPrimaryPressed,
-          child: Text(_isUpdating ? '下载中...' : '立即更新'),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton(
+              onPressed: _isUpdating ? null : () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.outline,
+                  width: 1.0,
+                ),
+              ),
+              child: const Text('稍后提醒'),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: _isUpdating ? null : _onPrimaryPressed,
+              child: Text(_isUpdating ? '下载中...' : '立即更新'),
+            ),
+          ],
         ),
       ],
     );
+  }
+
+  Future<void> _onNeverRemindPressed() async {
+    await UpdateService.instance.setAutoUpdateDialogSuppressed(true);
+    if (!mounted) return;
+    Navigator.of(context).pop();
   }
 
   Future<void> _onPrimaryPressed() async {
