@@ -3,6 +3,29 @@ import '../../utils/format.dart';
 /// Web DOM 解析适配器的基础 Mixin
 /// 提供通用的 DOM 元素选择和字段提取功能
 mixin BaseWebAdapterMixin {
+  // --- Cached Regular Expressions ---
+  static final _classAndAttrValueRegex = RegExp(
+    r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$',
+  );
+  static final _classAndAttrExistsRegex = RegExp(
+    r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)\]$',
+  );
+  static final _attributeExistsRegex = RegExp(
+    r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)\]$',
+  );
+  static final _attributeValueRegex = RegExp(
+    r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$',
+  );
+  static final _containsAllRegex = RegExp(r'^([^:]*):contains\((.*)\)$');
+  static final _whitespaceRegex = RegExp(r'\s+');
+  static final _nthChildRegex = RegExp(r'^([^:]*):nth-child\((\d+)\)');
+  static final _nthChildNoBracketRegex = RegExp(r'^([^:]+):nth-child$');
+  static final _nthNodeRegex = RegExp(r'^([^:]*):nth-node\((\d+)\)');
+  static final _nthNodeNoBracketRegex = RegExp(r'^([^:]+):nth-node$');
+  static final _groupTemplateRegex = RegExp(r'\$(\d+)');
+  static final _singleQuoteRegex = RegExp(r"^'(.*)'$");
+  static final _doubleQuoteRegex = RegExp(r'^"(.*)"$');
+
   /// 根据选择器查找所有匹配的元素
   /// [soup] 可以是 BeautifulSoup 或 Bs4Element 类型
   List<dynamic> findElementBySelector(dynamic soup, String selector) {
@@ -95,9 +118,7 @@ mixin BaseWebAdapterMixin {
 
     // 处理复合选择器：tag.class[attr=="value"] 或 tag.class[attr]
     // 这种选择器同时包含类名和属性条件
-    final classAndAttrValueMatch = RegExp(
-      r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$',
-    ).firstMatch(selector);
+    final classAndAttrValueMatch = _classAndAttrValueRegex.firstMatch(selector);
     if (classAndAttrValueMatch != null) {
       final tag = classAndAttrValueMatch.group(1)?.trim();
       final className = classAndAttrValueMatch.group(2)?.trim();
@@ -146,9 +167,9 @@ mixin BaseWebAdapterMixin {
     }
 
     // 处理复合选择器：tag.class[attr]（属性存在性）
-    final classAndAttrExistsMatch = RegExp(
-      r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)\]$',
-    ).firstMatch(selector);
+    final classAndAttrExistsMatch = _classAndAttrExistsRegex.firstMatch(
+      selector,
+    );
     if (classAndAttrExistsMatch != null) {
       final tag = classAndAttrExistsMatch.group(1)?.trim();
       final className = classAndAttrExistsMatch.group(2)?.trim();
@@ -173,9 +194,7 @@ mixin BaseWebAdapterMixin {
 
     // 处理属性选择器
     // 1. 属性存在性选择器 tag[attr]
-    final attributeExistsMatch = RegExp(
-      r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)\]$',
-    ).firstMatch(selector);
+    final attributeExistsMatch = _attributeExistsRegex.firstMatch(selector);
     if (attributeExistsMatch != null) {
       final tag = attributeExistsMatch.group(1)?.trim();
       final attribute = attributeExistsMatch.group(2)?.trim();
@@ -191,9 +210,7 @@ mixin BaseWebAdapterMixin {
     }
 
     // 2. 属性值选择器 tag[attr^="value"], tag[attr=="value"], tag[attr~="pattern"]
-    final attributeValueMatch = RegExp(
-      r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$',
-    ).firstMatch(selector);
+    final attributeValueMatch = _attributeValueRegex.firstMatch(selector);
     if (attributeValueMatch != null) {
       final tag = attributeValueMatch.group(1)?.trim();
       final attribute = attributeValueMatch.group(2)?.trim();
@@ -241,9 +258,7 @@ mixin BaseWebAdapterMixin {
     }
 
     // 处理单个选择器
-    final containsAllMatch = RegExp(
-      r'^([^:]*):contains\((.*)\)$',
-    ).firstMatch(selector);
+    final containsAllMatch = _containsAllRegex.firstMatch(selector);
     if (containsAllMatch != null) {
       final preSelector = (containsAllMatch.group(1) ?? '').trim();
       final expr = (containsAllMatch.group(2) ?? '').trim();
@@ -257,7 +272,7 @@ mixin BaseWebAdapterMixin {
       for (final el in candidates) {
         final t = (el.text ?? '')
             .replaceAll('\n', ' ')
-            .replaceAll(RegExp(r'\s+'), ' ')
+            .replaceAll(_whitespaceRegex, ' ')
             .trim();
         final ok = groups.any((g) => g.every((n) => t.contains(n)));
         if (ok) {
@@ -271,9 +286,7 @@ mixin BaseWebAdapterMixin {
       // nth-child选择器
       if (selector.contains(':nth-child(')) {
         // 带括号数字的 nth-child 选择器
-        final nthChildMatch = RegExp(
-          r'^([^:]*):nth-child\((\d+)\)',
-        ).firstMatch(selector);
+        final nthChildMatch = _nthChildRegex.firstMatch(selector);
         if (nthChildMatch != null) {
           final tag = nthChildMatch.group(1)?.trim();
           final index = FormatUtil.parseInt(nthChildMatch.group(2) ?? '1') ?? 1;
@@ -298,9 +311,7 @@ mixin BaseWebAdapterMixin {
         }
       } else {
         // 不带括号的 nth-child 选择器，只取直接子元素中的指定标签
-        final nthChildMatch = RegExp(
-          r'^([^:]+):nth-child$',
-        ).firstMatch(selector);
+        final nthChildMatch = _nthChildNoBracketRegex.firstMatch(selector);
         if (nthChildMatch != null) {
           final tag = nthChildMatch.group(1)?.trim();
           if (tag != null && tag.isNotEmpty) {
@@ -329,9 +340,7 @@ mixin BaseWebAdapterMixin {
       // nth-child选择器
       if (selector.contains(':nth-node(')) {
         // 带括号数字的 nth-child 选择器
-        final nthChildMatch = RegExp(
-          r'^([^:]*):nth-node\((\d+)\)',
-        ).firstMatch(selector);
+        final nthChildMatch = _nthNodeRegex.firstMatch(selector);
         if (nthChildMatch != null) {
           final tag = nthChildMatch.group(1)?.trim();
           final index = FormatUtil.parseInt(nthChildMatch.group(2) ?? '1') ?? 1;
@@ -356,7 +365,7 @@ mixin BaseWebAdapterMixin {
         }
       } else {
         // 不带括号的 nth-child 选择器，只取直接子元素中的指定标签
-        final nthNodeMatch = RegExp(r'^([^:]+):nth-node$').firstMatch(selector);
+        final nthNodeMatch = _nthNodeNoBracketRegex.firstMatch(selector);
         if (nthNodeMatch != null) {
           final tag = nthNodeMatch.group(1)?.trim();
           if (tag != null && tag.isNotEmpty) {
@@ -425,7 +434,6 @@ mixin BaseWebAdapterMixin {
     dynamic element,
     Map<String, dynamic> fieldConfig,
   ) async {
-
     final selector = fieldConfig['selector'] as String?;
     final attribute = fieldConfig['attribute'] as String?;
     final filter = fieldConfig['filter'] as Map<String, dynamic>?;
@@ -463,7 +471,9 @@ mixin BaseWebAdapterMixin {
 
       // 只添加非空值
       if (value != null && value.isNotEmpty) {
-        values.add(value.replaceAll('\n', ' ').replaceAll(RegExp(r'\s+'), ' '));
+        values.add(
+          value.replaceAll('\n', ' ').replaceAll(_whitespaceRegex, ' '),
+        );
       }
     }
 
@@ -478,7 +488,6 @@ mixin BaseWebAdapterMixin {
     final values = await extractFieldValue(element, fieldConfig);
     return values.isNotEmpty ? values.first : null;
   }
-
 
   /// 标准化href属性用于比较
   /// 将绝对URL转换为相对路径格式，便于与配置中的路径进行比较
@@ -505,7 +514,7 @@ mixin BaseWebAdapterMixin {
         final match = regex.firstMatch(value);
         if (match != null) {
           final template = format ?? r'$0';
-          return template.replaceAllMapped(RegExp(r'\$(\d+)'), (m) {
+          return template.replaceAllMapped(_groupTemplateRegex, (m) {
             final groupIndex = int.parse(m.group(1)!);
             if (groupIndex <= match.groupCount) {
               return match.group(groupIndex) ?? '';
@@ -563,8 +572,7 @@ mixin BaseWebAdapterMixin {
       for (final p in andParts) {
         final s = p.trim();
         final m =
-            RegExp(r"^'(.*)'$").firstMatch(s) ??
-            RegExp(r'^"(.*)"$').firstMatch(s);
+            _singleQuoteRegex.firstMatch(s) ?? _doubleQuoteRegex.firstMatch(s);
         if (m != null) {
           final v = (m.group(1) ?? '').trim();
           if (v.isNotEmpty) needles.add(v);
