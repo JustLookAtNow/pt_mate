@@ -53,7 +53,8 @@ class MemberProfile {
         json['downloadedBytesString'] ?? json['downloaded_str'] ?? '';
     // 新增字段兼容旧版本与不同命名
     final bonusPerHourVal = json['bonusPerHour'] ?? json['bonus_per_hour'];
-    final seedingSizeVal = json['seedingSizeBytes'] ?? json['seedingSize'] ?? json['seederSize'];
+    final seedingSizeVal =
+        json['seedingSizeBytes'] ?? json['seedingSize'] ?? json['seederSize'];
 
     double parseDouble(dynamic v) {
       if (v is num) return v.toDouble();
@@ -84,8 +85,12 @@ class MemberProfile {
           : (json['last_access'] != null
                 ? Formatters.parseDateTimeCustom(json['last_access'].toString())
                 : null),
-      bonusPerHour: bonusPerHourVal == null ? null : parseDouble(bonusPerHourVal),
-      seedingSizeBytes: seedingSizeVal == null ? null : parseInt(seedingSizeVal),
+      bonusPerHour: bonusPerHourVal == null
+          ? null
+          : parseDouble(bonusPerHourVal),
+      seedingSizeBytes: seedingSizeVal == null
+          ? null
+          : parseInt(seedingSizeVal),
     );
   }
 
@@ -318,7 +323,7 @@ enum TagType {
   mandarin('国语', Colors.blue, ''),
   diy('DIY', Colors.brown, ''),
   complete('完结', Color.fromARGB(255, 110, 8, 206), r'\b完结\b|全[^\s]+集'),
-  zero('零魔',Color.fromARGB(159, 4, 164, 239),''),
+  zero('零魔', Color.fromARGB(159, 4, 164, 239), ''),
   ep(
     '分集',
     Color.fromARGB(255, 110, 8, 206),
@@ -340,7 +345,6 @@ enum TagType {
   dovi('DOVI', Colors.pink, r'\bDOVI\b|Dolby Vision|\bDV\b|杜比(视界)*'),
   blueRay('Blu-ray', Colors.red, r'\bblu-ray\b|\bbluray\b');
 
-
   const TagType(this.content, this.color, this.regex);
   final String content;
   final Color color;
@@ -360,10 +364,7 @@ enum TagType {
   }
 
   // 序列化为 JSON
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'content': content,
-  };
+  Map<String, dynamic> toJson() => {'name': name, 'content': content};
 }
 
 // 网站类型枚举
@@ -383,21 +384,20 @@ enum SiteType {
     '可以在网站的「账户设置」页面查看和重置自己的 Passkey。',
   ),
   gazelle('Gazelle', 'Gazelle (Alpha)', 'Cookie认证', '通过网页登录获取认证信息'),
-  unit3d('Unit3D', 'Unit3D (beta)', 'API Key', '安全设置 - API Token')
-  ;
+  unit3d('Unit3D', 'Unit3D (beta)', 'API Key', '安全设置 - API Token');
 
   const SiteType(this.id, this.displayName, this.apiKeyLabel, this.apiKeyHint);
   final String id;
   final String displayName;
   final String apiKeyLabel;
   final String apiKeyHint;
-
 }
 
 // 站点功能配置
 class SiteFeatures {
   final bool supportMemberProfile; // 支持用户资料
   final bool supportTorrentSearch; // 支持种子搜索
+  final bool supportTorrentBrowse; // 支持无关键字浏览列表
   final bool supportTorrentDetail; // 支持种子详情
   final bool supportDownload; // 支持下载
   final bool supportCollection; // 支持收藏功能
@@ -411,6 +411,7 @@ class SiteFeatures {
   const SiteFeatures({
     this.supportMemberProfile = true,
     this.supportTorrentSearch = true,
+    this.supportTorrentBrowse = true,
     this.supportTorrentDetail = true,
     this.supportDownload = true,
     this.supportCollection = true,
@@ -425,6 +426,7 @@ class SiteFeatures {
   SiteFeatures copyWith({
     bool? supportMemberProfile,
     bool? supportTorrentSearch,
+    bool? supportTorrentBrowse,
     bool? supportTorrentDetail,
     bool? supportDownload,
     bool? supportCollection,
@@ -437,6 +439,7 @@ class SiteFeatures {
   }) => SiteFeatures(
     supportMemberProfile: supportMemberProfile ?? this.supportMemberProfile,
     supportTorrentSearch: supportTorrentSearch ?? this.supportTorrentSearch,
+    supportTorrentBrowse: supportTorrentBrowse ?? this.supportTorrentBrowse,
     supportTorrentDetail: supportTorrentDetail ?? this.supportTorrentDetail,
     supportDownload: supportDownload ?? this.supportDownload,
     supportCollection: supportCollection ?? this.supportCollection,
@@ -451,6 +454,7 @@ class SiteFeatures {
   Map<String, dynamic> toJson() => {
     'supportMemberProfile': supportMemberProfile,
     'supportTorrentSearch': supportTorrentSearch,
+    'supportTorrentBrowse': supportTorrentBrowse,
     'supportTorrentDetail': supportTorrentDetail,
     'supportDownload': supportDownload,
     'supportCollection': supportCollection,
@@ -467,6 +471,8 @@ class SiteFeatures {
         json['userProfile'] ?? json['supportMemberProfile'] as bool? ?? true,
     supportTorrentSearch:
         json['torrentSearch'] ?? json['supportTorrentSearch'] as bool? ?? true,
+    supportTorrentBrowse:
+        json['torrentBrowse'] ?? json['supportTorrentBrowse'] as bool? ?? true,
     supportTorrentDetail:
         json['torrentDetail'] ?? json['supportTorrentDetail'] as bool? ?? true,
     supportDownload:
@@ -491,6 +497,7 @@ class SiteFeatures {
   static const SiteFeatures mteamDefault = SiteFeatures(
     supportMemberProfile: true,
     supportTorrentSearch: true,
+    supportTorrentBrowse: true,
     supportTorrentDetail: true,
     supportDownload: true,
     supportCollection: true,
@@ -839,10 +846,7 @@ class SiteConfig {
         final v = colorJson.trim();
         if (v.startsWith('#')) {
           final hex = v.substring(1);
-          final parsed = int.parse(
-            hex.length == 6 ? 'FF$hex' : hex,
-            radix: 16,
-          );
+          final parsed = int.parse(hex.length == 6 ? 'FF$hex' : hex, radix: 16);
           siteColor = parsed;
         }
       }
@@ -985,10 +989,7 @@ class SiteConfig {
         final v = colorJson.trim();
         if (v.startsWith('#')) {
           final hex = v.substring(1);
-          final parsed = int.parse(
-            hex.length == 6 ? 'FF$hex' : hex,
-            radix: 16,
-          );
+          final parsed = int.parse(hex.length == 6 ? 'FF$hex' : hex, radix: 16);
           siteColor = parsed;
         }
       }

@@ -28,6 +28,7 @@
       "features": {
         "userProfile": true,
         "torrentSearch": true,
+        "torrentBrowse": true,
         "torrentDetail": true,
         "download": true,
         "favorites": true,
@@ -77,6 +78,7 @@
       "features": {
         "userProfile": true,
         "torrentSearch": true,
+        "torrentBrowse": true,
         "torrentDetail": true,
         "download": true,
         "favorites": false,
@@ -128,6 +130,7 @@
       "features": {
         "userProfile": true,
         "torrentSearch": true,
+        "torrentBrowse": true,
         "torrentDetail": true,
         "download": true,
         "favorites": false,
@@ -147,6 +150,7 @@
       "features": {
         "userProfile": true,
         "torrentSearch": true,
+        "torrentBrowse": true,
         "torrentDetail": true,
         "download": true,
         "favorites": true,
@@ -168,6 +172,7 @@
       "features": {
         "userProfile": false,
         "torrentSearch": true,
+        "torrentBrowse": true,
         "torrentDetail": true,
         "download": true,
         "favorites": false,
@@ -187,6 +192,7 @@
       "features": {
         "userProfile": true,
         "torrentSearch": true,
+        "torrentBrowse": true,
         "torrentDetail": true,
         "download": true,
         "favorites": true,

@@ -18,6 +18,7 @@ import 'package:pt_mate/utils/notification_helper.dart';
 
 class _HealthStatus {
   final bool ok;
+
   /// 功能不适用（站点不支持该接口，无需检查，非失败）
   final bool notApplicable;
   final String? message;
@@ -1828,6 +1829,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
               ? const SiteFeatures(
                   supportMemberProfile: true,
                   supportTorrentSearch: true,
+                  supportTorrentBrowse: true,
                   supportTorrentDetail: true,
                   supportDownload: true,
                   supportCollection: false,
@@ -1845,6 +1847,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
             ? const SiteFeatures(
                 supportMemberProfile: true,
                 supportTorrentSearch: true,
+                supportTorrentBrowse: true,
                 supportTorrentDetail: true,
                 supportDownload: true,
                 supportCollection: false,
@@ -3094,8 +3097,18 @@ class _SiteEditPageState extends State<SiteEditPage> {
                           }),
                         ),
                         _buildFeatureSwitch(
+                          '种子浏览',
+                          '是否支持仅浏览功能',
+                          _siteFeatures.supportTorrentBrowse,
+                          (value) => setState(() {
+                            _siteFeatures = _siteFeatures.copyWith(
+                              supportTorrentBrowse: value,
+                            );
+                          }),
+                        ),
+                        _buildFeatureSwitch(
                           '种子搜索',
-                          '搜索和浏览种子资源',
+                          '搜索种子资源',
                           _siteFeatures.supportTorrentSearch,
                           (value) => setState(() {
                             _siteFeatures = _siteFeatures.copyWith(
