@@ -262,7 +262,7 @@
     "categories": {
       "path": "usercp.php?action=tracker",
       "rows": {
-        "selector": "form[action=\"usercp.php\"] td.rowfollow > table"
+        "selector": "form[action==\"usercp.php\"] > table:nth-child > tbody:nth-child(1) > tr:nth-child(1) > td:nth-child(2) > table:nth-child"
       },
       "fields": {
         "categoryId": {
