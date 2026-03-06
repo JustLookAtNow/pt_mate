@@ -332,6 +332,7 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
         title: Text(_loginSuccess ? '登录成功 - 请手动关闭' : '网站登录'),
         leading: IconButton(
           icon: const Icon(Icons.close),
+          tooltip: '关闭',
           onPressed: () {
             widget.onCancel?.call();
             Navigator.of(context).pop();

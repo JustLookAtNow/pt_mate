@@ -198,6 +198,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
         title: const Text('下载器设置'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
+          tooltip: '返回',
           onPressed: () => Navigator.of(context).pop(),
         ),
         automaticallyImplyLeading: false,
