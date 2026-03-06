@@ -8,11 +8,17 @@ import 'update_service.dart';
 
 class AppUpdateProgress {
   final String message;
+  final double? progress;
+  final int? downloadedBytes;
+  final int? totalBytes;
   final bool isError;
   final bool isFinal;
 
   const AppUpdateProgress({
     required this.message,
+    this.progress,
+    this.downloadedBytes,
+    this.totalBytes,
     this.isError = false,
     this.isFinal = false,
   });
@@ -64,14 +70,15 @@ class AppUpdateDownloader {
 
     Object? lastError;
     for (var i = 0; i < ranked.length; i++) {
-      final url = ranked[i];
+      final candidate = ranked[i];
       onProgress(
         AppUpdateProgress(message: '正在尝试下载源 ${i + 1}/${ranked.length}'),
       );
       try {
         await _executeOta(
-          url: url,
+          url: candidate.url,
           version: updateResult.latestVersion,
+          totalBytes: candidate.contentLength,
           onProgress: onProgress,
         );
         return;
@@ -111,9 +118,6 @@ class AppUpdateDownloader {
       return null;
     }
 
-    // Convert GitHub release tag url to release asset direct url.
-    // Example:
-    // https://github.com/{owner}/{repo}/releases/tag/v1.2.3
     final segments = uri.pathSegments;
     if (segments.length >= 5 &&
         segments[2] == 'releases' &&
@@ -137,11 +141,17 @@ class AppUpdateDownloader {
     return candidates.toList();
   }
 
-  Future<List<String>> _rankCandidates(List<String> candidates) async {
+  Future<List<({String url, int? contentLength})>> _rankCandidates(
+    List<String> candidates,
+  ) async {
     final probes = await Future.wait(
       candidates.map((url) async {
-        final latency = await _probeLatency(url);
-        return (url: url, latency: latency);
+        final probe = await _probeUrl(url);
+        return (
+          url: url,
+          latency: probe.latency,
+          contentLength: probe.contentLength,
+        );
       }),
     );
 
@@ -149,30 +159,46 @@ class AppUpdateDownloader {
       ..sort((a, b) => a.latency!.compareTo(b.latency!));
 
     final unavailable = probes.where((item) => item.latency == null);
-    return <String>[
-      ...available.map((item) => item.url),
-      ...unavailable.map((item) => item.url),
+    return <({String url, int? contentLength})>[
+      ...available.map(
+        (item) => (url: item.url, contentLength: item.contentLength),
+      ),
+      ...unavailable.map(
+        (item) => (url: item.url, contentLength: item.contentLength),
+      ),
     ];
   }
 
-  Future<int?> _probeLatency(String url) async {
+  Future<({int? latency, int? contentLength})> _probeUrl(String url) async {
     final stopwatch = Stopwatch()..start();
     try {
       final response = await _probeDio.head(url);
       if ((response.statusCode ?? 500) < 400) {
-        return stopwatch.elapsedMilliseconds;
+        return (
+          latency: stopwatch.elapsedMilliseconds,
+          contentLength: _extractContentLength(response),
+        );
       }
-      return null;
+      return (latency: null, contentLength: _extractContentLength(response));
     } catch (_) {
-      return null;
+      return (latency: null, contentLength: null);
     } finally {
       stopwatch.stop();
     }
   }
 
+  int? _extractContentLength(Response<dynamic> response) {
+    final header = response.headers.value(Headers.contentLengthHeader);
+    if (header == null || header.isEmpty) {
+      return null;
+    }
+    return int.tryParse(header);
+  }
+
   Future<void> _executeOta({
     required String url,
     required String? version,
+    required int? totalBytes,
     required ValueChanged<AppUpdateProgress> onProgress,
   }) async {
     final completer = Completer<void>();
@@ -193,17 +219,37 @@ class AppUpdateDownloader {
 
             if (status == 'DOWNLOADING') {
               final progressValue = double.tryParse(value);
-              final msg = progressValue == null
-                  ? '正在下载更新包...'
-                  : '正在下载更新包 ${progressValue.toStringAsFixed(0)}%';
-              onProgress(AppUpdateProgress(message: msg));
+              final normalizedProgress = progressValue == null
+                  ? null
+                  : (progressValue.clamp(0, 100) / 100).toDouble();
+              final downloadedBytes =
+                  normalizedProgress == null || totalBytes == null
+                  ? null
+                  : (normalizedProgress * totalBytes).round();
+              onProgress(
+                AppUpdateProgress(
+                  message: _buildDownloadMessage(
+                    downloadedBytes: downloadedBytes,
+                    totalBytes: totalBytes,
+                    progressValue: progressValue,
+                  ),
+                  progress: normalizedProgress,
+                  downloadedBytes: downloadedBytes,
+                  totalBytes: totalBytes,
+                ),
+              );
               return;
             }
 
             if (status == 'INSTALLING') {
               onProgress(
-                const AppUpdateProgress(
-                  message: '下载完成，正在打开安装界面...',
+                AppUpdateProgress(
+                  message: totalBytes == null
+                      ? '下载完成，正在打开安装界面...'
+                      : '下载完成 ${_formatBytes(totalBytes)}，正在打开安装界面...',
+                  progress: 1,
+                  downloadedBytes: totalBytes,
+                  totalBytes: totalBytes,
                   isFinal: true,
                 ),
               );
@@ -238,5 +284,32 @@ class AppUpdateDownloader {
     } finally {
       await sub.cancel();
     }
+  }
+
+  String _buildDownloadMessage({
+    required int? downloadedBytes,
+    required int? totalBytes,
+    required double? progressValue,
+  }) {
+    if (downloadedBytes != null && totalBytes != null) {
+      return '已下载 ${_formatBytes(downloadedBytes)} / ${_formatBytes(totalBytes)}';
+    }
+    if (progressValue != null) {
+      return '正在下载更新包 ${progressValue.toStringAsFixed(0)}%';
+    }
+    return '正在下载更新包...';
+  }
+
+  String _formatBytes(int bytes) {
+    const units = <String>['B', 'KB', 'MB', 'GB', 'TB'];
+    double value = bytes.toDouble();
+    var unitIndex = 0;
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex++;
+    }
+
+    final fractionDigits = unitIndex == 0 ? 0 : 1;
+    return '${value.toStringAsFixed(fractionDigits)} ${units[unitIndex]}';
   }
 }

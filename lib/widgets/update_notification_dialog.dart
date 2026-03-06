@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/android_install_permission_service.dart';
 import '../services/app_update_downloader.dart';
 import '../services/update_service.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
@@ -32,8 +33,17 @@ class UpdateNotificationDialog extends StatefulWidget {
 }
 
 class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
+  final ScrollController _contentScrollController = ScrollController();
+
   bool _isUpdating = false;
   String? _progressMessage;
+  double? _downloadProgress;
+
+  @override
+  void dispose() {
+    _contentScrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +59,7 @@ class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
         ],
       ),
       content: SingleChildScrollView(
+        controller: _contentScrollController,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -95,6 +106,10 @@ class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
             ],
             if (_progressMessage != null) ...[
               const SizedBox(height: 12),
+              if (_isUpdating) ...[
+                LinearProgressIndicator(value: _downloadProgress),
+                const SizedBox(height: 8),
+              ],
               Text(
                 _progressMessage!,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -157,19 +172,47 @@ class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
   }
 
   Future<void> _startAndroidInAppUpdate() async {
+    final permissionGranted = await AndroidInstallPermissionService.instance
+        .isInstallPermissionGranted();
+    if (!permissionGranted) {
+      final opened = await AndroidInstallPermissionService.instance
+          .openInstallPermissionSettings();
+      if (!mounted) return;
+      NotificationHelper.showInfo(
+        context,
+        opened
+            ? '请先在系统页面允许本应用安装未知应用，然后返回重新点击“立即更新”'
+            : '无法打开系统安装授权页面，请手动在系统设置中允许本应用安装未知应用',
+        duration: const Duration(seconds: 3),
+      );
+      return;
+    }
+
     setState(() {
       _isUpdating = true;
-      _progressMessage = '正在准备下载更新包...';
+      _progressMessage = '正在清理旧安装包...';
+      _downloadProgress = null;
     });
+    _scrollToBottom();
 
     try {
+      await AndroidInstallPermissionService.instance.clearDownloadedApks();
+      if (!mounted) return;
+
+      setState(() {
+        _progressMessage = '正在准备下载更新包...';
+      });
+      _scrollToBottom();
+
       await AppUpdateDownloader.instance.startAndroidUpdate(
         updateResult: widget.updateResult,
         onProgress: (progress) {
           if (!mounted) return;
           setState(() {
             _progressMessage = progress.message;
+            _downloadProgress = progress.progress;
           });
+          _scrollToBottom();
         },
       );
 
@@ -180,9 +223,23 @@ class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
       if (!mounted) return;
       setState(() {
         _isUpdating = false;
+        _downloadProgress = null;
       });
+      _scrollToBottom();
       NotificationHelper.showError(context, '应用内更新失败：$e');
     }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_contentScrollController.hasClients) return;
+      final position = _contentScrollController.position.maxScrollExtent;
+      _contentScrollController.animateTo(
+        position,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   Future<void> _openDownloadUrl(BuildContext context) async {
@@ -201,7 +258,6 @@ class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        // 降级处理：复制URL到剪贴板
         await Clipboard.setData(ClipboardData(text: url.toString()));
         if (context.mounted) {
           NotificationHelper.showInfo(
