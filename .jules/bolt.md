@@ -1,0 +1,3 @@
+## 2024-05-18 - Caching RegExp in Flutter Widget builds
+**Learning:** Recompiling regular expressions inside frequently called Flutter widget methods (like `build` or custom parsers like `buildBBCodeContent`) causes significant performance overhead and unneeded garbage collection.
+**Action:** Extract dynamic `RegExp` objects to `static final` cached class fields where possible, specifically when the regex string is static. Ensure these are declared securely inside the class and correctly named. Always restore dependency lockfiles (`pubspec.lock`) if testing/formatting inadvertently modifies them.
