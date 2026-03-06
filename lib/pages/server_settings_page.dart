@@ -103,6 +103,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   List<SiteConfig> _sites = [];
   String? _activeSiteId;
   bool _loading = true;
+  final ScrollController _siteListScrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
@@ -114,6 +115,80 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
 
   // 站点图标路径缓存：siteId -> asset path
   final Map<String, String> _logoPathCache = {};
+
+  // 普通列表项 key：用于自动滚动到当前活跃站点
+  final Map<String, GlobalKey> _siteItemKeys = {};
+
+  GlobalKey _siteItemKeyFor(String siteId) {
+    return _siteItemKeys.putIfAbsent(
+      siteId,
+      () => GlobalKey(debugLabel: 'site_item_$siteId'),
+    );
+  }
+
+  void _pruneSiteItemKeys() {
+    final validIds = _sites.map((s) => s.id).toSet();
+    _siteItemKeys.removeWhere((siteId, _) => !validIds.contains(siteId));
+  }
+
+  void _scrollToActiveSite() {
+    if (!mounted || _reorderMode) return;
+    final activeSiteId = _activeSiteId;
+    if (activeSiteId == null) return;
+
+    final containsActive = _filteredSites.any((s) => s.id == activeSiteId);
+    if (!containsActive) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureActiveSiteVisibleWithFallback();
+    });
+  }
+
+  void _ensureActiveSiteVisibleWithFallback({int attempt = 0}) {
+    if (!mounted || _reorderMode) return;
+    final activeSiteId = _activeSiteId;
+    if (activeSiteId == null) return;
+
+    final targetContext = _siteItemKeys[activeSiteId]?.currentContext;
+    if (targetContext != null) {
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+        alignment: 0.15,
+      );
+      return;
+    }
+
+    final targetIndex = _filteredSites.indexWhere((s) => s.id == activeSiteId);
+    if (targetIndex < 0 || !_siteListScrollController.hasClients) return;
+
+    final position = _siteListScrollController.position;
+    final maxExtent = position.maxScrollExtent;
+
+    if (maxExtent <= 0) {
+      if (attempt < 8) {
+        Future.delayed(const Duration(milliseconds: 50), () {
+          _ensureActiveSiteVisibleWithFallback(attempt: attempt + 1);
+        });
+      }
+      return;
+    }
+
+    final denominator = max(1, _filteredSites.length - 1);
+    final ratio = targetIndex / denominator;
+    final roughOffset = (maxExtent * ratio).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    _siteListScrollController.jumpTo(roughOffset);
+
+    if (attempt < 8) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _ensureActiveSiteVisibleWithFallback(attempt: attempt + 1);
+      });
+    }
+  }
 
   Future<String> _resolveLogoPath(SiteConfig site) async {
     // 命中缓存直接返回
@@ -159,6 +234,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
 
   @override
   void dispose() {
+    _siteListScrollController.dispose();
     _searchController.dispose();
     _searchFocusNode.removeListener(_onSearchFocusChange);
     _searchFocusNode.dispose();
@@ -191,6 +267,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         _sites = sites;
         _activeSiteId = activeSiteId;
       });
+      _pruneSiteItemKeys();
       // 加载已缓存的健康检查结果；若无缓存则自动触发一次刷新
       await _loadCachedHealthStatuses(triggerRefreshWhenEmpty: true);
     } catch (e) {
@@ -198,7 +275,10 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         NotificationHelper.showError(context, '加载站点配置失败: $e');
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        _scrollToActiveSite();
+      }
     }
   }
 
@@ -780,12 +860,16 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
               ],
             )
           : ListView.builder(
+              controller: _siteListScrollController,
               padding: const EdgeInsets.all(16),
               itemCount: _filteredSites.length,
               itemBuilder: (context, index) {
                 final site = _filteredSites[index];
                 final isActive = site.id == _activeSiteId;
-                return _buildSiteCard(site, isActive, index);
+                return KeyedSubtree(
+                  key: _siteItemKeyFor(site.id),
+                  child: _buildSiteCard(site, isActive, index),
+                );
               },
             ),
     );
