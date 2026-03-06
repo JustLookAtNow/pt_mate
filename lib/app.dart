@@ -451,10 +451,13 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isLargeScreen = ScreenUtils.isLargeScreen(context);
+    final dialogContentWidth = isLargeScreen ? 500.0 : double.maxFinite;
+
     return AlertDialog(
       title: const Text('切换站点'),
       content: SizedBox(
-        width: double.maxFinite,
+        width: dialogContentWidth,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -476,14 +479,21 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
             else
               SizedBox(
                 height: 300,
-                child: ListView.builder(
+                child: GridView.builder(
                   itemCount: _filteredSites.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: isLargeScreen ? 5 : 3,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: isLargeScreen ? 0.84 : 0.78,
+                  ),
                   itemBuilder: (context, index) {
                     final site = _filteredSites[index];
                     final isSelected = site.id == _selectedSiteId;
                     final Color? siteColor = site.siteColor != null
                         ? Color(site.siteColor!)
                         : null;
+                    final theme = Theme.of(context);
 
                     Widget buildImage(String path, Color fgColor) {
                       if (path.isEmpty) {
@@ -507,61 +517,93 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                       );
                     }
 
-                    return ListTile(
-                      leading: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: isSelected
-                            ? Theme.of(context).colorScheme.primary
-                            : siteColor?.withValues(alpha: 0.2) ??
-                                  Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHighest,
-                        child: Builder(
-                          builder: (context) {
-                            final fgColor = isSelected
-                                ? Theme.of(context).colorScheme.onPrimary
-                                : siteColor ??
-                                      Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant;
+                    return Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => Navigator.of(context).pop(site.id),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? theme.colorScheme.primaryContainer.withValues(
+                                    alpha: 0.45,
+                                  )
+                                : theme.colorScheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.outlineVariant,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius: 18,
+                                backgroundColor: isSelected
+                                    ? theme.colorScheme.primary
+                                    : siteColor?.withValues(alpha: 0.2) ??
+                                          theme
+                                              .colorScheme
+                                              .surfaceContainerHighest,
+                                child: Builder(
+                                  builder: (context) {
+                                    final fgColor = isSelected
+                                        ? theme.colorScheme.onPrimary
+                                        : siteColor ??
+                                              theme
+                                                  .colorScheme
+                                                  .onSurfaceVariant;
 
-                            final cached = _logoPathCache[site.id];
-                            if (cached != null) {
-                              return buildImage(cached, fgColor);
-                            }
+                                    final cached = _logoPathCache[site.id];
+                                    if (cached != null) {
+                                      return buildImage(cached, fgColor);
+                                    }
 
-                            return FutureBuilder<String>(
-                              future: _resolveLogoPath(site),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState !=
-                                        ConnectionState.done ||
-                                    (snapshot.data == null ||
-                                        snapshot.data!.isEmpty)) {
-                                  return Icon(
-                                    Icons.dns,
-                                    size: 24,
-                                    color: fgColor,
-                                  );
-                                }
-                                return buildImage(snapshot.data!, fgColor);
-                              },
-                            );
-                          },
+                                    return FutureBuilder<String>(
+                                      future: _resolveLogoPath(site),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.connectionState !=
+                                                ConnectionState.done ||
+                                            (snapshot.data == null ||
+                                                snapshot.data!.isEmpty)) {
+                                          return Icon(
+                                            Icons.dns,
+                                            size: 24,
+                                            color: fgColor,
+                                          );
+                                        }
+                                        return buildImage(
+                                          snapshot.data!,
+                                          fgColor,
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                site.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      title: Text(site.name),
-                      subtitle: Text(
-                        site.baseUrl,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      selected: isSelected,
-                      selectedTileColor: Theme.of(
-                        context,
-                      ).colorScheme.primaryContainer.withValues(alpha: 0.3),
-                      onTap: () {
-                        Navigator.of(context).pop(site.id);
-                      },
                     );
                   },
                 ),
