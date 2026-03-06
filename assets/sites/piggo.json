@@ -10,7 +10,7 @@
     "downloadHistory": true,
     "categorySearch": true,
     "advancedSearch": true,
-    "showCover": true,
+    "showCover": false,
     "commentDetail": false,
     "nativeDetail": true
   },
@@ -154,7 +154,7 @@
       },
       "fields": {
         "torrentId": {
-          "selector": "table.torrentname a[href~=\"details\\.php\\?id=\"]",
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > a[href~=\"details\\.php\\?id=\"]",
           "attribute": "href",
           "filter": {
             "name": "regexp",
@@ -163,15 +163,15 @@
           }
         },
         "torrentName": {
-          "selector": "table.torrentname a[href~=\"details\\.php\\?id=\"] > b",
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > a[href~=\"details\\.php\\?id=\"] > b",
           "attribute": "text"
         },
         "tag": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(2) > span[style~=\"background-color\"]",
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > span[title]",
           "attribute": "text"
         },
         "description": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(2) > *:last-node",
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > *:last-node",
           "attribute": "text"
         },
         "discount": {
@@ -214,16 +214,12 @@
           }
         },
         "collection": {
-          "selector": "table.torrentname > img[class~=\"bookmark\"]",
+          "selector": "table.torrentname > img[class==\"bookmark\"]",
           "attribute": "src"
         },
         "isTop": {
-          "selector": "table.torrentname > img[title~=\"置顶|置頂\"]",
-          "attribute": "src"
         },
         "cover": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > img[data-src]",
-          "attribute": "data-src"
         },
         "createDate": {
           "selector": "td:nth-child(4) > span[title]",
@@ -284,26 +280,22 @@
   "request": {
     "search": {
       "normal": {
-        "path": "/torrents.php",
+        "path": "/search.php",
         "method": "GET",
         "params": {
-          "incldead": 1,
-          "inclbookmarked": "{onlyFav}",
           "search": "{keyword}",
           "page": "{page}",
-          "pageSize": "{pageSize}",
+          "search_area": 0,
           "cat": "{categoryId}"
         }
       },
       "special": {
-        "path": "/special.php",
+        "path": "/search.php",
         "method": "GET",
         "params": {
-          "incldead": 1,
-          "inclbookmarked": "{onlyFav}",
           "search": "{keyword}",
           "page": "{page}",
-          "pageSize": "{pageSize}",
+          "search_area": 0,
           "cat": "{categoryId}"
         }
       }
