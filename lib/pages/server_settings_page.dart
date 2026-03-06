@@ -848,7 +848,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                   sliver: SliverReorderableList(
                     itemBuilder: (context, index) => _buildSiteItem(index),
                     itemCount: _sites.length,
-                    onReorderItem: (oldIndex, newIndex) {
+                    onReorder: (oldIndex, newIndex) {
                       setState(() {
                         if (newIndex > oldIndex) newIndex -= 1;
                         final item = _sites.removeAt(oldIndex);
@@ -2589,6 +2589,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                           border: const OutlineInputBorder(),
                           suffixIcon: _showPresetList
                               ? IconButton(
+                                  tooltip: '收起',
                                   icon: const Icon(Icons.keyboard_arrow_up),
                                   onPressed: () {
                                     setState(() {
