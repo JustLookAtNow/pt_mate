@@ -9,7 +9,7 @@ description: 自动化项目的版本发布流程，包括版本号自增、Chan
 
 ## 目录结构
 - `scripts/bump_version.py`: 自动更新 `pubspec.yaml` 版本号。
-- `scripts/get_commits.py`: 提取自上次发布以来的 Git 提交记录。
+- `scripts/get_commits.py`: 提取用于发布日志的 Git 提交记录。发布 `beta` 时从上一次发布开始提取；发布非 `beta` 正式版时从上一个正式版开始提取，并自动过滤中间的 `# release:` 提交。
 - `scripts/format_release.py`: 格式化发布日志模板。
 
 ## 使用流程
@@ -24,7 +24,10 @@ description: 自动化项目的版本发布流程，包括版本号自增、Chan
    - 如果未提供版本号，脚本会自动在当前版本号的基础上增加一个小版本号（patch），并同样增加构建号，且保留原有的 `-beta` 等预发布后缀。
 
 3. **生成发布日志**
-   - 运行 `python3 scripts/get_commits.py` 获取原始提交记录。
+   - 运行 `python3 scripts/get_commits.py` 获取原始提交记录（也可显式传入版本：`python3 scripts/get_commits.py 2.20.2`）。
+   - 提交范围规则：
+     - 如果目标版本包含 `beta`，则从最近一次发布（`# release:`）到 `HEAD`。
+     - 如果目标版本不包含 `beta`，则从上一个正式版（不含 `beta`）到 `HEAD`，确保正式版汇总覆盖期间所有 beta 阶段改动。
    - 将记录提供给 AI，根据 `scripts/format_release.py` 的定义，总结出用户可感知的改动。
    - 改动分类应包括：🎉Highlights、✨新增功能、🐛修复问题、🔧性能优化、📋其它。架构优化和技术细节无需列入用户日志。
    - **非常重要：**如果某个分类下没有相关改动，**必须直接省略该分类**，绝对不要写“暂无”或“无”。
