@@ -516,6 +516,22 @@ class TorrentDetailPage extends StatefulWidget {
 }
 
 class _TorrentDetailPageState extends State<TorrentDetailPage> {
+  // 静态正则对象，避免在频繁调用的渲染和清理方法中重复编译
+  static final RegExp _colorTagRegExp = RegExp(r'\[color=([a-zA-Z]+)\]', caseSensitive: false);
+  static final RegExp _bbcodeTagRegExp = RegExp(r'\[(/?)(\w+)(?:=[^\]]+)?\]');
+  static final RegExp _mdImageRegExp = RegExp(r'!\[.*?\]\(([^)]+)\)');
+  static final RegExp _mdBoldRegExp = RegExp(r'\*\*([^*]+)\*\*');
+  static final RegExp _listTagRegExp = RegExp(r'\[\*\]([^\[]*?)(?=\[|\s*$)', dotAll: true);
+  static final RegExp _urlImgUrlRegExp = RegExp(r'\[url\=[^\]]*\](.*?)\[/url\]', caseSensitive: false, dotAll: true);
+  static final RegExp _codeTagRegExp = RegExp(r'\[code\]\s*(.*?)\s*\[/code\]', caseSensitive: false, dotAll: true);
+  static final RegExp _imgTagRegExp = RegExp(r'\[img\]([^\]]+)\[/img\]', caseSensitive: false);
+  static final RegExp _openTagRegExp = RegExp(r'\[(\w+)(?:=[^\]]+)?\]');
+  static final RegExp _closeTagRegExp = RegExp(r'\[/(\w+)\]');
+  static final RegExp _quoteNestingRegExp = RegExp(r'\[quote\][^\[]*\[b\][^\[]*\[color[^\]]*\][^\[]*\[size[^\]]*\][^\[]*\[/quote\]');
+  static final RegExp _upperImgRegExp = RegExp(r'\[IMG\]');
+  static final RegExp _emptySizeRegExp = RegExp(r'\[size\][^\[]*\[/size\]');
+  static final RegExp _anyTagRegExp = RegExp(r'\[/?\w+(?:=[^\]]+)?\]');
+
   bool _loading = true;
   String? _error;
   dynamic _detail;
@@ -774,7 +790,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
     // 处理[color=colorname]标签
     return content.replaceAllMapped(
-      RegExp(r'\[color=([a-zA-Z]+)\]', caseSensitive: false),
+      _colorTagRegExp,
       (match) {
         final colorName = match.group(1)!.toLowerCase();
         final hexColor = colorMap[colorName];
@@ -805,7 +821,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   String _cleanInvalidTags(String content) {
     final tagStack = <String>[];
     final result = StringBuffer();
-    final allMatches = RegExp(r'\[(/?)(\w+)(?:=[^\]]+)?\]').allMatches(content);
+    final allMatches = _bbcodeTagRegExp.allMatches(content);
 
     // 定义自闭合标签（不需要结束标签的标签）
     // 注意：BBCode中的img标签实际上需要闭合标签，所以不应该放在这里
@@ -882,7 +898,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
   String _fixUnclosedTags(String content) {
     final tagStack = <Map<String, dynamic>>[];
-    final allMatches = RegExp(r'\[(/?)(\w+)(?:=[^\]]+)?\]').allMatches(content);
+    final allMatches = _bbcodeTagRegExp.allMatches(content);
     final result = StringBuffer();
 
     // 定义自闭合标签（不需要结束标签的标签）
@@ -966,7 +982,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   void _analyzeTagStructure(String content) {
     debugPrint('--- 标签结构分析 ---');
 
-    final allMatches = RegExp(r'\[(/?)(\w+)(?:=[^\]]+)?\]').allMatches(content);
+    final allMatches = _bbcodeTagRegExp.allMatches(content);
     final tagStack = <String>[];
     final errors = <String>[];
 
@@ -1044,46 +1060,37 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
     // 预处理Markdown格式的图片，转换为BBCode格式
     processedContent = processedContent.replaceAllMapped(
-      RegExp(r'!\[.*?\]\(([^)]+)\)'),
+      _mdImageRegExp,
       (match) => '[img]${match.group(1)}[/img]',
     );
 
     // 预处理Markdown格式的粗体，转换为BBCode格式
     processedContent = processedContent.replaceAllMapped(
-      RegExp(r'\*\*([^*]+)\*\*'),
+      _mdBoldRegExp,
       (match) => '[b]${match.group(1)}[/b]',
     );
 
     // 预处理[*]标签，转换为BBCode粗体格式
     processedContent = processedContent.replaceAllMapped(
-      RegExp(r'\[\*\]([^\[]*?)(?=\[|\s*$)', dotAll: true),
+      _listTagRegExp,
       (match) => '[b]${match.group(1)?.trim() ?? ''}[/b]',
     );
 
     // 预处理[url][img][/img][/url]嵌套标签，提取图片URL
     processedContent = processedContent.replaceAllMapped(
-      RegExp(
-        r'\[url\=[^\]]*\](.*?)\[/url\]',
-        caseSensitive: false,
-        dotAll: true,
-      ),
+      _urlImgUrlRegExp,
       (match) => match.group(1)!,
     );
 
     // 预处理[code]标签，转换为等宽字体显示
     processedContent = processedContent.replaceAllMapped(
-      RegExp(
-        r'\[code\]\s*(.*?)\s*\[/code\]',
-        caseSensitive: false,
-        dotAll: true,
-      ),
+      _codeTagRegExp,
       (match) =>
           '[font=monospace][color=#666666]${match.group(1)}[/color][/font]',
     );
     // 提取图片URL用于统计
     _imageUrls.clear();
-    final imgRegex = RegExp(r'\[img\]([^\]]+)\[/img\]', caseSensitive: false);
-    for (final match in imgRegex.allMatches(processedContent)) {
+    for (final match in _imgTagRegExp.allMatches(processedContent)) {
       _imageUrls.add(match.group(1)!);
     }
 
@@ -1092,7 +1099,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
     // 如果不显示图片，替换图片标签为占位符
     if (!_showImages && _imageUrls.isNotEmpty) {
-      processedContent = processedContent.replaceAllMapped(imgRegex, (match) {
+      processedContent = processedContent.replaceAllMapped(_imgTagRegExp, (match) {
         return '[图片已隐藏]';
       });
     }
@@ -1169,17 +1176,13 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                 Builder(
                   builder: (context) {
                     // 检测所有开始标签
-                    final openTags = RegExp(
-                      r'\[(\w+)(?:=[^\]]+)?\]',
-                    ).allMatches(processedContent);
+                    final openTags = _openTagRegExp.allMatches(processedContent);
                     final foundOpenTags = openTags
                         .map((match) => match.group(1))
                         .toList();
 
                     // 检测所有结束标签
-                    final closeTags = RegExp(
-                      r'\[/(\w+)\]',
-                    ).allMatches(processedContent);
+                    final closeTags = _closeTagRegExp.allMatches(processedContent);
                     final foundCloseTags = closeTags
                         .map((match) => match.group(1))
                         .toList();
@@ -1202,28 +1205,22 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                     final nestingErrors = <String>[];
 
                     // 检测常见的嵌套错误模式
-                    if (RegExp(
-                      r'\[quote\][^\[]*\[b\][^\[]*\[color[^\]]*\][^\[]*\[size[^\]]*\][^\[]*\[/quote\]',
-                    ).hasMatch(processedContent)) {
+                    if (_quoteNestingRegExp.hasMatch(processedContent)) {
                       nestingErrors.add('quote标签内嵌套了b/color/size标签但没有正确闭合');
                     }
 
-                    if (RegExp(r'\[IMG\]').hasMatch(processedContent)) {
+                    if (_upperImgRegExp.hasMatch(processedContent)) {
                       nestingErrors.add('发现大写IMG标签，应该使用小写img');
                     }
 
-                    if (RegExp(
-                      r'\[size\][^\[]*\[/size\]',
-                    ).hasMatch(processedContent)) {
+                    if (_emptySizeRegExp.hasMatch(processedContent)) {
                       nestingErrors.add('发现空的size标签');
                     }
 
                     // 检测标签顺序错误
                     final orderErrors = <String>[];
                     final tagStack = <String>[];
-                    final allMatches = RegExp(
-                      r'\[/?\w+(?:=[^\]]+)?\]',
-                    ).allMatches(processedContent);
+                    final allMatches = _anyTagRegExp.allMatches(processedContent);
 
                     for (final match in allMatches) {
                       final fullTag = match.group(0)!;
