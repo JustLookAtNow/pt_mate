@@ -94,8 +94,6 @@ class TorrentListItem extends StatelessWidget {
     final siteShowCover = currentSite?.features.showCover ?? true;
     final showCover = siteShowCover && (showCoverSetting ?? true);
 
-
-
     final hasDouban = _hasRatingValue(torrent.doubanRating);
     final hasImdb = _hasRatingValue(torrent.imdbRating);
     final hasAnyRating = hasDouban || hasImdb;
@@ -616,6 +614,32 @@ class TorrentCover extends StatelessWidget {
     required this.hasImdb,
   });
 
+  Widget _buildCoverPlaceholder(
+    BuildContext context, {
+    required Widget icon,
+    required String text,
+  }) {
+    final color = Theme.of(context).colorScheme.onSurfaceVariant;
+
+    return SizedBox(
+      width: 70,
+      height: 100,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconTheme(
+              data: IconThemeData(color: color),
+              child: icon,
+            ),
+            const SizedBox(height: 4),
+            Text(text, style: TextStyle(fontSize: 10, color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -670,87 +694,34 @@ class TorrentCover extends StatelessWidget {
                         if (loadingProgress == null) {
                           return child;
                         }
-                        return Container(
-                          width: 70,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(6),
+                        return _buildCoverPlaceholder(
+                          context,
+                          icon: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                           ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '加载中',
-                                style: TextStyle(
-                                  fontSize: 8,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
+                          text: '加载中',
                         );
                       },
                       errorBuilder: (context, error, stackTrace) {
                         if (kDebugMode) {
                           _logger.w('图片加载失败: $error');
                         }
-                        return Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.image_outlined,
-                              size: 24,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '加载失败',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
+                        return _buildCoverPlaceholder(
+                          context,
+                          icon: const Icon(Icons.image_outlined, size: 24),
+                          text: '加载失败',
                         );
                       },
                     )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.image_outlined,
-                          size: 24,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '暂无',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+                  : _buildCoverPlaceholder(
+                      context,
+                      icon: const Icon(Icons.image_outlined, size: 24),
+                      text: '暂无',
                     ),
             ),
           ),
