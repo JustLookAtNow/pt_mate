@@ -1323,6 +1323,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                   size: 18,
                   color: Colors.red,
                 ),
+                tooltip: '查看错误详情',
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 onPressed: () {
@@ -3133,11 +3134,13 @@ class _SiteEditPageState extends State<SiteEditPage> {
                                   children: [
                                     IconButton(
                                       icon: const Icon(Icons.edit),
+                                      tooltip: '编辑分类',
                                       onPressed: () =>
                                           _editSearchCategory(index),
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.delete),
+                                      tooltip: '删除分类',
                                       onPressed: () =>
                                           _deleteSearchCategory(index),
                                     ),
