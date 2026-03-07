@@ -3,6 +3,30 @@ import '../../utils/format.dart';
 /// Web DOM 解析适配器的基础 Mixin
 /// 提供通用的 DOM 元素选择和字段提取功能
 mixin BaseWebAdapterMixin {
+  static final Map<String, RegExp> _regexCache = {};
+  static const int _maxCacheSize = 100;
+
+  RegExp _getCachedRegExp(String pattern) {
+    if (_regexCache.length > _maxCacheSize) {
+      _regexCache.clear();
+    }
+    return _regexCache.putIfAbsent(pattern, () => RegExp(pattern));
+  }
+
+  static final RegExp _classAndAttrValueMatchRegex = RegExp(r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$');
+  static final RegExp _classAndAttrExistsMatchRegex = RegExp(r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)\]$');
+  static final RegExp _attributeExistsMatchRegex = RegExp(r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)\]$');
+  static final RegExp _attributeValueMatchRegex = RegExp(r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$');
+  static final RegExp _containsAllMatchRegex = RegExp(r'^([^:]*):contains\((.*)\)$');
+  static final RegExp _whitespaceRegex = RegExp(r'\s+');
+  static final RegExp _nthChildWithParensRegex = RegExp(r'^([^:]*):nth-child\((\d+)\)');
+  static final RegExp _nthChildNoParensRegex = RegExp(r'^([^:]+):nth-child$');
+  static final RegExp _nthNodeWithParensRegex = RegExp(r'^([^:]*):nth-node\((\d+)\)');
+  static final RegExp _nthNodeNoParensRegex = RegExp(r'^([^:]+):nth-node$');
+  static final RegExp _replaceGroupRegex = RegExp(r'\$(\d+)');
+  static final RegExp _singleQuoteExprRegex = RegExp(r"^'(.*)'$");
+  static final RegExp _doubleQuoteExprRegex = RegExp(r'^"(.*)"$');
+
   /// 根据选择器查找所有匹配的元素
   /// [soup] 可以是 BeautifulSoup 或 Bs4Element 类型
   List<dynamic> findElementBySelector(dynamic soup, String selector) {
@@ -95,9 +119,7 @@ mixin BaseWebAdapterMixin {
 
     // 处理复合选择器：tag.class[attr=="value"] 或 tag.class[attr]
     // 这种选择器同时包含类名和属性条件
-    final classAndAttrValueMatch = RegExp(
-      r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$',
-    ).firstMatch(selector);
+    final classAndAttrValueMatch = _classAndAttrValueMatchRegex.firstMatch(selector);
     if (classAndAttrValueMatch != null) {
       final tag = classAndAttrValueMatch.group(1)?.trim();
       final className = classAndAttrValueMatch.group(2)?.trim();
@@ -129,7 +151,7 @@ mixin BaseWebAdapterMixin {
                 break;
               case '~': // 正则匹配
                 try {
-                  final regex = RegExp(value);
+                  final regex = _getCachedRegExp(value);
                   matches = regex.hasMatch(attrValue);
                 } catch (e) {
                   matches = false;
@@ -146,9 +168,7 @@ mixin BaseWebAdapterMixin {
     }
 
     // 处理复合选择器：tag.class[attr]（属性存在性）
-    final classAndAttrExistsMatch = RegExp(
-      r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)\]$',
-    ).firstMatch(selector);
+    final classAndAttrExistsMatch = _classAndAttrExistsMatchRegex.firstMatch(selector);
     if (classAndAttrExistsMatch != null) {
       final tag = classAndAttrExistsMatch.group(1)?.trim();
       final className = classAndAttrExistsMatch.group(2)?.trim();
@@ -173,9 +193,7 @@ mixin BaseWebAdapterMixin {
 
     // 处理属性选择器
     // 1. 属性存在性选择器 tag[attr]
-    final attributeExistsMatch = RegExp(
-      r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)\]$',
-    ).firstMatch(selector);
+    final attributeExistsMatch = _attributeExistsMatchRegex.firstMatch(selector);
     if (attributeExistsMatch != null) {
       final tag = attributeExistsMatch.group(1)?.trim();
       final attribute = attributeExistsMatch.group(2)?.trim();
@@ -191,9 +209,7 @@ mixin BaseWebAdapterMixin {
     }
 
     // 2. 属性值选择器 tag[attr^="value"], tag[attr=="value"], tag[attr~="pattern"]
-    final attributeValueMatch = RegExp(
-      r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$',
-    ).firstMatch(selector);
+    final attributeValueMatch = _attributeValueMatchRegex.firstMatch(selector);
     if (attributeValueMatch != null) {
       final tag = attributeValueMatch.group(1)?.trim();
       final attribute = attributeValueMatch.group(2)?.trim();
@@ -222,7 +238,7 @@ mixin BaseWebAdapterMixin {
                 break;
               case '~': // 正则匹配
                 try {
-                  final regex = RegExp(value);
+                  final regex = _getCachedRegExp(value);
                   matches = regex.hasMatch(normalizedAttrValue);
                 } catch (e) {
                   // 正则表达式无效，跳过
@@ -241,9 +257,7 @@ mixin BaseWebAdapterMixin {
     }
 
     // 处理单个选择器
-    final containsAllMatch = RegExp(
-      r'^([^:]*):contains\((.*)\)$',
-    ).firstMatch(selector);
+    final containsAllMatch = _containsAllMatchRegex.firstMatch(selector);
     if (containsAllMatch != null) {
       final preSelector = (containsAllMatch.group(1) ?? '').trim();
       final expr = (containsAllMatch.group(2) ?? '').trim();
@@ -257,7 +271,7 @@ mixin BaseWebAdapterMixin {
       for (final el in candidates) {
         final t = (el.text ?? '')
             .replaceAll('\n', ' ')
-            .replaceAll(RegExp(r'\s+'), ' ')
+            .replaceAll(_whitespaceRegex, ' ')
             .trim();
         final ok = groups.any((g) => g.every((n) => t.contains(n)));
         if (ok) {
@@ -271,9 +285,7 @@ mixin BaseWebAdapterMixin {
       // nth-child选择器
       if (selector.contains(':nth-child(')) {
         // 带括号数字的 nth-child 选择器
-        final nthChildMatch = RegExp(
-          r'^([^:]*):nth-child\((\d+)\)',
-        ).firstMatch(selector);
+        final nthChildMatch = _nthChildWithParensRegex.firstMatch(selector);
         if (nthChildMatch != null) {
           final tag = nthChildMatch.group(1)?.trim();
           final index = FormatUtil.parseInt(nthChildMatch.group(2) ?? '1') ?? 1;
@@ -298,9 +310,7 @@ mixin BaseWebAdapterMixin {
         }
       } else {
         // 不带括号的 nth-child 选择器，只取直接子元素中的指定标签
-        final nthChildMatch = RegExp(
-          r'^([^:]+):nth-child$',
-        ).firstMatch(selector);
+        final nthChildMatch = _nthChildNoParensRegex.firstMatch(selector);
         if (nthChildMatch != null) {
           final tag = nthChildMatch.group(1)?.trim();
           if (tag != null && tag.isNotEmpty) {
@@ -329,9 +339,7 @@ mixin BaseWebAdapterMixin {
       // nth-child选择器
       if (selector.contains(':nth-node(')) {
         // 带括号数字的 nth-child 选择器
-        final nthChildMatch = RegExp(
-          r'^([^:]*):nth-node\((\d+)\)',
-        ).firstMatch(selector);
+        final nthChildMatch = _nthNodeWithParensRegex.firstMatch(selector);
         if (nthChildMatch != null) {
           final tag = nthChildMatch.group(1)?.trim();
           final index = FormatUtil.parseInt(nthChildMatch.group(2) ?? '1') ?? 1;
@@ -356,7 +364,7 @@ mixin BaseWebAdapterMixin {
         }
       } else {
         // 不带括号的 nth-child 选择器，只取直接子元素中的指定标签
-        final nthNodeMatch = RegExp(r'^([^:]+):nth-node$').firstMatch(selector);
+        final nthNodeMatch = _nthNodeNoParensRegex.firstMatch(selector);
         if (nthNodeMatch != null) {
           final tag = nthNodeMatch.group(1)?.trim();
           if (tag != null && tag.isNotEmpty) {
@@ -463,7 +471,7 @@ mixin BaseWebAdapterMixin {
 
       // 只添加非空值
       if (value != null && value.isNotEmpty) {
-        values.add(value.replaceAll('\n', ' ').replaceAll(RegExp(r'\s+'), ' '));
+        values.add(value.replaceAll('\n', ' ').replaceAll(_whitespaceRegex, ' '));
       }
     }
 
@@ -501,11 +509,11 @@ mixin BaseWebAdapterMixin {
       final format = filter['value'] as String?;
 
       if (args != null) {
-        final regex = RegExp(args);
+        final regex = _getCachedRegExp(args);
         final match = regex.firstMatch(value);
         if (match != null) {
           final template = format ?? r'$0';
-          return template.replaceAllMapped(RegExp(r'\$(\d+)'), (m) {
+          return template.replaceAllMapped(_replaceGroupRegex, (m) {
             final groupIndex = int.parse(m.group(1)!);
             if (groupIndex <= match.groupCount) {
               return match.group(groupIndex) ?? '';
@@ -563,8 +571,8 @@ mixin BaseWebAdapterMixin {
       for (final p in andParts) {
         final s = p.trim();
         final m =
-            RegExp(r"^'(.*)'$").firstMatch(s) ??
-            RegExp(r'^"(.*)"$').firstMatch(s);
+            _singleQuoteExprRegex.firstMatch(s) ??
+            _doubleQuoteExprRegex.firstMatch(s);
         if (m != null) {
           final v = (m.group(1) ?? '').trim();
           if (v.isNotEmpty) needles.add(v);
