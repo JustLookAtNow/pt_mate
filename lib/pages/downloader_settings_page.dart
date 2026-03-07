@@ -197,6 +197,7 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
       appBar: AppBar(
         title: const Text('下载器设置'),
         leading: IconButton(
+          tooltip: '返回',
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
