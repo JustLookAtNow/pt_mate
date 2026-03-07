@@ -1,18 +1,20 @@
-# PT Mate（PT伴侣）
+# PT Mate
 
-基于 Flutter（Material Design 3）开发的私有种子站点客户端，支持多种 PT 站点的种子浏览、搜索和下载管理。
+[简体中文](./README.zh-CN.md)
 
-📣 官方交流群（Telegram）：[加入 PT Mate 官方交流群](https://t.me/pt_mate)
+A Flutter-based private tracker client built with Material Design 3. PT Mate supports torrent browsing, search, and download management across multiple PT site types.
 
-## 功能概览
+📣 Official Telegram group: [Join the PT Mate community](https://t.me/pt_mate)
 
-- 种子浏览、搜索、详情、收藏、批量操作
-- 多网站聚合搜索
-- 下载器集成（qBittorrent / Transmission）
-- 本地中转下载
-- 数据备份与恢复（含 WebDAV）
+## Features
 
-## 当前支持的网站类型
+- Browse torrents, search, view details, favorite items, and perform bulk actions
+- Aggregated search across multiple sites
+- Downloader integration (`qBittorrent` / `Transmission`)
+- Local relay download support
+- Backup and restore, including WebDAV
+
+## Supported Site Types
 
 - `M-Team`
 - `NexusPHP`
@@ -20,43 +22,43 @@
 - `RousiPro`
 - `Unit3D`
 
-## 当前支持的网站
+## Supported Sites
 
-以下清单基于 `assets/sites/*.json`（共 34 个）：
+The following list is based on `assets/sites/*.json` (35 total):
 
-- `M-Team`（1）：M-Team
-- `NexusPHP`（13）：藏宝阁、天枢、自由农场、好学、垃圾堆、幸运、momentpt、PTFans、PT GTK、PTSKit、PTZone、肉丝、织梦
-- `NexusPHPWeb`（18）：AFUN、末日、Audiences、比特校园、财神、FRDS、HDDolby、HDFans、麒麟、HHanClub、老师、OurBits、青蛙、SSD、TTG、U2Share、UBits、星陨阁
-- `RousiPro`（1）：肉丝Pro(beta)
-- `Unit3D`（1）：MonikaDesign
+- `M-Team` (1): M-Team
+- `NexusPHP` (13): 藏宝阁, 天枢, 自由农场, 好学, 垃圾堆, 幸运, momentpt, PTFans, PT GTK, PTSKit, PTZone, 肉丝, 织梦
+- `NexusPHPWeb` (19): AFUN, 末日, Audiences, 比特校园, 财神, FRDS, HDDolby, HDFans, 麒麟, HHanClub, 老师, OurBits, 青蛙, SSD, TTG, U2Share, UBits, 星陨阁, 猪猪
+- `RousiPro` (1): 肉丝Pro(beta)
+- `Unit3D` (1): MonikaDesign
 
-## 截图预览
+## Screenshots
 
 <p align="center">
-  <img src="screenshots/1.png" width="600" alt="截图1">
-  <img src="screenshots/2.png" width="300" alt="截图2">
-  <img src="screenshots/3.png" width="300" alt="截图3">
+  <img src="screenshots/1.png" width="600" alt="Screenshot 1">
+  <img src="screenshots/2.png" width="300" alt="Screenshot 2">
+  <img src="screenshots/3.png" width="300" alt="Screenshot 3">
 </p>
 
-## 快速开始
+## Quick Start
 
 ```bash
 flutter pub get
 flutter run
 ```
 
-## 文档
+## Documentation
 
-- [文档目录](./docs/README.md)
-- [使用指南](./docs/USER_GUIDE.md)
-- [开发指南](./docs/DEVELOPMENT_GUIDE.md)
-- [网站配置指南](./docs/SITE_CONFIGURATION_GUIDE.md)
-- [API 文档目录](./docs/api)
+- [Documentation Index](./docs/README.md)
+- [User Guide](./docs/USER_GUIDE.md)
+- [Development Guide](./docs/DEVELOPMENT_GUIDE.md)
+- [Site Configuration Guide](./docs/SITE_CONFIGURATION_GUIDE.md)
+- [API Docs](./docs/api)
 
-## 许可证
+## License
 
-MIT License，详见 [LICENSE](./LICENSE)。
+MIT License. See [LICENSE](./LICENSE) for details.
 
-## Star 趋势
+## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=JustLookAtNow/pt_mate&type=Date)](https://star-history.com/#JustLookAtNow/pt_mate&Date)
