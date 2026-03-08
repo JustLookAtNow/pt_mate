@@ -727,6 +727,7 @@ class TorrentCover extends StatelessWidget {
           ),
         ),
         // 评分模块（仅移动端左列显示；桌面端在右侧标签后显示）
+        if (isMobile && (hasDouban || hasImdb)) const SizedBox(height: 6),
         if (isMobile)
           Container(
             width: 70,

@@ -8,8 +8,18 @@ class CachedNetworkImage extends StatefulWidget {
   final double? width;
   final double? height;
   final BoxFit? fit;
-  final Widget Function(BuildContext context, Widget child, ImageChunkEvent? loadingProgress)? loadingBuilder;
-  final Widget Function(BuildContext context, Object error, StackTrace? stackTrace)? errorBuilder;
+  final Widget Function(
+    BuildContext context,
+    Widget child,
+    ImageChunkEvent? loadingProgress,
+  )?
+  loadingBuilder;
+  final Widget Function(
+    BuildContext context,
+    Object error,
+    StackTrace? stackTrace,
+  )?
+  errorBuilder;
 
   const CachedNetworkImage({
     super.key,
@@ -60,7 +70,9 @@ class _CachedNetworkImageState extends State<CachedNetworkImage> {
     });
 
     try {
-      final response = await ImageHttpClient.instance.fetchImage(widget.imageUrl);
+      final response = await ImageHttpClient.instance.fetchImage(
+        widget.imageUrl,
+      );
       if (response.data != null && mounted) {
         setState(() {
           _imageData = Uint8List.fromList(response.data!);
@@ -85,7 +97,11 @@ class _CachedNetworkImageState extends State<CachedNetworkImage> {
     }
 
     if (_isLoading) {
-      return widget.loadingBuilder?.call(context, Container(), null) ??
+      return widget.loadingBuilder?.call(
+            context,
+            SizedBox(width: widget.width, height: widget.height),
+            ImageChunkEvent(cumulativeBytesLoaded: 0, expectedTotalBytes: null),
+          ) ??
           _buildDefaultLoading(context);
     }
 
