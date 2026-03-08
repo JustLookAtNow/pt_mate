@@ -486,108 +486,172 @@ jobs:
         TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         COMMIT_MSG: ${{ steps.commit_message.outputs.message }}
         VERSION: ${{ steps.version.outputs.tag }}
+        VERSION_NUMBER: ${{ steps.version.outputs.version }}
         REPO: ${{ github.repository }}
       run: |
+        set -euo pipefail
+
+        if [ -z "${TG_BOT_TOKEN:-}" ] || [ -z "${TG_CHAT_ID:-}" ]; then
+          echo "TG_BOT_TOKEN or TG_CHAT_ID is not set. Skipping Telegram notification."
+          exit 0
+        fi
+
         npm install telegramify-markdown
-        
-        node <<EOF
+
+        MAX_TG_FILE_SIZE=$((50 * 1024 * 1024))
+        ATTACHMENT_MANIFEST=/tmp/tg_attachments.tsv
+        OVERSIZED_MANIFEST=/tmp/tg_oversized.tsv
+
+        : > "$ATTACHMENT_MANIFEST"
+        : > "$OVERSIZED_MANIFEST"
+
+        while IFS='|' read -r label path; do
+          if [ ! -f "$path" ]; then
+            echo "Skipping missing Telegram attachment: $path"
+            continue
+          fi
+
+          file_size=$(stat -c%s "$path")
+          file_name=$(basename "$path")
+
+          if [ "$file_size" -le "$MAX_TG_FILE_SIZE" ]; then
+            printf '%s\t%s\t%s\n' "$label" "$path" "$file_name" >> "$ATTACHMENT_MANIFEST"
+          else
+            printf '%s\t%s\n' "$label" "$file_name" >> "$OVERSIZED_MANIFEST"
+          fi
+        done <<EOF
+        Android APK|android-artifacts/pt_mate-${VERSION_NUMBER}-arm64-v8a.apk
+        Windows x64|windows-artifact/pt_mate-${VERSION_NUMBER}-windows-x64.exe
+        Linux x64|linux-artifact/pt_mate-${VERSION_NUMBER}-linux-x64.AppImage
+        iOS Unsigned IPA|ios-macos-artifacts/ios/build/pt_mate-${VERSION_NUMBER}-unsigned.ipa
+        macOS DMG|ios-macos-artifacts/build/macos/Build/Products/Release/pt_mate-${VERSION_NUMBER}-macos-x64.dmg
+        macOS App Zip|ios-macos-artifacts/build/macos/Build/Products/Release/pt_mate-${VERSION_NUMBER}-macos-x64.app.zip
+        Xcode Archive|ios-macos-artifacts/ios/build/pt_mate-${VERSION_NUMBER}.xcarchive.zip
+        EOF
+
+        export TG_ATTACHMENT_LINES
+        export TG_OVERSIZED_LINES
+        TG_ATTACHMENT_LINES=$(awk -F '\t' '{print "- " $1}' "$ATTACHMENT_MANIFEST" || true)
+        TG_OVERSIZED_LINES=$(awk -F '\t' '{print "- " $1 "（仅 GitHub Release）"}' "$OVERSIZED_MANIFEST" || true)
+
+        node <<'EOF'
+        const fs = require('fs');
         const https = require('https');
-        
-        // Async wrapper to allow using await and dynamic imports
+
         (async () => {
-          // Dynamically import telegramify-markdown (it might be an ES module)
           const module = await import('telegramify-markdown');
           const telegramify = module.default || module;
 
           const commitMsg = process.env.COMMIT_MSG;
           const version = process.env.VERSION;
           const repo = process.env.REPO;
-          const releaseUrl = \`https://github.com/\${repo}/releases/tag/\${version}\`;
-          
-          // Construct the full message in Standard Markdown
-          const fullMarkdown = \`# 🎉 PT Mate \${version} 发布了！\n\n\${commitMsg}\n\n📱 [GitHub Release](\${releaseUrl})\`;
-          
-          // Convert to MarkdownV2
+          const releaseUrl = `https://github.com/${repo}/releases/tag/${version}`;
+          const attachmentLines = process.env.TG_ATTACHMENT_LINES || '';
+          const oversizedLines = process.env.TG_OVERSIZED_LINES || '';
+
+          const sections = [
+            `# 🎉 PT Mate ${version} 发布了！`,
+            commitMsg,
+          ];
+
+          if (attachmentLines) {
+            sections.push(`📦 本条通知附带以下安装包\n${attachmentLines}`);
+          }
+
+          if (oversizedLines) {
+            sections.push(`🔗 以下大文件仅在 GitHub Release 提供\n${oversizedLines}`);
+          }
+
+          sections.push(`📱 [GitHub Release](${releaseUrl})`);
+
+          const fullMarkdown = sections.filter(Boolean).join('\n\n');
           const escapedMessage = telegramify(fullMarkdown);
-          
+
           console.log('Processed Message:', escapedMessage);
 
           const payload = {
             chat_id: process.env.TG_CHAT_ID,
             text: escapedMessage,
             parse_mode: 'MarkdownV2',
-            disable_web_page_preview: false
+            disable_web_page_preview: false,
           };
 
-          // Helper function to wait
-          const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+          const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-          // Helper function to send requests
           function sendRequest(method, endpoint, data) {
             return new Promise((resolve, reject) => {
-              const url = \`https://api.telegram.org/bot\${process.env.TG_BOT_TOKEN}/\${endpoint}\`;
-              const req = https.request(url, {
-                method: method,
-                headers: { 'Content-Type': 'application/json' },
-                timeout: 15000 // 15s timeout
-              }, (res) => {
-                let body = '';
-                res.on('data', (chunk) => body += chunk);
-                res.on('end', () => {
-                  try {
-                    const json = JSON.parse(body);
-                    resolve(json);
-                  } catch (e) {
-                    reject(e);
-                  }
-                });
-              });
+              const url = `https://api.telegram.org/bot${process.env.TG_BOT_TOKEN}/${endpoint}`;
+              const req = https.request(
+                url,
+                {
+                  method,
+                  headers: { 'Content-Type': 'application/json' },
+                  timeout: 15000,
+                },
+                (res) => {
+                  let body = '';
+                  res.on('data', (chunk) => (body += chunk));
+                  res.on('end', () => {
+                    try {
+                      resolve(JSON.parse(body));
+                    } catch (error) {
+                      reject(error);
+                    }
+                  });
+                },
+              );
+
               req.on('timeout', () => {
                 req.destroy();
                 reject(new Error('Request timed out after 15 seconds'));
               });
               req.on('error', reject);
-              if (data) req.write(JSON.stringify(data));
+
+              if (data) {
+                req.write(JSON.stringify(data));
+              }
+
               req.end();
             });
           }
 
           async function sendWithRetry(method, endpoint, data, maxRetries = 3) {
-            for (let i = 0; i < maxRetries; i++) {
+            for (let index = 0; index < maxRetries; index += 1) {
               try {
-                const res = await sendRequest(method, endpoint, data);
-                if (res.ok) return res;
-                // If not ok, might be rate limited or other API errors
-                console.error(\`Telegram API error (Attempt \${i+1}):\`, JSON.stringify(res));
-              } catch (err) {
-                console.error(\`Network error (Attempt \${i+1}):\`, err.message);
+                const response = await sendRequest(method, endpoint, data);
+                if (response.ok) {
+                  return response;
+                }
+                console.error(`Telegram API error (Attempt ${index + 1}):`, JSON.stringify(response));
+              } catch (error) {
+                console.error(`Network error (Attempt ${index + 1}):`, error.message);
               }
-              if (i < maxRetries - 1) {
-                const waitTime = 2000 * (i + 1);
-                console.log(\`Retrying in \${waitTime}ms...\`);
+
+              if (index < maxRetries - 1) {
+                const waitTime = 2000 * (index + 1);
+                console.log(`Retrying in ${waitTime}ms...`);
                 await delay(waitTime);
               }
             }
-            throw new Error(\`Failed after \${maxRetries} attempts\`);
+
+            throw new Error(`Failed after ${maxRetries} attempts`);
           }
 
           try {
             console.log('Sending message...');
             const sendRes = await sendWithRetry('POST', 'sendMessage', payload);
-            
             const messageId = sendRes.result.message_id;
+
             console.log('Message sent successfully with ID:', messageId);
-            
-            // Unpin all messages
+            fs.writeFileSync('/tmp/tg_message_id.txt', String(messageId));
+
             await sendWithRetry('POST', 'unpinAllChatMessages', { chat_id: process.env.TG_CHAT_ID });
-            
-            // Pin the new message
             await sendWithRetry('POST', 'pinChatMessage', {
               chat_id: process.env.TG_CHAT_ID,
               message_id: messageId,
-              disable_notification: false
+              disable_notification: false,
             });
-            
+
             console.log('Message pinned successfully');
           } catch (error) {
             console.error('Final Error:', error.message);
@@ -595,6 +659,21 @@ jobs:
           }
         })();
         EOF
+
+        TG_MESSAGE_ID=$(cat /tmp/tg_message_id.txt)
+
+        while IFS=$'\t' read -r label path file_name; do
+          [ -n "$path" ] || continue
+
+          echo "Uploading Telegram attachment: $file_name"
+          response=$(curl -fsS "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" \
+            -F "chat_id=${TG_CHAT_ID}" \
+            -F "reply_to_message_id=${TG_MESSAGE_ID}" \
+            -F "caption=${label} · ${VERSION}" \
+            -F "document=@${path};filename=${file_name}")
+          echo "$response"
+          echo "$response" | jq -e '.ok == true' > /dev/null
+        done < "$ATTACHMENT_MANIFEST"
 
     - name: Notify Update Server (POST /api/v1/github/version-update)
       env:
