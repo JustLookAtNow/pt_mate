@@ -485,7 +485,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                     crossAxisCount: isLargeScreen ? 5 : 3,
                     mainAxisSpacing: 10,
                     crossAxisSpacing: 10,
-                    childAspectRatio: isLargeScreen ? 0.84 : 0.78,
+                    childAspectRatio: 1,
                   ),
                   itemBuilder: (context, index) {
                     final site = _filteredSites[index];
@@ -497,19 +497,19 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
 
                     Widget buildImage(String path, Color fgColor) {
                       if (path.isEmpty) {
-                        return Icon(Icons.dns, size: 24, color: fgColor);
+                        return Icon(Icons.dns, size: 28, color: fgColor);
                       }
                       return ClipOval(
                         child: Image.asset(
                           path,
-                          width: 24,
-                          height: 24,
+                          width: 30,
+                          height: 30,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
                             return Image.asset(
                               'assets/sites_icon/_default_nexusphp.png',
-                              width: 24,
-                              height: 24,
+                              width: 30,
+                              height: 30,
                               fit: BoxFit.cover,
                             );
                           },
@@ -525,7 +525,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
-                            vertical: 10,
+                            vertical: 8,
                           ),
                           decoration: BoxDecoration(
                             color: isSelected
@@ -575,7 +575,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                                                 snapshot.data!.isEmpty)) {
                                           return Icon(
                                             Icons.dns,
-                                            size: 24,
+                                            size: 28,
                                             color: fgColor,
                                           );
                                         }
@@ -588,7 +588,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                                   },
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6),
                               Text(
                                 site.name,
                                 maxLines: 1,
