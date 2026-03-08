@@ -2,6 +2,9 @@ import 'package:intl/intl.dart';
 
 /// 格式化工具类，用于格式化文件大小、速度和时间
 class FormatUtil {
+  // Cache the RegExp to prevent recompilation on every parseInt call
+  static final RegExp _nonDigitRegExp = RegExp(r'\D');
+
   /// 格式化文件大小
   static String formatFileSize(int bytes) {
     if (bytes < 1024) {
@@ -58,7 +61,7 @@ class FormatUtil {
     }
 
     // 移除所有非数字字符
-    str = str.replaceAll(RegExp(r'\D'), '');
+    str = str.replaceAll(_nonDigitRegExp, '');
 
     return int.tryParse(str);
   }
@@ -66,6 +69,9 @@ class FormatUtil {
 
 class Formatters {
   static final NumberFormat _num2 = NumberFormat('#,##0.00');
+
+  // Cache the RegExp to prevent recompilation during time parsing
+  static final RegExp _timeZoneRegExp = RegExp(r'Z|[+-]\d{2}:?\d{2}$');
 
   // 输入单位为 B（字节），格式化为 GB 或 TB（保留两位小数）
   static String dataFromBytes(num bytes) {
@@ -190,7 +196,7 @@ class Formatters {
           normalizedDate = normalizedDate.replaceRange(10, 11, 'T');
         }
 
-        if (normalizedDate.contains(RegExp(r'Z|[+-]\d{2}:?\d{2}$'))) {
+        if (normalizedDate.contains(_timeZoneRegExp)) {
           return DateTime.parse(normalizedDate).toLocal();
         } else {
           return DateTime.parse("$normalizedDate$actualZone").toLocal();
