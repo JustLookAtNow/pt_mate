@@ -7,6 +7,7 @@ class ServerSettingsBackButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
+      tooltip: '返回',
       icon: const Icon(Icons.arrow_back),
       onPressed: () {
         Navigator.of(context).pop();

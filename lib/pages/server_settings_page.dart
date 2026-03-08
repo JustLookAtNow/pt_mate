@@ -848,7 +848,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                   sliver: SliverReorderableList(
                     itemBuilder: (context, index) => _buildSiteItem(index),
                     itemCount: _sites.length,
-                    onReorderItem: (oldIndex, newIndex) {
+                    onReorder: (oldIndex, newIndex) {
                       setState(() {
                         if (newIndex > oldIndex) newIndex -= 1;
                         final item = _sites.removeAt(oldIndex);
@@ -1318,6 +1318,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               IconButton(
+                tooltip: '查看错误详情',
                 icon: const Icon(
                   Icons.error_outline,
                   size: 18,
@@ -2589,6 +2590,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                           border: const OutlineInputBorder(),
                           suffixIcon: _showPresetList
                               ? IconButton(
+                                  tooltip: '收起预设列表',
                                   icon: const Icon(Icons.keyboard_arrow_up),
                                   onPressed: () {
                                     setState(() {
@@ -3132,11 +3134,13 @@ class _SiteEditPageState extends State<SiteEditPage> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     IconButton(
+                                      tooltip: '编辑类别',
                                       icon: const Icon(Icons.edit),
                                       onPressed: () =>
                                           _editSearchCategory(index),
                                     ),
                                     IconButton(
+                                      tooltip: '删除类别',
                                       icon: const Icon(Icons.delete),
                                       onPressed: () =>
                                           _deleteSearchCategory(index),
