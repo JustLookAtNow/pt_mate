@@ -661,19 +661,39 @@ jobs:
         EOF
 
         TG_MESSAGE_ID=$(cat /tmp/tg_message_id.txt)
+        ATTACHMENT_COUNT=$(awk 'END {print NR}' "$ATTACHMENT_MANIFEST")
 
-        while IFS=$'\t' read -r label path file_name; do
+        if [ "$ATTACHMENT_COUNT" -lt 2 ]; then
+          echo "Telegram media group requires at least 2 attachments, current count: $ATTACHMENT_COUNT"
+          exit 0
+        fi
+
+        MEDIA_PAYLOAD=$(jq -Rn '
+          [inputs
+           | select(length > 0)
+           | split("	")
+           | {type: "document", media: ("attach://file" + (input_line_number | tostring))}]
+        ' < "$ATTACHMENT_MANIFEST")
+
+        CURL_ARGS=(
+          -fsS
+          "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMediaGroup"
+          -F "chat_id=${TG_CHAT_ID}"
+          -F "reply_parameters={\"message_id\":${TG_MESSAGE_ID}}"
+          -F "media=${MEDIA_PAYLOAD}"
+        )
+
+        attachment_index=0
+        while IFS=$'	' read -r label path file_name; do
           [ -n "$path" ] || continue
-
-          echo "Uploading Telegram attachment: $file_name"
-          response=$(curl -fsS "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" \
-            -F "chat_id=${TG_CHAT_ID}" \
-            -F "reply_to_message_id=${TG_MESSAGE_ID}" \
-            -F "caption=${label} · ${VERSION}" \
-            -F "document=@${path};filename=${file_name}")
-          echo "$response"
-          echo "$response" | jq -e '.ok == true' > /dev/null
+          attachment_index=$((attachment_index + 1))
+          echo "Queueing Telegram media: $file_name"
+          CURL_ARGS+=( -F "file${attachment_index}=@${path};filename=${file_name}" )
         done < "$ATTACHMENT_MANIFEST"
+
+        response=$(curl "${CURL_ARGS[@]}")
+        echo "$response"
+        echo "$response" | jq -e '.ok == true and (.result | type == "array") and (.result | length >= 2)' > /dev/null
 
     - name: Notify Update Server (POST /api/v1/github/version-update)
       env:
