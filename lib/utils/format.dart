@@ -45,6 +45,8 @@ class FormatUtil {
     }
   }
 
+  static final RegExp _nonDigitRegExp = RegExp(r'\D');
+
   /// 解析字符串为整数
   /// 先判断有没有小数点，有的话则截取整数部分，然后移除掉所有的非数字字符，最后返回int.tryParse的结果
   static int? parseInt(dynamic value) {
@@ -58,7 +60,8 @@ class FormatUtil {
     }
 
     // 移除所有非数字字符
-    str = str.replaceAll(RegExp(r'\D'), '');
+    // ⚡ Bolt: Cache RegExp to avoid recompiling on every call
+    str = str.replaceAll(_nonDigitRegExp, '');
 
     return int.tryParse(str);
   }
@@ -213,5 +216,4 @@ class Formatters {
       }
     }
   }
-
 }
