@@ -848,9 +848,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                   sliver: SliverReorderableList(
                     itemBuilder: (context, index) => _buildSiteItem(index),
                     itemCount: _sites.length,
-                    onReorder: (oldIndex, newIndex) {
+                    onReorderItem: (oldIndex, newIndex) {
                       setState(() {
-                        if (newIndex > oldIndex) newIndex -= 1;
                         final item = _sites.removeAt(oldIndex);
                         _sites.insert(newIndex, item);
                       });
