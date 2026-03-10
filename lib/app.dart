@@ -1040,6 +1040,7 @@ class _HomePageState extends State<HomePage> {
                   // 分类按钮 - 仅在站点支持分类搜索功能时显示
                   if (_currentSite?.features.supportCategories ?? true)
                     IconButton(
+                      tooltip: '分类',
                       onPressed: () {
                         _showCategoryFilterDialog();
                       },
@@ -1130,6 +1131,7 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(width: 8),
                   if (_currentSite?.features.supportCollection == true)
                     IconButton(
+                      tooltip: _onlyFavorites ? '取消仅显示收藏' : '仅显示收藏',
                       onPressed: () {
                         if (mounted) {
                           setState(() {
