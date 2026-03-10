@@ -1,0 +1,1 @@
+## 2026-03-09 - Missing Tooltips in Download Task Actions\n**Learning:** IconButtons used as actions in list items frequently lack `tooltip` strings, leading to poor a11y and missing hover feedback on desktop web/Windows environments.\n**Action:** Always check newly added `IconButton` widgets or existing icon-only buttons for missing `tooltip` fields and add descriptive labels.
