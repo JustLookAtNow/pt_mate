@@ -2091,11 +2091,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
       }
     }
 
-    final tempSite = _composeCurrentSite();
-
     try {
-      ApiService.instance.removeAdapter(tempSite.id);
-      final adapter = await ApiService.instance.getAdapter(tempSite);
+      final tempSite = _composeCurrentSite();
+      final adapter = await ApiService.instance.createTemporaryAdapter(tempSite);
 
       final categories = await adapter.getSearchCategories();
       setState(() {
@@ -2150,8 +2148,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       }
 
       final site = _composeCurrentSite();
-      ApiService.instance.removeAdapter(site.id);
-      final adapter = await ApiService.instance.getAdapter(site);
+      final adapter = await ApiService.instance.createTemporaryAdapter(site);
       if (_siteFeatures.supportMemberProfile) {
         // 支持用户资料接口：获取并展示用户信息
         final profile = await adapter.fetchMemberProfile();
