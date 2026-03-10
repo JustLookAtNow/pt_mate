@@ -2076,7 +2076,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
           builder: (context) {
             final isLargeScreen = ScreenUtils.isLargeScreen(context);
             final maxLines = isLargeScreen ? 1 : 2;
-            return Text(
+            return SelectableText(
               widget.torrentItem.name,
               maxLines: maxLines,
               overflow: TextOverflow.ellipsis,
