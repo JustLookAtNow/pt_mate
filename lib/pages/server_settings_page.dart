@@ -2590,6 +2590,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                           border: const OutlineInputBorder(),
                           suffixIcon: _showPresetList
                               ? IconButton(
+                                  tooltip: '收起',
                                   icon: const Icon(Icons.keyboard_arrow_up),
                                   onPressed: () {
                                     setState(() {
