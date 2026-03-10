@@ -308,7 +308,6 @@ class QbittorrentClient
       forceRelay = true;
     }
 
-
     final useRelay = config.useLocalRelay || forceRelay;
     if (!useRelay) {
       body['urls'] = url;
@@ -338,8 +337,6 @@ class QbittorrentClient
 
     await _request('POST', '/torrents/add', body: body);
   }
-
-
 
   /// 根据版本获取暂停任务的 API 路径
   String _getPauseApiPath(String? version) {

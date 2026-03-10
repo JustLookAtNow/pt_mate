@@ -5,19 +5,34 @@ import 'dart:collection';
 /// 提供通用的 DOM 元素选择和字段提取功能
 mixin BaseWebAdapterMixin {
   // Static regex cache for dynamic regexes
-  static final LinkedHashMap<String, RegExp> _regexCache = LinkedHashMap<String, RegExp>();
+  static final LinkedHashMap<String, RegExp> _regexCache =
+      LinkedHashMap<String, RegExp>();
   static const int _maxCacheSize = 100;
 
   // Cached static regexes
-  static final RegExp _classAndAttrValueRegExp = RegExp(r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$');
-  static final RegExp _classAndAttrExistsRegExp = RegExp(r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)\]$');
-  static final RegExp _attributeExistsRegExp = RegExp(r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)\]$');
-  static final RegExp _attributeValueRegExp = RegExp(r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$');
-  static final RegExp _containsAllRegExp = RegExp(r'^([^:]*):contains\((.*)\)$');
+  static final RegExp _classAndAttrValueRegExp = RegExp(
+    r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$',
+  );
+  static final RegExp _classAndAttrExistsRegExp = RegExp(
+    r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)\]$',
+  );
+  static final RegExp _attributeExistsRegExp = RegExp(
+    r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)\]$',
+  );
+  static final RegExp _attributeValueRegExp = RegExp(
+    r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$',
+  );
+  static final RegExp _containsAllRegExp = RegExp(
+    r'^([^:]*):contains\((.*)\)$',
+  );
   static final RegExp _whitespaceRegExp = RegExp(r'\s+');
-  static final RegExp _nthChildWithParenRegExp = RegExp(r'^([^:]*):nth-child\((\d+)\)');
+  static final RegExp _nthChildWithParenRegExp = RegExp(
+    r'^([^:]*):nth-child\((\d+)\)',
+  );
   static final RegExp _nthChildRegExp = RegExp(r'^([^:]+):nth-child$');
-  static final RegExp _nthNodeWithParenRegExp = RegExp(r'^([^:]*):nth-node\((\d+)\)');
+  static final RegExp _nthNodeWithParenRegExp = RegExp(
+    r'^([^:]*):nth-node\((\d+)\)',
+  );
   static final RegExp _nthNodeRegExp = RegExp(r'^([^:]+):nth-node$');
   static final RegExp _filterGroupRegExp = RegExp(r'\$(\d+)');
   static final RegExp _singleQuoteRegExp = RegExp(r"^'(.*)'$");
@@ -129,7 +144,9 @@ mixin BaseWebAdapterMixin {
 
     // 处理复合选择器：tag.class[attr=="value"] 或 tag.class[attr]
     // 这种选择器同时包含类名和属性条件
-    final classAndAttrValueMatch = _classAndAttrValueRegExp.firstMatch(selector);
+    final classAndAttrValueMatch = _classAndAttrValueRegExp.firstMatch(
+      selector,
+    );
     if (classAndAttrValueMatch != null) {
       final tag = classAndAttrValueMatch.group(1)?.trim();
       final className = classAndAttrValueMatch.group(2)?.trim();
@@ -178,7 +195,9 @@ mixin BaseWebAdapterMixin {
     }
 
     // 处理复合选择器：tag.class[attr]（属性存在性）
-    final classAndAttrExistsMatch = _classAndAttrExistsRegExp.firstMatch(selector);
+    final classAndAttrExistsMatch = _classAndAttrExistsRegExp.firstMatch(
+      selector,
+    );
     if (classAndAttrExistsMatch != null) {
       final tag = classAndAttrExistsMatch.group(1)?.trim();
       final className = classAndAttrExistsMatch.group(2)?.trim();
@@ -443,7 +462,6 @@ mixin BaseWebAdapterMixin {
     dynamic element,
     Map<String, dynamic> fieldConfig,
   ) async {
-
     final selector = fieldConfig['selector'] as String?;
     final attribute = fieldConfig['attribute'] as String?;
     final filter = fieldConfig['filter'] as Map<String, dynamic>?;
@@ -481,7 +499,9 @@ mixin BaseWebAdapterMixin {
 
       // 只添加非空值
       if (value != null && value.isNotEmpty) {
-        values.add(value.replaceAll('\n', ' ').replaceAll(_whitespaceRegExp, ' '));
+        values.add(
+          value.replaceAll('\n', ' ').replaceAll(_whitespaceRegExp, ' '),
+        );
       }
     }
 
@@ -496,7 +516,6 @@ mixin BaseWebAdapterMixin {
     final values = await extractFieldValue(element, fieldConfig);
     return values.isNotEmpty ? values.first : null;
   }
-
 
   /// 标准化href属性用于比较
   /// 将绝对URL转换为相对路径格式，便于与配置中的路径进行比较

@@ -896,14 +896,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           }
                                           return _AggregateSearchScrollbar(
                                             controller: _listController,
-                                                sections: sections,
+                                            sections: sections,
                                             onFastScrollingChanged:
                                                 _setFastScrolling,
                                           );
                                         },
                                       ),
                                     ),
-
                                 ],
                               ),
                       ),
@@ -1813,8 +1812,6 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
       },
     );
   }
-
-
 }
 
 class _SiteSection {

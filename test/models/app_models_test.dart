@@ -11,8 +11,11 @@ void main() {
         'isActive': true,
         'enabledSites': [
           {'id': 'site1', 'additionalParams': null},
-          {'id': 'site2', 'additionalParams': {'key': 'value'}}
-        ]
+          {
+            'id': 'site2',
+            'additionalParams': {'key': 'value'},
+          },
+        ],
       };
 
       final config = AggregateSearchConfig.fromJson(json);
@@ -33,7 +36,7 @@ void main() {
         'name': 'Legacy Config',
         'type': 'custom',
         'isActive': true,
-        'enabledSiteIds': ['site1', 'site2']
+        'enabledSiteIds': ['site1', 'site2'],
       };
 
       final config = AggregateSearchConfig.fromJson(json);

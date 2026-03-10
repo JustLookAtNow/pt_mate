@@ -350,12 +350,20 @@ enum TagType {
   final Color color;
   final String regex;
 
+  static final Map<TagType, RegExp> _regexCache = {};
+
   // 从字符串中匹配所有标签
   static List<TagType> matchTags(String text) {
     List<TagType> matchedTags = [];
     for (TagType tag in TagType.values) {
       if (tag.regex.isEmpty) continue;
-      RegExp regExp = RegExp(tag.regex, caseSensitive: false);
+
+      // ⚡ Bolt: Cache RegExp to prevent recompilation on every matchTags call
+      final RegExp regExp = _regexCache.putIfAbsent(
+        tag,
+        () => RegExp(tag.regex, caseSensitive: false),
+      );
+
       if (regExp.hasMatch(text)) {
         matchedTags.add(tag);
       }

@@ -31,7 +31,11 @@ abstract class SiteAdapter {
   Future<TorrentDetail> fetchTorrentDetail(String id, {String? description});
 
   /// 获取种子评论列表
-  Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20});
+  Future<TorrentCommentList> fetchComments(
+    String id, {
+    int pageNumber = 1,
+    int pageSize = 20,
+  });
 
   /// 生成下载令牌并返回下载URL
   Future<String> genDlToken({required String id, String? url});

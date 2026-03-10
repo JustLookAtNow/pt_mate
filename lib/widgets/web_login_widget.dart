@@ -311,7 +311,11 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
         _logger.w('CookieManager未获取到cookie');
       }
       if (mounted) {
-                NotificationHelper.showInfo(context, '无法获取cookie，请检查登录状态', duration: const Duration(seconds: 3));
+        NotificationHelper.showInfo(
+          context,
+          '无法获取cookie，请检查登录状态',
+          duration: const Duration(seconds: 3),
+        );
       }
       return false;
     } catch (e) {
@@ -319,7 +323,7 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
         _logger.e('提取cookie时出错: $e');
       }
       if (mounted) {
-                NotificationHelper.showError(context, 'Cookie提取失败: $e');
+        NotificationHelper.showError(context, 'Cookie提取失败: $e');
       }
       return false;
     }

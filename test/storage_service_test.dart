@@ -7,18 +7,18 @@ import 'package:flutter/services.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const MethodChannel channel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+  const MethodChannel channel = MethodChannel(
+    'plugins.it_nomads.com/flutter_secure_storage',
+  );
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
 
     // Mock FlutterSecureStorage
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
-      channel,
-      (MethodCall methodCall) async {
-        return null;
-      },
-    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+          return null;
+        });
   });
 
   test('StorageService caching optimization test (Add, Update, Delete)', () async {
@@ -49,7 +49,6 @@ void main() {
     // Verify instance identity (no re-decoding)
     expect(loadedConfigsAfterAdd.first, same(cacheAfterAdd.first));
 
-
     // --- UPDATE TEST ---
     final updatedConfig = newConfig.copyWith(name: 'Updated Test Site');
     await service.updateSiteConfig(updatedConfig);
@@ -65,7 +64,6 @@ void main() {
     expect(loadedConfigsAfterUpdate.first.name, 'Updated Test Site');
     // Verify instance identity with the cache
     expect(loadedConfigsAfterUpdate.first, same(cacheAfterUpdate.first));
-
 
     // --- DELETE TEST ---
     await service.deleteSiteConfig('test-site-1');

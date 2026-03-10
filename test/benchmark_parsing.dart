@@ -45,50 +45,29 @@ void main() {
 
     // Mock configuration
     final searchConfig = {
-      'rows': {
-        'selector': 'table.torrents > tr'
-      },
+      'rows': {'selector': 'table.torrents > tr'},
       'fields': {
         'torrentId': {
           'selector': 'a[href^="details.php?id="]',
           'attribute': 'href',
-          'filter': {
-            'name': 'regexp',
-            'args': 'id=(\\d+)',
-            'value': '\$1'
-          }
+          'filter': {'name': 'regexp', 'args': 'id=(\\d+)', 'value': '\$1'},
         },
         'torrentName': {
           'selector': 'a[href^="details.php?id="] > b',
-          'attribute': 'text'
+          'attribute': 'text',
         },
-        'sizeText': {
-          'selector': 'td:nth-child(4)',
-          'attribute': 'text'
-        },
-        'seedersText': {
-          'selector': 'td:nth-child(5)',
-          'attribute': 'text'
-        },
-        'leechersText': {
-          'selector': 'td:nth-child(6)',
-          'attribute': 'text'
-        },
-        'downloadStatus': {
-          'selector': 'td:nth-child(7)',
-          'attribute': 'text'
-        }
-      }
+        'sizeText': {'selector': 'td:nth-child(4)', 'attribute': 'text'},
+        'seedersText': {'selector': 'td:nth-child(5)', 'attribute': 'text'},
+        'leechersText': {'selector': 'td:nth-child(6)', 'attribute': 'text'},
+        'downloadStatus': {'selector': 'td:nth-child(7)', 'attribute': 'text'},
+      },
     };
 
     final template = SiteConfigTemplate(
       id: 'test',
       name: 'test',
       baseUrls: ['https://test.com'],
-      infoFinder: {
-        'search': searchConfig,
-        'totalPages': {}
-      },
+      infoFinder: {'search': searchConfig, 'totalPages': {}},
       discountMapping: {},
       tagMapping: {},
     );
@@ -114,7 +93,6 @@ void main() {
     debugPrint(
       'Parsed ${result.length} items in ${stopwatch.elapsedMilliseconds} ms (Main Thread)',
     );
-
 
     // Expect 2000 because of nested trs and non-strict selector
     expect(result.length, 2000);

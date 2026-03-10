@@ -120,7 +120,10 @@ class Unit3dAdapter extends SiteAdapter {
         });
       }
 
-      final response = await _dio.get('/api/torrents/filter', queryParameters: queryParams);
+      final response = await _dio.get(
+        '/api/torrents/filter',
+        queryParameters: queryParams,
+      );
 
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
@@ -207,12 +210,12 @@ class Unit3dAdapter extends SiteAdapter {
     String id, {
     String? description,
   }) async {
-      // 如果自带了 description，就不需要另外请求
-      if (description != null && description.isNotEmpty) {
-        return TorrentDetail(descr: description);
-      }
+    // 如果自带了 description，就不需要另外请求
+    if (description != null && description.isNotEmpty) {
+      return TorrentDetail(descr: description);
+    }
 
-      return TorrentDetail(descr: '');
+    return TorrentDetail(descr: '');
   }
 
   @override
@@ -250,7 +253,7 @@ class Unit3dAdapter extends SiteAdapter {
     required String torrentId,
     required bool make,
   }) async {
-     throw const SiteServiceException(message: '当前站点不支持通过 API 收藏');
+    throw const SiteServiceException(message: '当前站点不支持通过 API 收藏');
   }
 
   @override

@@ -2093,7 +2093,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
     try {
       final tempSite = _composeCurrentSite();
-      final adapter = await ApiService.instance.createTemporaryAdapter(tempSite);
+      final adapter = await ApiService.instance.createTemporaryAdapter(
+        tempSite,
+      );
 
       final categories = await adapter.getSearchCategories();
       setState(() {

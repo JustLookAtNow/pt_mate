@@ -67,7 +67,6 @@ void main() {
       isTop: false,
       doubanRating: '0',
       imdbRating: '0',
-
     );
 
     // Set screen size to small (e.g., 400px width)
@@ -114,7 +113,6 @@ void main() {
         isTop: false,
         doubanRating: '0',
         imdbRating: '0',
-
       );
 
       // Set screen size to large (e.g., 1000px width)
