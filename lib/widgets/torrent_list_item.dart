@@ -418,7 +418,7 @@ class TorrentInfo extends StatelessWidget {
               (!isMobile && hasAnyRating) ||
               (isMobile && !showCover && hasAnyRating))
             Padding(
-              padding: const EdgeInsets.only(bottom: 2),
+              padding: EdgeInsets.zero,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -523,7 +523,7 @@ class TorrentInfo extends StatelessWidget {
                 ),
               ),
             ),
-          const SizedBox(height: 4),
+          // const SizedBox(height: 1),
           // 种子描述（使用清理后的描述）
           Text(
             torrent.smallDescr,
@@ -1089,7 +1089,7 @@ class _TagsViewState extends State<_TagsView> {
 
   Widget _buildChip(TagType tag) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
         color: tag.color,
         borderRadius: BorderRadius.circular(3),
@@ -1100,6 +1100,7 @@ class _TagsViewState extends State<_TagsView> {
           color: Colors.white,
           fontSize: 10,
           fontWeight: FontWeight.w500,
+          height: 1.1,
         ),
       ),
     );
@@ -1124,7 +1125,7 @@ class _TagsViewState extends State<_TagsView> {
             child: _MeasureSize(
               onChange: (s) {
                 if (!_expanded) {
-                  final overflow = s.height > 18.0 + 0.1;
+                  final overflow = s.height > 20.0 + 0.1;
                   if (overflow != _overflow) {
                     if (mounted) {
                       setState(() {
@@ -1146,7 +1147,7 @@ class _TagsViewState extends State<_TagsView> {
         return Row(
           children: [
             Expanded(
-              child: SizedBox(height: 18, child: ClipRect(child: _buildWrap())),
+              child: SizedBox(height: 20, child: ClipRect(child: _buildWrap())),
             ),
             if (_overflow && !ScreenUtils.isLargeScreen(context)) ...[
               const SizedBox(width: 8),
