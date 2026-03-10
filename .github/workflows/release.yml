@@ -498,12 +498,8 @@ jobs:
 
         npm install telegramify-markdown
 
-        MAX_TG_FILE_SIZE=$((50 * 1024 * 1024))
         ATTACHMENT_MANIFEST=/tmp/tg_attachments.tsv
-        OVERSIZED_MANIFEST=/tmp/tg_oversized.tsv
-
         : > "$ATTACHMENT_MANIFEST"
-        : > "$OVERSIZED_MANIFEST"
 
         while IFS='|' read -r label path; do
           if [ ! -f "$path" ]; then
@@ -511,14 +507,7 @@ jobs:
             continue
           fi
 
-          file_size=$(stat -c%s "$path")
-          file_name=$(basename "$path")
-
-          if [ "$file_size" -le "$MAX_TG_FILE_SIZE" ]; then
-            printf '%s\t%s\t%s\n' "$label" "$path" "$file_name" >> "$ATTACHMENT_MANIFEST"
-          else
-            printf '%s\t%s\n' "$label" "$file_name" >> "$OVERSIZED_MANIFEST"
-          fi
+          printf '%s\n' "$label" >> "$ATTACHMENT_MANIFEST"
         done <<EOF
         Android APK|android-artifacts/pt_mate-${VERSION_NUMBER}-arm64-v8a.apk
         Windows x64|windows-artifact/pt_mate-${VERSION_NUMBER}-windows-x64.exe
@@ -529,13 +518,10 @@ jobs:
         Xcode Archive|ios-macos-artifacts/ios/build/pt_mate-${VERSION_NUMBER}.xcarchive.zip
         EOF
 
-        export TG_ATTACHMENT_LINES
-        export TG_OVERSIZED_LINES
-        TG_ATTACHMENT_LINES=$(awk -F '\t' '{print "- " $1}' "$ATTACHMENT_MANIFEST" || true)
-        TG_OVERSIZED_LINES=$(awk -F '\t' '{print "- " $1 "（仅 GitHub Release）"}' "$OVERSIZED_MANIFEST" || true)
+        export TG_RELEASE_ASSET_LINES
+        TG_RELEASE_ASSET_LINES=$(awk '{print "- " $0}' "$ATTACHMENT_MANIFEST" || true)
 
         node <<'EOF'
-        const fs = require('fs');
         const https = require('https');
 
         (async () => {
@@ -546,20 +532,15 @@ jobs:
           const version = process.env.VERSION;
           const repo = process.env.REPO;
           const releaseUrl = `https://github.com/${repo}/releases/tag/${version}`;
-          const attachmentLines = process.env.TG_ATTACHMENT_LINES || '';
-          const oversizedLines = process.env.TG_OVERSIZED_LINES || '';
+          const releaseAssetLines = process.env.TG_RELEASE_ASSET_LINES || '';
 
           const sections = [
             `# 🎉 PT Mate ${version} 发布了！`,
             commitMsg,
           ];
 
-          if (attachmentLines) {
-            sections.push(`📦 本条通知附带以下安装包\n${attachmentLines}`);
-          }
-
-          if (oversizedLines) {
-            sections.push(`🔗 以下大文件仅在 GitHub Release 提供\n${oversizedLines}`);
+          if (releaseAssetLines) {
+            sections.push(`📦 可下载安装包\n${releaseAssetLines}\n请前往 GitHub Release 下载`);
           }
 
           sections.push(`📱 [GitHub Release](${releaseUrl})`);
@@ -643,7 +624,6 @@ jobs:
             const messageId = sendRes.result.message_id;
 
             console.log('Message sent successfully with ID:', messageId);
-            fs.writeFileSync('/tmp/tg_message_id.txt', String(messageId));
 
             await sendWithRetry('POST', 'unpinAllChatMessages', { chat_id: process.env.TG_CHAT_ID });
             await sendWithRetry('POST', 'pinChatMessage', {
@@ -659,41 +639,6 @@ jobs:
           }
         })();
         EOF
-
-        TG_MESSAGE_ID=$(cat /tmp/tg_message_id.txt)
-        ATTACHMENT_COUNT=$(awk 'END {print NR}' "$ATTACHMENT_MANIFEST")
-
-        if [ "$ATTACHMENT_COUNT" -lt 2 ]; then
-          echo "Telegram media group requires at least 2 attachments, current count: $ATTACHMENT_COUNT"
-          exit 0
-        fi
-
-        MEDIA_PAYLOAD=$(jq -Rn '
-          [inputs
-           | select(length > 0)
-           | split("	")
-           | {type: "document", media: ("attach://file" + (input_line_number | tostring))}]
-        ' < "$ATTACHMENT_MANIFEST")
-
-        CURL_ARGS=(
-          -fsS
-          "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMediaGroup"
-          -F "chat_id=${TG_CHAT_ID}"
-          -F "reply_parameters={\"message_id\":${TG_MESSAGE_ID}}"
-          -F "media=${MEDIA_PAYLOAD}"
-        )
-
-        attachment_index=0
-        while IFS=$'	' read -r label path file_name; do
-          [ -n "$path" ] || continue
-          attachment_index=$((attachment_index + 1))
-          echo "Queueing Telegram media: $file_name"
-          CURL_ARGS+=( -F "file${attachment_index}=@${path};filename=${file_name}" )
-        done < "$ATTACHMENT_MANIFEST"
-
-        response=$(curl "${CURL_ARGS[@]}")
-        echo "$response"
-        echo "$response" | jq -e '.ok == true and (.result | type == "array") and (.result | length >= 2)' > /dev/null
 
     - name: Notify Update Server (POST /api/v1/github/version-update)
       env:
