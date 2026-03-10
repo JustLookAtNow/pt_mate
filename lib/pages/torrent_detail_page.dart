@@ -2072,17 +2072,30 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       },
       child: Scaffold(
       appBar: AppBar(
-        title: SelectableText(
-          widget.torrentItem.name,
-          style: TextStyle(
-            fontSize: 16,
-            color: Theme.of(context).brightness == Brightness.light
-                ? Theme.of(context).colorScheme.onPrimary
-                : Theme.of(context).colorScheme.onSurface,
-            overflow: TextOverflow.ellipsis,
-          ),
-          maxLines: 2,
+        title: Builder(
+          builder: (context) {
+            final isLargeScreen = ScreenUtils.isLargeScreen(context);
+            final maxLines = isLargeScreen ? 1 : 2;
+            return Text(
+              widget.torrentItem.name,
+              maxLines: maxLines,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 16,
+                height: 1.35,
+                color: Theme.of(context).brightness == Brightness.light
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.onSurface,
+              ),
+              strutStyle: const StrutStyle(
+                forceStrutHeight: true,
+                height: 1.35,
+                leading: 0.15,
+              ),
+            );
+          },
         ),
+        toolbarHeight: ScreenUtils.isLargeScreen(context) ? kToolbarHeight : 72,
         backgroundColor: Theme.of(context).brightness == Brightness.light
             ? Theme.of(context).colorScheme.primary
             : Theme.of(context).colorScheme.surface,
