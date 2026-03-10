@@ -2092,26 +2092,19 @@ class _SiteEditPageState extends State<SiteEditPage> {
     }
 
     try {
-      // 创建临时站点配置用于获取分类
       final tempSite = _composeCurrentSite();
-      await ApiService.instance.setActiveSite(tempSite);
+      final adapter = await ApiService.instance.createTemporaryAdapter(tempSite);
 
-      // 从适配器获取分类配置
-      final adapter = ApiService.instance.activeAdapter;
-      if (adapter != null) {
-        final categories = await adapter.getSearchCategories();
-        setState(() {
-          _searchCategories = List.from(categories);
-        });
+      final categories = await adapter.getSearchCategories();
+      setState(() {
+        _searchCategories = List.from(categories);
+      });
 
-        if (mounted) {
-          NotificationHelper.showInfo(
-            context,
-            '已成功加载 ${categories.length} 个分类配置',
-          );
-        }
-      } else {
-        throw Exception('无法获取适配器实例');
+      if (mounted) {
+        NotificationHelper.showInfo(
+          context,
+          '已成功加载 ${categories.length} 个分类配置',
+        );
       }
     } catch (e) {
       // 如果获取失败，使用默认配置
@@ -2155,12 +2148,10 @@ class _SiteEditPageState extends State<SiteEditPage> {
       }
 
       final site = _composeCurrentSite();
-      // 临时设置站点进行测试
-      await ApiService.instance.setActiveSite(site);
-
+      final adapter = await ApiService.instance.createTemporaryAdapter(site);
       if (_siteFeatures.supportMemberProfile) {
         // 支持用户资料接口：获取并展示用户信息
-        final profile = await ApiService.instance.fetchMemberProfile();
+        final profile = await adapter.fetchMemberProfile();
 
         try {
           final statuses = await StorageService.instance.loadHealthStatuses();
@@ -2193,7 +2184,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       } else {
         // 不支持用户资料接口：使用 testConnection 测试连通性
         // 失败会抛出 SiteException，由外层 catch 统一展示错误
-        await ApiService.instance.testConnection();
+        await adapter.testConnection();
 
         try {
           final statuses = await StorageService.instance.loadHealthStatuses();

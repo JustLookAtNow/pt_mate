@@ -43,16 +43,31 @@ class ApiService {
       return _adapters[adapterId]!;
     }
 
+    final adapter = await _createAndInitAdapter(siteConfig, logLabel: 'getAdapter');
+    _adapters[adapterId] = adapter;
+
+    return adapter;
+  }
+
+  /// 创建一个不进入缓存的临时适配器
+  Future<SiteAdapter> createTemporaryAdapter(SiteConfig siteConfig) {
+    return _createAndInitAdapter(siteConfig, logLabel: 'createTemporaryAdapter');
+  }
+
+  Future<SiteAdapter> _createAndInitAdapter(
+    SiteConfig siteConfig, {
+    required String logLabel,
+  }) async {
     // 创建新的适配器实例
     final adapter = SiteAdapterFactory.createAdapter(siteConfig);
     final swInit = Stopwatch()..start();
     await adapter.init(siteConfig);
     swInit.stop();
     if (kDebugMode) {
-      _logger.d('ApiService.getAdapter: 适配器(${siteConfig.siteType.id})初始化耗时=${swInit.elapsedMilliseconds}ms');
+      _logger.d(
+        'ApiService.$logLabel: 适配器(${siteConfig.siteType.id})初始化耗时=${swInit.elapsedMilliseconds}ms',
+      );
     }
-    _adapters[adapterId] = adapter;
-
     return adapter;
   }
 
