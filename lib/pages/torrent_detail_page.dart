@@ -517,17 +517,36 @@ class TorrentDetailPage extends StatefulWidget {
 
 class _TorrentDetailPageState extends State<TorrentDetailPage> {
   // 静态正则对象，避免在频繁调用的渲染和清理方法中重复编译
-  static final RegExp _colorTagRegExp = RegExp(r'\[color=([a-zA-Z]+)\]', caseSensitive: false);
+  static final RegExp _colorTagRegExp = RegExp(
+    r'\[color=([a-zA-Z]+)\]',
+    caseSensitive: false,
+  );
   static final RegExp _bbcodeTagRegExp = RegExp(r'\[(/?)(\w+)(?:=[^\]]+)?\]');
   static final RegExp _mdImageRegExp = RegExp(r'!\[.*?\]\(([^)]+)\)');
   static final RegExp _mdBoldRegExp = RegExp(r'\*\*([^*]+)\*\*');
-  static final RegExp _listTagRegExp = RegExp(r'\[\*\]([^\[]*?)(?=\[|\s*$)', dotAll: true);
-  static final RegExp _urlImgUrlRegExp = RegExp(r'\[url\=[^\]]*\](.*?)\[/url\]', caseSensitive: false, dotAll: true);
-  static final RegExp _codeTagRegExp = RegExp(r'\[code\]\s*(.*?)\s*\[/code\]', caseSensitive: false, dotAll: true);
-  static final RegExp _imgTagRegExp = RegExp(r'\[img\]([^\]]+)\[/img\]', caseSensitive: false);
+  static final RegExp _listTagRegExp = RegExp(
+    r'\[\*\]([^\[]*?)(?=\[|\s*$)',
+    dotAll: true,
+  );
+  static final RegExp _urlImgUrlRegExp = RegExp(
+    r'\[url\=[^\]]*\](.*?)\[/url\]',
+    caseSensitive: false,
+    dotAll: true,
+  );
+  static final RegExp _codeTagRegExp = RegExp(
+    r'\[code\]\s*(.*?)\s*\[/code\]',
+    caseSensitive: false,
+    dotAll: true,
+  );
+  static final RegExp _imgTagRegExp = RegExp(
+    r'\[img\]([^\]]+)\[/img\]',
+    caseSensitive: false,
+  );
   static final RegExp _openTagRegExp = RegExp(r'\[(\w+)(?:=[^\]]+)?\]');
   static final RegExp _closeTagRegExp = RegExp(r'\[/(\w+)\]');
-  static final RegExp _quoteNestingRegExp = RegExp(r'\[quote\][^\[]*\[b\][^\[]*\[color[^\]]*\][^\[]*\[size[^\]]*\][^\[]*\[/quote\]');
+  static final RegExp _quoteNestingRegExp = RegExp(
+    r'\[quote\][^\[]*\[b\][^\[]*\[color[^\]]*\][^\[]*\[size[^\]]*\][^\[]*\[/quote\]',
+  );
   static final RegExp _upperImgRegExp = RegExp(r'\[IMG\]');
   static final RegExp _emptySizeRegExp = RegExp(r'\[size\][^\[]*\[/size\]');
   static final RegExp _anyTagRegExp = RegExp(r'\[/?\w+(?:=[^\]]+)?\]');
@@ -714,7 +733,10 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         // 添加短暂延迟，确保对话框完全关闭后再显示SnackBar
         await Future.delayed(const Duration(milliseconds: 100));
         if (mounted) {
-                    NotificationHelper.showInfo(context, '已成功发送"${widget.torrentItem.name}"到 ${clientConfig.name}');
+          NotificationHelper.showInfo(
+            context,
+            '已成功发送"${widget.torrentItem.name}"到 ${clientConfig.name}',
+          );
         }
       }
     } catch (e) {
@@ -722,7 +744,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         // 添加短暂延迟，确保对话框完全关闭后再显示SnackBar
         await Future.delayed(const Duration(milliseconds: 100));
         if (mounted) {
-                    NotificationHelper.showError(context, '下载失败：$e');
+          NotificationHelper.showError(context, '下载失败：$e');
         }
       }
     }
@@ -756,7 +778,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         // 添加短暂延迟，确保UI稳定后再显示SnackBar
         await Future.delayed(const Duration(milliseconds: 50));
         if (mounted) {
-                    NotificationHelper.showError(context, '收藏操作失败：$e');
+          NotificationHelper.showError(context, '收藏操作失败：$e');
         }
       }
     }
@@ -789,18 +811,15 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     };
 
     // 处理[color=colorname]标签
-    return content.replaceAllMapped(
-      _colorTagRegExp,
-      (match) {
-        final colorName = match.group(1)!.toLowerCase();
-        final hexColor = colorMap[colorName];
-        if (hexColor != null) {
-          return '[color=$hexColor]';
-        }
-        // 如果找不到对应的颜色，使用黑色
-        return '[color=#000000]';
-      },
-    );
+    return content.replaceAllMapped(_colorTagRegExp, (match) {
+      final colorName = match.group(1)!.toLowerCase();
+      final hexColor = colorMap[colorName];
+      if (hexColor != null) {
+        return '[color=$hexColor]';
+      }
+      // 如果找不到对应的颜色，使用黑色
+      return '[color=#000000]';
+    });
   }
 
   String _fixBBCodeErrors(String content) {
@@ -1099,7 +1118,9 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
     // 如果不显示图片，替换图片标签为占位符
     if (!_showImages && _imageUrls.isNotEmpty) {
-      processedContent = processedContent.replaceAllMapped(_imgTagRegExp, (match) {
+      processedContent = processedContent.replaceAllMapped(_imgTagRegExp, (
+        match,
+      ) {
         return '[图片已隐藏]';
       });
     }
@@ -1176,13 +1197,17 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                 Builder(
                   builder: (context) {
                     // 检测所有开始标签
-                    final openTags = _openTagRegExp.allMatches(processedContent);
+                    final openTags = _openTagRegExp.allMatches(
+                      processedContent,
+                    );
                     final foundOpenTags = openTags
                         .map((match) => match.group(1))
                         .toList();
 
                     // 检测所有结束标签
-                    final closeTags = _closeTagRegExp.allMatches(processedContent);
+                    final closeTags = _closeTagRegExp.allMatches(
+                      processedContent,
+                    );
                     final foundCloseTags = closeTags
                         .map((match) => match.group(1))
                         .toList();
@@ -1220,7 +1245,9 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                     // 检测标签顺序错误
                     final orderErrors = <String>[];
                     final tagStack = <String>[];
-                    final allMatches = _anyTagRegExp.allMatches(processedContent);
+                    final allMatches = _anyTagRegExp.allMatches(
+                      processedContent,
+                    );
 
                     for (final match in allMatches) {
                       final fullTag = match.group(0)!;
@@ -1696,7 +1723,10 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                     // 所以在这些平台上直接尝试启动，其他平台保持原有逻辑
                     if (defaultTargetPlatform == TargetPlatform.linux ||
                         defaultTargetPlatform == TargetPlatform.windows) {
-                      final platformName = defaultTargetPlatform == TargetPlatform.linux ? 'Linux' : 'Windows';
+                      final platformName =
+                          defaultTargetPlatform == TargetPlatform.linux
+                          ? 'Linux'
+                          : 'Windows';
                       debugPrint('$platformName平台：尝试启动URL: $webviewUrl');
                       debugPrint('使用模式: LaunchMode.externalApplication');
 
@@ -1711,23 +1741,34 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                         // 对于 Linux，提供 xdg-open 备选方案
                         if (defaultTargetPlatform == TargetPlatform.linux) {
                           // 等待一小段时间，然后尝试备选方案
-                          await Future.delayed(const Duration(milliseconds: 500));
+                          await Future.delayed(
+                            const Duration(milliseconds: 500),
+                          );
 
                           // 如果 url_launcher 没有效果，尝试直接调用 xdg-open
                           debugPrint('Linux平台：尝试备选方案 - 直接调用 xdg-open');
-                          final result = await Process.run('xdg-open', [webviewUrl]);
-                          debugPrint('Linux平台：xdg-open 退出码: ${result.exitCode}');
+                          final result = await Process.run('xdg-open', [
+                            webviewUrl,
+                          ]);
+                          debugPrint(
+                            'Linux平台：xdg-open 退出码: ${result.exitCode}',
+                          );
                           if (result.exitCode != 0) {
-                            debugPrint('Linux平台：xdg-open 错误输出: ${result.stderr}');
+                            debugPrint(
+                              'Linux平台：xdg-open 错误输出: ${result.stderr}',
+                            );
                           } else {
                             debugPrint('Linux平台：xdg-open 执行成功');
                           }
-                        } else if (defaultTargetPlatform == TargetPlatform.windows) {
+                        } else if (defaultTargetPlatform ==
+                            TargetPlatform.windows) {
                           // Windows 平台通常 url_launcher 就足够了，但如果需要可以添加 start 命令备选方案
                           debugPrint('Windows平台：url_launcher 应该已经处理了URL启动');
                         }
                       } catch (processError) {
-                        debugPrint('$platformName平台：Process.run 失败: $processError');
+                        debugPrint(
+                          '$platformName平台：Process.run 失败: $processError',
+                        );
                         // 如果 Process.run 也失败，抛出原始错误
                         rethrow;
                       }
@@ -1740,9 +1781,14 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                       } else {
                         if (mounted) {
                           // 添加短暂延迟，确保UI稳定后再显示SnackBar
-                          await Future.delayed(const Duration(milliseconds: 50));
+                          await Future.delayed(
+                            const Duration(milliseconds: 50),
+                          );
                           if (mounted) {
-                                                        NotificationHelper.showError(context, '无法打开链接: $webviewUrl');
+                            NotificationHelper.showError(
+                              context,
+                              '无法打开链接: $webviewUrl',
+                            );
                           }
                         }
                       }
@@ -1752,14 +1798,21 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                     if (mounted) {
                       String errorMessage = '打开链接失败: $e';
                       if (defaultTargetPlatform == TargetPlatform.linux) {
-                        errorMessage += '\n\n建议检查：\n1. 默认浏览器设置\n2. Desktop文件是否存在\n3. 运行: xdg-open $webviewUrl';
-                      } else if (defaultTargetPlatform == TargetPlatform.windows) {
-                        errorMessage += '\n\n建议检查：\n1. 默认浏览器设置\n2. 浏览器是否正确安装\n3. 运行: start $webviewUrl';
+                        errorMessage +=
+                            '\n\n建议检查：\n1. 默认浏览器设置\n2. Desktop文件是否存在\n3. 运行: xdg-open $webviewUrl';
+                      } else if (defaultTargetPlatform ==
+                          TargetPlatform.windows) {
+                        errorMessage +=
+                            '\n\n建议检查：\n1. 默认浏览器设置\n2. 浏览器是否正确安装\n3. 运行: start $webviewUrl';
                       }
                       // 添加短暂延迟，确保UI稳定后再显示SnackBar
                       await Future.delayed(const Duration(milliseconds: 50));
                       if (mounted) {
-                                                NotificationHelper.showError(context, errorMessage, duration: const Duration(seconds: 8));
+                        NotificationHelper.showError(
+                          context,
+                          errorMessage,
+                          duration: const Duration(seconds: 8),
+                        );
                       }
                     }
                   }
@@ -1969,7 +2022,10 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         child: Center(
           child: Column(
             children: [
-              Text('加载评论失败: $_commentsError', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(
+                '加载评论失败: $_commentsError',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
               ElevatedButton(onPressed: _loadComments, child: const Text('重试')),
             ],
           ),
@@ -2000,9 +2056,13 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                 children: [
                   CircleAvatar(
                     radius: 16,
-                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer,
                     child: Text(
-                      comment.author.isNotEmpty ? comment.author[0].toUpperCase() : '?',
+                      comment.author.isNotEmpty
+                          ? comment.author[0].toUpperCase()
+                          : '?',
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onPrimaryContainer,
                         fontWeight: FontWeight.bold,
@@ -2024,7 +2084,9 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                           ).format(comment.createdDate),
                           style: TextStyle(
                             fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -2071,65 +2133,67 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         }
       },
       child: Scaffold(
-      appBar: AppBar(
-        title: Builder(
-          builder: (context) {
-            final isLargeScreen = ScreenUtils.isLargeScreen(context);
-            final maxLines = isLargeScreen ? 1 : 2;
-            return SelectableText(
-              widget.torrentItem.name,
-              maxLines: maxLines,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 16,
-                height: 1.35,
-                color: Theme.of(context).brightness == Brightness.light
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onSurface,
-              ),
-              strutStyle: const StrutStyle(
-                forceStrutHeight: true,
-                height: 1.35,
-                leading: 0.15,
-              ),
-            );
-          },
+        appBar: AppBar(
+          title: Builder(
+            builder: (context) {
+              final isLargeScreen = ScreenUtils.isLargeScreen(context);
+              final maxLines = isLargeScreen ? 1 : 2;
+              return Text(
+                widget.torrentItem.name,
+                maxLines: maxLines,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 16,
+                  height: 1.35,
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? Theme.of(context).colorScheme.onPrimary
+                      : Theme.of(context).colorScheme.onSurface,
+                ),
+                strutStyle: const StrutStyle(
+                  forceStrutHeight: true,
+                  height: 1.35,
+                  leading: 0.15,
+                ),
+              );
+            },
+          ),
+          toolbarHeight: ScreenUtils.isLargeScreen(context)
+              ? kToolbarHeight
+              : 72,
+          backgroundColor: Theme.of(context).brightness == Brightness.light
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.surface,
+          iconTheme: IconThemeData(
+            color: Theme.of(context).brightness == Brightness.light
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurface,
+          ),
+          titleTextStyle: TextStyle(
+            color: Theme.of(context).brightness == Brightness.light
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurface,
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+          ),
         ),
-        toolbarHeight: ScreenUtils.isLargeScreen(context) ? kToolbarHeight : 72,
-        backgroundColor: Theme.of(context).brightness == Brightness.light
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.surface,
-        iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.light
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
-        ),
-        titleTextStyle: TextStyle(
-          color: Theme.of(context).brightness == Brightness.light
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
-          fontSize: 20,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error, size: 64, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text('加载失败: $_error'),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _loadDetail,
-                    child: const Text('重试'),
-                  ),
-                ],
-              ),
-            )
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error, size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    Text('加载失败: $_error'),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadDetail,
+                      child: const Text('重试'),
+                    ),
+                  ],
+                ),
+              )
             : _detail?.descrHtml != null && _detail!.descrHtml!.isNotEmpty
             ? SingleChildScrollView(
                 padding: const EdgeInsets.all(4),
@@ -2169,47 +2233,47 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
             : _detail?.descr != null && _detail!.descr.toString().isNotEmpty
             ? SingleChildScrollView(
                 padding: const EdgeInsets.all(4),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Card(
-                    child: Padding(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Card(
+                      child: Padding(
                         padding: const EdgeInsets.all(4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.info, color: Colors.blue),
-                              const SizedBox(width: 8),
-                              const Text(
-                                '种子详情',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.info, color: Colors.blue),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  '种子详情',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                              const Spacer(),
-                              if (!_showImages)
-                                TextButton.icon(
-                                  onPressed: () {
-                                    setState(() {
-                                      _showImages = true;
-                                    });
-                                  },
-                                  icon: const Icon(Icons.image),
-                                  label: const Text('显示图片'),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          buildBBCodeContent(
-                            _detail?.descr?.toString() ?? '暂无描述',
-                          ),
-                        ],
+                                const Spacer(),
+                                if (!_showImages)
+                                  TextButton.icon(
+                                    onPressed: () {
+                                      setState(() {
+                                        _showImages = true;
+                                      });
+                                    },
+                                    icon: const Icon(Icons.image),
+                                    label: const Text('显示图片'),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            buildBBCodeContent(
+                              _detail?.descr?.toString() ?? '暂无描述',
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
                     // 用户评论 - 仅在支持评论详情时显示
                     if (widget.siteFeatures.supportCommentDetail) ...[
                       const SizedBox(height: 16),
@@ -2243,10 +2307,10 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                         ),
                       ),
                     ],
-                  // 底部留白，防止被FAB遮挡
-                  const SizedBox(height: 80),
-                ],
-              ),
+                    // 底部留白，防止被FAB遮挡
+                    const SizedBox(height: 80),
+                  ],
+                ),
               )
             : _detail?.webviewUrl != null
             ? buildWebViewContent(_detail!.webviewUrl!)
@@ -2400,7 +2464,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
               ],
             );
           },
+        ),
       ),
-    ));
+    );
   }
 }
