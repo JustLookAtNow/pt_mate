@@ -2092,14 +2092,10 @@ class _SiteEditPageState extends State<SiteEditPage> {
     }
 
     final tempSite = _composeCurrentSite();
-    final previousActiveSite = await _loadCurrentActiveSiteForRestore();
 
     try {
-      await ApiService.instance.setActiveSite(tempSite);
-      final adapter = ApiService.instance.activeAdapter;
-      if (adapter == null) {
-        throw Exception('无法获取适配器实例');
-      }
+      ApiService.instance.removeAdapter(tempSite.id);
+      final adapter = await ApiService.instance.getAdapter(tempSite);
 
       final categories = await adapter.getSearchCategories();
       setState(() {
@@ -2121,8 +2117,6 @@ class _SiteEditPageState extends State<SiteEditPage> {
       if (mounted) {
         NotificationHelper.showError(context, '获取分类配置失败，已使用默认配置: $e');
       }
-    } finally {
-      await _restoreActiveSite(previousActiveSite, tempSite.id);
     }
   }
 
@@ -2141,32 +2135,6 @@ class _SiteEditPageState extends State<SiteEditPage> {
     );
   }
 
-  Future<SiteConfig?> _loadCurrentActiveSiteForRestore() async {
-    try {
-      final activeSiteId = await StorageService.instance.getActiveSiteId();
-      if (activeSiteId != null) {
-        final configs = await StorageService.instance.loadSiteConfigsWithSensitiveData();
-        for (final config in configs) {
-          if (config.id == activeSiteId) {
-            return config;
-          }
-        }
-      }
-    } catch (_) {}
-
-    return ApiService.instance.activeAdapter?.siteConfig;
-  }
-
-  Future<void> _restoreActiveSite(SiteConfig? previousActiveSite, String tempSiteId) async {
-    try {
-      if (previousActiveSite != null) {
-        await ApiService.instance.setActiveSite(previousActiveSite);
-      } else {
-        ApiService.instance.removeAdapter(tempSiteId);
-      }
-    } catch (_) {}
-  }
-
   Future<void> _testConnection() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -2182,13 +2150,11 @@ class _SiteEditPageState extends State<SiteEditPage> {
       }
 
       final site = _composeCurrentSite();
-      final previousActiveSite = await _loadCurrentActiveSiteForRestore();
-      await ApiService.instance.setActiveSite(site);
-
-      try {
-        if (_siteFeatures.supportMemberProfile) {
-          // 支持用户资料接口：获取并展示用户信息
-          final profile = await ApiService.instance.fetchMemberProfile();
+      ApiService.instance.removeAdapter(site.id);
+      final adapter = await ApiService.instance.getAdapter(site);
+      if (_siteFeatures.supportMemberProfile) {
+        // 支持用户资料接口：获取并展示用户信息
+        final profile = await adapter.fetchMemberProfile();
 
         try {
           final statuses = await StorageService.instance.loadHealthStatuses();
@@ -2218,10 +2184,10 @@ class _SiteEditPageState extends State<SiteEditPage> {
             ],
           ),
         );
-        } else {
-          // 不支持用户资料接口：使用 testConnection 测试连通性
-          // 失败会抛出 SiteException，由外层 catch 统一展示错误
-          await ApiService.instance.testConnection();
+      } else {
+        // 不支持用户资料接口：使用 testConnection 测试连通性
+        // 失败会抛出 SiteException，由外层 catch 统一展示错误
+        await adapter.testConnection();
 
         try {
           final statuses = await StorageService.instance.loadHealthStatuses();
@@ -2236,23 +2202,20 @@ class _SiteEditPageState extends State<SiteEditPage> {
           await StorageService.instance.saveHealthStatuses(statuses);
         } catch (_) {}
 
-          if (!mounted) return;
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('测试连接成功'),
-              content: const Text('站点连接正常。\n（当前站点配置不支持用户资料接口）'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('关闭'),
-                ),
-              ],
-            ),
-          );
-        }
-      } finally {
-        await _restoreActiveSite(previousActiveSite, site.id);
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('测试连接成功'),
+            content: const Text('站点连接正常。\n（当前站点配置不支持用户资料接口）'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('关闭'),
+              ),
+            ],
+          ),
+        );
       }
     } catch (e) {
       try {
