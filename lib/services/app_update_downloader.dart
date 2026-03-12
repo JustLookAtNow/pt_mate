@@ -25,6 +25,9 @@ class AppUpdateProgress {
 }
 
 class AppUpdateDownloader {
+  // ⚡ Bolt: Cache RegExp to avoid recompiling on every call
+  static final RegExp _invalidCharsRegExp = RegExp(r'[^0-9A-Za-z._-]');
+
   AppUpdateDownloader._();
 
   static final AppUpdateDownloader instance = AppUpdateDownloader._();
@@ -204,7 +207,7 @@ class AppUpdateDownloader {
     final completer = Completer<void>();
 
     final filenameVersion = (version ?? 'latest').replaceAll(
-      RegExp(r'[^0-9A-Za-z._-]'),
+      _invalidCharsRegExp,
       '_',
     );
     final destinationFilename = 'pt_mate-$filenameVersion-arm64-v8a.apk';

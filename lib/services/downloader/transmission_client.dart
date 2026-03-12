@@ -14,6 +14,9 @@ import 'torrent_file_downloader_mixin.dart';
 class TransmissionClient
     with TorrentFileDownloaderMixin
     implements DownloaderClient {
+  // ⚡ Bolt: Cache RegExp to avoid recompiling on every call
+  static final RegExp _httpProtocolRegExp = RegExp(r'https?://');
+
   final TransmissionConfig config;
   final String password;
 
@@ -52,7 +55,7 @@ class TransmissionClient
   String _buildBase(TransmissionConfig c) {
     var urlStr = c.host.trim();
     // 补全协议
-    if (!urlStr.startsWith(RegExp(r'https?://'))) {
+    if (!urlStr.startsWith(_httpProtocolRegExp)) {
       urlStr = 'http://$urlStr';
     }
 

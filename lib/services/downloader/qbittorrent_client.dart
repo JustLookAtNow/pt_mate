@@ -15,6 +15,10 @@ import 'torrent_file_downloader_mixin.dart';
 class QbittorrentClient
     with TorrentFileDownloaderMixin
     implements DownloaderClient {
+  // ⚡ Bolt: Cache RegExp to avoid recompiling on every call
+  static final RegExp _httpProtocolRegExp = RegExp(r'https?://');
+  static final RegExp _sidRegExp = RegExp(r'SID=([^;]+)');
+
   final QbittorrentConfig config;
   final String password;
 
@@ -65,7 +69,7 @@ class QbittorrentClient
   String _buildBase(QbittorrentConfig c) {
     var urlStr = c.host.trim();
     // 补全协议
-    if (!urlStr.startsWith(RegExp(r'https?://'))) {
+    if (!urlStr.startsWith(_httpProtocolRegExp)) {
       urlStr = 'http://$urlStr';
     }
 
@@ -223,7 +227,7 @@ class QbittorrentClient
         // 从响应头中提取会话ID
         final cookies = response.headers['set-cookie'];
         if (cookies != null && cookies.isNotEmpty) {
-          final sidMatch = RegExp(r'SID=([^;]+)').firstMatch(cookies.first);
+          final sidMatch = _sidRegExp.firstMatch(cookies.first);
           if (sidMatch != null) {
             _sessionId = sidMatch.group(1);
             return;

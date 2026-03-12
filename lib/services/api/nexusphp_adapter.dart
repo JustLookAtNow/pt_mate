@@ -12,6 +12,9 @@ import 'nexusphp_helper.dart';
 /// NexusPHP 站点适配器
 /// 实现 NexusPHP (1.9+) 站点的 API 调用
 class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
+  // ⚡ Bolt: Cache RegExp to avoid recompiling on every match during loops
+  static final RegExp _invisibleCharsRegExp = RegExp(r'[\s\u200B-\u200D\uFEFF]');
+
   late SiteConfig _siteConfig;
   late Dio _dio;
   Map<String, String>? _discountMapping;
@@ -536,13 +539,13 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
           for (final section in sectionsData) {
             final sectionName = section['name'] as String;
             final sectionDisplayName = (section['display_name'] as String)
-                .replaceAll(RegExp(r'[\s\u200B-\u200D\uFEFF]'), '');
+                .replaceAll(_invisibleCharsRegExp, '');
             final categoriesData = section['categories'] as List;
 
             for (final category in categoriesData) {
               final categoryId = category['id'];
               final categoryName = (category['name'] as String).replaceAll(
-                RegExp(r'[\s\u200B-\u200D\uFEFF]'),
+                _invisibleCharsRegExp,
                 '',
               );
               categories.add(
