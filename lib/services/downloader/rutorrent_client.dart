@@ -16,6 +16,9 @@ import 'torrent_file_downloader_mixin.dart';
 class RuTorrentClient
     with TorrentFileDownloaderMixin
     implements DownloaderClient {
+  // ⚡ Bolt: Cache RegExp to avoid recompiling on every call
+  static final RegExp _httpProtocolRegExp = RegExp(r'https?://');
+
   final RuTorrentConfig config;
   final String password;
 
@@ -66,7 +69,7 @@ class RuTorrentClient
   String _buildBase(RuTorrentConfig c) {
     var urlStr = c.host.trim();
     // 补全协议
-    if (!urlStr.startsWith(RegExp(r'https?://'))) {
+    if (!urlStr.startsWith(_httpProtocolRegExp)) {
       urlStr = 'http://$urlStr';
     }
 
