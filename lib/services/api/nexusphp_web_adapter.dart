@@ -57,6 +57,13 @@ class ParsedTorrentResult {
 /// Helper class for Isolate usage
 class _AdapterHelper with BaseWebAdapterMixin {}
 
+// ⚡ Bolt: Caching RegExp instances to prevent recompilation during isolate parsing loops.
+final _sizeRegExp = RegExp(r'([\d.]+)\s*(\w+)');
+final _htmlUrlRegExp = RegExp(
+  r'(src|href)="((?!https?://|//|data:|javascript:|#)[^"]+)"',
+  caseSensitive: false,
+);
+
 /// Isolate entry point for parsing search results
 Future<ParsedTorrentResult> _parseSearchResponseInIsolate(
   ParseSearchParams params,
@@ -1147,7 +1154,7 @@ class NexusPHPWebAdapter extends SiteAdapter
           // 解析文件大小为字节数
           int sizeInBytes = 0;
           if (sizeText.isNotEmpty) {
-            final sizeMatch = RegExp(r'([\d.]+)\s*(\w+)').firstMatch(sizeText);
+            final sizeMatch = _sizeRegExp.firstMatch(sizeText);
             if (sizeMatch != null) {
               final sizeValue = double.tryParse(sizeMatch.group(1) ?? '0') ?? 0;
               final unit = sizeMatch.group(2)?.toUpperCase() ?? 'B';
@@ -1303,10 +1310,7 @@ class NexusPHPWebAdapter extends SiteAdapter
           } else {
             // HTML 模式：处理相对URL
             extractedContent = extractedContent.replaceAllMapped(
-              RegExp(
-                r'(src|href)="((?!https?://|//|data:|javascript:|#)[^"]+)"',
-                caseSensitive: false,
-              ),
+              _htmlUrlRegExp,
               (match) {
                 final attr = match.group(1);
                 final path = match.group(2)!;
