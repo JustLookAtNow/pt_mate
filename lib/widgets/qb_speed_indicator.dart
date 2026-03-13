@@ -169,48 +169,51 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
     }
     final info = _info!;
     final serverState = _serverState!;
-    return InkWell(
-      onTap: _openDownloader,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.cloud_download,
-                  size: 16,
-                  color: Theme.of(context).brightness == Brightness.light
-                      ? Theme.of(context).colorScheme.onPrimary
-                      : Theme.of(context).colorScheme.onSurface,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '↑${Formatters.speedFromBytesPerSec(info.upSpeed)} ↓${Formatters.speedFromBytesPerSec(info.dlSpeed)}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+    return Tooltip(
+      message: '打开下载器任务页面',
+      child: InkWell(
+        onTap: _openDownloader,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.cloud_download,
+                    size: 16,
                     color: Theme.of(context).brightness == Brightness.light
                         ? Theme.of(context).colorScheme.onPrimary
                         : Theme.of(context).colorScheme.onSurface,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '剩余空间: ${Formatters.dataFromBytes(serverState.freeSpaceOnDisk)}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color:
-                    (Theme.of(context).brightness == Brightness.light
-                            ? Theme.of(context).colorScheme.onPrimary
-                            : Theme.of(context).colorScheme.onSurface)
-                        .withValues(alpha: 0.8),
+                  const SizedBox(width: 4),
+                  Text(
+                    '↑${Formatters.speedFromBytesPerSec(info.upSpeed)} ↓${Formatters.speedFromBytesPerSec(info.dlSpeed)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? Theme.of(context).colorScheme.onPrimary
+                          : Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                '剩余空间: ${Formatters.dataFromBytes(serverState.freeSpaceOnDisk)}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color:
+                      (Theme.of(context).brightness == Brightness.light
+                              ? Theme.of(context).colorScheme.onPrimary
+                              : Theme.of(context).colorScheme.onSurface)
+                          .withValues(alpha: 0.8),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
