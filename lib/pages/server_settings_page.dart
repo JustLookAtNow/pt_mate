@@ -2093,7 +2093,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
     try {
       final tempSite = _composeCurrentSite();
-      final adapter = await ApiService.instance.createTemporaryAdapter(tempSite);
+      final adapter = await ApiService.instance.createTemporaryAdapter(
+        tempSite,
+      );
 
       final categories = await adapter.getSearchCategories();
       setState(() {
@@ -2722,30 +2724,33 @@ class _SiteEditPageState extends State<SiteEditPage> {
                   children: [
                     Text('站点颜色', style: Theme.of(context).textTheme.bodyMedium),
                     const SizedBox(width: 12),
-                    GestureDetector(
-                      onTap: () async {
-                        final picked = await showDialog<Color>(
-                          context: context,
-                          builder: (context) => _SiteColorPickerDialog(
-                            initialColor:
+                    Tooltip(
+                      message: '选择站点颜色',
+                      child: GestureDetector(
+                        onTap: () async {
+                          final picked = await showDialog<Color>(
+                            context: context,
+                            builder: (context) => _SiteColorPickerDialog(
+                              initialColor:
+                                  _siteColor ??
+                                  Theme.of(context).colorScheme.primary,
+                            ),
+                          );
+                          if (picked != null) {
+                            setState(() => _siteColor = picked);
+                          }
+                        },
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color:
                                 _siteColor ??
                                 Theme.of(context).colorScheme.primary,
-                          ),
-                        );
-                        if (picked != null) {
-                          setState(() => _siteColor = picked);
-                        }
-                      },
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color:
-                              _siteColor ??
-                              Theme.of(context).colorScheme.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.outline,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
                           ),
                         ),
                       ),
