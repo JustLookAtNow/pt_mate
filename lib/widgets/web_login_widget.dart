@@ -4,6 +4,11 @@ import 'package:logger/logger.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
 
+final RegExp _titleRegExp = RegExp(
+  r'<title>(.*?)<\/title>',
+  caseSensitive: false,
+);
+
 class WebLoginWidget extends StatefulWidget {
   final String baseUrl;
   final String? loginPath; // 自定义登录页面路径，默认为 /login.php
@@ -77,10 +82,7 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
       if (html == null || html.isEmpty) return;
 
       // 检查页面标题
-      final titleMatch = RegExp(
-        r'<title>(.*?)<\/title>',
-        caseSensitive: false,
-      ).firstMatch(html);
+      final titleMatch = _titleRegExp.firstMatch(html);
       final title = titleMatch?.group(1) ?? "";
 
       // 如果标题包含登录字样，说明尚未成功
@@ -311,7 +313,11 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
         _logger.w('CookieManager未获取到cookie');
       }
       if (mounted) {
-                NotificationHelper.showInfo(context, '无法获取cookie，请检查登录状态', duration: const Duration(seconds: 3));
+        NotificationHelper.showInfo(
+          context,
+          '无法获取cookie，请检查登录状态',
+          duration: const Duration(seconds: 3),
+        );
       }
       return false;
     } catch (e) {
@@ -319,7 +325,7 @@ class _WebLoginWidgetState extends State<WebLoginWidget> {
         _logger.e('提取cookie时出错: $e');
       }
       if (mounted) {
-                NotificationHelper.showError(context, 'Cookie提取失败: $e');
+        NotificationHelper.showError(context, 'Cookie提取失败: $e');
       }
       return false;
     }
