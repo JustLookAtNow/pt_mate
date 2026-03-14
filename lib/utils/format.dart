@@ -46,6 +46,7 @@ class FormatUtil {
   }
 
   static final RegExp _nonDigitRegExp = RegExp(r'\D');
+  static final RegExp _timezoneRegExp = RegExp(r'Z|[+-]\d{2}:?\d{2}$');
 
   /// 解析字符串为整数
   /// 先判断有没有小数点，有的话则截取整数部分，然后移除掉所有的非数字字符，最后返回int.tryParse的结果
@@ -193,7 +194,7 @@ class Formatters {
           normalizedDate = normalizedDate.replaceRange(10, 11, 'T');
         }
 
-        if (normalizedDate.contains(RegExp(r'Z|[+-]\d{2}:?\d{2}$'))) {
+        if (normalizedDate.contains(FormatUtil._timezoneRegExp)) {
           return DateTime.parse(normalizedDate).toLocal();
         } else {
           return DateTime.parse("$normalizedDate$actualZone").toLocal();

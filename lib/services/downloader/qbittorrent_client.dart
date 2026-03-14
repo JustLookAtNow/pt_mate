@@ -11,6 +11,9 @@ import 'downloader_config.dart';
 import 'downloader_models.dart';
 import 'torrent_file_downloader_mixin.dart';
 
+final RegExp _httpRegExp = RegExp(r'https?://');
+final RegExp _sidRegExp = RegExp(r'SID=([^;]+)');
+
 /// qBittorrent下载器客户端实现
 class QbittorrentClient
     with TorrentFileDownloaderMixin
@@ -65,7 +68,7 @@ class QbittorrentClient
   String _buildBase(QbittorrentConfig c) {
     var urlStr = c.host.trim();
     // 补全协议
-    if (!urlStr.startsWith(RegExp(r'https?://'))) {
+    if (!urlStr.startsWith(_httpRegExp)) {
       urlStr = 'http://$urlStr';
     }
 
@@ -223,7 +226,7 @@ class QbittorrentClient
         // 从响应头中提取会话ID
         final cookies = response.headers['set-cookie'];
         if (cookies != null && cookies.isNotEmpty) {
-          final sidMatch = RegExp(r'SID=([^;]+)').firstMatch(cookies.first);
+          final sidMatch = _sidRegExp.firstMatch(cookies.first);
           if (sidMatch != null) {
             _sessionId = sidMatch.group(1);
             return;
@@ -308,7 +311,6 @@ class QbittorrentClient
       forceRelay = true;
     }
 
-
     final useRelay = config.useLocalRelay || forceRelay;
     if (!useRelay) {
       body['urls'] = url;
@@ -338,8 +340,6 @@ class QbittorrentClient
 
     await _request('POST', '/torrents/add', body: body);
   }
-
-
 
   /// 根据版本获取暂停任务的 API 路径
   String _getPauseApiPath(String? version) {

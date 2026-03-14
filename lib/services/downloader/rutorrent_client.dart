@@ -12,6 +12,8 @@ import 'downloader_config.dart';
 import 'downloader_models.dart';
 import 'torrent_file_downloader_mixin.dart';
 
+final RegExp _httpRegExp = RegExp(r'https?://');
+
 /// ruTorrent下载器客户端实现
 class RuTorrentClient
     with TorrentFileDownloaderMixin
@@ -66,7 +68,7 @@ class RuTorrentClient
   String _buildBase(RuTorrentConfig c) {
     var urlStr = c.host.trim();
     // 补全协议
-    if (!urlStr.startsWith(RegExp(r'https?://'))) {
+    if (!urlStr.startsWith(_httpRegExp)) {
       urlStr = 'http://$urlStr';
     }
 
@@ -290,8 +292,6 @@ class RuTorrentClient
   int _iv(String? val) {
     return FormatUtil.parseInt(val) ?? 0;
   }
-
-
 
   @override
   Future<void> testConnection() async {
