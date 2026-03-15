@@ -65,53 +65,60 @@ class _AboutPageState extends State<AboutPage> {
             const SizedBox(height: 8),
             Text(
               _version,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 16),
-            InkWell(
-              onTap: () async {
-                try {
-                  final Uri url = Uri.parse('https://github.com/JustLookAtNow/pt_mate');
-                  if (await canLaunchUrl(url)) {
-                    await launchUrl(url, mode: LaunchMode.externalApplication);
-                  } else {
-                    // 降级处理：复制URL到剪贴板
-                    await Clipboard.setData(ClipboardData(text: url.toString()));
+            Tooltip(
+              message: '在浏览器中打开 GitHub 仓库',
+              child: InkWell(
+                onTap: () async {
+                  try {
+                    final Uri url = Uri.parse(
+                      'https://github.com/JustLookAtNow/pt_mate',
+                    );
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(
+                        url,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    } else {
+                      // 降级处理：复制URL到剪贴板
+                      await Clipboard.setData(
+                        ClipboardData(text: url.toString()),
+                      );
+                      if (context.mounted) {
+                        NotificationHelper.showInfo(
+                          context,
+                          '无法直接打开链接，已复制到剪贴板，请手动粘贴到浏览器',
+                          duration: const Duration(seconds: 2),
+                        );
+                      }
+                    }
+                  } catch (e) {
+                    // 捕获任何异常并显示错误信息
                     if (context.mounted) {
-                      NotificationHelper.showInfo(
+                      NotificationHelper.showError(
                         context,
-                        '无法直接打开链接，已复制到剪贴板，请手动粘贴到浏览器',
+                        '操作失败: $e',
                         duration: const Duration(seconds: 2),
                       );
                     }
                   }
-                } catch (e) {
-                  // 捕获任何异常并显示错误信息
-                  if (context.mounted) {
-                    NotificationHelper.showError(
-                      context,
-                      '操作失败: $e',
-                      duration: const Duration(seconds: 2),
-                    );
-                  }
-                }
-              },
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'https://github.com/JustLookAtNow',
-                    style: TextStyle(
-                      color: Colors.blue,
-                      // decoration: TextDecoration.underline,
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'https://github.com/JustLookAtNow',
+                      style: TextStyle(
+                        color: Colors.blue,
+                        // decoration: TextDecoration.underline,
+                      ),
+                      overflow: TextOverflow.visible,
+                      softWrap: true,
                     ),
-                    overflow: TextOverflow.visible,
-                    softWrap: true,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 24),
