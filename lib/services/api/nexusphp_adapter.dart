@@ -9,6 +9,11 @@ import 'package:pt_mate/services/site_config_service.dart';
 import '../../utils/format.dart';
 import 'nexusphp_helper.dart';
 
+// ⚡ Bolt: Cache RegExp to avoid recompiling it in list parsing loops,
+// minimizing object allocations and improving performance when iterating
+// over search categories.
+final RegExp _whitespaceRegExp = RegExp(r'[\s\u200B-\u200D\uFEFF]');
+
 /// NexusPHP 站点适配器
 /// 实现 NexusPHP (1.9+) 站点的 API 调用
 class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
@@ -39,7 +44,9 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
     await _loadTagMapping();
     swDiscount.stop();
     if (kDebugMode) {
-      _logger.d('NexusPHPAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms');
+      _logger.d(
+        'NexusPHPAdapter.init: 加载优惠映射耗时=${swDiscount.elapsedMilliseconds}ms',
+      );
     }
 
     _dio = Dio(
@@ -75,7 +82,9 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
     );
     swInterceptors.stop();
     if (kDebugMode) {
-      _logger.d('NexusPHPAdapter.init: 配置Dio与拦截器耗时=${swInterceptors.elapsedMilliseconds}ms');
+      _logger.d(
+        'NexusPHPAdapter.init: 配置Dio与拦截器耗时=${swInterceptors.elapsedMilliseconds}ms',
+      );
     }
     swTotal.stop();
     if (kDebugMode) {
@@ -91,9 +100,7 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
         SiteType.nexusphp,
       );
       if (template?.discountMapping != null) {
-        _discountMapping = Map<String, String>.from(
-          template!.discountMapping,
-        );
+        _discountMapping = Map<String, String>.from(template!.discountMapping);
       }
       final specialMapping = await SiteConfigService.getDiscountMapping(
         _siteConfig.baseUrl,
@@ -283,8 +290,6 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
       }
     }
 
-
-
     final name = item['name'] as String;
     final smallDescr = item['small_descr'] as String? ?? '';
 
@@ -310,8 +315,6 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
         }
       }
     }
-
-
 
     return TorrentItem(
       id: (item['id'] as int).toString(),
@@ -369,7 +372,11 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
   }
 
   @override
-  Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20}) async {
+  Future<TorrentCommentList> fetchComments(
+    String id, {
+    int pageNumber = 1,
+    int pageSize = 20,
+  }) async {
     try {
       final response = await _dio.get(
         '/api/v1/comments',
@@ -506,9 +513,7 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
   Future<List<SearchCategoryConfig>> getSearchCategories() async {
     // 通过baseUrl匹配预设配置
     final defaultCategories =
-        await SiteConfigService.getDefaultSearchCategories(
-          _siteConfig.baseUrl,
-        );
+        await SiteConfigService.getDefaultSearchCategories(_siteConfig.baseUrl);
 
     // 如果获取到默认分类配置，则直接返回
     if (defaultCategories.isNotEmpty) {
@@ -536,13 +541,13 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
           for (final section in sectionsData) {
             final sectionName = section['name'] as String;
             final sectionDisplayName = (section['display_name'] as String)
-                .replaceAll(RegExp(r'[\s\u200B-\u200D\uFEFF]'), '');
+                .replaceAll(_whitespaceRegExp, '');
             final categoriesData = section['categories'] as List;
 
             for (final category in categoriesData) {
               final categoryId = category['id'];
               final categoryName = (category['name'] as String).replaceAll(
-                RegExp(r'[\s\u200B-\u200D\uFEFF]'),
+                _whitespaceRegExp,
                 '',
               );
               categories.add(

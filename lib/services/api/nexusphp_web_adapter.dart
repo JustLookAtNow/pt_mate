@@ -88,6 +88,15 @@ Future<ParsedTorrentResult> _parseSearchResponseInIsolate(
   );
 }
 
+// ⚡ Bolt: Cache RegExp objects used in background isolates as top-level final
+// variables. Caching these objects outside of the static class methods prevents
+// recompilation on hot paths (e.g., list rendering and HTML parsing).
+final RegExp _sizeRegExp = RegExp(r'([\d.]+)\s*(\w+)');
+final RegExp _htmlUrlRegExp = RegExp(
+  r'(src|href)="((?!https?://|//|data:|javascript:|#)[^"]+)"',
+  caseSensitive: false,
+);
+
 /// NexusPHP Web站点适配器
 /// 用于处理基于Web接口的NexusPHP站点
 class NexusPHPWebAdapter extends SiteAdapter
@@ -1147,7 +1156,7 @@ class NexusPHPWebAdapter extends SiteAdapter
           // 解析文件大小为字节数
           int sizeInBytes = 0;
           if (sizeText.isNotEmpty) {
-            final sizeMatch = RegExp(r'([\d.]+)\s*(\w+)').firstMatch(sizeText);
+            final sizeMatch = _sizeRegExp.firstMatch(sizeText);
             if (sizeMatch != null) {
               final sizeValue = double.tryParse(sizeMatch.group(1) ?? '0') ?? 0;
               final unit = sizeMatch.group(2)?.toUpperCase() ?? 'B';
@@ -1303,10 +1312,7 @@ class NexusPHPWebAdapter extends SiteAdapter
           } else {
             // HTML 模式：处理相对URL
             extractedContent = extractedContent.replaceAllMapped(
-              RegExp(
-                r'(src|href)="((?!https?://|//|data:|javascript:|#)[^"]+)"',
-                caseSensitive: false,
-              ),
+              _htmlUrlRegExp,
               (match) {
                 final attr = match.group(1);
                 final path = match.group(2)!;
