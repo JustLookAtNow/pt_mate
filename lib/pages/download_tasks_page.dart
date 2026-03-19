@@ -744,6 +744,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                   tooltip: isPaused ? '恢复' : '暂停',
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   padding: EdgeInsets.zero,
+                  tooltip: isPaused ? '继续' : '暂停',
                   onPressed: () => isPaused ? _resumeTask(task.hash) : _pauseTask(task.hash),
                 ),
                 IconButton(
@@ -751,6 +752,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                   tooltip: '删除',
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   padding: EdgeInsets.zero,
+                  tooltip: '删除',
                   onPressed: () => _confirmDelete(task),
                 ),
               ],

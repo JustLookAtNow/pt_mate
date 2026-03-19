@@ -350,12 +350,21 @@ enum TagType {
   final Color color;
   final String regex;
 
+  static final Map<TagType, RegExp> _regexCache = {};
+
   // 从字符串中匹配所有标签
   static List<TagType> matchTags(String text) {
     List<TagType> matchedTags = [];
     for (TagType tag in TagType.values) {
       if (tag.regex.isEmpty) continue;
-      RegExp regExp = RegExp(tag.regex, caseSensitive: false);
+
+      // Lazily initialize and cache the RegExp object to prevent recompilation
+      // on hot paths like list rendering and parsing.
+      final regExp = _regexCache.putIfAbsent(
+        tag,
+        () => RegExp(tag.regex, caseSensitive: false),
+      );
+
       if (regExp.hasMatch(text)) {
         matchedTags.add(tag);
       }
