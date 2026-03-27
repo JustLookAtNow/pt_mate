@@ -1669,6 +1669,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           : '$actionLabel完成，成功${batchProgress.successCount}个，失败${batchProgress.failureCount}个';
 
       if (batchProgress.failureCount == 0) {
+        _closeBatchProgress();
         NotificationHelper.showInfo(
           context,
           message,
