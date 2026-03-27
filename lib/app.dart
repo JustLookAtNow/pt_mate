@@ -9,6 +9,7 @@ import 'package:flutter/rendering.dart';
 import 'dart:math' as math;
 
 import 'models/app_models.dart';
+import 'models/batch_operation_models.dart';
 import 'pages/torrent_detail_page.dart';
 import 'services/api/api_service.dart';
 import 'services/storage/storage_service.dart';
@@ -24,6 +25,7 @@ import 'services/downloader/downloader_models.dart';
 
 import 'pages/server_settings_page.dart';
 import 'widgets/qb_speed_indicator.dart';
+import 'widgets/batch_progress_card.dart';
 import 'widgets/responsive_layout.dart';
 import 'widgets/torrent_download_dialog.dart';
 import 'widgets/torrent_list_item.dart';
@@ -742,6 +744,12 @@ class _HomePageState extends State<HomePage> {
 
   // 下载请求状态管理
   final Set<String> _pendingDownloadRequests = <String>{};
+
+  BatchProgressState<TorrentItem>? _batchProgress;
+  final Map<String, BatchItemState> _batchItemStates =
+      <String, BatchItemState>{};
+  final Map<String, String> _batchItemErrors = <String, String>{};
+  final Map<String, TorrentItem> _batchTrackedItems = <String, TorrentItem>{};
 
   // 当前站点配置
   SiteConfig? _currentSite;
@@ -1498,34 +1506,23 @@ class _HomePageState extends State<HomePage> {
 
       if (result == null) return; // 用户取消了
 
-      // 3. 从对话框结果中获取设置
-      final clientConfig = result['clientConfig'] as DownloaderConfig;
-      final password = result['password'] as String;
-      final category = result['category'] as String?;
-      final tags = result['tags'] as List<String>?;
-      final savePath = result['savePath'] as String?;
-      final autoTMM = result['autoTMM'] as bool?;
-      final startPaused = result['startPaused'] as bool?;
-
-      // 4. 发送到下载器
-      await DownloaderService.instance.addTask(
-        config: clientConfig,
-        password: password,
-        params: AddTaskParams(
-          url: url,
-          category: category,
-          tags: tags,
-          savePath: savePath,
-          autoTMM: autoTMM,
-          startPaused: startPaused,
-        ),
-        siteConfig: _currentSite,
+      final downloadContext = BatchDownloadContext(
+        clientConfig: result['clientConfig'] as DownloaderConfig,
+        password: result['password'] as String,
+        category: result['category'] as String?,
+        tags: result['tags'] as List<String>? ?? const [],
+        savePath: result['savePath'] as String?,
+        autoTMM: result['autoTMM'] as bool?,
+        startPaused: result['startPaused'] as bool?,
       );
+
+      // 3. 发送到下载器
+      await _enqueueDownload(item, downloadContext, resolvedUrl: url);
 
       if (mounted) {
         NotificationHelper.showInfo(
           context,
-          '已成功发送"${item.name}"到 ${clientConfig.name}',
+          '已成功发送"${item.name}"到 ${downloadContext.clientConfig.name}',
         );
       }
     } catch (e) {
@@ -1536,19 +1533,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _onToggleCollection(TorrentItem item) async {
-    final newCollectionState = !item.collection;
-
-    // 立即更新UI状态 - 直接修改现有对象
-    if (mounted) {
-      setState(() {
-        item.collection = newCollectionState;
-      });
-    }
-
-    // 不显示开始通知，直接进行后台处理
-
-    // 异步后台请求
-    _performCollectionRequest(item, newCollectionState);
+    await _toggleCollectionWithOptimisticUpdate(item);
   }
 
   Future<void> _showCategoryFilterDialog() async {
@@ -1588,21 +1573,78 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _performCollectionRequest(
-    TorrentItem item,
-    bool newCollectionState,
-  ) async {
-    // 检查请求间隔
+  BatchItemState _batchItemStateFor(String itemId) {
+    return _batchItemStates[itemId] ?? BatchItemState.idle;
+  }
+
+  String? _batchItemErrorFor(String itemId) {
+    return _batchItemErrors[itemId];
+  }
+
+  bool get _isBatchRunning => _batchProgress?.isRunning ?? false;
+
+  bool _isBatchActionRunning(BatchOperationType actionType) {
+    return _isBatchRunning && _batchProgress?.actionType == actionType;
+  }
+
+  void _closeBatchProgress() {
+    if (!mounted || _isBatchRunning) return;
+    setState(() {
+      _batchProgress = null;
+      _batchTrackedItems.clear();
+      _batchItemStates.clear();
+      _batchItemErrors.clear();
+    });
+  }
+
+  BatchProgressState<TorrentItem> _buildBatchProgressState({
+    required BatchOperationType actionType,
+    required bool isRunning,
+    required int runTotalCount,
+    required int runCompletedCount,
+    String? currentItemName,
+    BatchRetryContext? retryableContext,
+  }) {
+    return buildBatchProgressState<TorrentItem>(
+      actionType: actionType,
+      isRunning: isRunning,
+      runTotalCount: runTotalCount,
+      runCompletedCount: runCompletedCount,
+      itemStates: _batchItemStates,
+      itemErrors: _batchItemErrors,
+      trackedItems: _batchTrackedItems,
+      itemNameOf: (item) => item.name,
+      currentItemName: currentItemName,
+      retryableContext: retryableContext,
+    );
+  }
+
+  int _currentOperationIntervalMs() {
+    return math.max(0, _currentSite?.operationIntervalMs ?? 500);
+  }
+
+  Future<void> _waitForCollectionInterval(int intervalMs) async {
+    if (intervalMs <= 0) return;
     final now = DateTime.now();
     if (_lastCollectionRequest != null) {
       final timeDiff = now.difference(_lastCollectionRequest!);
-      if (timeDiff.inMilliseconds < 1000) {
+      if (timeDiff.inMilliseconds < intervalMs) {
         await Future.delayed(
-          Duration(milliseconds: 1000 - timeDiff.inMilliseconds),
+          Duration(milliseconds: intervalMs - timeDiff.inMilliseconds),
         );
       }
     }
     _lastCollectionRequest = DateTime.now();
+  }
+
+  Future<void> _performCollectionRequest(
+    TorrentItem item,
+    bool newCollectionState, {
+    bool applyRateLimit = true,
+  }) async {
+    if (applyRateLimit) {
+      await _waitForCollectionInterval(_currentOperationIntervalMs());
+    }
 
     // 标记为处理中
     _pendingCollectionRequests[item.id] = newCollectionState;
@@ -1612,27 +1654,82 @@ class _HomePageState extends State<HomePage> {
         id: item.id,
         make: newCollectionState,
       );
-
-      // 请求成功，移除处理标记
+    } finally {
       _pendingCollectionRequests.remove(item.id);
-      // 不显示成功通知
+    }
+  }
+
+  Future<void> _toggleCollectionWithOptimisticUpdate(
+    TorrentItem item, {
+    bool showErrorToast = true,
+    bool applyRateLimit = true,
+    bool rethrowOnError = false,
+  }) async {
+    final newCollectionState = !item.collection;
+
+    if (mounted) {
+      setState(() {
+        item.collection = newCollectionState;
+      });
+    }
+
+    try {
+      await _performCollectionRequest(
+        item,
+        newCollectionState,
+        applyRateLimit: applyRateLimit,
+      );
     } catch (e) {
-      // 请求失败，恢复原状态
-      _pendingCollectionRequests.remove(item.id);
-
       if (mounted) {
         setState(() {
-          item.collection = !newCollectionState; // 恢复原状态
+          item.collection = !newCollectionState;
         });
       }
-
-      if (mounted) {
+      if (mounted && showErrorToast) {
         NotificationHelper.showError(
           context,
           '收藏操作失败：$e',
           duration: const Duration(seconds: 2),
         );
       }
+      if (rethrowOnError) {
+        rethrow;
+      }
+    }
+  }
+
+  Future<void> _enqueueDownload(
+    TorrentItem item,
+    BatchDownloadContext downloadContext, {
+    String? resolvedUrl,
+  }) async {
+    if (_pendingDownloadRequests.contains(item.id)) {
+      throw Exception('该项目正在处理下载请求');
+    }
+
+    _pendingDownloadRequests.add(item.id);
+    try {
+      final url =
+          resolvedUrl ??
+          await ApiService.instance.genDlToken(
+            id: item.id,
+            url: item.downloadUrl,
+          );
+      await DownloaderService.instance.addTask(
+        config: downloadContext.clientConfig,
+        password: downloadContext.password,
+        params: AddTaskParams(
+          url: url,
+          category: downloadContext.category,
+          tags: downloadContext.tags.isEmpty ? null : downloadContext.tags,
+          savePath: downloadContext.savePath,
+          autoTMM: downloadContext.autoTMM,
+          startPaused: downloadContext.startPaused,
+        ),
+        siteConfig: _currentSite,
+      );
+    } finally {
+      _pendingDownloadRequests.remove(item.id);
     }
   }
 
@@ -1862,6 +1959,7 @@ class _HomePageState extends State<HomePage> {
                       style: const TextStyle(color: Colors.red),
                     ),
                   ),
+                if (_batchProgress != null) _buildBatchProgressCard(),
                 Expanded(
                   child: _currentSite == null
                       ? Center(
@@ -2026,14 +2124,33 @@ class _HomePageState extends State<HomePage> {
                                         isSelectionMode: _isSelectionMode,
                                         currentSite: _currentSite,
                                         showCoverSetting: _showCoverSetting,
+                                        batchOperationType:
+                                            _batchProgress?.actionType,
+                                        batchItemState: _batchItemStateFor(
+                                          item.id,
+                                        ),
+                                        batchErrorMessage: _batchItemErrorFor(
+                                          item.id,
+                                        ),
+                                        onRetryBatchAction:
+                                            _buildRetryCallbackForItem(item),
                                         onTap: () => _isSelectionMode
                                             ? _onToggleSelection(item, index)
                                             : _onTorrentTap(item),
                                         onLongPress: () =>
                                             _onLongPress(item, index),
-                                        onToggleCollection: () =>
-                                            _onToggleCollection(item),
-                                        onDownload: () => _onDownload(item),
+                                        onToggleCollection:
+                                            _isBatchActionRunning(
+                                              BatchOperationType.favorite,
+                                            )
+                                            ? null
+                                            : () => _onToggleCollection(item),
+                                        onDownload:
+                                            _isBatchActionRunning(
+                                              BatchOperationType.download,
+                                            )
+                                            ? null
+                                            : () => _onDownload(item),
                                       ),
                                     );
                                   },
@@ -2061,7 +2178,9 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         Expanded(
                           child: TextButton(
-                            onPressed: _onCancelSelection,
+                            onPressed: _isBatchRunning
+                                ? null
+                                : _onCancelSelection,
                             style: TextButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 0,
@@ -2079,18 +2198,20 @@ class _HomePageState extends State<HomePage> {
                         // 全选按钮
                         Expanded(
                           child: TextButton(
-                            onPressed: () {
-                              if (_selectedItems.length ==
-                                  _filteredItems.length) {
-                                setState(() => _selectedItems.clear());
-                              } else {
-                                setState(() {
-                                  _selectedItems.addAll(
-                                    _filteredItems.map((e) => e.id),
-                                  );
-                                });
-                              }
-                            },
+                            onPressed: _isBatchRunning
+                                ? null
+                                : () {
+                                    if (_selectedItems.length ==
+                                        _filteredItems.length) {
+                                      setState(() => _selectedItems.clear());
+                                    } else {
+                                      setState(() {
+                                        _selectedItems.addAll(
+                                          _filteredItems.map((e) => e.id),
+                                        );
+                                      });
+                                    }
+                                  },
                             style: TextButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 0,
@@ -2114,7 +2235,8 @@ class _HomePageState extends State<HomePage> {
                             true) ...[
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: _selectedItems.isNotEmpty
+                              onPressed:
+                                  !_isBatchRunning && _selectedItems.isNotEmpty
                                   ? _onBatchFavorite
                                   : null,
                               style: ElevatedButton.styleFrom(
@@ -2134,7 +2256,8 @@ class _HomePageState extends State<HomePage> {
                         if (_currentSite?.features.supportDownload ?? true)
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: _selectedItems.isNotEmpty
+                              onPressed:
+                                  !_isBatchRunning && _selectedItems.isNotEmpty
                                   ? _onBatchDownload
                                   : null,
                               style: ElevatedButton.styleFrom(
@@ -2327,71 +2450,33 @@ class _HomePageState extends State<HomePage> {
 
   // 批量收藏
   Future<void> _onBatchFavorite() async {
-    if (_selectedItems.isEmpty) return;
+    if (_selectedItems.isEmpty || _isBatchRunning) return;
 
     final selectedItems = _items
         .where((item) => _selectedItems.contains(item.id))
         .toList();
     _onCancelSelection(); // 立即取消选择模式
 
-    // 显示开始收藏的提示
-    if (mounted) {
-      NotificationHelper.showInfo(
-        context,
-        '开始批量收藏${selectedItems.length}个项目...',
-      );
-    }
-
-    // 异步处理收藏
-    _performBatchFavorite(selectedItems);
+    unawaited(_performBatchFavorite(selectedItems));
   }
 
   Future<void> _performBatchFavorite(List<TorrentItem> items) async {
-    int successCount = 0;
-    int failureCount = 0;
-
-    for (int i = 0; i < items.length; i++) {
-      final item = items[i];
-      try {
-        await _onToggleCollection(item);
-        successCount++;
-
-        // 间隔控制
-        if (i < items.length - 1) {
-          await Future.delayed(Duration(seconds: 2));
-        }
-      } catch (e) {
-        failureCount++;
-        if (mounted) {
-          NotificationHelper.showError(context, '收藏失败: ${item.name}, 错误: $e');
-        }
-      }
-    }
-
-    // 显示最终结果
-    if (mounted) {
-      final total = items.length;
-      final message = '已成功收藏/取消收藏 $successCount/$total 个';
-
-      if (failureCount == 0) {
-        NotificationHelper.showInfo(
-          context,
-          message,
-          duration: const Duration(seconds: 2),
-        );
-      } else {
-        NotificationHelper.showError(
-          context,
-          message,
-          duration: const Duration(seconds: 2),
-        );
-      }
-    }
+    await _runBatchOperation(
+      actionType: BatchOperationType.favorite,
+      items: items,
+      executeItem: (item) => _toggleCollectionWithOptimisticUpdate(
+        item,
+        showErrorToast: false,
+        applyRateLimit: false,
+        rethrowOnError: true,
+      ),
+      preserveExistingState: false,
+    );
   }
 
   // 批量下载
   Future<void> _onBatchDownload() async {
-    if (_selectedItems.isEmpty) return;
+    if (_selectedItems.isEmpty || _isBatchRunning) return;
 
     final selectedItems = _items
         .where((item) => _selectedItems.contains(item.id))
@@ -2408,92 +2493,138 @@ class _HomePageState extends State<HomePage> {
 
     _onCancelSelection(); // 取消选择模式
 
-    // 显示开始下载的提示
-    if (mounted) {
-      final clientConfig = result['clientConfig'] as DownloaderConfig;
-      NotificationHelper.showInfo(
-        context,
-        '开始批量下载${selectedItems.length}个项目到${clientConfig.name}...',
-      );
-    }
-
-    // 异步处理下载
-    _performBatchDownload(
-      selectedItems,
-      result['clientConfig'] as DownloaderConfig,
-      result['password'] as String,
-      result['category'] as String?,
-      result['tags'] as List<String>? ?? [],
-      result['savePath'] as String?,
-      result['autoTMM'] as bool?,
+    final downloadContext = BatchDownloadContext(
+      clientConfig: result['clientConfig'] as DownloaderConfig,
+      password: result['password'] as String,
+      category: result['category'] as String?,
+      tags: result['tags'] as List<String>? ?? const [],
+      savePath: result['savePath'] as String?,
+      autoTMM: result['autoTMM'] as bool?,
+      startPaused: result['startPaused'] as bool?,
     );
+
+    unawaited(_performBatchDownload(selectedItems, downloadContext));
   }
 
   Future<void> _performBatchDownload(
     List<TorrentItem> items,
-    DownloaderConfig clientConfig,
-    String password,
-    String? category,
-    List<String> tags,
-    String? savePath,
-    bool? autoTMM,
+    BatchDownloadContext downloadContext,
   ) async {
-    int successCount = 0;
-    int failureCount = 0;
+    await _runBatchOperation(
+      actionType: BatchOperationType.download,
+      items: items,
+      executeItem: (item) => _enqueueDownload(item, downloadContext),
+      retryableContext: downloadContext,
+      preserveExistingState: false,
+    );
+  }
 
-    for (final item in items) {
-      try {
-        // 检查是否在待处理列表中
-        if (_pendingDownloadRequests.contains(item.id)) {
-          continue;
+  Future<void> _runBatchOperation({
+    required BatchOperationType actionType,
+    required List<TorrentItem> items,
+    required Future<void> Function(TorrentItem item) executeItem,
+    BatchRetryContext? retryableContext,
+    required bool preserveExistingState,
+  }) async {
+    if (items.isEmpty || _isBatchRunning) return;
+
+    if (mounted) {
+      setState(() {
+        if (!preserveExistingState) {
+          _batchTrackedItems.clear();
+          _batchItemStates.clear();
+          _batchItemErrors.clear();
         }
-
-        _pendingDownloadRequests.add(item.id);
-
-        // 获取下载 URL
-        final url = await ApiService.instance.genDlToken(
-          id: item.id,
-          url: item.downloadUrl,
+        for (final item in items) {
+          _batchTrackedItems[item.id] = item;
+          _batchItemStates[item.id] = BatchItemState.idle;
+          _batchItemErrors.remove(item.id);
+        }
+        _batchProgress = _buildBatchProgressState(
+          actionType: actionType,
+          isRunning: true,
+          runTotalCount: items.length,
+          runCompletedCount: 0,
+          retryableContext: retryableContext,
         );
+      });
+    }
 
-        // 发送到下载器
-        await DownloaderService.instance.addTask(
-          config: clientConfig,
-          password: password,
-          params: AddTaskParams(
-            url: url,
-            category: category,
-            tags: tags.isEmpty ? null : tags,
-            savePath: savePath,
-            autoTMM: autoTMM,
-          ),
-        );
+    for (int index = 0; index < items.length; index++) {
+      final item = items[index];
 
-        successCount++;
-
-        // 添加延迟避免请求过快
-        await Future.delayed(const Duration(milliseconds: 500));
-      } catch (e) {
-        failureCount++;
-        if (mounted) {
-          NotificationHelper.showError(
-            context,
-            '下载失败: ${item.name}, 错误: $e',
-            duration: const Duration(seconds: 2),
+      if (mounted) {
+        setState(() {
+          _batchItemStates[item.id] = BatchItemState.running;
+          _batchItemErrors.remove(item.id);
+          _batchProgress = _buildBatchProgressState(
+            actionType: actionType,
+            isRunning: true,
+            runTotalCount: items.length,
+            runCompletedCount: index,
+            currentItemName: item.name,
+            retryableContext: retryableContext,
           );
+        });
+      }
+
+      try {
+        await executeItem(item);
+        if (mounted) {
+          setState(() {
+            _batchItemStates[item.id] = BatchItemState.success;
+            _batchItemErrors.remove(item.id);
+          });
         }
-      } finally {
-        _pendingDownloadRequests.remove(item.id);
+      } catch (e) {
+        final errorMessage = formatBatchError(e);
+        if (mounted) {
+          setState(() {
+            _batchItemStates[item.id] = BatchItemState.failed;
+            _batchItemErrors[item.id] = errorMessage;
+          });
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _batchProgress = _buildBatchProgressState(
+            actionType: actionType,
+            isRunning: true,
+            runTotalCount: items.length,
+            runCompletedCount: index + 1,
+            retryableContext: retryableContext,
+            currentItemName: index == items.length - 1 ? null : item.name,
+          );
+        });
+      }
+
+      if (index < items.length - 1) {
+        final intervalMs = _currentOperationIntervalMs();
+        if (intervalMs > 0) {
+          await Future.delayed(Duration(milliseconds: intervalMs));
+        }
       }
     }
 
-    // 显示最终结果
     if (mounted) {
-      final message = failureCount == 0
-          ? '批量下载完成，成功$successCount个项目'
-          : '批量下载完成，成功$successCount个，失败$failureCount个';
+      setState(() {
+        _batchProgress = _buildBatchProgressState(
+          actionType: actionType,
+          isRunning: false,
+          runTotalCount: items.length,
+          runCompletedCount: items.length,
+          retryableContext: retryableContext,
+        );
+      });
 
-      if (failureCount == 0) {
+      final batchProgress = _batchProgress!;
+      final actionLabel = batchProgress.actionLabel;
+      final message = batchProgress.failureCount == 0
+          ? '$actionLabel完成，成功${batchProgress.successCount}个项目'
+          : '$actionLabel完成，成功${batchProgress.successCount}个，失败${batchProgress.failureCount}个';
+
+      if (batchProgress.failureCount == 0) {
         NotificationHelper.showInfo(
           context,
           message,
@@ -2507,6 +2638,114 @@ class _HomePageState extends State<HomePage> {
         );
       }
     }
+  }
+
+  Future<void> _retryFailedBatchItems() async {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null ||
+        batchProgress.isRunning ||
+        batchProgress.failedItems.isEmpty) {
+      return;
+    }
+
+    switch (batchProgress.actionType) {
+      case BatchOperationType.favorite:
+        await _runBatchOperation(
+          actionType: BatchOperationType.favorite,
+          items: batchProgress.failedItems
+              .map((failure) => failure.item)
+              .toList(),
+          executeItem: (item) => _toggleCollectionWithOptimisticUpdate(
+            item,
+            showErrorToast: false,
+            applyRateLimit: false,
+            rethrowOnError: true,
+          ),
+          preserveExistingState: true,
+        );
+        break;
+      case BatchOperationType.download:
+        final retryContext = batchProgress.retryableContext;
+        if (retryContext is! BatchDownloadContext) return;
+        await _runBatchOperation(
+          actionType: BatchOperationType.download,
+          items: batchProgress.failedItems
+              .map((failure) => failure.item)
+              .toList(),
+          executeItem: (item) => _enqueueDownload(item, retryContext),
+          retryableContext: retryContext,
+          preserveExistingState: true,
+        );
+        break;
+    }
+  }
+
+  Future<void> _retrySingleBatchItem(TorrentItem item) async {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null ||
+        batchProgress.isRunning ||
+        _batchItemStateFor(item.id) != BatchItemState.failed) {
+      return;
+    }
+
+    switch (batchProgress.actionType) {
+      case BatchOperationType.favorite:
+        await _runBatchOperation(
+          actionType: BatchOperationType.favorite,
+          items: [item],
+          executeItem: (retryItem) => _toggleCollectionWithOptimisticUpdate(
+            retryItem,
+            showErrorToast: false,
+            applyRateLimit: false,
+            rethrowOnError: true,
+          ),
+          preserveExistingState: true,
+        );
+        break;
+      case BatchOperationType.download:
+        final retryContext = batchProgress.retryableContext;
+        if (retryContext is! BatchDownloadContext) return;
+        await _runBatchOperation(
+          actionType: BatchOperationType.download,
+          items: [item],
+          executeItem: (retryItem) => _enqueueDownload(retryItem, retryContext),
+          retryableContext: retryContext,
+          preserveExistingState: true,
+        );
+        break;
+    }
+  }
+
+  VoidCallback? _buildRetryCallbackForItem(TorrentItem item) {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null ||
+        batchProgress.isRunning ||
+        _batchItemStateFor(item.id) != BatchItemState.failed) {
+      return null;
+    }
+
+    final isTrackedFailure = batchProgress.failedItems.any(
+      (failure) => failure.itemId == item.id,
+    );
+    if (!isTrackedFailure) {
+      return null;
+    }
+
+    return () => unawaited(_retrySingleBatchItem(item));
+  }
+
+  Widget _buildBatchProgressCard() {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null) {
+      return const SizedBox.shrink();
+    }
+    return BatchProgressCard<TorrentItem>(
+      progress: batchProgress,
+      margin: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+      onRetryAll: _retryFailedBatchItems,
+      onRetryItem: (item) => unawaited(_retrySingleBatchItem(item)),
+      onClose: _closeBatchProgress,
+    );
   }
 }
 

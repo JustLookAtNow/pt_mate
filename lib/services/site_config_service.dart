@@ -340,6 +340,8 @@ class SiteConfigService {
         tagMapping: tagMapping,
         infoFinder: infoFinder,
         request: request,
+        operationIntervalMs:
+            defaultTemplate['operationIntervalMs'] as int? ?? 500,
       );
     } catch (e) {
       return null;

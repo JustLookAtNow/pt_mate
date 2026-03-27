@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter/rendering.dart';
 import 'dart:math' as math;
 import '../models/app_models.dart';
+import '../models/batch_operation_models.dart';
 import '../services/storage/storage_service.dart';
 import '../services/api/api_service.dart';
 import '../services/aggregate_search_service.dart';
@@ -13,6 +14,7 @@ import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
 
 import '../providers/aggregate_search_provider.dart';
+import '../widgets/batch_progress_card.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/torrent_list_item.dart';
@@ -59,6 +61,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
   // 封面图片显示设置（用户偏好）
   bool _showCoverSetting = true; // 默认自动显示
+
+  BatchProgressState<AggregateSearchResultItem>? _batchProgress;
+  final Map<String, BatchItemState> _batchItemStates =
+      <String, BatchItemState>{};
+  final Map<String, String> _batchItemErrors = <String, String>{};
+  final Map<String, AggregateSearchResultItem> _batchTrackedItems =
+      <String, AggregateSearchResultItem>{};
 
   Color _colorForSite(String siteId) {
     if (_siteColors.containsKey(siteId)) return _siteColors[siteId]!;
@@ -754,6 +763,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                         ),
                         const SizedBox(height: 16),
                       ],
+                      if (_batchProgress != null) _buildBatchProgressCard(),
                       Expanded(
                         child:
                             provider.searchResults.isEmpty &&
@@ -822,6 +832,21 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                                   siteName: item.siteName,
                                                   showCoverSetting:
                                                       _showCoverSetting,
+                                                  batchOperationType:
+                                                      _batchProgress
+                                                          ?.actionType,
+                                                  batchItemState:
+                                                      _batchItemStateFor(
+                                                        item.torrent.id,
+                                                      ),
+                                                  batchErrorMessage:
+                                                      _batchItemErrorFor(
+                                                        item.torrent.id,
+                                                      ),
+                                                  onRetryBatchAction:
+                                                      _buildRetryCallbackForItem(
+                                                        item,
+                                                      ),
                                                   suspendImageLoading:
                                                       _isFastScrolling,
                                                   onTap: _isSelectionMode
@@ -834,8 +859,16 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                                             _onTorrentTap(item),
                                                   onLongPress: () =>
                                                       _onLongPress(item, index),
-                                                  onDownload: () =>
-                                                      _showDownloadDialog(item),
+                                                  onDownload:
+                                                      _isBatchActionRunning(
+                                                        BatchOperationType
+                                                            .download,
+                                                      )
+                                                      ? null
+                                                      : () =>
+                                                            _showDownloadDialog(
+                                                              item,
+                                                            ),
                                                   onToggleCollection: () =>
                                                       _onToggleCollection(item),
                                                 ),
@@ -896,14 +929,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           }
                                           return _AggregateSearchScrollbar(
                                             controller: _listController,
-                                                sections: sections,
+                                            sections: sections,
                                             onFastScrollingChanged:
                                                 _setFastScrolling,
                                           );
                                         },
                                       ),
                                     ),
-
                                 ],
                               ),
                       ),
@@ -926,7 +958,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                 ),
                                 const Spacer(),
                                 TextButton(
-                                  onPressed: _onCancelSelection,
+                                  onPressed: _isBatchRunning
+                                      ? null
+                                      : _onCancelSelection,
                                   style: TextButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 8,
@@ -944,20 +978,24 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                 const SizedBox(width: 6),
                                 // 全选按钮
                                 TextButton(
-                                  onPressed: () {
-                                    if (_selectedItems.length ==
-                                        provider.filteredResults.length) {
-                                      setState(() => _selectedItems.clear());
-                                    } else {
-                                      setState(() {
-                                        _selectedItems.addAll(
-                                          provider.filteredResults.map(
-                                            (e) => e.torrent.id,
-                                          ),
-                                        );
-                                      });
-                                    }
-                                  },
+                                  onPressed: _isBatchRunning
+                                      ? null
+                                      : () {
+                                          if (_selectedItems.length ==
+                                              provider.filteredResults.length) {
+                                            setState(
+                                              () => _selectedItems.clear(),
+                                            );
+                                          } else {
+                                            setState(() {
+                                              _selectedItems.addAll(
+                                                provider.filteredResults.map(
+                                                  (e) => e.torrent.id,
+                                                ),
+                                              );
+                                            });
+                                          }
+                                        },
                                   style: TextButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 8,
@@ -979,9 +1017,11 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                 ),
                                 const SizedBox(width: 6),
                                 ElevatedButton.icon(
-                                  onPressed: _selectedItems.isEmpty
-                                      ? null
-                                      : _onBatchDownload,
+                                  onPressed:
+                                      !_isBatchRunning &&
+                                          _selectedItems.isNotEmpty
+                                      ? _onBatchDownload
+                                      : null,
                                   style: ElevatedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 8,
@@ -1256,6 +1296,89 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     }
   }
 
+  BatchItemState _batchItemStateFor(String itemId) {
+    return _batchItemStates[itemId] ?? BatchItemState.idle;
+  }
+
+  String? _batchItemErrorFor(String itemId) {
+    return _batchItemErrors[itemId];
+  }
+
+  bool get _isBatchRunning => _batchProgress?.isRunning ?? false;
+
+  bool _isBatchActionRunning(BatchOperationType actionType) {
+    return _isBatchRunning && _batchProgress?.actionType == actionType;
+  }
+
+  void _closeBatchProgress() {
+    if (!mounted || _isBatchRunning) return;
+    setState(() {
+      _batchProgress = null;
+      _batchTrackedItems.clear();
+      _batchItemStates.clear();
+      _batchItemErrors.clear();
+    });
+  }
+
+  BatchProgressState<AggregateSearchResultItem> _buildBatchProgressState({
+    required BatchOperationType actionType,
+    required bool isRunning,
+    required int runTotalCount,
+    required int runCompletedCount,
+    String? currentItemName,
+    BatchRetryContext? retryableContext,
+  }) {
+    return buildBatchProgressState<AggregateSearchResultItem>(
+      actionType: actionType,
+      isRunning: isRunning,
+      runTotalCount: runTotalCount,
+      runCompletedCount: runCompletedCount,
+      itemStates: _batchItemStates,
+      itemErrors: _batchItemErrors,
+      trackedItems: _batchTrackedItems,
+      itemNameOf: (item) => item.torrent.name,
+      currentItemName: currentItemName,
+      retryableContext: retryableContext,
+    );
+  }
+
+  Future<Map<String, SiteConfig>> _loadSitesById() async {
+    final storage = Provider.of<StorageService>(context, listen: false);
+    final allSites = await storage.loadSiteConfigs();
+    return {for (final site in allSites) site.id: site};
+  }
+
+  Future<void> _enqueueAggregateDownload(
+    AggregateSearchResultItem item,
+    BatchDownloadContext downloadContext,
+  ) async {
+    final sitesById = downloadContext.sitesById ?? await _loadSitesById();
+    final siteConfig = sitesById[item.siteId];
+    if (siteConfig == null) {
+      throw Exception('找不到站点配置: ${item.siteId}');
+    }
+
+    final url = await ApiService.instance.genDlToken(
+      id: item.torrent.id,
+      url: item.torrent.downloadUrl,
+      siteConfig: siteConfig,
+    );
+
+    await DownloaderService.instance.addTask(
+      config: downloadContext.clientConfig,
+      password: downloadContext.password,
+      params: AddTaskParams(
+        url: url,
+        category: downloadContext.category,
+        tags: downloadContext.tags.isEmpty ? null : downloadContext.tags,
+        savePath: downloadContext.savePath,
+        autoTMM: downloadContext.autoTMM,
+        startPaused: downloadContext.startPaused,
+      ),
+      siteConfig: siteConfig,
+    );
+  }
+
   void _onPointerUp(PointerUpEvent event) {
     if (_isDraggingSelection && mounted) {
       setState(() {
@@ -1387,7 +1510,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
   // 批量下载
   Future<void> _onBatchDownload() async {
-    if (_selectedItems.isEmpty) return;
+    if (_selectedItems.isEmpty || _isBatchRunning) return;
 
     final provider = Provider.of<AggregateSearchProvider>(
       context,
@@ -1408,93 +1531,144 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
     _onCancelSelection(); // 取消选择模式
 
-    // 显示开始下载的提示
-    if (mounted) {
-      final clientConfig = result['clientConfig'] as QbClientConfig;
-      NotificationHelper.showInfo(
-        context,
-        '开始批量下载${selectedItems.length}个项目到${clientConfig.name}...',
-      );
-    }
-
-    // 异步处理下载
-    _performBatchDownload(
-      selectedItems,
-      result['clientConfig'] as DownloaderConfig,
-      result['password'] as String,
-      result['category'] as String?,
-      result['tags'] as List<String>? ?? [],
-      result['savePath'] as String?,
-      result['autoTMM'] as bool?,
+    final downloadContext = BatchDownloadContext(
+      clientConfig: result['clientConfig'] as DownloaderConfig,
+      password: result['password'] as String,
+      category: result['category'] as String?,
+      tags: result['tags'] as List<String>? ?? const [],
+      savePath: result['savePath'] as String?,
+      autoTMM: result['autoTMM'] as bool?,
+      startPaused: result['startPaused'] as bool?,
     );
+
+    unawaited(_performBatchDownload(selectedItems, downloadContext));
   }
 
   Future<void> _performBatchDownload(
     List<AggregateSearchResultItem> items,
-    DownloaderConfig clientConfig,
-    String password,
-    String? category,
-    List<String> tags,
-    String? savePath,
-    bool? autoTMM,
+    BatchDownloadContext downloadContext,
   ) async {
-    int successCount = 0;
-    int failureCount = 0;
+    await _runBatchDownloadOperation(
+      items: items,
+      downloadContext: downloadContext,
+      preserveExistingState: false,
+    );
+  }
 
-    for (final item in items) {
-      try {
-        // 1. 获取种子所属站点的配置
-        final storage = Provider.of<StorageService>(context, listen: false);
-        final allSites = await storage.loadSiteConfigs();
-        final siteConfig = allSites.firstWhere(
-          (site) => site.id == item.siteId,
-          orElse: () => throw Exception('找不到站点配置: ${item.siteId}'),
+  Future<void> _runBatchDownloadOperation({
+    required List<AggregateSearchResultItem> items,
+    required BatchDownloadContext downloadContext,
+    required bool preserveExistingState,
+  }) async {
+    if (items.isEmpty || _isBatchRunning) return;
+    final effectiveContext = downloadContext.sitesById == null
+        ? downloadContext.copyWith(sitesById: await _loadSitesById())
+        : downloadContext;
+
+    if (mounted) {
+      setState(() {
+        if (!preserveExistingState) {
+          _batchTrackedItems.clear();
+          _batchItemStates.clear();
+          _batchItemErrors.clear();
+        }
+        for (final item in items) {
+          _batchTrackedItems[item.torrent.id] = item;
+          _batchItemStates[item.torrent.id] = BatchItemState.idle;
+          _batchItemErrors.remove(item.torrent.id);
+        }
+        _batchProgress = _buildBatchProgressState(
+          actionType: BatchOperationType.download,
+          isRunning: true,
+          runTotalCount: items.length,
+          runCompletedCount: 0,
+          retryableContext: effectiveContext,
         );
+      });
+    }
 
-        // 2. 获取下载 URL
-        final url = await ApiService.instance.genDlToken(
-          id: item.torrent.id,
-          url: item.torrent.downloadUrl,
-          siteConfig: siteConfig,
-        );
+    for (int index = 0; index < items.length; index++) {
+      final item = items[index];
 
-        // 3. 发送到下载器
-        await DownloaderService.instance.addTask(
-          config: clientConfig,
-          password: password,
-          params: AddTaskParams(
-            url: url,
-            category: category,
-            tags: tags.isEmpty ? null : tags,
-            savePath: savePath,
-            autoTMM: autoTMM,
-          ),
-          siteConfig: siteConfig,
-        );
-
-        successCount++;
-
-        // 添加延迟避免请求过快
-        await Future.delayed(const Duration(milliseconds: 500));
-      } catch (e) {
-        failureCount++;
-        if (mounted) {
-          NotificationHelper.showError(
-            context,
-            '下载失败: ${item.torrent.name}, 错误: $e',
-            duration: const Duration(seconds: 2),
+      if (mounted) {
+        setState(() {
+          _batchItemStates[item.torrent.id] = BatchItemState.running;
+          _batchItemErrors.remove(item.torrent.id);
+          _batchProgress = _buildBatchProgressState(
+            actionType: BatchOperationType.download,
+            isRunning: true,
+            runTotalCount: items.length,
+            runCompletedCount: index,
+            currentItemName: item.torrent.name,
+            retryableContext: effectiveContext,
           );
+        });
+      }
+
+      try {
+        await _enqueueAggregateDownload(item, effectiveContext);
+        if (mounted) {
+          setState(() {
+            _batchItemStates[item.torrent.id] = BatchItemState.success;
+            _batchItemErrors.remove(item.torrent.id);
+          });
+        }
+      } catch (e) {
+        final errorMessage = formatBatchError(e);
+        if (mounted) {
+          setState(() {
+            _batchItemStates[item.torrent.id] = BatchItemState.failed;
+            _batchItemErrors[item.torrent.id] = errorMessage;
+          });
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _batchProgress = _buildBatchProgressState(
+            actionType: BatchOperationType.download,
+            isRunning: true,
+            runTotalCount: items.length,
+            runCompletedCount: index + 1,
+            currentItemName: index == items.length - 1
+                ? null
+                : item.torrent.name,
+            retryableContext: effectiveContext,
+          );
+        });
+      }
+
+      if (index < items.length - 1) {
+        final nextSiteConfig =
+            effectiveContext.sitesById?[items[index + 1].siteId];
+        final intervalMs = math.max(
+          0,
+          nextSiteConfig?.operationIntervalMs ?? 500,
+        );
+        if (intervalMs > 0) {
+          await Future.delayed(Duration(milliseconds: intervalMs));
         }
       }
     }
 
-    // 显示最终结果
     if (mounted) {
-      final message = failureCount == 0
-          ? '批量下载完成，成功$successCount个项目'
-          : '批量下载完成，成功$successCount个，失败$failureCount个';
+      setState(() {
+        _batchProgress = _buildBatchProgressState(
+          actionType: BatchOperationType.download,
+          isRunning: false,
+          runTotalCount: items.length,
+          runCompletedCount: items.length,
+          retryableContext: effectiveContext,
+        );
+      });
 
-      if (failureCount == 0) {
+      final batchProgress = _batchProgress!;
+      final actionLabel = batchProgress.actionLabel;
+      final message = batchProgress.failureCount == 0
+          ? '$actionLabel完成，成功${batchProgress.successCount}个项目'
+          : '$actionLabel完成，成功${batchProgress.successCount}个，失败${batchProgress.failureCount}个';
+
+      if (batchProgress.failureCount == 0) {
         NotificationHelper.showInfo(
           context,
           message,
@@ -1508,6 +1682,74 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         );
       }
     }
+  }
+
+  Future<void> _retryFailedBatchItems() async {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null ||
+        batchProgress.isRunning ||
+        batchProgress.failedItems.isEmpty) {
+      return;
+    }
+
+    final retryContext = batchProgress.retryableContext;
+    if (retryContext is! BatchDownloadContext) return;
+
+    await _runBatchDownloadOperation(
+      items: batchProgress.failedItems.map((failure) => failure.item).toList(),
+      downloadContext: retryContext,
+      preserveExistingState: true,
+    );
+  }
+
+  Future<void> _retrySingleBatchItem(AggregateSearchResultItem item) async {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null ||
+        batchProgress.isRunning ||
+        _batchItemStateFor(item.torrent.id) != BatchItemState.failed) {
+      return;
+    }
+
+    final retryContext = batchProgress.retryableContext;
+    if (retryContext is! BatchDownloadContext) return;
+
+    await _runBatchDownloadOperation(
+      items: [item],
+      downloadContext: retryContext,
+      preserveExistingState: true,
+    );
+  }
+
+  VoidCallback? _buildRetryCallbackForItem(AggregateSearchResultItem item) {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null ||
+        batchProgress.isRunning ||
+        _batchItemStateFor(item.torrent.id) != BatchItemState.failed) {
+      return null;
+    }
+
+    final isTrackedFailure = batchProgress.failedItems.any(
+      (failure) => failure.itemId == item.torrent.id,
+    );
+    if (!isTrackedFailure) {
+      return null;
+    }
+
+    return () => unawaited(_retrySingleBatchItem(item));
+  }
+
+  Widget _buildBatchProgressCard() {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null) {
+      return const SizedBox.shrink();
+    }
+    return BatchProgressCard<AggregateSearchResultItem>(
+      progress: batchProgress,
+      margin: const EdgeInsets.only(top: 8),
+      onRetryAll: _retryFailedBatchItems,
+      onRetryItem: (item) => unawaited(_retrySingleBatchItem(item)),
+      onClose: _closeBatchProgress,
+    );
   }
 
   // 取消选中模式
@@ -1813,8 +2055,6 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
       },
     );
   }
-
-
 }
 
 class _SiteSection {

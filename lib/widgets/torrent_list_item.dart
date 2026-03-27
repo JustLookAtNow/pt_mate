@@ -69,6 +69,10 @@ class TorrentListItem extends StatelessWidget {
 
   /// 下载回调
   final VoidCallback? onDownload;
+  final BatchOperationType? batchOperationType;
+  final BatchItemState batchItemState;
+  final String? batchErrorMessage;
+  final VoidCallback? onRetryBatchAction;
 
   const TorrentListItem({
     super.key,
@@ -84,6 +88,10 @@ class TorrentListItem extends StatelessWidget {
     this.onDownload,
     this.suspendImageLoading,
     this.showCoverSetting,
+    this.batchOperationType,
+    this.batchItemState = BatchItemState.idle,
+    this.batchErrorMessage,
+    this.onRetryBatchAction,
   });
 
   @override
@@ -166,6 +174,10 @@ class TorrentListItem extends StatelessWidget {
                             hasImdb: hasImdb,
                             hasAnyRating: hasAnyRating,
                             rightMinHeight: rightMinHeight,
+                            batchOperationType: batchOperationType,
+                            batchItemState: batchItemState,
+                            batchErrorMessage: batchErrorMessage,
+                            onRetryBatchAction: onRetryBatchAction,
                           ),
                         ),
                         // 桌面端显示操作按钮
@@ -226,6 +238,8 @@ class TorrentListItem extends StatelessWidget {
   // 构建左滑动作按钮
   List<Widget> _buildSwipeActions(BuildContext context, VoidCallback close) {
     List<Widget> actions = [];
+    final favoriteDisabled = onToggleCollection == null;
+    final downloadDisabled = onDownload == null;
 
     // 添加收藏按钮（如果支持）
     if (currentSite?.features.supportCollection ?? true) {
@@ -234,7 +248,9 @@ class TorrentListItem extends StatelessWidget {
           width: 60,
           margin: const EdgeInsets.only(left: 4),
           child: Material(
-            color: torrent.collection
+            color: favoriteDisabled
+                ? Theme.of(context).disabledColor.withValues(alpha: 0.6)
+                : torrent.collection
                 ? (Theme.of(context).brightness == Brightness.dark
                       ? Colors.red.shade800
                       : Colors.red)
@@ -246,10 +262,12 @@ class TorrentListItem extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
-              onTap: () {
-                close();
-                if (onToggleCollection != null) onToggleCollection!();
-              },
+              onTap: favoriteDisabled
+                  ? null
+                  : () {
+                      close();
+                      if (onToggleCollection != null) onToggleCollection!();
+                    },
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -278,16 +296,20 @@ class TorrentListItem extends StatelessWidget {
           width: 60,
           margin: const EdgeInsets.only(left: 4),
           child: Material(
-            color: Theme.of(context).brightness == Brightness.dark
+            color: downloadDisabled
+                ? Theme.of(context).disabledColor.withValues(alpha: 0.6)
+                : Theme.of(context).brightness == Brightness.dark
                 ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)
                 : Theme.of(context).colorScheme.primary,
             borderRadius: BorderRadius.circular(8),
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
-              onTap: () {
-                close();
-                if (onDownload != null) onDownload!();
-              },
+              onTap: downloadDisabled
+                  ? null
+                  : () {
+                      close();
+                      if (onDownload != null) onDownload!();
+                    },
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -296,6 +318,37 @@ class TorrentListItem extends StatelessWidget {
                   Text(
                     '下载',
                     style: const TextStyle(color: Colors.white, fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (onRetryBatchAction != null) {
+      actions.add(
+        Container(
+          width: 60,
+          margin: const EdgeInsets.only(left: 4),
+          child: Material(
+            color: Theme.of(context).colorScheme.error,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () {
+                close();
+                onRetryBatchAction!();
+              },
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.refresh, color: Colors.white, size: 20),
+                  SizedBox(height: 2),
+                  Text(
+                    '重试',
+                    style: TextStyle(color: Colors.white, fontSize: 10),
                   ),
                 ],
               ),
@@ -320,6 +373,10 @@ class TorrentInfo extends StatelessWidget {
   final bool hasImdb;
   final bool hasAnyRating;
   final double rightMinHeight;
+  final BatchOperationType? batchOperationType;
+  final BatchItemState batchItemState;
+  final String? batchErrorMessage;
+  final VoidCallback? onRetryBatchAction;
 
   const TorrentInfo({
     super.key,
@@ -333,6 +390,10 @@ class TorrentInfo extends StatelessWidget {
     required this.hasImdb,
     required this.hasAnyRating,
     required this.rightMinHeight,
+    this.batchOperationType,
+    this.batchItemState = BatchItemState.idle,
+    this.batchErrorMessage,
+    this.onRetryBatchAction,
   });
 
   /// 获取优惠类型对应的颜色
@@ -405,8 +466,132 @@ class TorrentInfo extends StatelessWidget {
     }
   }
 
+  String _batchActionLabel() {
+    switch (batchOperationType) {
+      case BatchOperationType.favorite:
+        return '收藏';
+      case BatchOperationType.download:
+        return '下载';
+      case null:
+        return '操作';
+    }
+  }
+
+  Widget? _buildBatchStatus(BuildContext context) {
+    switch (batchItemState) {
+      case BatchItemState.idle:
+        return null;
+      case BatchItemState.running:
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '批量${_batchActionLabel()}中',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        );
+      case BatchItemState.success:
+        final successContainerColor = Theme.of(
+          context,
+        ).colorScheme.tertiaryContainer;
+        final successForegroundColor = Theme.of(
+          context,
+        ).colorScheme.onTertiaryContainer;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: successContainerColor,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle, size: 14, color: successForegroundColor),
+              const SizedBox(width: 6),
+              Text(
+                '批量${_batchActionLabel()}成功',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: successForegroundColor),
+              ),
+            ],
+          ),
+        );
+      case BatchItemState.failed:
+        return Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Tooltip(
+              message: batchErrorMessage ?? '批量${_batchActionLabel()}失败',
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.errorContainer.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 14,
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '批量${_batchActionLabel()}失败',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (onRetryBatchAction != null)
+              FilledButton.tonalIcon(
+                onPressed: onRetryBatchAction,
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                ),
+                icon: const Icon(Icons.refresh, size: 14),
+                label: const Text('重试'),
+              ),
+          ],
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final batchStatus = _buildBatchStatus(context);
     return ConstrainedBox(
       constraints: BoxConstraints(minHeight: rightMinHeight),
       child: Column(
@@ -543,6 +728,7 @@ class TorrentInfo extends StatelessWidget {
               color: Theme.of(context).colorScheme.primary,
             ),
           ),
+          if (batchStatus != null) ...[const SizedBox(height: 4), batchStatus],
           const SizedBox(height: 2),
           // 底部信息行（优惠标签、做种/下载数、大小、下载状态）
           Row(

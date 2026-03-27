@@ -129,6 +129,10 @@ enum DownloadStatus {
   completed, // 已完成
 }
 
+enum BatchOperationType { favorite, download }
+
+enum BatchItemState { idle, running, success, failed }
+
 // 种子项目
 class TorrentItem {
   final String id;
@@ -741,6 +745,7 @@ class SiteConfig {
   final SiteFeatures features; // 功能支持配置
   final String templateId; // 模板ID，记录创建时的模板，自定义为-1
   final int? siteColor; // 站点颜色（ARGB int），可选，缺失时使用哈希色
+  final int operationIntervalMs; // 批量操作间隔（毫秒）
 
   const SiteConfig({
     required this.id,
@@ -757,6 +762,7 @@ class SiteConfig {
     this.features = SiteFeatures.mteamDefault,
     this.templateId = '',
     this.siteColor,
+    this.operationIntervalMs = 500,
   });
 
   SiteConfig copyWith({
@@ -774,6 +780,7 @@ class SiteConfig {
     SiteFeatures? features,
     String? templateId,
     int? siteColor,
+    int? operationIntervalMs,
   }) => SiteConfig(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -789,6 +796,7 @@ class SiteConfig {
     features: features ?? this.features,
     templateId: templateId ?? this.templateId,
     siteColor: siteColor ?? this.siteColor,
+    operationIntervalMs: operationIntervalMs ?? this.operationIntervalMs,
   );
 
   Map<String, dynamic> toJson() => {
@@ -806,6 +814,7 @@ class SiteConfig {
     'features': features.toJson(),
     'templateId': templateId,
     'siteColor': siteColor,
+    'operationIntervalMs': operationIntervalMs,
   };
 
   factory SiteConfig.fromJson(Map<String, dynamic> json) {
@@ -881,6 +890,7 @@ class SiteConfig {
       features: features,
       templateId: templateId,
       siteColor: siteColor,
+      operationIntervalMs: json['operationIntervalMs'] as int? ?? 500,
     );
   }
 
@@ -1024,6 +1034,7 @@ class SiteConfig {
       features: features,
       templateId: templateId,
       siteColor: siteColor,
+      operationIntervalMs: json['operationIntervalMs'] as int? ?? 500,
     );
 
     final result = SiteConfigLoadResult(
@@ -1113,6 +1124,7 @@ class SiteConfigTemplate {
   final Map<String, dynamic>? infoFinder; // 信息提取器配置
   final Map<String, dynamic>? request; // 请求配置
   final String? logo; // 可选的 logo 资源路径（assets/sites_icon/...）
+  final int operationIntervalMs; // 批量操作间隔（毫秒）
 
   const SiteConfigTemplate({
     required this.id,
@@ -1128,6 +1140,7 @@ class SiteConfigTemplate {
     this.infoFinder,
     this.request,
     this.logo,
+    this.operationIntervalMs = 500,
   });
 
   SiteConfigTemplate copyWith({
@@ -1144,6 +1157,7 @@ class SiteConfigTemplate {
     Map<String, dynamic>? infoFinder,
     Map<String, dynamic>? request,
     String? logo,
+    int? operationIntervalMs,
   }) => SiteConfigTemplate(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -1158,6 +1172,7 @@ class SiteConfigTemplate {
     infoFinder: infoFinder ?? this.infoFinder,
     request: request ?? this.request,
     logo: logo ?? this.logo,
+    operationIntervalMs: operationIntervalMs ?? this.operationIntervalMs,
   );
 
   Map<String, dynamic> toJson() => {
@@ -1174,6 +1189,7 @@ class SiteConfigTemplate {
     'infoFinder': infoFinder,
     'request': request,
     if (logo != null) 'logo': logo,
+    'operationIntervalMs': operationIntervalMs,
   };
 
   factory SiteConfigTemplate.fromJson(Map<String, dynamic> json) {
@@ -1260,6 +1276,7 @@ class SiteConfigTemplate {
       tagMapping: json['tagMapping'] != null
           ? Map<String, String>.from(json['tagMapping'] as Map<String, dynamic>)
           : const {},
+      operationIntervalMs: json['operationIntervalMs'] as int? ?? 500,
     );
   }
 
@@ -1298,6 +1315,7 @@ class SiteConfigTemplate {
       searchCategories: searchCategories,
       features: features,
       templateId: id,
+      operationIntervalMs: operationIntervalMs,
     );
   }
 

@@ -3,6 +3,7 @@
     "M-Team": {
       "name": "M-Team 站点",
       "baseUrl": "https://",
+      "operationIntervalMs": 500,
       "searchCategories": [
         {
           "id": "normal",
@@ -74,6 +75,7 @@
     "NexusPHP": {
       "name": "NexusPHP api",
       "baseUrl": "https://",
+      "operationIntervalMs": 500,
       "searchCategories": [],
       "features": {
         "userProfile": true,
@@ -126,6 +128,7 @@
     "RousiPro": {
       "name": "RousiPro 站点",
       "baseUrl": "https://",
+      "operationIntervalMs": 500,
       "searchCategories": [],
       "features": {
         "userProfile": true,
@@ -146,6 +149,7 @@
     "Gazelle": {
       "name": "Gazelle 站点",
       "baseUrl": "https://",
+      "operationIntervalMs": 500,
       "searchCategories": [],
       "features": {
         "userProfile": true,
@@ -168,6 +172,7 @@
     "Unit3D": {
       "name": "Unit3D 站点",
       "baseUrl": "https://",
+      "operationIntervalMs": 500,
       "searchCategories": [],
       "features": {
         "userProfile": false,
@@ -188,6 +193,7 @@
     "NexusPHPWeb": {
       "name": "NexusPHP web",
       "baseUrl": "https://",
+      "operationIntervalMs": 500,
       "searchCategories": [],
       "features": {
         "userProfile": true,
