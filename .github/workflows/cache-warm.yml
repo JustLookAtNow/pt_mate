@@ -177,8 +177,9 @@ jobs:
         with:
           path: |
             ios/Pods
+            macos/Pods
             ~/.cocoapods
-          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          key: ${{ runner.os }}-pods-${{ hashFiles('pubspec.lock', 'ios/Podfile', 'macos/Podfile') }}
           restore-keys: |
             ${{ runner.os }}-pods-
 
@@ -189,8 +190,11 @@ jobs:
             cd ios
             pod install --repo-update
             cd -
-          else
-            echo "No Podfile found; skip CocoaPods"
+          fi
+          if [ -f macos/Podfile ]; then
+            cd macos
+            pod install --repo-update
+            cd -
           fi
 
       - name: Cache Xcode DerivedData

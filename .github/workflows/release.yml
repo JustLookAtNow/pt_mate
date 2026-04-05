@@ -307,8 +307,9 @@ jobs:
       with:
         path: |
           ios/Pods
+          macos/Pods
           ~/.cocoapods
-        key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+        key: ${{ runner.os }}-pods-${{ hashFiles('pubspec.lock', 'ios/Podfile', 'macos/Podfile') }}
         restore-keys: |
           ${{ runner.os }}-pods-
     
@@ -323,6 +324,13 @@ jobs:
         
     - name: Get dependencies
       run: flutter pub get
+
+    - name: Install CocoaPods dependencies
+      run: |
+        cd ios
+        pod install
+        cd ../macos
+        pod install
       
     - name: Build unsigned IPA
       run: |
