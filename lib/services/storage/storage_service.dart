@@ -86,6 +86,7 @@ class StorageService {
   StorageService._();
   static final StorageService instance = StorageService._();
   static final Logger _logger = Logger();
+  static const Duration _secureStorageTimeout = Duration(milliseconds: 800);
 
   bool _hasPendingConfigUpdates = false;
 
@@ -109,7 +110,9 @@ class StorageService {
   /// 统一安全存储读取：优先使用统一选项的安全存储，若没有读到则尝试旧构造参数的安全存储，并在读到旧值后自动迁移到新存储。
   Future<String?> _secureReadWithMigration(String key) async {
     try {
-      final v = await _secure.read(key: key);
+      final v = await _secure
+          .read(key: key)
+          .timeout(_secureStorageTimeout);
       if (v != null && v.isNotEmpty) {
         return v;
       }
@@ -118,12 +121,18 @@ class StorageService {
     }
 
     try {
-      final legacy = await _legacySecure.read(key: key);
+      final legacy = await _legacySecure
+          .read(key: key)
+          .timeout(_secureStorageTimeout);
       if (legacy != null && legacy.isNotEmpty) {
         // 迁移到新存储
         try {
-          await _secure.write(key: key, value: legacy);
-          await _legacySecure.delete(key: key);
+          await _secure
+              .write(key: key, value: legacy)
+              .timeout(_secureStorageTimeout);
+          await _legacySecure
+              .delete(key: key)
+              .timeout(_secureStorageTimeout);
         } catch (_) {
           // 写入或删除失败不影响读取返回
         }
