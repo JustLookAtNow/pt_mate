@@ -286,7 +286,7 @@ class _NotificationOverlayState extends State<_NotificationOverlay>
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       maxWidth: maxWidth,
-                      minHeight: 44,
+                      minHeight: 40,
                     ),
                     child: FadeTransition(
                       opacity: _opacity,
@@ -305,7 +305,7 @@ class _NotificationOverlayState extends State<_NotificationOverlay>
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
-                              vertical: 12,
+                              vertical: 9,
                             ),
                             child: Text(
                               widget.message,
