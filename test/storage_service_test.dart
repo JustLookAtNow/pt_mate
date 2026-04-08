@@ -8,9 +8,12 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   const MethodChannel channel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+  late StorageService service;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    service = StorageService.instance;
+    service.resetForTest();
 
     // Mock FlutterSecureStorage
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -22,8 +25,6 @@ void main() {
   });
 
   test('StorageService caching optimization test (Add, Update, Delete)', () async {
-    final service = StorageService.instance;
-
     // 1. Initial load (should be empty)
     var configs = await service.loadSiteConfigs();
     expect(configs, isEmpty);
@@ -80,5 +81,75 @@ void main() {
     // or the underlying mechanism didn't trigger a reload.
     // Ideally we'd check logs or mock verify, but given the previous tests passed,
     // ensuring correctness (empty list) is sufficient here.
+  });
+
+  test('Linux keyring failure should disable further secure reads for current run', () async {
+    service.overridePlatformForTest(TargetPlatform.linux);
+    var secureReadCalls = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+          if (methodCall.method == 'read') {
+            secureReadCalls++;
+            throw PlatformException(
+              code: 'libsecret_error',
+              message: 'Failed to unlock the keyring',
+            );
+          }
+          return null;
+        });
+
+    await service.saveSiteConfigs([
+      const SiteConfig(
+        id: 'site-a',
+        name: 'Site A',
+        baseUrl: 'https://a.example.com',
+      ),
+      const SiteConfig(
+        id: 'site-b',
+        name: 'Site B',
+        baseUrl: 'https://b.example.com',
+      ),
+    ]);
+
+    final configs = await service.loadSiteConfigs(includeApiKeys: true);
+    expect(configs, hasLength(2));
+    expect(service.isSecureStorageBypassedForCurrentRun, isTrue);
+    expect(secureReadCalls, 1);
+
+    await service.loadDownloaderPassword('downloader-1');
+    expect(secureReadCalls, 1);
+  });
+
+  test('Linux keyring failure should fallback to plaintext writes after first error', () async {
+    service.overridePlatformForTest(TargetPlatform.linux);
+    var secureWriteCalls = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+          if (methodCall.method == 'write') {
+            secureWriteCalls++;
+            throw PlatformException(
+              code: 'libsecret_error',
+              message: 'Failed to unlock the keyring',
+            );
+          }
+          return null;
+        });
+
+    await service.saveDownloaderPassword('downloader-1', 'password-1');
+    expect(service.isSecureStorageBypassedForCurrentRun, isTrue);
+    expect(secureWriteCalls, 1);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(
+      prefs.getString(StorageKeys.downloaderPasswordFallbackKey('downloader-1')),
+      'password-1',
+    );
+
+    await service.saveDownloaderPassword('downloader-2', 'password-2');
+    expect(secureWriteCalls, 1);
+    expect(
+      prefs.getString(StorageKeys.downloaderPasswordFallbackKey('downloader-2')),
+      'password-2',
+    );
   });
 }
