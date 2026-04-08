@@ -1337,25 +1337,28 @@ class _TagsViewState extends State<_TagsView> {
             ),
             if (_overflow && !ScreenUtils.isLargeScreen(context)) ...[
               const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _expanded = true;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: const Icon(
-                    Icons.keyboard_arrow_down,
-                    size: 12,
-                    color: Colors.white,
+              Tooltip(
+                message: '展开标签',
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _expanded = true;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: const Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 12,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
