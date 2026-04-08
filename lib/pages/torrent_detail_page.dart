@@ -200,8 +200,9 @@ class CustomImgTag extends AdvancedTag {
   void _showFullScreenImage(BuildContext context, List<int> imageData) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) =>
-            FullScreenImageViewer(imageData: Uint8List.fromList(imageData)),
+        builder: (context) => FullScreenImageViewer.memory(
+          imageData: Uint8List.fromList(imageData),
+        ),
         fullscreenDialog: true,
       ),
     );
@@ -210,9 +211,16 @@ class CustomImgTag extends AdvancedTag {
 
 // 全屏图片查看器
 class FullScreenImageViewer extends StatefulWidget {
-  final Uint8List imageData;
+  final Uint8List? imageData;
+  final String? imageUrl;
 
-  const FullScreenImageViewer({super.key, required this.imageData});
+  const FullScreenImageViewer.memory({super.key, required this.imageData})
+    : assert(imageData != null),
+      imageUrl = null;
+
+  const FullScreenImageViewer.network({super.key, required this.imageUrl})
+    : assert(imageUrl != null && imageUrl != ''),
+      imageData = null;
 
   @override
   State<FullScreenImageViewer> createState() => _FullScreenImageViewerState();
@@ -275,6 +283,51 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
     }
   }
 
+  Widget _buildImage() {
+    final imageData = widget.imageData;
+    if (imageData != null) {
+      return Image.memory(
+        imageData,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stack) => const Center(
+          child: Text('图片加载失败', style: TextStyle(color: Colors.white)),
+        ),
+      );
+    }
+
+    final imageUrl = widget.imageUrl;
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return const Center(
+        child: Text('图片地址无效', style: TextStyle(color: Colors.white)),
+      );
+    }
+
+    return FutureBuilder<List<int>>(
+      future: ImageHttpClient.instance
+          .fetchImage(imageUrl)
+          .then((response) => response.data ?? const <int>[]),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(
+            child: Text('图片加载失败', style: TextStyle(color: Colors.white)),
+          );
+        }
+
+        return Image.memory(
+          Uint8List.fromList(snapshot.data!),
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stack) => const Center(
+            child: Text('图片加载失败', style: TextStyle(color: Colors.white)),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -299,13 +352,7 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
             maxScale: 5.0,
             constrained: true,
             clipBehavior: Clip.none,
-            child: Image.memory(
-              widget.imageData,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stack) => const Center(
-                child: Text('图片加载失败', style: TextStyle(color: Colors.white)),
-              ),
-            ),
+            child: _buildImage(),
           ),
         ),
       ),
@@ -1665,9 +1712,35 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
   // 构建WebView内容
   /// 构建 HTML 原生渲染内容
+  void _showFullScreenImageFromUrl(String imageUrl) {
+    if (imageUrl.isEmpty) {
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => FullScreenImageViewer.network(imageUrl: imageUrl),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
   Widget buildHtmlContent(String html) {
     return HtmlWidget(
       html,
+      onTapImage: (imageMetadata) {
+        final sources = imageMetadata.sources;
+        if (sources.isEmpty) {
+          return;
+        }
+
+        final imageUrl = sources.first.url;
+        if (imageUrl.isEmpty) {
+          return;
+        }
+
+        _showFullScreenImageFromUrl(imageUrl);
+      },
       onTapUrl: (url) {
         launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
         return true;
