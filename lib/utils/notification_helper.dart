@@ -286,7 +286,7 @@ class _NotificationOverlayState extends State<_NotificationOverlay>
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       maxWidth: maxWidth,
-                      minHeight: 40,
+                      minHeight: 28,
                     ),
                     child: FadeTransition(
                       opacity: _opacity,
@@ -305,20 +305,29 @@ class _NotificationOverlayState extends State<_NotificationOverlay>
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
-                              vertical: 9,
+                              vertical: 6,
                             ),
-                            child: Text(
-                              widget.message,
-                              key: const Key('notification_helper_message'),
-                              maxLines: NotificationHelper._maxMessageLines,
-                              overflow: TextOverflow.ellipsis,
-                              softWrap: true,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                height: 1.35,
-                                color: widget.foregroundColor,
-                              ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  widget.message,
+                                  key: const Key('notification_helper_message'),
+                                  maxLines: NotificationHelper._maxMessageLines,
+                                  overflow: TextOverflow.ellipsis,
+                                  softWrap: true,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.25,
+                                    leadingDistribution:
+                                        TextLeadingDistribution.even,
+                                    color: widget.foregroundColor,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
