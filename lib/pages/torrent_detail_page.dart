@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:ui';
 import 'dart:io';
+import 'package:html/dom.dart' as dom;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_bbcode/flutter_bbcode.dart';
@@ -11,12 +12,12 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api/api_service.dart';
 import '../services/storage/storage_service.dart';
-import '../services/image_http_client.dart';
 import '../models/app_models.dart';
 import '../services/downloader/downloader_config.dart';
 import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
 import '../widgets/torrent_download_dialog.dart';
+import '../widgets/cached_network_image.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
 import '../utils/screen_utils.dart';
 
@@ -152,37 +153,24 @@ class CustomImgTag extends AdvancedTag {
     // 图片URL是第一个子节点的文本内容
     String imageUrl = element.children.first.textContent;
 
-    final image = FutureBuilder<List<int>>(
-      future: ImageHttpClient.instance
-          .fetchImage(imageUrl)
-          .then((response) => response.data!),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
-            height: 200,
-            alignment: Alignment.center,
-            child: const CircularProgressIndicator(),
-          );
+    final image = CachedNetworkImage(
+      imageUrl: imageUrl,
+      fit: BoxFit.contain,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          return child;
         }
-
-        if (snapshot.hasError || !snapshot.hasData) {
-          return Text("[$tag]");
-        }
-
-        final imageWidget = Image.memory(
-          Uint8List.fromList(snapshot.data!),
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stack) => Text("[$tag]"),
-        );
-
-        // 添加点击全屏查看功能
-        return GestureDetector(
-          onTap: () {
-            _showFullScreenImage(context, snapshot.data!);
-          },
-          child: imageWidget,
+        return Container(
+          height: 200,
+          alignment: Alignment.center,
+          child: const CircularProgressIndicator(),
         );
       },
+      errorBuilder: (context, error, stackTrace) => Text("[$tag]"),
+      imageBuilder: (context, imageData, image) => GestureDetector(
+        onTap: () => _showFullScreenImage(context, imageData),
+        child: image,
+      ),
     );
 
     if (renderer.peekTapAction() != null) {
@@ -211,16 +199,9 @@ class CustomImgTag extends AdvancedTag {
 
 // 全屏图片查看器
 class FullScreenImageViewer extends StatefulWidget {
-  final Uint8List? imageData;
-  final String? imageUrl;
+  final Uint8List imageData;
 
-  const FullScreenImageViewer.memory({super.key, required this.imageData})
-    : assert(imageData != null),
-      imageUrl = null;
-
-  const FullScreenImageViewer.network({super.key, required this.imageUrl})
-    : assert(imageUrl != null && imageUrl != ''),
-      imageData = null;
+  const FullScreenImageViewer.memory({super.key, required this.imageData});
 
   @override
   State<FullScreenImageViewer> createState() => _FullScreenImageViewerState();
@@ -284,47 +265,12 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
   }
 
   Widget _buildImage() {
-    final imageData = widget.imageData;
-    if (imageData != null) {
-      return Image.memory(
-        imageData,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stack) => const Center(
-          child: Text('图片加载失败', style: TextStyle(color: Colors.white)),
-        ),
-      );
-    }
-
-    final imageUrl = widget.imageUrl;
-    if (imageUrl == null || imageUrl.isEmpty) {
-      return const Center(
-        child: Text('图片地址无效', style: TextStyle(color: Colors.white)),
-      );
-    }
-
-    return FutureBuilder<List<int>>(
-      future: ImageHttpClient.instance
-          .fetchImage(imageUrl)
-          .then((response) => response.data ?? const <int>[]),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(
-            child: Text('图片加载失败', style: TextStyle(color: Colors.white)),
-          );
-        }
-
-        return Image.memory(
-          Uint8List.fromList(snapshot.data!),
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stack) => const Center(
-            child: Text('图片加载失败', style: TextStyle(color: Colors.white)),
-          ),
-        );
-      },
+    return Image.memory(
+      widget.imageData,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stack) => const Center(
+        child: Text('图片加载失败', style: TextStyle(color: Colors.white)),
+      ),
     );
   }
 
@@ -1710,37 +1656,78 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     return widget;
   }
 
-  // 构建WebView内容
-  /// 构建 HTML 原生渲染内容
-  void _showFullScreenImageFromUrl(String imageUrl) {
-    if (imageUrl.isEmpty) {
+  void _showFullScreenImageFromBytes(List<int> imageData) {
+    if (imageData.isEmpty) {
       return;
     }
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => FullScreenImageViewer.network(imageUrl: imageUrl),
+        builder: (context) => FullScreenImageViewer.memory(
+          imageData: Uint8List.fromList(imageData),
+        ),
         fullscreenDialog: true,
       ),
+    );
+  }
+
+  /// 构建 HTML 原生渲染内容中的图片节点。
+  Widget? _buildHtmlImage(dom.Element element) {
+    if (element.localName != 'img') {
+      return null;
+    }
+
+    final imageUrl = element.attributes['src']?.trim() ?? '';
+    if (imageUrl.isEmpty) {
+      return null;
+    }
+
+    final width = double.tryParse(element.attributes['width'] ?? '');
+    final height = double.tryParse(element.attributes['height'] ?? '');
+    final semanticsLabel =
+        element.attributes['alt'] ?? element.attributes['title'];
+
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      width: width,
+      height: height,
+      fit: BoxFit.contain,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          return child;
+        }
+        return Container(
+          width: width,
+          height: height ?? 200,
+          alignment: Alignment.center,
+          child: const CircularProgressIndicator(),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) => Container(
+        width: width,
+        height: height,
+        alignment: Alignment.centerLeft,
+        child: Text(
+          semanticsLabel?.isNotEmpty == true ? semanticsLabel! : '[图片加载失败]',
+        ),
+      ),
+      imageBuilder: (context, imageData, image) {
+        Widget built = image;
+        if (semanticsLabel?.isNotEmpty == true) {
+          built = Semantics(label: semanticsLabel, image: true, child: built);
+        }
+        return GestureDetector(
+          onTap: () => _showFullScreenImageFromBytes(imageData),
+          child: built,
+        );
+      },
     );
   }
 
   Widget buildHtmlContent(String html) {
     return HtmlWidget(
       html,
-      onTapImage: (imageMetadata) {
-        final sources = imageMetadata.sources;
-        if (sources.isEmpty) {
-          return;
-        }
-
-        final imageUrl = sources.first.url;
-        if (imageUrl.isEmpty) {
-          return;
-        }
-
-        _showFullScreenImageFromUrl(imageUrl);
-      },
+      customWidgetBuilder: _buildHtmlImage,
       onTapUrl: (url) {
         launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
         return true;

@@ -8,6 +8,19 @@ class CachedNetworkImage extends StatefulWidget {
   final double? width;
   final double? height;
   final BoxFit? fit;
+
+  /// 在图片字节加载完成后自定义最终展示。
+  ///
+  /// [image] 是组件默认构建的 `Image.memory`。
+  final Widget Function(
+    BuildContext context,
+    Uint8List imageData,
+    Widget image,
+  )?
+  imageBuilder;
+
+  /// 与 Flutter 原生 `Image.loadingBuilder` 保持一致：
+  /// 图片加载完成后仍会被调用一次，此时 [loadingProgress] 为 `null`。
   final Widget Function(
     BuildContext context,
     Widget child,
@@ -27,6 +40,7 @@ class CachedNetworkImage extends StatefulWidget {
     this.width,
     this.height,
     this.fit,
+    this.imageBuilder,
     this.loadingBuilder,
     this.errorBuilder,
   });
@@ -112,8 +126,10 @@ class _CachedNetworkImageState extends State<CachedNetworkImage> {
         height: widget.height,
         fit: widget.fit,
       );
+      final built =
+          widget.imageBuilder?.call(context, _imageData!, image) ?? image;
 
-      return widget.loadingBuilder?.call(context, image, null) ?? image;
+      return widget.loadingBuilder?.call(context, built, null) ?? built;
     }
 
     return widget.errorBuilder?.call(context, 'No image data', null) ??
