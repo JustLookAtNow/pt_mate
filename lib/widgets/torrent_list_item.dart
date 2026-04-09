@@ -157,6 +157,7 @@ class TorrentListItem extends StatelessWidget {
                         if (showCover && (suspendImageLoading != true))
                           TorrentCover(
                             torrent: torrent,
+                            currentSite: currentSite,
                             isMobile: isMobile,
                             hasDouban: hasDouban,
                             hasImdb: hasImdb,
@@ -790,6 +791,7 @@ class TorrentInfo extends StatelessWidget {
 
 class TorrentCover extends StatelessWidget {
   final TorrentItem torrent;
+  final SiteConfig? currentSite;
   final bool isMobile;
   final bool hasDouban;
   final bool hasImdb;
@@ -797,6 +799,7 @@ class TorrentCover extends StatelessWidget {
   const TorrentCover({
     super.key,
     required this.torrent,
+    this.currentSite,
     required this.isMobile,
     required this.hasDouban,
     required this.hasImdb,
@@ -857,6 +860,7 @@ class TorrentCover extends StatelessWidget {
                   builder: (ctx) => Dialog(
                     child: CachedNetworkImage(
                       imageUrl: torrent.cover,
+                      siteConfig: currentSite,
                       fit: BoxFit.contain,
                     ),
                   ),
@@ -875,6 +879,7 @@ class TorrentCover extends StatelessWidget {
               child: torrent.cover.isNotEmpty
                   ? CachedNetworkImage(
                       imageUrl: torrent.cover,
+                      siteConfig: currentSite,
                       width: 70,
                       height: 100,
                       fit: BoxFit.cover,

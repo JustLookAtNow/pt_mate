@@ -142,7 +142,9 @@ class CustomQuoteDisplay extends StatelessWidget {
 
 // 自定义IMG标签处理器
 class CustomImgTag extends AdvancedTag {
-  CustomImgTag() : super("img");
+  final SiteConfig? siteConfig;
+
+  CustomImgTag({this.siteConfig}) : super("img");
 
   @override
   List<InlineSpan> parse(FlutterRenderer renderer, element) {
@@ -155,6 +157,7 @@ class CustomImgTag extends AdvancedTag {
 
     final image = CachedNetworkImage(
       imageUrl: imageUrl,
+      siteConfig: siteConfig,
       fit: BoxFit.contain,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) {
@@ -1129,8 +1132,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
     // 如果显示图片，添加自定义IMG标签处理器
     if (_showImages) {
-      stylesheet.tags['img'] = CustomImgTag();
-      stylesheet.tags['IMG'] = CustomImgTag();
+      stylesheet.tags['img'] = CustomImgTag(siteConfig: widget.siteConfig);
+      stylesheet.tags['IMG'] = CustomImgTag(siteConfig: widget.siteConfig);
     }
     // 添加自定义size标签处理逻辑
     stylesheet.tags['size'] = CustomSizeTag();
@@ -1141,7 +1144,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     stylesheet.tags['HIDE'] = CustomHideTag();
 
     // 构建最终的Widget
-    final widget = Column(
+    final contentWidget = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 添加调试信息
@@ -1653,7 +1656,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     // 更新缓存并返回widget
     _cachedRawContent = cacheKey;
     _cachedBBCodeWidget = widget;
-    return widget;
+    return contentWidget;
   }
 
   void _showFullScreenImageFromBytes(List<int> imageData) {
@@ -1689,6 +1692,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
     return CachedNetworkImage(
       imageUrl: imageUrl,
+      siteConfig: widget.siteConfig,
       width: width,
       height: height,
       fit: BoxFit.contain,
