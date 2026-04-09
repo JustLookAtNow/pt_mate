@@ -1653,9 +1653,10 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       ],
     );
 
-    // 更新缓存并返回widget
+    // 这里只缓存渲染后的内容组件，不能缓存 State.widget 本身，
+    // 否则下次命中缓存时会把整个 TorrentDetailPage 再次嵌进详情内容里。
     _cachedRawContent = cacheKey;
-    _cachedBBCodeWidget = widget;
+    _cachedBBCodeWidget = contentWidget;
     return contentWidget;
   }
 
