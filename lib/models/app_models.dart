@@ -244,8 +244,10 @@ class TorrentSearchResult {
 enum DiscountType {
   normal('NORMAL'),
   free('FREE'),
+  twoXUpload('2xUP'),
   twoXFree('2xFREE'),
   twoX50Percent('2x50%'),
+  zero('ZERO'),
   percent10('PERCENT_10'),
   percent20('PERCENT_20'),
   percent30('PERCENT_30'),
@@ -266,10 +268,14 @@ enum DiscountType {
         return '';
       case DiscountType.free:
         return 'FREE';
+      case DiscountType.twoXUpload:
+        return '2xUP';
       case DiscountType.twoXFree:
         return '2xFREE';
       case DiscountType.twoX50Percent:
         return '2x50%';
+      case DiscountType.zero:
+        return '0';
       case DiscountType.percent10:
         return '10%';
       case DiscountType.percent20:
@@ -297,10 +303,13 @@ enum DiscountType {
       case DiscountType.normal:
         return DiscountColorType.none;
       case DiscountType.free:
+      case DiscountType.twoXUpload:
       case DiscountType.twoXFree:
         return DiscountColorType.green;
       case DiscountType.twoX50Percent:
         return DiscountColorType.yellow;
+      case DiscountType.zero:
+        return DiscountColorType.blue;
       case DiscountType.percent10:
       case DiscountType.percent20:
       case DiscountType.percent30:
@@ -316,7 +325,7 @@ enum DiscountType {
 }
 
 // 优惠显示颜色类型
-enum DiscountColorType { none, green, yellow }
+enum DiscountColorType { none, green, yellow, blue }
 
 // 标签类型枚举
 enum TagType {

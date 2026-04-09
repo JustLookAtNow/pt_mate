@@ -1072,7 +1072,14 @@ class NexusPHPWebAdapter extends SiteAdapter
             row,
             fieldsConfig['cover'] as Map<String, dynamic>? ?? {},
           );
-          final cover = coverList.isNotEmpty ? coverList.first : '';
+          var cover = coverList.isNotEmpty ? coverList.first : '';
+          if (cover.isNotEmpty && !cover.startsWith('http')) {
+            var finalBaseUrl = baseUrl;
+            if (baseUrl.endsWith("/")) {
+              finalBaseUrl = baseUrl.substring(0, baseUrl.length - 1);
+            }
+            cover = '$finalBaseUrl$cover';
+          }
 
           final createDateConfig =
               fieldsConfig['createDate'] as Map<String, dynamic>? ?? {};

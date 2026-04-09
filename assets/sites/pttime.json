@@ -1,0 +1,319 @@
+{
+  "id": "pttime",
+  "name": "ptt",
+  "isShow": true,
+  "baseUrls": [
+    "https://www.pttime.org/"
+  ],
+  "primaryUrl": "https://www.pttime.org/",
+  "siteType": "NexusPHPWeb",
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentBrowse": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": true,
+    "downloadHistory": true,
+    "categorySearch": true,
+    "advancedSearch": true,
+    "showCover": true,
+    "commentDetail": false,
+    "nativeDetail": true
+  },
+  "discountMapping": {
+    "免费": "FREE",
+    "2X免费": "2xFREE",
+    "2X上传": "2xUP",
+    "2X上传&50%免费": "2x50%",
+    "0流量": "ZERO",
+    "30%免费": "PERCENT_30",
+    "50%免费": "PERCENT_50",
+    "Normal": "NORMAL"
+  },
+  "tagMapping": {
+    "热门": "hot",
+    "熱門": "hot",
+    "官方": "official",
+    "官种": "official",
+    "中字": "chinese",
+    "中文": "chinese",
+    "简体": "chinese",
+    "繁体": "chineseTraditional",
+    "国语": "mandarin",
+    "国配": "mandarin",
+    "普通话": "mandarin",
+    "中配": "mandarin",
+    "國語": "mandarin",
+    "DIY": "diy",
+    "自定义": "diy",
+    "完结": "complete",
+    "合集": "complete",
+    "分集": "ep",
+    "HDR": "hdr",
+    "Dolby Vision": "dovi",
+    "Blu-ray": "blueRay",
+    "4 K": "fourK",
+    "4K": "fourK"
+  },
+  "infoFinder": {
+    "detail": {
+      "isBbcode": false,
+      "rows": {
+        "selector": "div#kdescr"
+      }
+    },
+    "userInfo": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "table#info_block"
+      },
+      "fields": {
+        "userId": {
+          "selector": "a[href^=\"userdetails.php?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "value": "$1"
+          }
+        },
+        "userName": {
+          "selector": "a[href^=\"userdetails.php?id=\"] > b",
+          "attribute": "text"
+        },
+        "ratio": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "分享率(:|：)\\s*([^\\s]+)",
+            "value": "$2"
+          }
+        },
+        "upload": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(上传|上傳)(量)?(:|：)\\s*(.*?B)",
+            "value": "$4"
+          }
+        },
+        "download": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(下载|下載)(量)?(:|：)\\s*(.*?B)",
+            "value": "$4"
+          }
+        },
+        "bonus": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "魔力值\\([^)]*\\)\\s*\\[[^\\]]*\\]:\\s*([\\d,.]+)",
+            "value": "$1"
+          }
+        }
+      }
+    },
+    "passKey": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "td.rowhead:contains('密钥'||'密匙'||'Passkey') > next"
+      },
+      "fields": {
+        "passKey": {
+          "selector": "",
+          "attribute": "text"
+        }
+      }
+    },
+    "bonusPerHour": {
+      "path": "mybonus.php",
+      "rows": {
+        "selector": "#outer"
+      },
+      "fields": {
+        "bonusPerHour": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(你当前每小时能获取|You are currently getting|你當前每小時能獲取)\\s*([\\d.]+)",
+            "value": "$2"
+          }
+        }
+      }
+    },
+    "search": {
+      "rows": {
+        "selector": "table.torrents > tr[data]"
+      },
+      "fields": {
+        "torrentId": {
+          "selector": "table.torrentname > a[href^=\"details.php?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "value": "$1"
+          }
+        },
+        "torrentName": {
+          "selector": "table.torrentname > a[href^=\"details.php?id=\"] > b",
+          "attribute": "text"
+        },
+        "tag": {
+          "selector": "table.torrentname > span[class^=\"tags\"]",
+          "attribute": "text"
+        },
+        "description": {
+          "selector": "table.torrentname > font[title]",
+          "attribute": "text"
+        },
+        "discount": {
+          "selector": "table.torrentname > font[class~=\"free|twoupfree|halfdown|twouphalfdown|thirtypercent\"]",
+          "attribute": "text"
+        },
+        "discountEndTime": {
+          "selector": "table.torrentname > font[class~=\"free|twoupfree|halfdown|twouphalfdown|thirtypercent\"] > next",
+          "attribute": "title",
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
+        },
+        "downloadUrl": {
+          "value": "{baseUrl}/download.php?id={torrentId}&passkey={passKey}&uid={userId}"
+        },
+        "seedersText": {
+          "selector": "td:nth-child(7)",
+          "attribute": "text"
+        },
+        "leechersText": {
+          "selector": "td:nth-child(8)",
+          "attribute": "text"
+        },
+        "sizeText": {
+          "selector": "td:nth-child(6)",
+          "attribute": "text"
+        },
+        "downloadStatus": {
+          "selector": "td:nth-child(10)",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(\\d+)%",
+            "value": "$1"
+          }
+        },
+        "collection": {
+          "selector": "a[title~=\"取消收藏\"]",
+          "attribute": "title"
+        },
+        "isTop": {},
+        "cover": {
+          "selector": "table.torrentname > img.lazy-image",
+          "attribute": "data-src"
+        },
+        "createDate": {
+          "selector": "td:nth-child(5) > span[title]",
+          "attribute": "title",
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
+        },
+        "doubanRating": {
+          "selector": "a[href~=\"douban\\.com\"] > next",
+          "attribute": "text"
+        },
+        "imdbRating": {
+          "selector": "a[href~=\"imdb\\.com\"] > next",
+          "attribute": "text"
+        }
+      }
+    },
+    "totalPages": {
+      "rows": {
+        "selector": "body"
+      },
+      "fields": {
+        "totalPages": {
+          "selector": "script",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "var\\s+maxpage\\s*=\\s*(\\d+);",
+            "value": "$1"
+          }
+        }
+      }
+    },
+    "categories": {
+      "path": "usercp.php?action=tracker",
+      "rows": {
+        "selector": "form.tracker > parent > tbody:nth-child > tr:nth-child(1) > td:nth-child(2) > table > tr"
+      },
+      "fields": {
+        "categoryId": {
+          "selector": "a[href~=\"torrents\\.php\\?cat=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "cat=(\\d+)",
+            "value": "$1"
+          }
+        },
+        "categoryName": {
+          "selector": "a[href~=\"torrents\\.php\\?cat=\"] > span.category",
+          "attribute": "title"
+        }
+      }
+    }
+  },
+  "request": {
+    "search": {
+      "normal": {
+        "path": "/torrents.php",
+        "method": "GET",
+        "params": {
+          "incldead": 1,
+          "inclbookmarked": "{onlyFav}",
+          "search": "{keyword}",
+          "page": "{page}",
+          "pageSize": "{pageSize}",
+          "cat": "{categoryId}"
+        }
+      },
+      "special": {
+        "path": "/adults.php",
+        "method": "GET",
+        "params": {
+          "incldead": 1,
+          "inclbookmarked": "{onlyFav}",
+          "search": "{keyword}",
+          "page": "{page}",
+          "pageSize": "{pageSize}",
+          "cat": "{categoryId}"
+        }
+      }
+    },
+    "loginPage": {
+      "path": "/login.php"
+    },
+    "collect": {
+      "path": "/bookmark.php",
+      "method": "GET",
+      "params": {
+        "torrentid": "{torrentId}"
+      }
+    }
+  },
+  "logo": "assets/sites_icon/pttime.png"
+}

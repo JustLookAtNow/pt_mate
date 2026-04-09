@@ -403,6 +403,8 @@ class TorrentInfo extends StatelessWidget {
         return Colors.green;
       case DiscountColorType.yellow:
         return Colors.amber;
+      case DiscountColorType.blue:
+        return Colors.lightBlue;
       case DiscountColorType.none:
         return Colors.grey;
     }
