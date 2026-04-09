@@ -81,7 +81,7 @@ jobs:
           ${{ runner.os }}-gradle-
         
     - name: Get dependencies
-      run: flutter pub get --enforce-lockfile
+      run: flutter pub get
       
     - name: Decode keystore
       run: |
@@ -237,7 +237,7 @@ jobs:
           ${{ runner.os }}-vs-
     
     - name: Get dependencies
-      run: flutter pub get --enforce-lockfile
+      run: flutter pub get
       
     - name: Build Windows
       run: flutter build windows --release
@@ -323,7 +323,7 @@ jobs:
           ${{ runner.os }}-xcode-
         
     - name: Get dependencies
-      run: flutter pub get --enforce-lockfile
+      run: flutter pub get
 
     - name: Install CocoaPods dependencies
       run: |
