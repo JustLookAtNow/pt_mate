@@ -891,10 +891,12 @@ class NexusPHPWebAdapter extends SiteAdapter
         return 1;
       }
 
-      List<int> pageValues = [];
-      for (final row in rows) {
-        final values = await helper.extractFieldValue(row, fieldConfig);
+      final List<List<String>> allValues = await Future.wait(
+        rows.map((row) => helper.extractFieldValue(row, fieldConfig)),
+      );
 
+      List<int> pageValues = [];
+      for (final values in allValues) {
         for (final val in values) {
           final parsed = FormatUtil.parseInt(val);
           if (parsed != null) {
@@ -964,231 +966,240 @@ class NexusPHPWebAdapter extends SiteAdapter
       // 使用配置的选择器查找行
       final rows = helper.findElementBySelector(soup, rowSelector);
 
-      for (final rowElement in rows) {
-        final row = rowElement as Bs4Element;
-        try {
-          // 提取种子ID - 如果提取失败则跳过当前行
-          final torrentIdConfig =
-              fieldsConfig['torrentId'] as Map<String, dynamic>?;
-          if (torrentIdConfig == null) {
-            continue;
-          }
-
-          final torrentIdList = await helper.extractFieldValue(
-            row,
-            torrentIdConfig,
-          );
-
-          final torrentId = torrentIdList.isNotEmpty ? torrentIdList.first : '';
-          if (torrentId.isEmpty) {
-            continue; // 种子ID提取失败，跳过当前行
-          }
-
-          // 提取其他字段
-          final torrentNameList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['torrentName'] as Map<String, dynamic>? ?? {},
-          );
-          final torrentName = torrentNameList.isNotEmpty
-              ? torrentNameList.first
-              : '';
-
-          final tagList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['tag'] as Map<String, dynamic>? ?? {},
-          );
-
-          final descriptionList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['description'] as Map<String, dynamic>? ?? {},
-          );
-          final description = descriptionList.isNotEmpty
-              ? descriptionList.first
-              : '';
-
-          final discountList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['discount'] as Map<String, dynamic>? ?? {},
-          );
-          final discount = discountList.isNotEmpty ? discountList.first : '';
-
-          final discountEndTimeConfig =
-              fieldsConfig['discountEndTime'] as Map<String, dynamic>? ?? {};
-          final discountEndTimeList = await helper.extractFieldValue(
-            row,
-            discountEndTimeConfig,
-          );
-          final discountEndTime = discountEndTimeList.isNotEmpty
-              ? discountEndTimeList.first
-              : '';
-          final discountEndTimeTimeConfig =
-              discountEndTimeConfig['time'] as Map<String, dynamic>?;
-
-          final seedersTextList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['seedersText'] as Map<String, dynamic>? ?? {},
-          );
-          final seedersText = seedersTextList.isNotEmpty
-              ? seedersTextList.first
-              : '';
-
-          final leechersTextList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['leechersText'] as Map<String, dynamic>? ?? {},
-          );
-          final leechersText = leechersTextList.isNotEmpty
-              ? leechersTextList.first
-              : '';
-
-          final sizeTextList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['sizeText'] as Map<String, dynamic>? ?? {},
-          );
-          final sizeText = sizeTextList.isNotEmpty ? sizeTextList.first : '';
-
-          final downloadStatusTextList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['downloadStatus'] as Map<String, dynamic>? ?? {},
-          );
-          final downloadUrlConfig =
-              fieldsConfig['downloadUrl'] as Map<String, dynamic>? ?? {};
-          var downloadUrl = '';
-          if (downloadUrlConfig['value'] != null) {
-            downloadUrl = downloadUrlConfig['value'] as String? ?? '';
-            downloadUrl = downloadUrl.replaceAll('{torrentId}', torrentId);
-            downloadUrl = downloadUrl.replaceAll('{passKey}', passKey);
-            var finalBaseUrl = baseUrl;
-            if (baseUrl.endsWith("/")) {
-              finalBaseUrl = baseUrl.substring(0, baseUrl.length - 1);
+      final List<TorrentItem?> results = await Future.wait(
+        rows.map((rowElement) async {
+          final row = rowElement as Bs4Element;
+          try {
+            // 提取种子ID - 如果提取失败则跳过当前行
+            final torrentIdConfig =
+                fieldsConfig['torrentId'] as Map<String, dynamic>?;
+            if (torrentIdConfig == null) {
+              return null;
             }
-            downloadUrl = downloadUrl.replaceAll('{baseUrl}', finalBaseUrl);
-          }
 
-          final downloadStatusText = downloadStatusTextList.isNotEmpty
-              ? downloadStatusTextList.first
-              : '';
-
-          final coverList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['cover'] as Map<String, dynamic>? ?? {},
-          );
-          final cover = coverList.isNotEmpty ? coverList.first : '';
-
-          final createDateConfig =
-              fieldsConfig['createDate'] as Map<String, dynamic>? ?? {};
-          final createDateList = await helper.extractFieldValue(
-            row,
-            createDateConfig,
-          );
-          final createDate = createDateList.isNotEmpty
-              ? createDateList.first
-              : '';
-          final createDateTimeConfig =
-              createDateConfig['time'] as Map<String, dynamic>?;
-
-          final doubanRatingList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['doubanRating'] as Map<String, dynamic>? ?? {},
-          );
-          final doubanRating = doubanRatingList.isNotEmpty
-              ? doubanRatingList.first
-              : '';
-
-          final imdbRatingList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['imdbRating'] as Map<String, dynamic>? ?? {},
-          );
-          final imdbRating = imdbRatingList.isNotEmpty
-              ? imdbRatingList.first
-              : '';
-
-          // 提取评论数
-          final commentsList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['comments'] as Map<String, dynamic>? ?? {},
-          );
-          final commentsText = commentsList.isNotEmpty
-              ? commentsList.first
-              : '0';
-          final comments = FormatUtil.parseInt(commentsText) ?? 0;
-
-          // 检查收藏状态（布尔字段）
-          final collectionConfig =
-              fieldsConfig['collection'] as Map<String, dynamic>?;
-          bool collection = false;
-          if (collectionConfig != null) {
-            final collectionList = await helper.extractFieldValue(
+            final torrentIdList = await helper.extractFieldValue(
               row,
-              collectionConfig,
+              torrentIdConfig,
             );
-            collection = collectionList.isNotEmpty; // 如果找不到元素说明未收藏
-          }
-          // 检查置顶状态（布尔字段）
-          final isTopConfig = fieldsConfig['isTop'] as Map<String, dynamic>?;
-          bool isTop = false;
-          if (isTopConfig != null) {
-            final isTopList = await helper.extractFieldValue(row, isTopConfig);
 
-            isTop = isTopList.isNotEmpty; // 如果找不到元素说明未置顶
-          }
+            final torrentId = torrentIdList.isNotEmpty
+                ? torrentIdList.first
+                : '';
+            if (torrentId.isEmpty) {
+              return null; // 种子ID提取失败，跳过当前行
+            }
 
-          DownloadStatus downloadStatus = DownloadStatus.none;
-          if (downloadStatusText.isNotEmpty) {
-            final percentInt = FormatUtil.parseInt(downloadStatusText);
-            if (percentInt != null) {
-              if (percentInt == 100) {
-                downloadStatus = DownloadStatus.completed;
-              } else {
-                downloadStatus = DownloadStatus.downloading;
+            // 提取其他字段
+            final torrentNameList = await helper.extractFieldValue(
+              row,
+              fieldsConfig['torrentName'] as Map<String, dynamic>? ?? {},
+            );
+            final torrentName = torrentNameList.isNotEmpty
+                ? torrentNameList.first
+                : '';
+
+            final tagList = await helper.extractFieldValue(
+              row,
+              fieldsConfig['tag'] as Map<String, dynamic>? ?? {},
+            );
+
+            final descriptionList = await helper.extractFieldValue(
+              row,
+              fieldsConfig['description'] as Map<String, dynamic>? ?? {},
+            );
+            final description = descriptionList.isNotEmpty
+                ? descriptionList.first
+                : '';
+
+            final discountList = await helper.extractFieldValue(
+              row,
+              fieldsConfig['discount'] as Map<String, dynamic>? ?? {},
+            );
+            final discount = discountList.isNotEmpty ? discountList.first : '';
+
+            final discountEndTimeConfig =
+                fieldsConfig['discountEndTime'] as Map<String, dynamic>? ?? {};
+            final discountEndTimeList = await helper.extractFieldValue(
+              row,
+              discountEndTimeConfig,
+            );
+            final discountEndTime = discountEndTimeList.isNotEmpty
+                ? discountEndTimeList.first
+                : '';
+            final discountEndTimeTimeConfig =
+                discountEndTimeConfig['time'] as Map<String, dynamic>?;
+
+            final seedersTextList = await helper.extractFieldValue(
+              row,
+              fieldsConfig['seedersText'] as Map<String, dynamic>? ?? {},
+            );
+            final seedersText = seedersTextList.isNotEmpty
+                ? seedersTextList.first
+                : '';
+
+            final leechersTextList = await helper.extractFieldValue(
+              row,
+              fieldsConfig['leechersText'] as Map<String, dynamic>? ?? {},
+            );
+            final leechersText = leechersTextList.isNotEmpty
+                ? leechersTextList.first
+                : '';
+
+            final sizeTextList = await helper.extractFieldValue(
+              row,
+              fieldsConfig['sizeText'] as Map<String, dynamic>? ?? {},
+            );
+            final sizeText = sizeTextList.isNotEmpty ? sizeTextList.first : '';
+
+            final downloadStatusTextList = await helper.extractFieldValue(
+              row,
+              fieldsConfig['downloadStatus'] as Map<String, dynamic>? ?? {},
+            );
+            final downloadUrlConfig =
+                fieldsConfig['downloadUrl'] as Map<String, dynamic>? ?? {};
+            var downloadUrl = '';
+            if (downloadUrlConfig['value'] != null) {
+              downloadUrl = downloadUrlConfig['value'] as String? ?? '';
+              downloadUrl = downloadUrl.replaceAll('{torrentId}', torrentId);
+              downloadUrl = downloadUrl.replaceAll('{passKey}', passKey);
+              var finalBaseUrl = baseUrl;
+              if (baseUrl.endsWith("/")) {
+                finalBaseUrl = baseUrl.substring(0, baseUrl.length - 1);
+              }
+              downloadUrl = downloadUrl.replaceAll('{baseUrl}', finalBaseUrl);
+            }
+
+            final downloadStatusText = downloadStatusTextList.isNotEmpty
+                ? downloadStatusTextList.first
+                : '';
+
+            final coverList = await helper.extractFieldValue(
+              row,
+              fieldsConfig['cover'] as Map<String, dynamic>? ?? {},
+            );
+            final cover = coverList.isNotEmpty ? coverList.first : '';
+
+            final createDateConfig =
+                fieldsConfig['createDate'] as Map<String, dynamic>? ?? {};
+            final createDateList = await helper.extractFieldValue(
+              row,
+              createDateConfig,
+            );
+            final createDate = createDateList.isNotEmpty
+                ? createDateList.first
+                : '';
+            final createDateTimeConfig =
+                createDateConfig['time'] as Map<String, dynamic>?;
+
+            final doubanRatingList = await helper.extractFieldValue(
+              row,
+              fieldsConfig['doubanRating'] as Map<String, dynamic>? ?? {},
+            );
+            final doubanRating = doubanRatingList.isNotEmpty
+                ? doubanRatingList.first
+                : '';
+
+            final imdbRatingList = await helper.extractFieldValue(
+              row,
+              fieldsConfig['imdbRating'] as Map<String, dynamic>? ?? {},
+            );
+            final imdbRating = imdbRatingList.isNotEmpty
+                ? imdbRatingList.first
+                : '';
+
+            // 提取评论数
+            final commentsList = await helper.extractFieldValue(
+              row,
+              fieldsConfig['comments'] as Map<String, dynamic>? ?? {},
+            );
+            final commentsText = commentsList.isNotEmpty
+                ? commentsList.first
+                : '0';
+            final comments = FormatUtil.parseInt(commentsText) ?? 0;
+
+            // 检查收藏状态（布尔字段）
+            final collectionConfig =
+                fieldsConfig['collection'] as Map<String, dynamic>?;
+            bool collection = false;
+            if (collectionConfig != null) {
+              final collectionList = await helper.extractFieldValue(
+                row,
+                collectionConfig,
+              );
+              collection = collectionList.isNotEmpty; // 如果找不到元素说明未收藏
+            }
+            // 检查置顶状态（布尔字段）
+            final isTopConfig = fieldsConfig['isTop'] as Map<String, dynamic>?;
+            bool isTop = false;
+            if (isTopConfig != null) {
+              final isTopList = await helper.extractFieldValue(
+                row,
+                isTopConfig,
+              );
+
+              isTop = isTopList.isNotEmpty; // 如果找不到元素说明未置顶
+            }
+
+            DownloadStatus downloadStatus = DownloadStatus.none;
+            if (downloadStatusText.isNotEmpty) {
+              final percentInt = FormatUtil.parseInt(downloadStatusText);
+              if (percentInt != null) {
+                if (percentInt == 100) {
+                  downloadStatus = DownloadStatus.completed;
+                } else {
+                  downloadStatus = DownloadStatus.downloading;
+                }
               }
             }
-          }
 
-          // 解析文件大小为字节数
-          int sizeInBytes = 0;
-          if (sizeText.isNotEmpty) {
-            final sizeMatch = RegExp(r'([\d.]+)\s*(\w+)').firstMatch(sizeText);
-            if (sizeMatch != null) {
-              final sizeValue = double.tryParse(sizeMatch.group(1) ?? '0') ?? 0;
-              final unit = sizeMatch.group(2)?.toUpperCase() ?? 'B';
+            // 解析文件大小为字节数
+            int sizeInBytes = 0;
+            if (sizeText.isNotEmpty) {
+              final sizeMatch = RegExp(
+                r'([\d.]+)\s*(\w+)',
+              ).firstMatch(sizeText);
+              if (sizeMatch != null) {
+                final sizeValue =
+                    double.tryParse(sizeMatch.group(1) ?? '0') ?? 0;
+                final unit = sizeMatch.group(2)?.toUpperCase() ?? 'B';
 
-              switch (unit) {
-                case 'KB':
-                case 'KIB':
-                  sizeInBytes = (sizeValue * 1024).round();
-                  break;
-                case 'MB':
-                case 'MIB':
-                  sizeInBytes = (sizeValue * 1024 * 1024).round();
-                  break;
-                case 'GB':
-                case 'GIB':
-                  sizeInBytes = (sizeValue * 1024 * 1024 * 1024).round();
-                  break;
-                case 'TB':
-                case 'TIB':
-                  sizeInBytes = (sizeValue * 1024 * 1024 * 1024 * 1024).round();
-                  break;
-                default:
-                  sizeInBytes = sizeValue.round();
+                switch (unit) {
+                  case 'KB':
+                  case 'KIB':
+                    sizeInBytes = (sizeValue * 1024).round();
+                    break;
+                  case 'MB':
+                  case 'MIB':
+                    sizeInBytes = (sizeValue * 1024 * 1024).round();
+                    break;
+                  case 'GB':
+                  case 'GIB':
+                    sizeInBytes = (sizeValue * 1024 * 1024 * 1024).round();
+                    break;
+                  case 'TB':
+                  case 'TIB':
+                    sizeInBytes = (sizeValue * 1024 * 1024 * 1024 * 1024)
+                        .round();
+                    break;
+                  default:
+                    sizeInBytes = sizeValue.round();
+                }
               }
             }
-          }
 
-          // 计算标签并清理描述
-          final tags = TagType.matchTags(torrentName + description);
+            // 计算标签并清理描述
+            final tags = TagType.matchTags(torrentName + description);
 
-          if (tagList.isNotEmpty) {
-            for (final tagStr in tagList) {
-              final mappedTag = _staticParseTagType(tagStr, tagMapping);
-              if (mappedTag != null && !tags.contains(mappedTag)) {
-                tags.add(mappedTag);
+            if (tagList.isNotEmpty) {
+              for (final tagStr in tagList) {
+                final mappedTag = _staticParseTagType(tagStr, tagMapping);
+                if (mappedTag != null && !tags.contains(mappedTag)) {
+                  tags.add(mappedTag);
+                }
               }
             }
-          }
 
-          torrents.add(
-            TorrentItem(
+            return TorrentItem(
               id: torrentId,
               name: torrentName,
               smallDescr: description.trim(),
@@ -1221,11 +1232,17 @@ class NexusPHPWebAdapter extends SiteAdapter
               isTop: isTop,
               tags: tags,
               comments: comments,
-            ),
-          );
-        } catch (e) {
-          logs?.add('search.row.parseFailed: ${fieldsConfig.toString()}');
-          continue;
+            );
+          } catch (e) {
+            logs?.add('search.row.parseFailed: ${fieldsConfig.toString()}');
+            return null;
+          }
+        }),
+      );
+
+      for (final item in results) {
+        if (item != null) {
+          torrents.add(item);
         }
       }
     } catch (e) {
@@ -1581,18 +1598,20 @@ class NexusPHPWebAdapter extends SiteAdapter
       throw Exception('配置错误：缺少 categoryId 或 categoryName 字段配置');
     }
 
+    // 并行提取所有 row 的 categoryIds 和 categoryNames
+    final List<List<List<String>>> allResults = await Future.wait(
+      rowElements.map((rowElement) async {
+        return await Future.wait([
+          extractFieldValue(rowElement, categoryIdConfig),
+          extractFieldValue(rowElement, categoryNameConfig),
+        ]);
+      }),
+    );
+
     int batchIndex = 1;
-
-    // 遍历每个 row 元素（每个代表一个批次）
-    for (final rowElement in rowElements) {
-      // 提取当前 row 中的所有 categoryId
-      final categoryIds = await extractFieldValue(rowElement, categoryIdConfig);
-
-      // 提取当前 row 中的所有 categoryName
-      final categoryNames = await extractFieldValue(
-        rowElement,
-        categoryNameConfig,
-      );
+    for (final result in allResults) {
+      final categoryIds = result[0];
+      final categoryNames = result[1];
 
       // 检查是否有有效的字段提取结果
       if (categoryIds.isEmpty && categoryNames.isEmpty) {
