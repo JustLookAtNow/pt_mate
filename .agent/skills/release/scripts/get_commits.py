@@ -9,7 +9,7 @@ def run_command(cmd):
 
 def main():
     # 查找上次 release 的 commit hash
-    last_release_commit = run_command('git log --format="%H" --grep="^release:" -n 1')
+    last_release_commit = run_command('git log --format="%H" --grep=".*release:" -n 1')
     
     if not last_release_commit:
         print("Warning: No previous release commit found. Fetching all commits.")
