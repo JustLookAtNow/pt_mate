@@ -73,6 +73,8 @@ dependencies:
   html: ^0.15.6
   flutter_widget_from_html_core: ^0.17.0
   toastification: ^3.0.3
+  flutter_native_splash: ^2.4.1
+
 
 
 dev_dependencies:
@@ -86,7 +88,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4  # 添加这一行
-  flutter_native_splash: ^2.4.1
+
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
