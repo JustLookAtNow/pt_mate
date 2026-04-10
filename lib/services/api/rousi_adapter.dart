@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../models/app_models.dart';
 import 'site_adapter.dart';
@@ -31,6 +32,7 @@ class RousiAdapter implements SiteAdapter {
     );
 
     _dio.interceptors.clear();
+
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -52,6 +54,16 @@ class RousiAdapter implements SiteAdapter {
         },
       ),
     );
+
+    if (kDebugMode) {
+      _dio.interceptors.add(LogInterceptor(
+        requestHeader: true,
+        requestBody: true,
+        responseHeader: true,
+        responseBody: true,
+        error: true,
+      ));
+    }
   }
 
   @override
@@ -217,7 +229,7 @@ class RousiAdapter implements SiteAdapter {
     final tags = TagType.matchTags(name);
 
     return TorrentItem(
-      id: (map['id'] ?? map['uuid']).toString(), // 优先使用ID，或者UUID
+      id: (map['uuid'] ?? map['id']).toString(), // 优先使用uuid，或者id
       name: name,
       smallDescr: map['subtitle'] as String? ?? '',
       discount: discount,
@@ -252,7 +264,24 @@ class RousiAdapter implements SiteAdapter {
       final data = response.data;
       if (data['code'] == 0 && data['data'] != null) {
         final info = data['data'];
-        return TorrentDetail(descr: info['description'] ?? '');
+
+        // 解析图片列表并加到描述最前面 (BBCode 格式)
+        String imageBBCode = '';
+        final images = info['images'] as List?;
+        if (images != null && images.isNotEmpty) {
+          for (var img in images) {
+            final url = img['url'];
+            if (url != null) {
+              imageBBCode += '[img]$url[/img]\n';
+            }
+          }
+          if (imageBBCode.isNotEmpty) {
+            imageBBCode += '\n';
+          }
+        }
+
+        final descr = info['description'] ?? '';
+        return TorrentDetail(descr: imageBBCode + descr);
       } else {
         throw SiteApiException(
           message: '获取详情失败: ${data['message'] ?? '未知错误'}',
