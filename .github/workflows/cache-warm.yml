@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -46,7 +46,7 @@ jobs:
 
       - name: Cache Gradle
         id: cache_gradle_linux
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -65,7 +65,7 @@ jobs:
           flutter build apk --debug --target-platform=android-arm64
       - name: Cache CMake
         id: cache_cmake_linux
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             build/linux
@@ -86,7 +86,7 @@ jobs:
           flutter build linux --debug
 
       - name: Cache AppImageTool
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: appimagetool-x86_64.AppImage
           key: ${{ runner.os }}-appimagetool-continuous
@@ -107,7 +107,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Flutter (cached)
         id: cache_flutter_windows
@@ -130,7 +130,7 @@ jobs:
 
       - name: Cache Visual Studio
         id: cache_vs_windows
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             C:\Users\runneradmin\AppData\Local\Microsoft\VisualStudio
@@ -150,7 +150,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Flutter (cached)
         id: cache_flutter_macos
@@ -173,7 +173,7 @@ jobs:
 
       - name: Cache CocoaPods
         id: cache_pods_macos
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ios/Pods
@@ -199,7 +199,7 @@ jobs:
 
       - name: Cache Xcode DerivedData
         id: cache_xcode_macos
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/Library/Developer/Xcode/DerivedData
           key: ${{ runner.os }}-xcode-${{ hashFiles('**/project.pbxproj') }}

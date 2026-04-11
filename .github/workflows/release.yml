@@ -17,13 +17,14 @@ on:
         default: ''
 permissions:
   contents: write
+
 jobs:
   build-android-linux:
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         ref: ${{ github.ref }}
       
@@ -51,7 +52,7 @@ jobs:
         sed -i "s/^version:.*/version: ${{ steps.version.outputs.version }}+${{ github.run_number }}/" pubspec.yaml
         
     - name: Setup Java
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         distribution: 'zulu'
         java-version: '17'
@@ -69,7 +70,7 @@ jobs:
     
     # Gradle 缓存
     - name: Cache Gradle
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           ~/.gradle/caches
@@ -100,7 +101,7 @@ jobs:
         mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/pt_mate-${{ steps.version.outputs.version }}-arm64-v8a.apk
           
     - name: Upload Android artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: android-artifacts
         path: |
@@ -115,7 +116,7 @@ jobs:
     
     # CMake 缓存
     - name: Cache CMake
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           build/linux
@@ -129,7 +130,7 @@ jobs:
       
     # AppImageTool 缓存
     - name: Cache AppImageTool
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: appimagetool-x86_64.AppImage
         key: ${{ runner.os }}-appimagetool-continuous
@@ -187,7 +188,7 @@ jobs:
         ./appimagetool-x86_64.AppImage AppDir pt_mate-${{ steps.version.outputs.version }}-linux-x64.AppImage
         
     - name: Upload Linux artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: linux-artifact
         path: pt_mate-${{ steps.version.outputs.version }}-linux-x64.AppImage
@@ -198,7 +199,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         ref: ${{ github.ref }}
         
@@ -227,7 +228,7 @@ jobs:
         
     # Visual Studio 缓存
     - name: Cache Visual Studio
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           C:\Users\runneradmin\AppData\Local\Microsoft\VisualStudio
@@ -263,7 +264,7 @@ jobs:
         iscc /DMyAppVersion="${{ steps.version.outputs.version }}" windows/inno_setup.iss
         
     - name: Upload Windows artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: windows-artifact
         path: windows/Output/pt_mate-${{ steps.version.outputs.version }}-windows-x64.exe
@@ -274,7 +275,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         ref: ${{ github.ref }}
         
@@ -303,7 +304,7 @@ jobs:
     
     # CocoaPods 缓存
     - name: Cache CocoaPods
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           ios/Pods
@@ -315,7 +316,7 @@ jobs:
     
     # Xcode 缓存
     - name: Cache Xcode DerivedData
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/Library/Developer/Xcode/DerivedData
         key: ${{ runner.os }}-xcode-${{ hashFiles('**/project.pbxproj') }}
@@ -385,7 +386,7 @@ jobs:
         cd -
           
     - name: Upload iOS and macOS artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: ios-macos-artifacts
         path: |
@@ -401,7 +402,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         ref: ${{ github.ref }}
         
@@ -446,7 +447,7 @@ jobs:
         echo "EOF" >> $GITHUB_OUTPUT
         
     - name: Download all artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       
     - name: Create Release and Upload All Artifacts
       uses: softprops/action-gh-release@v2
