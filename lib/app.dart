@@ -1501,7 +1501,11 @@ class _HomePageState extends State<HomePage> {
       final result = await showDialog<Map<String, dynamic>>(
         context: context,
         builder: (_) =>
-            TorrentDownloadDialog(torrentName: item.name, downloadUrl: url),
+            TorrentDownloadDialog(
+               torrentName: item.name, 
+               downloadUrl: url,
+               isGazelleSite: _currentSite?.siteType == SiteType.gazelle,
+            ),
       );
 
       if (result == null) return; // 用户取消了
@@ -1514,10 +1518,15 @@ class _HomePageState extends State<HomePage> {
         savePath: result['savePath'] as String?,
         autoTMM: result['autoTMM'] as bool?,
         startPaused: result['startPaused'] as bool?,
+        useToken: result['useToken'] as bool?,
       );
 
       // 3. 发送到下载器
-      await _enqueueDownload(item, downloadContext, resolvedUrl: url);
+      String finalUrl = url;
+      if (downloadContext.useToken == true && !finalUrl.contains('usetoken=1')) {
+        finalUrl += '&usetoken=1';
+      }
+      await _enqueueDownload(item, downloadContext, resolvedUrl: finalUrl);
 
       if (mounted) {
         NotificationHelper.showInfo(
@@ -1709,12 +1718,15 @@ class _HomePageState extends State<HomePage> {
 
     _pendingDownloadRequests.add(item.id);
     try {
-      final url =
+      var url =
           resolvedUrl ??
           await ApiService.instance.genDlToken(
             id: item.id,
             url: item.downloadUrl,
           );
+      if (downloadContext.useToken == true && !url.contains('usetoken=1')) {
+        url += '&usetoken=1';
+      }
       await DownloaderService.instance.addTask(
         config: downloadContext.clientConfig,
         password: downloadContext.password,
@@ -2486,7 +2498,10 @@ class _HomePageState extends State<HomePage> {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) =>
-          TorrentDownloadDialog(itemCount: selectedItems.length),
+          TorrentDownloadDialog(
+             itemCount: selectedItems.length,
+             isGazelleSite: _currentSite?.siteType == SiteType.gazelle,
+          ),
     );
 
     if (result == null) return; // 用户取消了
@@ -2501,6 +2516,7 @@ class _HomePageState extends State<HomePage> {
       savePath: result['savePath'] as String?,
       autoTMM: result['autoTMM'] as bool?,
       startPaused: result['startPaused'] as bool?,
+      useToken: result['useToken'] as bool?,
     );
 
     unawaited(_performBatchDownload(selectedItems, downloadContext));

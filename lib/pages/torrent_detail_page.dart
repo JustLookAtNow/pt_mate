@@ -696,6 +696,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         builder: (_) => TorrentDownloadDialog(
           torrentName: widget.torrentItem.name,
           downloadUrl: url,
+          isGazelleSite: widget.siteConfig?.siteType == SiteType.gazelle,
         ),
       );
 
@@ -709,13 +710,19 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       final savePath = result['savePath'] as String?;
       final autoTMM = result['autoTMM'] as bool?;
       final startPaused = result['startPaused'] as bool?;
+      final useToken = result['useToken'] as bool?;
 
       // 4. 发送到下载器
+      String finalUrl = url;
+      if (useToken == true && !finalUrl.contains('usetoken=1')) {
+        finalUrl += '&usetoken=1';
+      }
+
       await DownloaderService.instance.addTask(
         config: clientConfig,
         password: password,
         params: AddTaskParams(
-          url: url,
+          url: finalUrl,
           category: category,
           tags: tags,
           savePath: savePath,

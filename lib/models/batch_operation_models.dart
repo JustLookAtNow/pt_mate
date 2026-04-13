@@ -13,6 +13,7 @@ class BatchDownloadContext extends BatchRetryContext {
   final String? savePath;
   final bool? autoTMM;
   final bool? startPaused;
+  final bool? useToken;
   final Map<String, SiteConfig>? sitesById;
 
   const BatchDownloadContext({
@@ -23,6 +24,7 @@ class BatchDownloadContext extends BatchRetryContext {
     required this.savePath,
     required this.autoTMM,
     required this.startPaused,
+    this.useToken,
     this.sitesById,
   });
 
@@ -34,6 +36,7 @@ class BatchDownloadContext extends BatchRetryContext {
     String? savePath,
     bool? autoTMM,
     bool? startPaused,
+    bool? useToken,
     Map<String, SiteConfig>? sitesById,
   }) => BatchDownloadContext(
     clientConfig: clientConfig ?? this.clientConfig,
@@ -43,6 +46,7 @@ class BatchDownloadContext extends BatchRetryContext {
     savePath: savePath ?? this.savePath,
     autoTMM: autoTMM ?? this.autoTMM,
     startPaused: startPaused ?? this.startPaused,
+    useToken: useToken ?? this.useToken,
     sitesById: sitesById ?? this.sitesById,
   );
 }

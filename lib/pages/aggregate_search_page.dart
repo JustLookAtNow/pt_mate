@@ -1221,6 +1221,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         builder: (_) => TorrentDownloadDialog(
           torrentName: item.torrent.name,
           downloadUrl: url,
+          isGazelleSite: siteConfig.siteType == SiteType.gazelle,
         ),
       );
 
@@ -1234,13 +1235,19 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       final savePath = result['savePath'] as String?;
       final autoTMM = result['autoTMM'] as bool?;
       final startPaused = result['startPaused'] as bool?;
+      final useToken = result['useToken'] as bool?;
 
       // 5. 发送到 qBittorrent
+      String finalUrl = url;
+      if (useToken == true && !finalUrl.contains('usetoken=1')) {
+        finalUrl += '&usetoken=1';
+      }
+
       await _onTorrentDownload(
         item,
         clientConfig,
         password,
-        url,
+        finalUrl,
         category,
         tags,
         savePath,
@@ -1358,11 +1365,14 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       throw Exception('找不到站点配置: ${item.siteId}');
     }
 
-    final url = await ApiService.instance.genDlToken(
+    var url = await ApiService.instance.genDlToken(
       id: item.torrent.id,
       url: item.torrent.downloadUrl,
       siteConfig: siteConfig,
     );
+    if (downloadContext.useToken == true && siteConfig.siteType == SiteType.gazelle && !url.contains('usetoken=1')) {
+      url += '&usetoken=1';
+    }
 
     await DownloaderService.instance.addTask(
       config: downloadContext.clientConfig,
@@ -1520,11 +1530,21 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         .where((item) => _selectedItems.contains(item.torrent.id))
         .toList();
 
+    final storage = Provider.of<StorageService>(context, listen: false);
+    final allSites = await storage.loadSiteConfigs();
+    if (!mounted) return;
+    
+    final sitesById = {for (final site in allSites) site.id: site};
+    bool hasGazelle = selectedItems.any((item) => sitesById[item.siteId]?.siteType == SiteType.gazelle);
+
     // 显示批量下载设置对话框
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) =>
-          TorrentDownloadDialog(itemCount: selectedItems.length),
+          TorrentDownloadDialog(
+             itemCount: selectedItems.length,
+             isGazelleSite: hasGazelle,
+          ),
     );
 
     if (result == null) return; // 用户取消了
@@ -1539,6 +1559,8 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       savePath: result['savePath'] as String?,
       autoTMM: result['autoTMM'] as bool?,
       startPaused: result['startPaused'] as bool?,
+      useToken: result['useToken'] as bool?,
+      sitesById: sitesById,
     );
 
     unawaited(_performBatchDownload(selectedItems, downloadContext));

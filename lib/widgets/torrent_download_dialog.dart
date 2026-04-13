@@ -8,12 +8,14 @@ class TorrentDownloadDialog extends StatefulWidget {
   final String? torrentName;
   final String? downloadUrl;
   final int? itemCount; // 批量下载时的项目数量
+  final bool? isGazelleSite;
 
   const TorrentDownloadDialog({
     super.key,
     this.torrentName,
     this.downloadUrl,
     this.itemCount,
+    this.isGazelleSite,
   });
 
   @override
@@ -33,6 +35,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
   bool _loading = false;
   String? _error;
   bool _startPaused = false; // 不立即开始（添加后暂停）
+  bool _useToken = false; // Gazelle类型站点使用FL Token选项
 
   @override
   void initState() {
@@ -199,6 +202,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
           : _savePathCtrl.text.trim(),
       'autoTMM': autoTMM,
       'startPaused': _startPaused,
+      'useToken': _useToken,
     });
   }
 
@@ -471,6 +475,25 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
             ),
           ],
         ),
+
+        // Gazelle类型站点 使用 Token 选项
+        if (widget.isGazelleSite == true) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text('使用 FL Token',
+                    style: Theme.of(context).textTheme.titleSmall),
+              ),
+              Switch(
+                value: _useToken,
+                onChanged: (val) {
+                  setState(() => _useToken = val);
+                },
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
