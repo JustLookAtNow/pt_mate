@@ -1,0 +1,30 @@
+{
+  "id": "dicmusic",
+  "name": "DIC Music",
+  "isShow": true,
+  "baseUrls": [
+    "https://dicmusic.com/"
+  ],
+  "primaryUrl": "https://dicmusic.com/",
+  "siteType": "Gazelle",
+  "operationIntervalMs": 500,
+  "searchCategories": [],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentBrowse": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": true,
+    "downloadHistory": false,
+    "categorySearch": false,
+    "advancedSearch": false,
+    "showCover": true,
+    "commentDetail": false
+  },
+  "discountMapping": {
+    "Freeleech": "FREE"
+  },
+  "tagMapping": {},
+  "logo": "assets/sites_icon/dicmusic.png"
+}

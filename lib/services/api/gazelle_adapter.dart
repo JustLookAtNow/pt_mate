@@ -231,9 +231,10 @@ class GazelleAdapter extends SiteAdapter {
       if (group is! Map<String, dynamic>) continue;
 
       final torrents = group['torrents'] as List? ?? [];
-      final groupName = _unescapeHtml(
+      final rawGroupName = FormatUtil.unescapeHtml(
         (group['groupName'] ?? group['name'] ?? '').toString(),
       );
+      final artist = FormatUtil.unescapeHtml((group['artist'] ?? '').toString());
       final cover = (group['cover'] ?? group['wikiImage'] ?? '').toString();
 
       for (final torrent in torrents) {
@@ -258,9 +259,8 @@ class GazelleAdapter extends SiteAdapter {
         items.add(
           TorrentItem(
             id: id,
-            name: _unescapeHtml(
-              (torrent['fileName'] ?? groupName).toString().trim(),
-            ),
+            name: '${artist.isNotEmpty ? '$artist - ' : ''}$rawGroupName'
+                ' - ${torrent['format'] ?? ''} / ${torrent['encoding'] ?? ''}',
             smallDescr: '',
             discount: _parseDiscountType(torrent['isFreeleech'] == true),
             discountEndTime: null,
@@ -306,7 +306,8 @@ class GazelleAdapter extends SiteAdapter {
       if (group is! Map<String, dynamic>) continue;
 
       final torrents = group['torrents'] as List? ?? [];
-      final groupName = _unescapeHtml((group['name'] ?? '').toString());
+      final rawGroupName = FormatUtil.unescapeHtml((group['name'] ?? '').toString());
+      final artist = FormatUtil.unescapeHtml((group['artist'] ?? '').toString());
       final cover = (group['image'] ?? '').toString();
 
       for (final torrent in torrents) {
@@ -331,7 +332,8 @@ class GazelleAdapter extends SiteAdapter {
         items.add(
           TorrentItem(
             id: id,
-            name: (torrent['fileName'] ?? groupName).toString().trim(),
+            name: '${artist.isNotEmpty ? '$artist - ' : ''}$rawGroupName'
+                ' - ${torrent['format'] ?? ''} / ${torrent['encoding'] ?? ''}',
             smallDescr: '',
             discount: _parseDiscountType(
               torrent['freeTorrent'] == true || torrent['isFreeleech'] == true,
@@ -366,16 +368,6 @@ class GazelleAdapter extends SiteAdapter {
     );
   }
 
-  /// 处理 HTML 转义字符
-  String _unescapeHtml(String input) {
-    if (input.isEmpty) return input;
-    return input
-        .replaceAll('&#039;', "'")
-        .replaceAll('&quot;', '"')
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>');
-  }
 
   @override
   Future<TorrentDetail> fetchTorrentDetail(

@@ -65,6 +65,42 @@ class FormatUtil {
 
     return int.tryParse(str);
   }
+
+  /// 处理 HTML 转义字符，支持命名实体、十进制和十六进制 Unicode 实体
+  static String unescapeHtml(String? input) {
+    if (input == null || input.isEmpty) return input ?? '';
+
+    // 1. 处理命名实体
+    var result = input
+        .replaceAll('&#039;', "'")
+        .replaceAll('&quot;', '"')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&nbsp;', ' ');
+
+    // 2. 处理十进制 Unicode 实体: &#123;
+    result = result.replaceAllMapped(RegExp(r'&#(\d+);'), (match) {
+      try {
+        final code = int.parse(match.group(1)!);
+        return String.fromCharCode(code);
+      } catch (_) {
+        return match.group(0)!;
+      }
+    });
+
+    // 3. 处理十六进制 Unicode 实体: &#x1f600;
+    result = result.replaceAllMapped(RegExp(r'&#[xX]([0-9a-fA-F]+);'), (match) {
+      try {
+        final code = int.parse(match.group(1)!, radix: 16);
+        return String.fromCharCode(code);
+      } catch (_) {
+        return match.group(0)!;
+      }
+    });
+
+    return result;
+  }
 }
 
 class Formatters {
