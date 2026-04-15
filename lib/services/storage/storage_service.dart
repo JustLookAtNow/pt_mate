@@ -23,7 +23,8 @@ class StorageKeys {
   static const String legacyQbClientConfigs = 'qb.clients';
   static const String legacyDefaultQbId = 'qb.defaultId';
   static String legacyQbPasswordKey(String id) => 'qb.password.$id';
-  static String legacyQbPasswordFallbackKey(String id) => 'qb.password.fallback.$id';
+  static String legacyQbPasswordFallbackKey(String id) =>
+      'qb.password.fallback.$id';
   static String legacyQbCategoriesKey(String id) => 'qb.categories.$id';
   static String legacyQbTagsKey(String id) => 'qb.tags.$id';
 
@@ -31,8 +32,10 @@ class StorageKeys {
   static const String downloaderConfigs = 'downloader.configs';
   static const String defaultDownloaderId = 'downloader.defaultId';
   static String downloaderPasswordKey(String id) => 'downloader.password.$id';
-  static String downloaderPasswordFallbackKey(String id) => 'downloader.password.fallback.$id';
-  static String downloaderCategoriesKey(String id) => 'downloader.categories.$id';
+  static String downloaderPasswordFallbackKey(String id) =>
+      'downloader.password.fallback.$id';
+  static String downloaderCategoriesKey(String id) =>
+      'downloader.categories.$id';
   static String downloaderTagsKey(String id) => 'downloader.tags.$id';
   static String downloaderPathsKey(String id) => 'downloader.paths.$id';
 
@@ -40,11 +43,13 @@ class StorageKeys {
   static const String defaultDownloadCategory = 'download.defaultCategory';
   static const String defaultDownloadTags = 'download.defaultTags';
   static const String defaultDownloadSavePath = 'download.defaultSavePath';
-  static const String defaultDownloadStartPaused = 'download.defaultStartPaused';
+  static const String defaultDownloadStartPaused =
+      'download.defaultStartPaused';
 
   // 多站点API密钥存储
   static String siteApiKey(String siteId) => 'site.apiKey.$siteId';
-  static String siteApiKeyFallback(String siteId) => 'site.apiKey.fallback.$siteId';
+  static String siteApiKeyFallback(String siteId) =>
+      'site.apiKey.fallback.$siteId';
 
   // 兼容性：旧的API密钥存储
   static const String legacySiteApiKey = 'site.apiKey';
@@ -53,7 +58,8 @@ class StorageKeys {
 
   // WebDAV密码安全存储
   static String webdavPassword(String configId) => 'webdav.password.$configId';
-  static String webdavPasswordFallback(String configId) => 'webdav.password.fallback.$configId';
+  static String webdavPasswordFallback(String configId) =>
+      'webdav.password.fallback.$configId';
 
   // 设备ID（与历史 DeviceIdService 使用的 key 保持一致）
   static const String deviceId = 'device_id';
@@ -92,44 +98,59 @@ class StorageService {
   static const IOSOptions _iosSecureOptions = IOSOptions(
     accessibility: KeychainAccessibility.first_unlock_this_device,
   );
+  // Android 选项配置：分别对应 RSA OAEP (Modern) 与 RSA PKCS1 (Compat)
+  static const AndroidOptions _androidModernSecureOptions = AndroidOptions(
+    resetOnError: false,
+    migrateOnAlgorithmChange: false,
+    keyCipherAlgorithm:
+        KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
+    storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
+  );
   static const AndroidOptions _androidCompatSecureOptions = AndroidOptions(
     resetOnError: false,
     migrateOnAlgorithmChange: false,
     keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_PKCS1Padding,
     storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
   );
-  static const AndroidOptions _androidModernSecureOptions = AndroidOptions(
-    resetOnError: false,
-    migrateOnAlgorithmChange: false,
-    keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
-    storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
-  );
 
   bool _hasPendingConfigUpdates = false;
 
-  // 站点配置内存缓存（避免重复 JSON 解析与密钥反复读取）
-  List<SiteConfig>? _siteConfigsCache; // 不含 apiKey 的基础配置缓存
-  bool _siteConfigsCacheDirty = true; // 当有增删改或持久化后需要重新解析
-  bool _siteConfigsCacheNeedsUpdate = false; // 最近一次解析是否发现需要更新
-  final Map<String, String?> _siteApiKeysCache = {}; // 站点 id -> apiKey 的缓存
-  List<SiteConfig>? get siteConfigsCache => _siteConfigsCache; // 只读访问器
+  // 站点配置内存缓存
+  List<SiteConfig>? _siteConfigsCache;
+  bool _siteConfigsCacheDirty = true;
+  bool _siteConfigsCacheNeedsUpdate = false;
+  final Map<String, String?> _siteApiKeysCache = {};
+  List<SiteConfig>? get siteConfigsCache => _siteConfigsCache;
   TargetPlatform? _platformOverrideForTest;
   _SecureStorageAvailability _secureStorageAvailability =
       _SecureStorageAvailability.unknown;
   bool _hasLoggedSecureStorageUnavailable = false;
 
-  // Android 主写入只避开 RSA OAEP，保留 AES-GCM，便于缩小兼容性问题范围。
-  final FlutterSecureStorage _secure = const FlutterSecureStorage(
-    aOptions: _androidCompatSecureOptions,
-    iOptions: _iosSecureOptions,
-  );
-  // 保留对 flutter_secure_storage 10.x 默认 Android 格式的读取兼容。
-  final FlutterSecureStorage _modernSecure = const FlutterSecureStorage(
-    aOptions: _androidModernSecureOptions,
-    iOptions: _iosSecureOptions,
-  );
-  // 保留历史默认构造实例，兼容更早版本写出的数据。
-  final FlutterSecureStorage _legacySecure = const FlutterSecureStorage();
+  // 统一安全存储实例
+  final FlutterSecureStorage _secure = const FlutterSecureStorage();
+
+  // Android 选项序列缓存，用于根据 API 版本动态调整首选算法
+  List<AndroidOptions>? _cachedAndroidOptionsSequence;
+
+  Future<List<AndroidOptions>> _getAndroidOptionsSequence() async {
+    if (_cachedAndroidOptionsSequence != null) {
+      return _cachedAndroidOptionsSequence!;
+    }
+    if (!_isAndroidPlatform) {
+      _cachedAndroidOptionsSequence = [const AndroidOptions()];
+      return _cachedAndroidOptionsSequence!;
+    }
+
+    // 既然有报告称 Android 13 (API 33) 使用 OAEP 也会在重启后丢失数据，
+    // 我们统一首选最稳定的 PKCS1 (Compat) 进行写入。
+    // OAEP (Modern) 仅放在序列中用于尝试读取现有数据。
+    _cachedAndroidOptionsSequence = [
+      _androidCompatSecureOptions, // 稳定首选 (PKCS1)
+      _androidModernSecureOptions, // 历史回退 (OAEP)
+      const AndroidOptions(), // 默认回退
+    ];
+    return _cachedAndroidOptionsSequence!;
+  }
 
   Future<SharedPreferences> get _prefs async => SharedPreferences.getInstance();
 
@@ -170,9 +191,7 @@ class StorageService {
     }
     _hasLoggedSecureStorageUnavailable = true;
     if (kDebugMode) {
-      _logger.w(
-        'StorageService: Linux keyring 不可用，本次运行改用本地降级存储。error=$error',
-      );
+      _logger.w('StorageService: Linux keyring 不可用，本次运行改用本地降级存储。error=$error');
     }
   }
 
@@ -190,41 +209,69 @@ class StorageService {
     );
   }
 
-  Future<String?> _secureRead(
-    FlutterSecureStorage storage,
-    String key,
-    {void Function(Object error)? onError,}
-  ) async {
+  /// 统一安全存储读取：支持按序列尝试不同的加密算法（主要针对 Android 兼容性）
+  Future<String?> _secureRead(String key) async {
     if (_shouldShortCircuitSecureStorage) {
       return null;
     }
-    try {
-      final value = await storage
-          .read(key: key)
-          .timeout(_secureStorageTimeout);
-      _markSecureStorageAvailable();
-      return value;
-    } catch (e) {
-      if (_isSecureStorageFailure(e)) {
-        _markSecureStorageUnavailable(e);
+
+    final sequence = await _getAndroidOptionsSequence();
+    Object? lastError;
+
+    for (final aOptions in sequence) {
+      try {
+        final value = await _secure
+            .read(key: key, aOptions: aOptions, iOptions: _iosSecureOptions)
+            .timeout(_secureStorageTimeout);
+
+        if (value != null) {
+          _markSecureStorageAvailable();
+          // 如果使用了回退算法（非首选）读取成功，则触发静默迁移
+          if (_isAndroidPlatform && aOptions != sequence.first) {
+            await _secureWrite(key: key, value: value);
+          }
+          return value;
+        }
+        // 如果返回 null，说明底层的 SharedPreferences 中完全不存在这个 key，无需继续尝试其他解密算法
         return null;
+      } catch (e) {
+        lastError = e;
+        if (_isSecureStorageFailure(e)) {
+          _markSecureStorageUnavailable(e);
+          return null;
+        }
+        // 解密失败通常意味着算法不匹配，继续尝试下一个选项
       }
-      onError?.call(e);
-      return null;
+      // 如果不是安卓平台，或者只有一个选项，则无需循环
+      if (!_isAndroidPlatform) break;
     }
+
+    if (lastError != null && kDebugMode && !_isAndroidPlatform) {
+      _logSecureStorageError(operation: 'read', key: key, error: lastError);
+    }
+    return null;
   }
 
-  Future<bool> _secureWrite(
-    FlutterSecureStorage storage, {
+  /// 统一安全存储写入：使用首选的加密算法
+  Future<bool> _secureWrite({
     required String key,
     required String value,
   }) async {
     if (_shouldShortCircuitSecureStorage) {
       return false;
     }
+
+    final sequence = await _getAndroidOptionsSequence();
+    final aOptions = sequence.first;
+
     try {
-      await storage
-          .write(key: key, value: value)
+      await _secure
+          .write(
+            key: key,
+            value: value,
+            aOptions: aOptions,
+            iOptions: _iosSecureOptions,
+          )
           .timeout(_secureStorageTimeout);
       _markSecureStorageAvailable();
       return true;
@@ -238,16 +285,20 @@ class StorageService {
     }
   }
 
-  Future<bool> _secureDelete(
-    FlutterSecureStorage storage, {
-    required String key,
-  }) async {
+  /// 统一安全存储删除：从首选的 SharedPreferences 配置中删除（由于键名相同，只需删除一次）
+  Future<bool> _secureDelete({required String key}) async {
     if (_shouldShortCircuitSecureStorage) {
       return false;
     }
+
+    final sequence = await _getAndroidOptionsSequence();
     try {
-      await storage
-          .delete(key: key)
+      await _secure
+          .delete(
+            key: key,
+            aOptions: sequence.first,
+            iOptions: _iosSecureOptions,
+          )
           .timeout(_secureStorageTimeout);
       _markSecureStorageAvailable();
       return true;
@@ -259,69 +310,6 @@ class StorageService {
       }
       return false;
     }
-  }
-
-  /// Android 上读取顺序：兼容主存储 -> 10.x 默认格式 -> 历史默认构造格式。
-  /// 其他平台保持：兼容主存储 -> 历史默认构造格式。
-  Future<String?> _secureReadWithMigration(String key) async {
-    Object? primaryError;
-    final current = await _secureRead(
-      _secure,
-      key,
-      onError: (error) => primaryError ??= error,
-    );
-    if (current != null && current.isNotEmpty) {
-      return current;
-    }
-
-    Object? modernError;
-    if (_isAndroidPlatform) {
-      final modern = await _secureRead(
-        _modernSecure,
-        key,
-        onError: (error) => modernError ??= error,
-      );
-      if (modern != null && modern.isNotEmpty) {
-        final migrated = await _secureWrite(_secure, key: key, value: modern);
-        if (migrated) {
-          await _secureDelete(_modernSecure, key: key);
-        }
-        return modern;
-      }
-    }
-
-    Object? legacyError;
-    final legacy = await _secureRead(
-      _legacySecure,
-      key,
-      onError: (error) => legacyError ??= error,
-    );
-    if (legacy != null && legacy.isNotEmpty) {
-      final migrated = await _secureWrite(_secure, key: key, value: legacy);
-      if (migrated) {
-        await _secureDelete(_legacySecure, key: key);
-      }
-      return legacy;
-    }
-
-    if (primaryError != null && modernError != null && legacyError != null) {
-      _logger.w(
-        'StorageService: secure storage read failed on all cipher paths, '
-        'key=$key, compatError=$primaryError, modernError=$modernError, legacyError=$legacyError',
-      );
-    } else if (primaryError != null && modernError != null) {
-      _logger.w(
-        'StorageService: secure storage read failed on both Android cipher paths, '
-        'key=$key, compatError=$primaryError, modernError=$modernError',
-      );
-    } else if (primaryError != null) {
-      _logSecureStorageError(operation: 'read', key: key, error: primaryError!);
-    } else if (modernError != null) {
-      _logSecureStorageError(operation: 'read', key: key, error: modernError!);
-    } else if (legacyError != null) {
-      _logSecureStorageError(operation: 'read', key: key, error: legacyError!);
-    }
-    return null;
   }
 
   // 版本管理
@@ -355,7 +343,8 @@ class StorageService {
     final qbConfigsStr = prefs.getString(StorageKeys.legacyQbClientConfigs);
     if (qbConfigsStr != null) {
       try {
-        final qbConfigs = (jsonDecode(qbConfigsStr) as List).cast<Map<String, dynamic>>();
+        final qbConfigs = (jsonDecode(qbConfigsStr) as List)
+            .cast<Map<String, dynamic>>();
         final downloaderConfigs = <Map<String, dynamic>>[];
 
         for (final qbConfig in qbConfigs) {
@@ -384,7 +373,10 @@ class StorageService {
         }
 
         // 保存新的下载器配置
-        await prefs.setString(StorageKeys.downloaderConfigs, jsonEncode(downloaderConfigs));
+        await prefs.setString(
+          StorageKeys.downloaderConfigs,
+          jsonEncode(downloaderConfigs),
+        );
 
         // 迁移默认下载器ID
         final defaultQbId = prefs.getString(StorageKeys.legacyDefaultQbId);
@@ -395,43 +387,33 @@ class StorageService {
         // 清理旧配置
         await prefs.remove(StorageKeys.legacyQbClientConfigs);
         await prefs.remove(StorageKeys.legacyDefaultQbId);
-
       } catch (e) {
-         // 迁移失败时记录错误，但不阻塞应用启动
-         if (kDebugMode) {
-           _logger.e('数据迁移失败: $e');
-         }
-       }
+        // 迁移失败时记录错误，但不阻塞应用启动
+        if (kDebugMode) {
+          _logger.e('数据迁移失败: $e');
+        }
+      }
     }
   }
 
   /// 迁移密码
   Future<void> _migratePassword(String clientId) async {
     // 尝试从安全存储读取旧密码
-    final oldPassword = await _secureReadWithMigration(
+    final oldPassword = await _secureRead(
       StorageKeys.legacyQbPasswordKey(clientId),
     );
     if (oldPassword != null && oldPassword.isNotEmpty) {
       await saveDownloaderPassword(clientId, oldPassword);
-      await _secureDelete(
-        _secure,
-        key: StorageKeys.legacyQbPasswordKey(clientId),
-      );
-      await _secureDelete(
-        _modernSecure,
-        key: StorageKeys.legacyQbPasswordKey(clientId),
-      );
-      await _secureDelete(
-        _legacySecure,
-        key: StorageKeys.legacyQbPasswordKey(clientId),
-      );
+      await _secureDelete(key: StorageKeys.legacyQbPasswordKey(clientId));
       return;
     }
 
     try {
       // 尝试从降级存储读取旧密码
       final prefs = await _prefs;
-      final oldPassword = prefs.getString(StorageKeys.legacyQbPasswordFallbackKey(clientId));
+      final oldPassword = prefs.getString(
+        StorageKeys.legacyQbPasswordFallbackKey(clientId),
+      );
       if (oldPassword != null && oldPassword.isNotEmpty) {
         await saveDownloaderPassword(clientId, oldPassword);
         await prefs.remove(StorageKeys.legacyQbPasswordFallbackKey(clientId));
@@ -445,9 +427,14 @@ class StorageService {
   Future<void> _migrateCategories(String clientId) async {
     try {
       final prefs = await _prefs;
-      final oldCategories = prefs.getString(StorageKeys.legacyQbCategoriesKey(clientId));
+      final oldCategories = prefs.getString(
+        StorageKeys.legacyQbCategoriesKey(clientId),
+      );
       if (oldCategories != null) {
-        await prefs.setString(StorageKeys.downloaderCategoriesKey(clientId), oldCategories);
+        await prefs.setString(
+          StorageKeys.downloaderCategoriesKey(clientId),
+          oldCategories,
+        );
         await prefs.remove(StorageKeys.legacyQbCategoriesKey(clientId));
       }
     } catch (_) {
@@ -494,7 +481,6 @@ class StorageService {
     // secure parts
     if ((config.apiKey ?? '').isNotEmpty) {
       final wrote = await _secureWrite(
-        _secure,
         key: StorageKeys.legacySiteApiKey,
         value: config.apiKey!,
       );
@@ -503,10 +489,13 @@ class StorageService {
         await prefs.remove(StorageKeys.legacySiteApiKeyFallback);
       } else {
         // 当桌面环境的 keyring 被锁定或不可用时，降级到本地存储，避免崩溃
-        await prefs.setString(StorageKeys.legacySiteApiKeyFallback, config.apiKey!);
+        await prefs.setString(
+          StorageKeys.legacySiteApiKeyFallback,
+          config.apiKey!,
+        );
       }
     } else {
-      await _secureDelete(_secure, key: StorageKeys.legacySiteApiKey);
+      await _secureDelete(key: StorageKeys.legacySiteApiKey);
       // 同步清理降级存储
       await prefs.remove(StorageKeys.legacySiteApiKeyFallback);
     }
@@ -521,7 +510,7 @@ class StorageService {
 
     String? apiKey;
     try {
-      apiKey = await _secureReadWithMigration(StorageKeys.legacySiteApiKey);
+      apiKey = await _secureRead(StorageKeys.legacySiteApiKey);
     } catch (_) {
       // 读取失败时，从降级存储取值
       apiKey = prefs.getString(StorageKeys.legacySiteApiKeyFallback);
@@ -540,10 +529,14 @@ class StorageService {
   // 多站点配置管理
   Future<void> saveSiteConfigs(List<SiteConfig> configs) async {
     final prefs = await _prefs;
-    final jsonList = configs.map((config) => {
-      ...config.toJson(),
-      'apiKey': null, // API密钥单独存储
-    }).toList();
+    final jsonList = configs
+        .map(
+          (config) => {
+            ...config.toJson(),
+            'apiKey': null, // API密钥单独存储
+          },
+        )
+        .toList();
     await prefs.setString(StorageKeys.siteConfigs, jsonEncode(jsonList));
 
     // 保存每个站点的API密钥
@@ -586,7 +579,9 @@ class StorageService {
         baseConfigs = _siteConfigsCache!;
         hasUpdates = _siteConfigsCacheNeedsUpdate;
         if (kDebugMode) {
-          _logger.d('StorageService.loadSiteConfigs: 使用内存缓存，includeApiKeys=$includeApiKeys');
+          _logger.d(
+            'StorageService.loadSiteConfigs: 使用内存缓存，includeApiKeys=$includeApiKeys',
+          );
         }
       } else {
         // 重新解析 JSON
@@ -633,7 +628,9 @@ class StorageService {
           }
           swKey.stop();
           if (kDebugMode) {
-            _logger.d('StorageService.loadSiteConfigs: 第${idx + 1}个站点 加载API密钥耗时=${swKey.elapsedMilliseconds}ms');
+            _logger.d(
+              'StorageService.loadSiteConfigs: 第${idx + 1}个站点 加载API密钥耗时=${swKey.elapsedMilliseconds}ms',
+            );
           }
           finalConfig = cfg.copyWith(apiKey: apiKey);
         } else {
@@ -649,18 +646,24 @@ class StorageService {
         await saveSiteConfigs(configs);
         swSave.stop();
         if (kDebugMode) {
-          _logger.d('StorageService.loadSiteConfigs: 保存更新耗时=${swSave.elapsedMilliseconds}ms');
+          _logger.d(
+            'StorageService.loadSiteConfigs: 保存更新耗时=${swSave.elapsedMilliseconds}ms',
+          );
         }
       } else if (hasUpdates && !includeApiKeys) {
         _hasPendingConfigUpdates = true;
         if (kDebugMode) {
-          _logger.i('StorageService.loadSiteConfigs: 检测到配置需要更新，但已跳过保存以避免清除API密钥（稍后持久化）');
+          _logger.i(
+            'StorageService.loadSiteConfigs: 检测到配置需要更新，但已跳过保存以避免清除API密钥（稍后持久化）',
+          );
         }
       }
 
       swTotal.stop();
       if (kDebugMode) {
-        _logger.d('StorageService.loadSiteConfigs: 总耗时=${swTotal.elapsedMilliseconds}ms');
+        _logger.d(
+          'StorageService.loadSiteConfigs: 总耗时=${swTotal.elapsedMilliseconds}ms',
+        );
       }
 
       return configs;
@@ -756,7 +759,6 @@ class StorageService {
     }
 
     final wrote = await _secureWrite(
-      _secure,
       key: StorageKeys.siteApiKey(siteId),
       value: apiKey,
     );
@@ -773,7 +775,7 @@ class StorageService {
 
   Future<String?> _loadSiteApiKey(String siteId) async {
     try {
-      final apiKey = await _secureReadWithMigration(StorageKeys.siteApiKey(siteId));
+      final apiKey = await _secureRead(StorageKeys.siteApiKey(siteId));
       if (apiKey != null && apiKey.isNotEmpty) return apiKey;
     } catch (_) {
       // ignore and try fallback
@@ -784,9 +786,7 @@ class StorageService {
   }
 
   Future<void> _deleteSiteApiKey(String siteId) async {
-    await _secureDelete(_secure, key: StorageKeys.siteApiKey(siteId));
-    await _secureDelete(_modernSecure, key: StorageKeys.siteApiKey(siteId));
-    await _secureDelete(_legacySecure, key: StorageKeys.siteApiKey(siteId));
+    await _secureDelete(key: StorageKeys.siteApiKey(siteId));
 
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.siteApiKeyFallback(siteId));
@@ -918,7 +918,6 @@ class StorageService {
     }
 
     final wrote = await _secureWrite(
-      _secure,
       key: StorageKeys.webdavPassword(configId),
       value: password,
     );
@@ -929,13 +928,16 @@ class StorageService {
     } else {
       // 当桌面环境的 keyring 被锁定或不可用时，降级到本地存储，避免崩溃
       final prefs = await _prefs;
-      await prefs.setString(StorageKeys.webdavPasswordFallback(configId), password);
+      await prefs.setString(
+        StorageKeys.webdavPasswordFallback(configId),
+        password,
+      );
     }
   }
 
   Future<String?> loadWebDAVPassword(String configId) async {
     try {
-      final password = await _secureReadWithMigration(StorageKeys.webdavPassword(configId));
+      final password = await _secureRead(StorageKeys.webdavPassword(configId));
       if (password != null && password.isNotEmpty) return password;
     } catch (_) {
       // 读取失败时，从降级存储取值
@@ -943,7 +945,9 @@ class StorageService {
 
     // 若安全存储读取到的值为空或为 null，则继续尝试降级存储
     final prefs = await _prefs;
-    final fallback = prefs.getString(StorageKeys.webdavPasswordFallback(configId));
+    final fallback = prefs.getString(
+      StorageKeys.webdavPasswordFallback(configId),
+    );
     if (fallback != null && fallback.isNotEmpty) {
       return fallback;
     }
@@ -952,24 +956,21 @@ class StorageService {
   }
 
   Future<void> deleteWebDAVPassword(String configId) async {
-    await _secureDelete(_secure, key: StorageKeys.webdavPassword(configId));
-    await _secureDelete(
-      _modernSecure,
-      key: StorageKeys.webdavPassword(configId),
-    );
-    await _secureDelete(
-      _legacySecure,
-      key: StorageKeys.webdavPassword(configId),
-    );
+    await _secureDelete(key: StorageKeys.webdavPassword(configId));
 
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.webdavPasswordFallback(configId));
   }
 
   // 聚合搜索设置相关
-  Future<void> saveAggregateSearchSettings(AggregateSearchSettings settings) async {
+  Future<void> saveAggregateSearchSettings(
+    AggregateSearchSettings settings,
+  ) async {
     final prefs = await _prefs;
-    await prefs.setString(StorageKeys.aggregateSearchSettings, jsonEncode(settings.toJson()));
+    await prefs.setString(
+      StorageKeys.aggregateSearchSettings,
+      jsonEncode(settings.toJson()),
+    );
   }
 
   Future<AggregateSearchSettings> loadAggregateSearchSettings() async {
@@ -1004,7 +1005,10 @@ class StorageService {
   }
 
   // 新的下载器配置管理方法
-  Future<void> saveDownloaderConfigs(List<DownloaderConfig> configs, {String? defaultId}) async {
+  Future<void> saveDownloaderConfigs(
+    List<DownloaderConfig> configs, {
+    String? defaultId,
+  }) async {
     final prefs = await _prefs;
     final jsonList = configs.map((config) => config.toJson()).toList();
 
@@ -1054,7 +1058,6 @@ class StorageService {
 
   Future<void> saveDownloaderPassword(String id, String password) async {
     final wrote = await _secureWrite(
-      _secure,
       key: StorageKeys.downloaderPasswordKey(id),
       value: password,
     );
@@ -1065,13 +1068,16 @@ class StorageService {
     } else {
       // 在 Linux 桌面端等环境，可能出现 keyring 未解锁；降级写入本地存储，避免功能中断
       final prefs = await _prefs;
-      await prefs.setString(StorageKeys.downloaderPasswordFallbackKey(id), password);
+      await prefs.setString(
+        StorageKeys.downloaderPasswordFallbackKey(id),
+        password,
+      );
     }
   }
 
   Future<String?> loadDownloaderPassword(String id) async {
     try {
-      final password = await _secureReadWithMigration(StorageKeys.downloaderPasswordKey(id));
+      final password = await _secureRead(StorageKeys.downloaderPasswordKey(id));
       if (password != null && password.isNotEmpty) return password;
     } catch (_) {
       // 读取失败时，从降级存储取值
@@ -1079,7 +1085,9 @@ class StorageService {
 
     // 若安全存储读取到的值为空或为 null，则继续尝试降级存储
     final prefs = await _prefs;
-    final fallback = prefs.getString(StorageKeys.downloaderPasswordFallbackKey(id));
+    final fallback = prefs.getString(
+      StorageKeys.downloaderPasswordFallbackKey(id),
+    );
     if (fallback != null && fallback.isNotEmpty) {
       return fallback;
     }
@@ -1088,28 +1096,27 @@ class StorageService {
   }
 
   Future<void> deleteDownloaderPassword(String id) async {
-    await _secureDelete(_secure, key: StorageKeys.downloaderPasswordKey(id));
-    await _secureDelete(
-      _modernSecure,
-      key: StorageKeys.downloaderPasswordKey(id),
-    );
-    await _secureDelete(
-      _legacySecure,
-      key: StorageKeys.downloaderPasswordKey(id),
-    );
+    await _secureDelete(key: StorageKeys.downloaderPasswordKey(id));
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.downloaderPasswordFallbackKey(id));
   }
 
   // 下载器分类与标签的本地缓存
-  Future<void> saveDownloaderCategories(String id, List<String> categories) async {
+  Future<void> saveDownloaderCategories(
+    String id,
+    List<String> categories,
+  ) async {
     final prefs = await _prefs;
-    await prefs.setStringList(StorageKeys.downloaderCategoriesKey(id), categories);
+    await prefs.setStringList(
+      StorageKeys.downloaderCategoriesKey(id),
+      categories,
+    );
   }
 
   Future<List<String>> loadDownloaderCategories(String id) async {
     final prefs = await _prefs;
-    return prefs.getStringList(StorageKeys.downloaderCategoriesKey(id)) ?? <String>[];
+    return prefs.getStringList(StorageKeys.downloaderCategoriesKey(id)) ??
+        <String>[];
   }
 
   Future<void> saveDownloaderTags(String id, List<String> tags) async {
@@ -1129,13 +1136,13 @@ class StorageService {
 
   Future<List<String>> loadDownloaderPaths(String id) async {
     final prefs = await _prefs;
-    return prefs.getStringList(StorageKeys.downloaderPathsKey(id)) ?? <String>[];
+    return prefs.getStringList(StorageKeys.downloaderPathsKey(id)) ??
+        <String>[];
   }
 
   // 设备ID统一读写删除（使用安全存储，支持旧存储兼容与自动迁移；在桌面环境等不可用时降级到本地存储）
   Future<void> saveDeviceId(String deviceId) async {
     final wrote = await _secureWrite(
-      _secure,
       key: StorageKeys.deviceId,
       value: deviceId,
     );
@@ -1152,7 +1159,7 @@ class StorageService {
 
   Future<String?> loadDeviceId() async {
     try {
-      final id = await _secureReadWithMigration(StorageKeys.deviceId);
+      final id = await _secureRead(StorageKeys.deviceId);
       if (id != null && id.isNotEmpty) return id;
     } catch (_) {
       // 忽略错误，尝试降级存储
@@ -1166,9 +1173,7 @@ class StorageService {
   }
 
   Future<void> deleteDeviceId() async {
-    await _secureDelete(_secure, key: StorageKeys.deviceId);
-    await _secureDelete(_modernSecure, key: StorageKeys.deviceId);
-    await _secureDelete(_legacySecure, key: StorageKeys.deviceId);
+    await _secureDelete(key: StorageKeys.deviceId);
 
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.deviceIdFallback);
@@ -1212,7 +1217,9 @@ class StorageService {
   }
 
   // 健康检查结果缓存：保存与读取
-  Future<void> saveHealthStatuses(Map<String, Map<String, dynamic>> statuses) async {
+  Future<void> saveHealthStatuses(
+    Map<String, Map<String, dynamic>> statuses,
+  ) async {
     final prefs = await _prefs;
     try {
       await prefs.setString(StorageKeys.healthStatuses, jsonEncode(statuses));
@@ -1231,7 +1238,9 @@ class StorageService {
         // 强制转换为 Map<String, Map<String, dynamic>>
         return decoded.map((key, value) {
           final k = key.toString();
-          final v = (value is Map) ? value.cast<String, dynamic>() : <String, dynamic>{};
+          final v = (value is Map)
+              ? value.cast<String, dynamic>()
+              : <String, dynamic>{};
           return MapEntry(k, v);
         });
       }
