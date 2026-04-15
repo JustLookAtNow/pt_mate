@@ -128,6 +128,8 @@ class StorageService {
     aOptions: _androidModernSecureOptions,
     iOptions: _iosSecureOptions,
   );
+  // 保留历史默认构造实例，兼容更早版本写出的数据。
+  final FlutterSecureStorage _legacySecure = const FlutterSecureStorage();
 
   Future<SharedPreferences> get _prefs async => SharedPreferences.getInstance();
 
@@ -259,7 +261,8 @@ class StorageService {
     }
   }
 
-  /// Android 上优先读取兼容主存储，再回退读取 10.x 默认新格式。
+  /// Android 上读取顺序：兼容主存储 -> 10.x 默认格式 -> 历史默认构造格式。
+  /// 其他平台保持：兼容主存储 -> 历史默认构造格式。
   Future<String?> _secureReadWithMigration(String key) async {
     Object? primaryError;
     final current = await _secureRead(
@@ -271,28 +274,42 @@ class StorageService {
       return current;
     }
 
-    if (!_isAndroidPlatform) {
-      if (primaryError != null) {
-        _logSecureStorageError(operation: 'read', key: key, error: primaryError!);
-      }
-      return null;
-    }
-
     Object? modernError;
-    final modern = await _secureRead(
-      _modernSecure,
-      key,
-      onError: (error) => modernError ??= error,
-    );
-    if (modern != null && modern.isNotEmpty) {
-      final migrated = await _secureWrite(_secure, key: key, value: modern);
-      if (migrated) {
-        await _secureDelete(_modernSecure, key: key);
+    if (_isAndroidPlatform) {
+      final modern = await _secureRead(
+        _modernSecure,
+        key,
+        onError: (error) => modernError ??= error,
+      );
+      if (modern != null && modern.isNotEmpty) {
+        final migrated = await _secureWrite(_secure, key: key, value: modern);
+        if (migrated) {
+          await _secureDelete(_modernSecure, key: key);
+        }
+        return modern;
       }
-      return modern;
     }
 
-    if (primaryError != null && modernError != null) {
+    Object? legacyError;
+    final legacy = await _secureRead(
+      _legacySecure,
+      key,
+      onError: (error) => legacyError ??= error,
+    );
+    if (legacy != null && legacy.isNotEmpty) {
+      final migrated = await _secureWrite(_secure, key: key, value: legacy);
+      if (migrated) {
+        await _secureDelete(_legacySecure, key: key);
+      }
+      return legacy;
+    }
+
+    if (primaryError != null && modernError != null && legacyError != null) {
+      _logger.w(
+        'StorageService: secure storage read failed on all cipher paths, '
+        'key=$key, compatError=$primaryError, modernError=$modernError, legacyError=$legacyError',
+      );
+    } else if (primaryError != null && modernError != null) {
       _logger.w(
         'StorageService: secure storage read failed on both Android cipher paths, '
         'key=$key, compatError=$primaryError, modernError=$modernError',
@@ -301,6 +318,8 @@ class StorageService {
       _logSecureStorageError(operation: 'read', key: key, error: primaryError!);
     } else if (modernError != null) {
       _logSecureStorageError(operation: 'read', key: key, error: modernError!);
+    } else if (legacyError != null) {
+      _logSecureStorageError(operation: 'read', key: key, error: legacyError!);
     }
     return null;
   }
@@ -400,6 +419,10 @@ class StorageService {
       );
       await _secureDelete(
         _modernSecure,
+        key: StorageKeys.legacyQbPasswordKey(clientId),
+      );
+      await _secureDelete(
+        _legacySecure,
         key: StorageKeys.legacyQbPasswordKey(clientId),
       );
       return;
@@ -763,6 +786,7 @@ class StorageService {
   Future<void> _deleteSiteApiKey(String siteId) async {
     await _secureDelete(_secure, key: StorageKeys.siteApiKey(siteId));
     await _secureDelete(_modernSecure, key: StorageKeys.siteApiKey(siteId));
+    await _secureDelete(_legacySecure, key: StorageKeys.siteApiKey(siteId));
 
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.siteApiKeyFallback(siteId));
@@ -933,6 +957,10 @@ class StorageService {
       _modernSecure,
       key: StorageKeys.webdavPassword(configId),
     );
+    await _secureDelete(
+      _legacySecure,
+      key: StorageKeys.webdavPassword(configId),
+    );
 
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.webdavPasswordFallback(configId));
@@ -1065,6 +1093,10 @@ class StorageService {
       _modernSecure,
       key: StorageKeys.downloaderPasswordKey(id),
     );
+    await _secureDelete(
+      _legacySecure,
+      key: StorageKeys.downloaderPasswordKey(id),
+    );
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.downloaderPasswordFallbackKey(id));
   }
@@ -1136,6 +1168,7 @@ class StorageService {
   Future<void> deleteDeviceId() async {
     await _secureDelete(_secure, key: StorageKeys.deviceId);
     await _secureDelete(_modernSecure, key: StorageKeys.deviceId);
+    await _secureDelete(_legacySecure, key: StorageKeys.deviceId);
 
     final prefs = await _prefs;
     await prefs.remove(StorageKeys.deviceIdFallback);
