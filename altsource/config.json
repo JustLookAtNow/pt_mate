@@ -4,6 +4,11 @@
   "source_id": "com.github.justlookatnow.ptmate.source",
   "app_id": "com.github.justlookatnow.ptmate",
   "app_name": "PT Mate",
+  "developer_name": "JustLookAtNow",
+  "subtitle": "PT private tracker companion",
+  "localized_description": "PT Mate is a Flutter-based private tracker client for browsing, searching, and managing downloads across multiple PT sites.",
+  "category": "utilities",
+  "screenshot_count": 3,
   "caption": "Update for PT Mate now available!",
   "tint_colour": "1D4ED8",
   "image_url": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/1.png"

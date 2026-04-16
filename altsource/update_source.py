@@ -35,6 +35,11 @@ class AppConfig(TypedDict):
     source_id: str
     app_id: str
     app_name: str
+    developer_name: str
+    subtitle: str
+    localized_description: str
+    category: str
+    screenshot_count: int
     caption: str
     tint_colour: str
     image_url: str
@@ -54,8 +59,15 @@ def fetch_releases(repo_url: str) -> List[GitHubRelease]:
         headers["Authorization"] = f"Bearer {token}"
         
     req = urllib.request.Request(api_url, headers=headers)
-    with urllib.request.urlopen(req, timeout=30) as response:
-        releases: List[GitHubRelease] = json.loads(response.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            if response.status != 200:
+                raise Exception(f"GitHub API returned status code {response.status}")
+            releases: List[GitHubRelease] = json.loads(response.read().decode())
+    except urllib.error.HTTPError as e:
+        raise Exception(f"GitHub API error ({e.code}): {e.read().decode()}")
+    except Exception as e:
+        raise Exception(f"Failed to fetch releases: {e}")
     
     valid_releases = [
         release
@@ -68,7 +80,9 @@ def fetch_releases(repo_url: str) -> List[GitHubRelease]:
 def format_description(description: str) -> str:
     if not description:
         return ""
+    # Basic HTML strip
     formatted = re.sub(r"<[^<]+?>", "", description)
+    # Basic Markdown title strip
     formatted = re.sub(r"#{1,6}\s?", "", formatted)
     return formatted.strip()
 
@@ -84,7 +98,7 @@ def find_download_url_and_size(
 
 def normalize_version(version: str) -> str:
     cleaned = version.lstrip("v")
-    match = re.search(r"(\d+\.\d+\.\d+)", cleaned)
+    match = re.search(r"(\d+(\.\d+)*)", cleaned)
     if match:
         return match.group(1)
     return cleaned
@@ -123,9 +137,7 @@ def build_source_data(
 ) -> Dict[str, Any]:
     version_entries = build_version_entries(releases)
     if not version_entries:
-        # Don't raise error if no IPA found, just return empty list or handle gracefully
-        # But for AltStore, we need at least one app
-        pass
+        print("Warning: No version entries with .ipa files found.")
 
     latest_release = None
     latest_download_url = None
@@ -149,24 +161,20 @@ def build_source_data(
                 "beta": False,
                 "name": config["app_name"],
                 "bundleIdentifier": config["app_id"],
-                "developerName": "JustLookAtNow",
-                "subtitle": "PT private tracker companion",
+                "developerName": config["developer_name"],
+                "subtitle": config["subtitle"],
                 "version": latest_version,
                 "versionDate": latest_release["published_at"],
                 "versionDescription": latest_description,
                 "downloadURL": latest_download_url,
-                "localizedDescription": (
-                    "PT Mate is a Flutter-based private tracker client for browsing, "
-                    "searching, and managing downloads across multiple PT sites."
-                ),
+                "localizedDescription": config["localized_description"],
                 "iconURL": f"{raw_base_url}/mt.png",
                 "tintColor": config["tint_colour"],
-                "category": "utilities",
+                "category": config["category"],
                 "size": latest_size or 0,
                 "screenshotURLs": [
-                    f"{raw_base_url}/screenshots/1.png",
-                    f"{raw_base_url}/screenshots/2.png",
-                    f"{raw_base_url}/screenshots/3.png",
+                    f"{raw_base_url}/screenshots/{i + 1}.png"
+                    for i in range(config["screenshot_count"])
                 ],
                 "versions": version_entries,
                 "appPermissions": {
@@ -206,9 +214,9 @@ def build_source_data(
         "headerURL": f"{raw_base_url}/screenshots/1.png",
         "website": f"https://github.com/{repo_url}",
         "iconURL": f"{raw_base_url}/mt.png",
-        "subtitle": "PT private tracker companion",
+        "subtitle": config["subtitle"],
         "description": (
-            "This is the official source for PT Mate.\n\n"
+            f"This is the official source for {config['app_name']}.\n\n"
             "For full details, check the GitHub repository:\n"
             f"https://github.com/{repo_url}"
         ),
