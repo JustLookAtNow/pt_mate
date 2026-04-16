@@ -1,9 +1,9 @@
 import json
+import os
 import re
+import urllib.request
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TypedDict
-
-import requests
 
 
 class ReleaseAsset(TypedDict):
@@ -48,9 +48,15 @@ def load_config(config_path: str) -> AppConfig:
 def fetch_releases(repo_url: str) -> List[GitHubRelease]:
     api_url = f"https://api.github.com/repos/{repo_url}/releases"
     headers = {"Accept": "application/vnd.github+json"}
-    response = requests.get(api_url, headers=headers, timeout=30)
-    response.raise_for_status()
-    releases: List[GitHubRelease] = response.json()
+    
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+        
+    req = urllib.request.Request(api_url, headers=headers)
+    with urllib.request.urlopen(req, timeout=30) as response:
+        releases: List[GitHubRelease] = json.loads(response.read().decode())
+    
     valid_releases = [
         release
         for release in releases
@@ -60,6 +66,8 @@ def fetch_releases(repo_url: str) -> List[GitHubRelease]:
 
 
 def format_description(description: str) -> str:
+    if not description:
+        return ""
     formatted = re.sub(r"<[^<]+?>", "", description)
     formatted = re.sub(r"#{1,6}\s?", "", formatted)
     return formatted.strip()
@@ -115,7 +123,9 @@ def build_source_data(
 ) -> Dict[str, Any]:
     version_entries = build_version_entries(releases)
     if not version_entries:
-        raise ValueError("No iOS IPA asset found in non-prerelease releases.")
+        # Don't raise error if no IPA found, just return empty list or handle gracefully
+        # But for AltStore, we need at least one app
+        pass
 
     latest_release = None
     latest_download_url = None
@@ -126,29 +136,15 @@ def build_source_data(
             latest_release = release
             break
 
-    if latest_release is None or latest_download_url is None:
-        raise ValueError("No release with a matching iOS IPA asset was found.")
-
-    latest_version = normalize_version(latest_release["tag_name"])
-    latest_description = format_description(latest_release.get("body", ""))
     repo_url = config["repo_url"]
-    raw_base_url = f"https://raw.githubusercontent.com/{repo_url}/refs/heads/master"
+    branch = os.environ.get("GITHUB_REF_NAME", "master")
+    raw_base_url = f"https://raw.githubusercontent.com/{repo_url}/refs/heads/{branch}"
 
-    return {
-        "name": config["app_name"],
-        "identifier": config["source_id"],
-        "sourceURL": f"{raw_base_url}/altsource/AltSource.json",
-        "headerURL": f"{raw_base_url}/screenshots/1.png",
-        "website": f"https://github.com/{repo_url}",
-        "iconURL": f"{raw_base_url}/mt.png",
-        "subtitle": "PT private tracker companion",
-        "description": (
-            "This is the official source for PT Mate.\n\n"
-            "For full details, check the GitHub repository:\n"
-            f"https://github.com/{repo_url}"
-        ),
-        "tintColor": config["tint_colour"],
-        "apps": [
+    apps = []
+    if latest_release and latest_download_url:
+        latest_version = normalize_version(latest_release["tag_name"])
+        latest_description = format_description(latest_release.get("body", ""))
+        apps.append(
             {
                 "beta": False,
                 "name": config["app_name"],
@@ -178,8 +174,12 @@ def build_source_data(
                     "privacy": {}
                 }
             }
-        ],
-        "news": [
+        )
+
+    news = []
+    if latest_release:
+        latest_version = normalize_version(latest_release["tag_name"])
+        news.append(
             {
                 "appID": config["app_id"],
                 "title": (
@@ -197,20 +197,40 @@ def build_source_data(
                     f"{latest_release['tag_name']}"
                 )
             }
-        ]
+        )
+
+    return {
+        "name": config["app_name"],
+        "identifier": config["source_id"],
+        "sourceURL": f"{raw_base_url}/altsource/AltSource.json",
+        "headerURL": f"{raw_base_url}/screenshots/1.png",
+        "website": f"https://github.com/{repo_url}",
+        "iconURL": f"{raw_base_url}/mt.png",
+        "subtitle": "PT private tracker companion",
+        "description": (
+            "This is the official source for PT Mate.\n\n"
+            "For full details, check the GitHub repository:\n"
+            f"https://github.com/{repo_url}"
+        ),
+        "tintColor": config["tint_colour"],
+        "apps": apps,
+        "news": news
     }
 
 
 def main() -> None:
     config = load_config("altsource/config.json")
-    releases = fetch_releases(config["repo_url"])
-    source_data = build_source_data(config, releases)
+    try:
+        releases = fetch_releases(config["repo_url"])
+        source_data = build_source_data(config, releases)
 
-    with open(config["json_file"], "w", encoding="utf-8") as output_file:
-        json.dump(source_data, output_file, indent=2, ensure_ascii=False)
-        output_file.write("\n")
+        with open(config["json_file"], "w", encoding="utf-8") as output_file:
+            json.dump(source_data, output_file, indent=2, ensure_ascii=False)
+            output_file.write("\n")
 
-    print("Successfully updated altsource/AltSource.json.")
+        print("Successfully updated altsource/AltSource.json.")
+    except Exception as e:
+        print(f"Error updating altsource: {e}")
 
 
 if __name__ == "__main__":

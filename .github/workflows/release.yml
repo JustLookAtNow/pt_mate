@@ -694,3 +694,37 @@ jobs:
         else
           echo "✅ Update server acknowledged: $HTTP_OK"
         fi
+
+  update-altsource:
+    runs-on: ubuntu-latest
+    needs: create-release
+    if: success()
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v6
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Update AltSource metadata
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REF_NAME: master
+        run: python altsource/update_source.py
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add altsource/AltSource.json
+          if git diff --cached --quiet; then
+            echo "No changes detected, skipping commit."
+          else
+            git commit -m "chore: update AltSource for ${{ github.ref_name }}"
+            git push origin master
+          fi
