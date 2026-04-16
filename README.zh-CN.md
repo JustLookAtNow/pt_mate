@@ -47,6 +47,17 @@ flutter pub get
 flutter run
 ```
 
+## iOS 侧载源
+
+SideStore：
+[添加 PT Mate Source](https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/altsource/AltSource.json)
+
+直接源地址：
+
+```text
+https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/altsource/AltSource.json
+```
+
 ## 文档
 
 - [文档目录](./docs/README.md)

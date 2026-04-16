@@ -47,6 +47,17 @@ flutter pub get
 flutter run
 ```
 
+## iOS Sideloading Source
+
+SideStore:
+[Add PT Mate Source](https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/altsource/AltSource.json)
+
+Direct source URL:
+
+```text
+https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/altsource/AltSource.json
+```
+
 ## Documentation
 
 - [Documentation Index](./docs/README.md)

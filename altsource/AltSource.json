@@ -1,0 +1,40 @@
+{
+  "name": "PT Mate",
+  "identifier": "com.github.justlookatnow.ptmate.source",
+  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/altsource/AltSource.json",
+  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/1.png",
+  "website": "https://github.com/JustLookAtNow/pt_mate",
+  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/mt.png",
+  "subtitle": "PT private tracker companion",
+  "description": "This is the official source for PT Mate.\n\nFor full details, check the GitHub repository:\nhttps://github.com/JustLookAtNow/pt_mate",
+  "tintColor": "1D4ED8",
+  "apps": [
+    {
+      "beta": false,
+      "name": "PT Mate",
+      "bundleIdentifier": "com.github.justlookatnow.ptmate",
+      "developerName": "JustLookAtNow",
+      "subtitle": "PT private tracker companion",
+      "version": "",
+      "versionDate": "",
+      "versionDescription": "",
+      "downloadURL": "",
+      "localizedDescription": "PT Mate is a Flutter-based private tracker client for browsing, searching, and managing downloads across multiple PT sites.",
+      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/mt.png",
+      "tintColor": "1D4ED8",
+      "category": "utilities",
+      "size": 0,
+      "screenshotURLs": [
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/1.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/2.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/3.png"
+      ],
+      "versions": [],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {}
+      }
+    }
+  ],
+  "news": []
+}

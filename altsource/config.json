@@ -1,0 +1,10 @@
+{
+  "repo_url": "JustLookAtNow/pt_mate",
+  "json_file": "altsource/AltSource.json",
+  "source_id": "com.github.justlookatnow.ptmate.source",
+  "app_id": "com.github.justlookatnow.ptmate",
+  "app_name": "PT Mate",
+  "caption": "Update for PT Mate now available!",
+  "tint_colour": "1D4ED8",
+  "image_url": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/1.png"
+}
