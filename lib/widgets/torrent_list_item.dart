@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
-import 'package:flutter/rendering.dart';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import '../utils/format.dart';
 import 'cached_network_image.dart';
-import '../utils/screen_utils.dart';
 
 // 文件级日志实例
 final Logger _logger = Logger();
@@ -1269,16 +1267,9 @@ class _SwipeableItemState extends State<_SwipeableItem>
   }
 }
 
-class _TagsView extends StatefulWidget {
+class _TagsView extends StatelessWidget {
   final List<TagType> tags;
   const _TagsView({required this.tags});
-  @override
-  State<_TagsView> createState() => _TagsViewState();
-}
-
-class _TagsViewState extends State<_TagsView> {
-  bool _expanded = false;
-  bool _overflow = false;
 
   Widget _buildChip(TagType tag) {
     return Container(
@@ -1299,113 +1290,13 @@ class _TagsViewState extends State<_TagsView> {
     );
   }
 
-  Widget _buildWrap() {
+  @override
+  Widget build(BuildContext context) {
     return Wrap(
       spacing: 4,
       runSpacing: 2,
-      children: widget.tags.map(_buildChip).toList(),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final measureChild = Offstage(
-          offstage: true,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: constraints.maxWidth),
-            child: _MeasureSize(
-              onChange: (s) {
-                if (!_expanded) {
-                  final overflow = s.height > 20.0 + 0.1;
-                  if (overflow != _overflow) {
-                    if (mounted) {
-                      setState(() {
-                        _overflow = overflow;
-                      });
-                    }
-                  }
-                }
-              },
-              child: _buildWrap(),
-            ),
-          ),
-        );
-
-        if (_expanded) {
-          return _buildWrap();
-        }
-
-        return Row(
-          children: [
-            Expanded(
-              child: SizedBox(height: 20, child: ClipRect(child: _buildWrap())),
-            ),
-            if (_overflow && !ScreenUtils.isLargeScreen(context)) ...[
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _expanded = true;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: const Icon(
-                    Icons.keyboard_arrow_down,
-                    size: 12,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 9),
-            ],
-            measureChild,
-          ],
-        );
-      },
+      children: tags.map(_buildChip).toList(),
     );
   }
 }
 
-typedef SizeChangedCallback = void Function(Size size);
-
-class _MeasureSize extends SingleChildRenderObjectWidget {
-  final SizeChangedCallback onChange;
-  const _MeasureSize({required this.onChange, super.child});
-  @override
-  RenderObject createRenderObject(BuildContext context) =>
-      _RenderMeasureSize(onChange);
-  @override
-  void updateRenderObject(
-    BuildContext context,
-    covariant _RenderMeasureSize renderObject,
-  ) {
-    renderObject.onChange = onChange;
-  }
-}
-
-class _RenderMeasureSize extends RenderProxyBox {
-  SizeChangedCallback onChange;
-  Size? _prevSize;
-  _RenderMeasureSize(this.onChange);
-  @override
-  void performLayout() {
-    super.performLayout();
-    final newSize = child?.size ?? size;
-    if (_prevSize == null || _prevSize != newSize) {
-      _prevSize = newSize;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        onChange(newSize);
-      });
-    }
-  }
-}
