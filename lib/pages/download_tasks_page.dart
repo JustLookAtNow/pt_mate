@@ -41,6 +41,8 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
   bool _isLoading = true;
   String? _errorMessage;
   List<DownloadTask> _tasks = [];
+  TransferInfo? _transferInfo;
+  ServerState? _serverState;
   DownloaderConfig? _downloaderConfig;
   String? _password;
   bool _showAllTasks = false; // 控制是否显示全部任务
@@ -174,10 +176,16 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
       final client = _getClient();
       if (client == null) return;
 
-      final tasks = await client.getTasks();
+      final List<dynamic> futures = await Future.wait([
+        client.getTasks(),
+        client.getTransferInfo(),
+        client.getServerState(),
+      ]);
 
       setState(() {
-        _tasks = tasks;
+        _tasks = futures[0] as List<DownloadTask>;
+        _transferInfo = futures[1] as TransferInfo;
+        _serverState = futures[2] as ServerState;
         if (!silent) _isLoading = false;
         _errorMessage = null; // 清除错误信息
       });
@@ -277,6 +285,8 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                   ),
                 // 搜索和过滤UI
                 _buildSearchAndFilterBar(),
+                // 传输状态指示
+                _buildTransferStateBar(),
                 Expanded(child: _buildAllTasksList()),
               ],
             ),
@@ -507,6 +517,79 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                 },
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransferStateBar() {
+    if (_transferInfo == null || _serverState == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.cloud_download,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '下载总量: ${Formatters.dataFromBytes(_transferInfo!.dlTotal)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.cloud_upload,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.tertiary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '上传总量: ${Formatters.dataFromBytes(_transferInfo!.upTotal)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.storage,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '剩余空间: ${Formatters.dataFromBytes(_serverState!.freeSpaceOnDisk)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),

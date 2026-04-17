@@ -8,6 +8,7 @@ import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
 import '../utils/format.dart';
 import '../pages/downloader_settings_page.dart';
+import '../utils/screen_utils.dart';
 
 // 右上角全局：默认下载器传输信息，每5秒刷新
 class QbSpeedIndicator extends StatefulWidget {
@@ -190,7 +191,7 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '↑${Formatters.speedFromBytesPerSec(info.upSpeed)} ↓${Formatters.speedFromBytesPerSec(info.dlSpeed)}',
+                  '↑${Formatters.speedFromBytesPerSec(info.upSpeed)}${ScreenUtils.isLargeScreen(context) ? " (${Formatters.dataFromBytes(info.upTotal)})" : ""} ↓${Formatters.speedFromBytesPerSec(info.dlSpeed)}${ScreenUtils.isLargeScreen(context) ? " (${Formatters.dataFromBytes(info.dlTotal)})" : ""}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).brightness == Brightness.light
                         ? Theme.of(context).colorScheme.onPrimary
