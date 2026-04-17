@@ -277,12 +277,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                   ),
                 // 搜索和过滤UI
                 _buildSearchAndFilterBar(),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 150),
-                    child: _buildAllTasksList(),
-                  ),
-                ),
+                Expanded(child: _buildAllTasksList()),
               ],
             ),
       floatingActionButton: Builder(
@@ -584,7 +579,12 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
       onRefresh: _loadTasks,
       child: ListView.builder(
         itemCount: filteredTasks.length,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.only(
+          left: 16,
+          top: 16,
+          right: 16,
+          bottom: 150,
+        ),
         itemBuilder: (context, index) {
           final task = filteredTasks[index];
           return _buildTaskCard(task);
