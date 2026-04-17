@@ -581,7 +581,7 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
         itemCount: filteredTasks.length,
         padding: const EdgeInsets.only(
           left: 16,
-          top: 16,
+          top: 4,
           right: 16,
           bottom: 150,
         ),
