@@ -2092,7 +2092,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
     try {
       final tempSite = _composeCurrentSite();
-      final adapter = await ApiService.instance.createTemporaryAdapter(tempSite);
+      final adapter = await ApiService.instance.createTemporaryAdapter(
+        tempSite,
+      );
 
       final categories = await adapter.getSearchCategories();
       setState(() {
@@ -2543,7 +2545,12 @@ class _SiteEditPageState extends State<SiteEditPage> {
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.only(
+            left: 16,
+            top: 16,
+            right: 16,
+            bottom: _hasUserMadeSelection ? 160 : 16,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

@@ -2380,7 +2380,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                       ),
                     ],
                     // 底部留白，防止被FAB遮挡
-                    const SizedBox(height: 80),
+                    const SizedBox(height: 160),
                   ],
                 ),
               )

@@ -277,7 +277,12 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
                   ),
                 // 搜索和过滤UI
                 _buildSearchAndFilterBar(),
-                Expanded(child: _buildAllTasksList()),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 150),
+                    child: _buildAllTasksList(),
+                  ),
+                ),
               ],
             ),
       floatingActionButton: Builder(
