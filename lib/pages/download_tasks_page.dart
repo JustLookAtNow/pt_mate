@@ -528,6 +528,10 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
       return const SizedBox.shrink();
     }
 
+    if (ScreenUtils.isLargeScreen(context)) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: Theme.of(context).colorScheme.surfaceContainerLow,
@@ -535,58 +539,33 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.cloud_download,
-                      size: 16,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '下载总量: ${Formatters.dataFromBytes(_transferInfo!.dlTotal)}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
+                Icon(
+                  Icons.cloud_download,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.cloud_upload,
-                      size: 16,
-                      color: Theme.of(context).colorScheme.tertiary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '上传总量: ${Formatters.dataFromBytes(_transferInfo!.upTotal)}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
+                const SizedBox(width: 4),
+                Text(
+                  '下载: ${Formatters.dataFromBytes(_transferInfo!.dlTotal)}',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
           ),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.storage,
-                      size: 16,
-                      color: Theme.of(context).colorScheme.secondary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '剩余空间: ${Formatters.dataFromBytes(_serverState!.freeSpaceOnDisk)}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
+                Icon(
+                  Icons.cloud_upload,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.tertiary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '上传: ${Formatters.dataFromBytes(_transferInfo!.upTotal)}',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
