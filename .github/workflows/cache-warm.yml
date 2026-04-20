@@ -38,6 +38,14 @@ jobs:
           flutter config --enable-linux-desktop
           flutter precache --linux
 
+      - name: Cache Pub dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-cache-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-cache-
+
       - name: Get dependencies
         run: |
           # 如果 pubspec.lock 未变化，actions/cache 会命中，跳过更新
@@ -51,9 +59,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            android/.gradle
-            android/app/.gradle
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('pubspec.lock', '**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
 
@@ -70,9 +76,9 @@ jobs:
           path: |
             build/linux
             ~/.cmake
-          key: ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-cmake-debug-${{ hashFiles('pubspec.lock', '**/CMakeLists.txt') }}
           restore-keys: |
-            ${{ runner.os }}-cmake-
+            ${{ runner.os }}-cmake-debug-
 
       - name: Install Linux dependencies
         if: ${{ steps.cache_cmake_linux.outputs.cache-hit != 'true' || steps.cache_flutter_linux.outputs.cache-hit != 'true' }}
@@ -124,6 +130,14 @@ jobs:
           flutter config --enable-windows-desktop
           flutter precache --windows
 
+      - name: Cache Pub dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~\AppData\Local\Pub\Cache
+          key: ${{ runner.os }}-pub-cache-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-cache-
+
       - name: Get dependencies
         run: |
           flutter pub get
@@ -135,9 +149,9 @@ jobs:
           path: |
             C:\Users\runneradmin\AppData\Local\Microsoft\VisualStudio
             build/windows
-          key: ${{ runner.os }}-vs-${{ hashFiles('**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-vs-debug-${{ hashFiles('pubspec.lock', '**/CMakeLists.txt') }}
           restore-keys: |
-            ${{ runner.os }}-vs-
+            ${{ runner.os }}-vs-debug-
 
       - name: Build Windows (Debug)
         if: ${{ steps.cache_vs_windows.outputs.cache-hit != 'true' || steps.cache_flutter_windows.outputs.cache-hit != 'true' }}
@@ -159,13 +173,21 @@ jobs:
           flutter-version-file: .flutter-version
           channel: 'main'
           cache: true
-          cache-key: 'flutter-:os:-:channel:-:version:-:arch:'
+          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
           cache-path: '${{ runner.tool_cache }}/flutter'
 
       - name: Flutter precache (macOS & iOS)
         run: |
           flutter config --enable-macos-desktop
           flutter precache --macos --ios
+
+      - name: Cache Pub dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-cache-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-cache-
 
       - name: Get dependencies
         run: |
@@ -202,9 +224,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/Library/Developer/Xcode/DerivedData
-          key: ${{ runner.os }}-xcode-${{ hashFiles('**/project.pbxproj') }}
+          key: ${{ runner.os }}-xcode-debug-${{ hashFiles('pubspec.lock', '**/project.pbxproj') }}
           restore-keys: |
-            ${{ runner.os }}-xcode-
+            ${{ runner.os }}-xcode-debug-
 
       - name: Build macOS (Debug)
         if: ${{ steps.cache_xcode_macos.outputs.cache-hit != 'true' || steps.cache_pods_macos.outputs.cache-hit != 'true' || steps.cache_flutter_macos.outputs.cache-hit != 'true' }}

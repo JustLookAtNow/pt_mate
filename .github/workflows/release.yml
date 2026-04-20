@@ -67,6 +67,13 @@ jobs:
         cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
         cache-path: '${{ runner.tool_cache }}/flutter'
 
+    - name: Cache Pub dependencies
+      uses: actions/cache@v5
+      with:
+        path: ~/.pub-cache
+        key: ${{ runner.os }}-pub-cache-${{ hashFiles('pubspec.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pub-cache-
     
     # Gradle 缓存
     - name: Cache Gradle
@@ -75,9 +82,7 @@ jobs:
         path: |
           ~/.gradle/caches
           ~/.gradle/wrapper
-          android/.gradle
-          android/app/.gradle
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        key: ${{ runner.os }}-gradle-${{ hashFiles('pubspec.lock', '**/*.gradle*', '**/gradle-wrapper.properties') }}
         restore-keys: |
           ${{ runner.os }}-gradle-
         
@@ -121,9 +126,9 @@ jobs:
         path: |
           build/linux
           ~/.cmake
-        key: ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt') }}
+        key: ${{ runner.os }}-cmake-release-${{ hashFiles('pubspec.lock', '**/CMakeLists.txt') }}
         restore-keys: |
-          ${{ runner.os }}-cmake-
+          ${{ runner.os }}-cmake-release-
         
     - name: Build Linux
       run: flutter build linux --release
@@ -226,6 +231,14 @@ jobs:
         cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
         cache-path: '${{ runner.tool_cache }}/flutter'
         
+    - name: Cache Pub dependencies
+      uses: actions/cache@v5
+      with:
+        path: ~\AppData\Local\Pub\Cache
+        key: ${{ runner.os }}-pub-cache-${{ hashFiles('pubspec.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pub-cache-
+
     # Visual Studio 缓存
     - name: Cache Visual Studio
       uses: actions/cache@v5
@@ -233,9 +246,9 @@ jobs:
         path: |
           C:\Users\runneradmin\AppData\Local\Microsoft\VisualStudio
           build/windows
-        key: ${{ runner.os }}-vs-${{ hashFiles('**/CMakeLists.txt') }}
+        key: ${{ runner.os }}-vs-release-${{ hashFiles('pubspec.lock', '**/CMakeLists.txt') }}
         restore-keys: |
-          ${{ runner.os }}-vs-
+          ${{ runner.os }}-vs-release-
     
     - name: Get dependencies
       run: flutter pub get
@@ -298,9 +311,16 @@ jobs:
         flutter-version-file: .flutter-version
         channel: 'main'
         cache: true  # 启用 Flutter SDK 缓存
-        cache-key: 'flutter-:os:-:channel:-:version:-:arch:'
+        cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
         cache-path: '${{ runner.tool_cache }}/flutter'
     
+    - name: Cache Pub dependencies
+      uses: actions/cache@v5
+      with:
+        path: ~/.pub-cache
+        key: ${{ runner.os }}-pub-cache-${{ hashFiles('pubspec.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pub-cache-
     
     # CocoaPods 缓存
     - name: Cache CocoaPods
@@ -319,9 +339,9 @@ jobs:
       uses: actions/cache@v5
       with:
         path: ~/Library/Developer/Xcode/DerivedData
-        key: ${{ runner.os }}-xcode-${{ hashFiles('**/project.pbxproj') }}
+        key: ${{ runner.os }}-xcode-release-${{ hashFiles('pubspec.lock', '**/project.pbxproj') }}
         restore-keys: |
-          ${{ runner.os }}-xcode-
+          ${{ runner.os }}-xcode-release-
         
     - name: Get dependencies
       run: flutter pub get
