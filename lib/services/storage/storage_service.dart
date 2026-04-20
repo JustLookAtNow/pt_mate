@@ -112,6 +112,13 @@ class StorageService {
     keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_PKCS1Padding,
     storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
   );
+  // 旧版默认格式（pre-PR#126）：PKCS1 + AES_CBC，与 const AndroidOptions() 的库默认值一致
+  static const AndroidOptions _androidLegacySecureOptions = AndroidOptions(
+    resetOnError: false,
+    migrateOnAlgorithmChange: false,
+    keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_PKCS1Padding,
+    storageCipherAlgorithm: StorageCipherAlgorithm.AES_CBC_PKCS7Padding,
+  );
 
   bool _hasPendingConfigUpdates = false;
 
@@ -145,9 +152,10 @@ class StorageService {
     // 我们统一首选最稳定的 PKCS1 (Compat) 进行写入。
     // OAEP (Modern) 仅放在序列中用于尝试读取现有数据。
     _cachedAndroidOptionsSequence = [
-      _androidCompatSecureOptions, // 稳定首选 (PKCS1)
-      _androidModernSecureOptions, // 历史回退 (OAEP)
-      const AndroidOptions(), // 默认回退
+      _androidCompatSecureOptions,  // 当前首选 (PKCS1+AES_GCM)
+      _androidLegacySecureOptions,  // 旧版默认格式 (PKCS1+AES_CBC)，pre-PR#126 数据
+      _androidModernSecureOptions,  // 历史回退 (OAEP+AES_GCM)
+      const AndroidOptions(),       // 兜底默认
     ];
     return _cachedAndroidOptionsSequence!;
   }
@@ -232,8 +240,7 @@ class StorageService {
           }
           return value;
         }
-        // 如果返回 null，说明底层的 SharedPreferences 中完全不存在这个 key，无需继续尝试其他解密算法
-        return null;
+        // null 仅代表在当前算法空间中不存在，继续尝试其他算法
       } catch (e) {
         lastError = e;
         if (_isSecureStorageFailure(e)) {
