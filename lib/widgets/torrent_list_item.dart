@@ -892,27 +892,48 @@ class TorrentCover extends StatelessWidget {
             Positioned(
               left: 0,
               bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: hasDouban
-                      ? const Color(0xFF007711)
-                      : const Color(0xFFF5C518),
-                  borderRadius: const BorderRadius.only(
-                    topRight: Radius.circular(6),
-                    bottomLeft: Radius.circular(6),
-                  ),
-                ),
-                child: Text(
-                  hasDouban
-                      ? '豆 ${torrent.doubanRating}'
-                      : 'IMDB ${torrent.imdbRating}',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: hasDouban ? Colors.white : Colors.black,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (hasImdb)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5C518),
+                        borderRadius: BorderRadius.only(
+                          topRight: const Radius.circular(6),
+                          bottomLeft: hasDouban ? Radius.zero : const Radius.circular(6),
+                        ),
+                      ),
+                      child: Text(
+                        'IMDB ${torrent.imdbRating}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  if (hasDouban)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF007711),
+                        borderRadius: BorderRadius.only(
+                          topRight: Radius.circular(6),
+                          bottomLeft: Radius.circular(6),
+                        ),
+                      ),
+                      child: Text(
+                        '豆 ${torrent.doubanRating}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
         ],
