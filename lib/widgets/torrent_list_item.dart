@@ -667,21 +667,7 @@ class TorrentInfo extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (torrent.isTop)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Transform.rotate(
-                    angle: math.pi / 4,
-                    child: Icon(
-                      Icons.push_pin,
-                      size: 16,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                )
-              else
-                const SizedBox(height: 16), // Placeholder if no pin
-              // discount
+// discount
               if (torrent.discount != DiscountType.normal)
                 Container(
                   padding: const EdgeInsets.symmetric(
