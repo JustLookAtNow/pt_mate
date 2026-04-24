@@ -119,7 +119,7 @@ class TorrentListItem extends StatelessWidget {
             decoration: BoxDecoration(
               color: isSelected
                   ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-                  : Theme.of(context).colorScheme.surface,
+                  : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isSelected
