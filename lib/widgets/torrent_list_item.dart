@@ -4,13 +4,9 @@ import 'package:provider/provider.dart';
 import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart';
-import 'package:logger/logger.dart';
+
 import '../utils/format.dart';
 import 'cached_network_image.dart';
-
-// 文件级日志实例
-final Logger _logger = Logger();
 
 // Helper method to parse rating
 // Using a static final RegExp to avoid recompiling the pattern on every call, improving performance.
@@ -413,20 +409,6 @@ class TorrentInfo extends StatelessWidget {
     }
 
     return baseText;
-  }
-
-  /// 构建做种/下载数信息组件
-  Widget _buildSeedLeechInfo(int seeders, int leechers) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.arrow_upward, color: Colors.green, size: 16),
-        Text('$seeders', style: const TextStyle(fontSize: 12)),
-        const SizedBox(width: 4),
-        const Icon(Icons.arrow_downward, color: Colors.red, size: 16),
-        Text('$leechers', style: const TextStyle(fontSize: 12)),
-      ],
-    );
   }
 
   /// 构建下载状态图标
