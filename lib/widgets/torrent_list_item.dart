@@ -588,11 +588,28 @@ class TorrentInfo extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Tags
-              if (torrent.tags.isNotEmpty)
+              // Tags and Pin
+              if (torrent.isTop || torrent.tags.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),
-                  child: _TagsView(tags: torrent.tags),
+                  child: Row(
+                    children: [
+                      if (torrent.isTop)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: Transform.rotate(
+                            angle: math.pi / 4,
+                            child: Icon(
+                              Icons.push_pin,
+                              size: 14,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      if (torrent.tags.isNotEmpty)
+                        Expanded(child: _TagsView(tags: torrent.tags)),
+                    ],
+                  ),
                 ),
               // Title
               if (isAggregateMode && siteName != null)
