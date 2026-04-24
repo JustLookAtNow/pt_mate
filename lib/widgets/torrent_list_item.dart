@@ -585,8 +585,8 @@ class TorrentInfo extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Tags and Pin
-              if (torrent.isTop || torrent.tags.isNotEmpty)
+              // Tags, Pin and Site
+              if (torrent.isTop || torrent.tags.isNotEmpty || (isAggregateMode && siteName != null))
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Row(
@@ -603,17 +603,17 @@ class TorrentInfo extends StatelessWidget {
                             ),
                           ),
                         ),
+                      if (isAggregateMode && siteName != null)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: _AggregateSiteChip(siteName: siteName!),
+                        ),
                       if (torrent.tags.isNotEmpty)
                         Expanded(child: _TagsView(tags: torrent.tags)),
                     ],
                   ),
                 ),
-              // Title
-              if (isAggregateMode && siteName != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: _AggregateSiteChip(siteName: siteName!),
-                ),
+
               Tooltip(
                 message: torrent.name,
                 child: Text(
@@ -1009,21 +1009,21 @@ class _AggregateSiteChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _resolveSiteColor(context, siteName);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color, width: 1.2),
+        border: Border.all(color: color, width: 1.0),
       ),
       child: Text(
-        ' $siteName ',
+        siteName,
         style:
             Theme.of(context).textTheme.bodySmall?.copyWith(
               color: color,
               fontWeight: FontWeight.w600,
-              fontSize: 13,
+              fontSize: 10,
             ) ??
-            TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13),
+            TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 10),
       ),
     );
   }
