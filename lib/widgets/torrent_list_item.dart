@@ -110,7 +110,7 @@ class TorrentListItem extends StatelessWidget {
 
     // 构建主要内容
     Widget mainContent = Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -631,7 +631,7 @@ class TorrentInfo extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               // Subtitle
               Text(
                 torrent.smallDescr,
@@ -643,7 +643,7 @@ class TorrentInfo extends StatelessWidget {
                   height: 1.4,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
               // Date
               Text(
                 '发布于 ${Formatters.formatTorrentCreatedDate(torrent.createdDate)}',
