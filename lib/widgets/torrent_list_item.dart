@@ -969,8 +969,8 @@ class TorrentActions extends StatelessWidget {
               color: torrent.collection ? Colors.red : null,
             ),
             tooltip: torrent.collection ? '取消收藏' : '收藏',
-            padding: EdgeInsets.all(10),
-            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+            padding: EdgeInsets.all(6),
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           ),
         // 下载按钮 - 仅在站点支持下载功能时显示
         if (currentSite?.features.supportDownload ?? true)
@@ -978,8 +978,8 @@ class TorrentActions extends StatelessWidget {
             onPressed: onDownload,
             icon: const Icon(Icons.download_outlined),
             tooltip: '下载',
-            padding: EdgeInsets.all(10),
-            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+            padding: EdgeInsets.all(6),
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
           ),
       ],
     );
