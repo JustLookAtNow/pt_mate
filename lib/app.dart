@@ -1053,17 +1053,13 @@ class _HomePageState extends State<HomePage> {
                       },
                       icon: const Icon(Icons.category, size: 20),
                       style: IconButton.styleFrom(
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.primaryContainer,
-                        foregroundColor: Theme.of(
-                          context,
-                        ).colorScheme.onPrimaryContainer,
-                        elevation: 2,
+                        backgroundColor: const Color(0xFFBBE5E1),
+                        foregroundColor: const Color(0xFF006688),
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(10),
                       ),
                       tooltip:
                           _categories.isNotEmpty &&
@@ -1091,34 +1087,23 @@ class _HomePageState extends State<HomePage> {
                                   ? '输入关键词（可选）'
                                   : '输入关键词（必填）')
                             : '当前站点不支持搜索功能',
-                        border: OutlineInputBorder(
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(25),
-                          ),
-                          borderSide: BorderSide(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.3),
-                          ),
+                        border: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(25)),
+                          borderSide: BorderSide.none,
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(25),
-                          ),
-                          borderSide: BorderSide(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.3),
-                          ),
+                        enabledBorder: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(25)),
+                          borderSide: BorderSide.none,
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(25),
-                          ),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                        focusedBorder: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(25)),
+                          borderSide: BorderSide.none,
                         ),
+                        filled: true,
+                        fillColor:
+                            Theme.of(context).brightness == Brightness.light
+                            ? Colors.grey.withValues(alpha: 0.1)
+                            : Colors.white.withValues(alpha: 0.1),
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -1500,12 +1485,11 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
       final result = await showDialog<Map<String, dynamic>>(
         context: context,
-        builder: (_) =>
-            TorrentDownloadDialog(
-               torrentName: item.name, 
-               downloadUrl: url,
-               isGazelleSite: _currentSite?.siteType == SiteType.gazelle,
-            ),
+        builder: (_) => TorrentDownloadDialog(
+          torrentName: item.name,
+          downloadUrl: url,
+          isGazelleSite: _currentSite?.siteType == SiteType.gazelle,
+        ),
       );
 
       if (result == null) return; // 用户取消了
@@ -1523,7 +1507,8 @@ class _HomePageState extends State<HomePage> {
 
       // 3. 发送到下载器
       String finalUrl = url;
-      if (downloadContext.useToken == true && !finalUrl.contains('usetoken=1')) {
+      if (downloadContext.useToken == true &&
+          !finalUrl.contains('usetoken=1')) {
         finalUrl += '&usetoken=1';
       }
       await _enqueueDownload(item, downloadContext, resolvedUrl: finalUrl);
@@ -2497,11 +2482,10 @@ class _HomePageState extends State<HomePage> {
     // 显示批量下载设置对话框
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) =>
-          TorrentDownloadDialog(
-             itemCount: selectedItems.length,
-             isGazelleSite: _currentSite?.siteType == SiteType.gazelle,
-          ),
+      builder: (context) => TorrentDownloadDialog(
+        itemCount: selectedItems.length,
+        isGazelleSite: _currentSite?.siteType == SiteType.gazelle,
+      ),
     );
 
     if (result == null) return; // 用户取消了
