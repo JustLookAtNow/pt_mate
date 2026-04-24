@@ -176,14 +176,26 @@ class TorrentListItem extends StatelessWidget {
                             onRetryBatchAction: onRetryBatchAction,
                           ),
                         ),
-                        // 桌面端显示操作按钮
+        // 桌面端显示操作按钮
                         if (!isMobile) ...[
+                          const SizedBox(width: 8),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: Container(
+                              width: 1,
+                              height: math.max(60, rightMinHeight - 16),
+                              color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                            ),
+                          ),
                           const SizedBox(width: 4),
-                          TorrentActions(
-                            torrent: torrent,
-                            currentSite: currentSite,
-                            onToggleCollection: onToggleCollection,
-                            onDownload: onDownload,
+                          SizedBox(
+                            height: math.max(60, rightMinHeight - 8),
+                            child: TorrentActions(
+                              torrent: torrent,
+                              currentSite: currentSite,
+                              onToggleCollection: onToggleCollection,
+                              onDownload: onDownload,
+                            ),
                           ),
                         ],
                       ],
@@ -609,11 +621,11 @@ class TorrentInfo extends StatelessWidget {
                     color: Theme.of(context).textTheme.titleMedium?.color,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
-                    height: 1.3,
+                    height: 1.2,
                   ),
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               // Subtitle
               Text(
                 torrent.smallDescr,
@@ -622,7 +634,7 @@ class TorrentInfo extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  height: 1.4,
+                  height: 1.2,
                 ),
               ),
               const SizedBox(height: 4),
@@ -645,9 +657,9 @@ class TorrentInfo extends StatelessWidget {
         const SizedBox(width: 8),
         // 右侧数据列
         SizedBox(
-          width: 70, // Fixed width for right column for alignment
+          width: 75, // Fixed width for right column for alignment
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 // discount
               if (torrent.discount != DiscountType.normal)
