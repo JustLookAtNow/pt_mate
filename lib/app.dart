@@ -990,46 +990,60 @@ class _HomePageState extends State<HomePage> {
     if (_searchFocusNode.hasFocus) {
       _searchFocusNode.unfocus();
     }
+
+    if (!mounted) return;
+
     final currentOffset = _scrollCtrl.position.pixels;
     final delta = currentOffset - _lastScrollOffset;
+    _lastScrollOffset = currentOffset;
 
     // 基于滚动距离的连续进度控制：向下滚动逐步隐藏，向上滚动逐步显示
     double newProgress = _headerProgress;
+    bool shouldUpdateFab = false;
+    bool nextFabVisible = _fabVisible;
+
     if (delta > 0) {
       // 向下滚动（内容上移）：减少头部显示进度，隐藏 FAB
       newProgress = (newProgress - delta / _maxHideDistance).clamp(0.0, 1.0);
       if (_fabVisible) {
-        setState(() {
-          _headerProgress = newProgress;
-          _fabVisible = false;
-        });
-      } else if (newProgress != _headerProgress) {
-        setState(() {
-          _headerProgress = newProgress;
-        });
+        nextFabVisible = false;
+        shouldUpdateFab = true;
       }
     } else if (delta < 0) {
       // 向上滚动（内容下移）：增加头部显示进度，显示 FAB
       newProgress = (newProgress + (-delta) / _maxHideDistance).clamp(0.0, 1.0);
       if (!_fabVisible) {
-        setState(() {
-          _headerProgress = newProgress;
-          _fabVisible = true;
-        });
-      } else if (newProgress != _headerProgress) {
-        setState(() {
-          _headerProgress = newProgress;
-        });
+        nextFabVisible = true;
+        shouldUpdateFab = true;
       }
     }
-    _lastScrollOffset = currentOffset;
+
+    if (newProgress != _headerProgress || shouldUpdateFab) {
+      // 优化：使用 WidgetsBinding 确保在布局完成后更新状态，
+      // 避免在 resize 等导致 layout 的过程中触发 setState 报错
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _headerProgress = newProgress;
+            if (shouldUpdateFab) {
+              _fabVisible = nextFabVisible;
+            }
+          });
+        }
+      });
+    }
 
     // 原有的分页加载逻辑
     if (!_hasMore || _loading) return;
     // 使用筛选后的列表长度来判断是否触底加载可能不太准确，但通常加载更多是基于原始列表
     // 这里保持原逻辑，只要滚动到底部就加载更多
     if (currentOffset >= _scrollCtrl.position.maxScrollExtent - 200) {
-      _loadMore();
+      // 同样在下一帧执行，避免在 layout 过程中触发
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _loadMore();
+        }
+      });
     }
   }
 

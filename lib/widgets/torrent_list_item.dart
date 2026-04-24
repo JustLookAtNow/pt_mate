@@ -145,37 +145,38 @@ class TorrentListItem extends StatelessWidget {
                     ),
                   Padding(
                     padding: const EdgeInsets.all(4),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 封面截图和创建时间（在 showCover 为 true 时显示）
-                        if (showCover && (suspendImageLoading != true))
-                          TorrentCover(
-                            torrent: torrent,
-                            currentSite: currentSite,
-                            isMobile: isMobile,
-                            hasDouban: hasDouban,
-                            hasImdb: hasImdb,
-                          ),
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // 封面截图和创建时间（在 showCover 为 true 时显示）
+                          if (showCover && (suspendImageLoading != true))
+                            TorrentCover(
+                              torrent: torrent,
+                              currentSite: currentSite,
+                              isMobile: isMobile,
+                              hasDouban: hasDouban,
+                              hasImdb: hasImdb,
+                            ),
 
-                        Expanded(
-                          child: TorrentInfo(
-                            torrent: torrent,
-                            currentSite: currentSite,
-                            isAggregateMode: isAggregateMode,
-                            siteName: siteName,
-                            isMobile: isMobile,
-                            showCover: showCover,
-                            hasDouban: hasDouban,
-                            hasImdb: hasImdb,
-                            hasAnyRating: hasAnyRating,
-                            rightMinHeight: rightMinHeight,
-                            batchOperationType: batchOperationType,
-                            batchItemState: batchItemState,
-                            batchErrorMessage: batchErrorMessage,
-                            onRetryBatchAction: onRetryBatchAction,
+                          Expanded(
+                            child: TorrentInfo(
+                              torrent: torrent,
+                              currentSite: currentSite,
+                              isAggregateMode: isAggregateMode,
+                              siteName: siteName,
+                              isMobile: isMobile,
+                              showCover: showCover,
+                              hasDouban: hasDouban,
+                              hasImdb: hasImdb,
+                              hasAnyRating: hasAnyRating,
+                              rightMinHeight: rightMinHeight,
+                              batchOperationType: batchOperationType,
+                              batchItemState: batchItemState,
+                              batchErrorMessage: batchErrorMessage,
+                              onRetryBatchAction: onRetryBatchAction,
+                            ),
                           ),
-                        ),
         // 桌面端显示操作按钮
                         if (!isMobile) ...[
                           const SizedBox(width: 8),
@@ -199,6 +200,7 @@ class TorrentListItem extends StatelessWidget {
                           ),
                         ],
                       ],
+                      ),
                     ),
                   ),
                 ],
@@ -575,11 +577,12 @@ class TorrentInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     final batchStatus = _buildBatchStatus(context);
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // 中间内容列
         Expanded(
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Tags and Pin
@@ -659,6 +662,7 @@ class TorrentInfo extends StatelessWidget {
         SizedBox(
           width: 75, // Fixed width for right column for alignment
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 // discount
