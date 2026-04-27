@@ -1176,7 +1176,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
       // 4. 跳转到详情页面
       if (!mounted) return;
-      Navigator.of(context).push(
+      await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => TorrentDetailPage(
             torrentItem: item.torrent,
@@ -1186,6 +1186,11 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           ),
         ),
       );
+      
+      // 从详情页返回后，刷新列表页状态以确保收藏状态同步
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
       if (mounted) {
         NotificationHelper.showError(context, '打开详情失败: $e');

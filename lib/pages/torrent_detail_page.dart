@@ -756,10 +756,11 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   Future<void> _onToggleCollection() async {
     final newCollectionState = !_isCollected;
 
-    // 立即更新UI状态 - 只更新收藏状态变量
+    // 立即更新UI状态 - 更新收藏状态变量并乐观更新传入的torrentItem对象
     if (mounted) {
       setState(() {
         _isCollected = newCollectionState;
+        widget.torrentItem.collection = newCollectionState;
       });
     }
 
@@ -769,14 +770,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         id: widget.torrentItem.id,
         make: newCollectionState,
       );
-
-      // 请求成功，直接更新传入的torrentItem对象
-      widget.torrentItem.collection = newCollectionState;
     } catch (e) {
-      // 请求失败，恢复原状态 - 只恢复收藏状态变量
+      // 请求失败，恢复原状态 - 恢复收藏状态变量和torrentItem对象
       if (mounted) {
         setState(() {
           _isCollected = !newCollectionState;
+          widget.torrentItem.collection = !newCollectionState;
         });
         // 添加短暂延迟，确保UI稳定后再显示SnackBar
         await Future.delayed(const Duration(milliseconds: 50));
