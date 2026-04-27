@@ -242,15 +242,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                             vertical: 0,
                                           ),
                                           decoration: BoxDecoration(
-                                            color:
-                                                Theme.of(context).brightness ==
-                                                    Brightness.light
-                                                ? Colors.grey.withValues(
-                                                    alpha: 0.1,
-                                                  )
-                                                : Colors.white.withValues(
-                                                    alpha: 0.1,
-                                                  ),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainer,
                                             borderRadius: BorderRadius.circular(
                                               25,
                                             ),
@@ -335,15 +329,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                                   borderSide: BorderSide.none,
                                                 ),
                                             filled: true,
-                                            fillColor:
-                                                Theme.of(context).brightness ==
-                                                    Brightness.light
-                                                ? Colors.grey.withValues(
-                                                    alpha: 0.1,
-                                                  )
-                                                : Colors.white.withValues(
-                                                    alpha: 0.1,
-                                                  ),
+                                            fillColor: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainer,
                                             contentPadding:
                                                 const EdgeInsets.symmetric(
                                                   horizontal: 12,

@@ -1509,8 +1509,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                     }
                   },
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF006655),
-                    foregroundColor: Colors.white,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   icon: const Icon(Icons.check),
@@ -1529,8 +1529,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                     });
                   },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF006655),
-                    side: const BorderSide(color: Color(0xFF006655)),
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    side: BorderSide(color: Theme.of(context).colorScheme.primary),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   icon: const Icon(Icons.close),
@@ -1545,8 +1545,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
               icon: const Icon(Icons.add, size: 18),
               label: const Text('新增', style: TextStyle(fontSize: 13)),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF006655),
-                foregroundColor: Colors.white,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 minimumSize: const Size(0, 36),
@@ -1558,8 +1558,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
               icon: const Icon(Icons.refresh, size: 18),
               label: Text(_healthChecking ? '刷新中…' : '刷新', style: const TextStyle(fontSize: 13)),
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF006655),
-                side: const BorderSide(color: Color(0xFF006655)),
+                foregroundColor: Theme.of(context).colorScheme.primary,
+                side: BorderSide(color: Theme.of(context).colorScheme.primary),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 minimumSize: const Size(0, 36),

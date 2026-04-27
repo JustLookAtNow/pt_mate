@@ -1067,8 +1067,10 @@ class _HomePageState extends State<HomePage> {
                       },
                       icon: const Icon(Icons.category, size: 20),
                       style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFFBBE5E1),
-                        foregroundColor: const Color(0xFF006688),
+                        backgroundColor:
+                            Theme.of(context).colorScheme.primaryContainer,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimaryContainer,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -1114,10 +1116,7 @@ class _HomePageState extends State<HomePage> {
                           borderSide: BorderSide.none,
                         ),
                         filled: true,
-                        fillColor:
-                            Theme.of(context).brightness == Brightness.light
-                            ? Colors.grey.withValues(alpha: 0.1)
-                            : Colors.white.withValues(alpha: 0.1),
+                        fillColor: Theme.of(context).colorScheme.surfaceContainer,
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
