@@ -242,12 +242,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                             vertical: 0,
                                           ),
                                           decoration: BoxDecoration(
-                                            border: Border.all(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .primary
-                                                  .withValues(alpha: 0.3),
-                                            ),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainer,
                                             borderRadius: BorderRadius.circular(
                                               25,
                                             ),
@@ -309,18 +306,32 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           controller: _searchController,
                                           decoration: InputDecoration(
                                             hintText: '输入搜索关键词',
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  const BorderRadius.all(
-                                                    Radius.circular(25),
-                                                  ),
-                                              borderSide: BorderSide(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .primary
-                                                    .withValues(alpha: 0.3),
+                                            border: const OutlineInputBorder(
+                                              borderRadius: BorderRadius.all(
+                                                Radius.circular(25),
                                               ),
+                                              borderSide: BorderSide.none,
                                             ),
+                                            enabledBorder:
+                                                const OutlineInputBorder(
+                                                  borderRadius:
+                                                      BorderRadius.all(
+                                                        Radius.circular(25),
+                                                      ),
+                                                  borderSide: BorderSide.none,
+                                                ),
+                                            focusedBorder:
+                                                const OutlineInputBorder(
+                                                  borderRadius:
+                                                      BorderRadius.all(
+                                                        Radius.circular(25),
+                                                      ),
+                                                  borderSide: BorderSide.none,
+                                                ),
+                                            filled: true,
+                                            fillColor: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainer,
                                             contentPadding:
                                                 const EdgeInsets.symmetric(
                                                   horizontal: 12,

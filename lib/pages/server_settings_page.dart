@@ -667,7 +667,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, color: Colors.white, size: 20),
-              const SizedBox(height: 2),
+              const SizedBox(height: 1),
               Text(
                 text,
                 style: const TextStyle(color: Colors.white, fontSize: 10),
@@ -838,6 +838,60 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     );
   }
 
+  Widget _buildTableHeader() {
+    if (!ScreenUtils.isLargeScreen(context)) return const SizedBox.shrink();
+    
+    final headerStyle = TextStyle(
+      fontSize: 12,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
+    
+    return Padding(
+      // 16 ListView padding + 10 Card padding = 26 left padding to match row start
+      padding: const EdgeInsets.fromLTRB(26, 6, 26, 8),
+      child: Row(
+        children: [
+          // Match Index (24) + space (6) + Logo (32) + space (6) = 68
+          const SizedBox(width: 68),
+          Expanded(
+            flex: 2, // Changed back to 2 to give Site Name space without overflowing
+            child: Text('站点信息', style: headerStyle),
+          ),
+          Expanded(
+            flex: 1,
+            child: Text('上传', style: headerStyle),
+          ),
+          Expanded(
+            flex: 1,
+            child: Text('下载', style: headerStyle),
+          ),
+          Expanded(
+            flex: 1,
+            child: Text('魔力值', style: headerStyle),
+          ),
+          Expanded(
+            flex: 1,
+            child: Center(child: Text('分享率', style: headerStyle)),
+          ),
+          Expanded(
+            flex: 1,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text('更新时间', style: headerStyle),
+                Icon(Icons.arrow_drop_down, size: 16, color: headerStyle.color),
+              ],
+            ),
+          ),
+          // Match trailing menu size + safety space.
+          // The trailing menu is an IconButton which is typically 48x48.
+          // Also there is some padding. Let's reserve 40 width.
+          const SizedBox(width: 40),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSiteList() {
     return Expanded(
       child: _reorderMode
@@ -851,25 +905,32 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                     onReorderItem: (oldIndex, newIndex) {
                       setState(() {
                         final item = _sites.removeAt(oldIndex);
-                        _sites.insert(newIndex, item);
+                        _sites.insert(newIndex > oldIndex ? newIndex - 1 : newIndex, item);
                       });
                     },
                   ),
                 ),
               ],
             )
-          : ListView.builder(
-              controller: _siteListScrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _filteredSites.length,
-              itemBuilder: (context, index) {
-                final site = _filteredSites[index];
-                final isActive = site.id == _activeSiteId;
-                return KeyedSubtree(
-                  key: _siteItemKeyFor(site.id),
-                  child: _buildSiteCard(site, isActive, index),
-                );
-              },
+          : Column(
+              children: [
+                _buildTableHeader(),
+                Expanded(
+                  child: ListView.builder(
+                    controller: _siteListScrollController,
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    itemCount: _filteredSites.length,
+                    itemBuilder: (context, index) {
+                      final site = _filteredSites[index];
+                      final isActive = site.id == _activeSiteId;
+                      return KeyedSubtree(
+                        key: _siteItemKeyFor(site.id),
+                        child: _buildSiteCard(site, isActive, index),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
     );
   }
@@ -885,14 +946,12 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       margin: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: isActive
-            ? Theme.of(
-                context,
-              ).colorScheme.primaryContainer.withValues(alpha: 0.3)
+            ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.15)
             : Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(
           side: BorderSide(
-            color: siteColor ?? Theme.of(context).colorScheme.outline,
-            width: 2.0,
+            color: siteColor ?? Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+            width: 1.0,
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -902,17 +961,13 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             height: 28,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: isActive
-                  ? Theme.of(context).colorScheme.primaryContainer
-                  : Theme.of(context).colorScheme.secondaryContainer,
-              shape: BoxShape.circle,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
               '${index + 1}',
               style: TextStyle(
-                color: isActive
-                    ? Theme.of(context).colorScheme.onPrimaryContainer
-                    : Theme.of(context).colorScheme.onSecondaryContainer,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
               ),
@@ -972,450 +1027,421 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     );
   }
 
+  Color _getStatusColor(_HealthStatus? hs) {
+    if (hs == null) return Colors.grey;
+    if (!hs.ok) {
+      if (hs.message != null && hs.message!.contains('超时')) return Colors.grey;
+      return Colors.red;
+    }
+    if (hs.notApplicable) return Colors.green;
+    if (hs.profile?.lastAccess != null && _isLastAccessOverMonth(hs.profile!.lastAccess)) {
+      return Colors.orange;
+    }
+    return Colors.green;
+  }
+
+  String _getStatusText(_HealthStatus? hs) {
+    if (hs == null) return '未获取';
+    if (!hs.ok) {
+      if (hs.message != null && hs.message!.contains('超时')) return '连接超时';
+      return '异常 (无数据)';
+    }
+    if (hs.notApplicable) return '正常 (无数据)';
+    if (hs.profile?.lastAccess != null && _isLastAccessOverMonth(hs.profile!.lastAccess)) {
+      return '警告';
+    }
+    return '正常';
+  }
+
+  Widget _buildDateColumn(_HealthStatus? hs) {
+    if (hs == null) {
+      return Center(
+        child: Text(
+          '未连接',
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
+        ),
+      );
+    }
+    
+    // 相对时间（上方）：显示数据更新/刷新时间
+    final now = DateTime.now();
+    final diff = now.difference(hs.updatedAt);
+    String relativeTime;
+    if (diff.inDays > 0) {
+      relativeTime = '${diff.inDays} 天 ${diff.inHours % 24} 小时前';
+    } else if (diff.inHours > 0) {
+      relativeTime = '${diff.inHours} 小时前';
+    } else {
+      relativeTime = '${diff.inMinutes} 分钟前';
+    }
+    
+    // 绝对日期（下方）：如果有 lastAccess 则显示用户的最后访问时间，否则兜底显示更新日期
+    final dateToShow = hs.profile?.lastAccess ?? hs.updatedAt;
+    final dateString = '${dateToShow.year}-${dateToShow.month.toString().padLeft(2, '0')}-${dateToShow.day.toString().padLeft(2, '0')}';
+    
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          relativeTime,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 1),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Icon(Icons.schedule, size: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            const SizedBox(width: 4),
+            Text(
+              dateString,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatArrow(IconData icon, Color color, String text) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: [
+        Icon(icon, color: color, size: 14),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: const TextStyle(fontSize: 13),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSiteLogo(SiteConfig site) {
+    return FutureBuilder<String>(
+      future: _resolveLogoPath(site),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done ||
+            (snapshot.data == null || snapshot.data!.isEmpty)) {
+          return const Icon(Icons.dns, size: 24, color: Colors.grey);
+        }
+        return Image.asset(
+          snapshot.data!,
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Image.asset(
+              'assets/sites_icon/_default_nexusphp.png',
+              width: 32,
+              height: 32,
+              fit: BoxFit.cover,
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildSiteCard(SiteConfig site, bool isActive, int index) {
     final Color? siteColor = site.siteColor != null
         ? Color(site.siteColor!)
         : null;
     final hs = _healthStatuses[site.id];
 
+    final isLarge = ScreenUtils.isLargeScreen(context);
+    final statusDotColor = _getStatusColor(hs);
+    final statusText = _getStatusText(hs);
+
     final card = Card(
-      elevation: 2,
-      shadowColor: (siteColor ?? Theme.of(context).colorScheme.outline)
-          .withValues(alpha: 0.4),
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
         side: BorderSide(
-          color: siteColor ?? Theme.of(context).colorScheme.outline,
-          width: 2.0,
+          color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: 1.0,
         ),
         borderRadius: BorderRadius.circular(12),
       ),
-      margin: const EdgeInsets.only(bottom: 8),
       color: isActive
-          ? Theme.of(
-              context,
-            ).colorScheme.primaryContainer.withValues(alpha: 0.3)
-          : null,
+          ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.15)
+          : Theme.of(context).colorScheme.surface,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Builder(
-            builder: (context) {
-              final isLarge = ScreenUtils.isLargeScreen(context);
-              return InkWell(
-                onTap: isActive ? null : () => _setActiveSite(site.id),
-                onLongPress: isLarge
-                    ? null
-                    : () => _showSiteMenu(site, isActive),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          InkWell(
+            onTap: isActive ? null : () => _setActiveSite(site.id),
+            onLongPress: isLarge ? null : () => _showSiteMenu(site, isActive),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      // 1. Index & Logo
+                      Container(
+                        width: 24,
+                        height: 24,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${index + 1}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: siteColor ?? Theme.of(context).colorScheme.outlineVariant,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: _buildSiteLogo(site),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      
+                      // 2. Identity Column
                       Expanded(
+                        flex: 2,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Text(
+                              site.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              hs?.username ?? '未登录',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                fontSize: 11,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
                             Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 Container(
-                                  width: 28,
-                                  height: 28,
-                                  alignment: Alignment.center,
-                                  margin: const EdgeInsets.only(right: 8),
+                                  width: 6,
+                                  height: 6,
                                   decoration: BoxDecoration(
-                                    color: isActive
-                                        ? Theme.of(
-                                            context,
-                                          ).colorScheme.primaryContainer
-                                        : Theme.of(
-                                            context,
-                                          ).colorScheme.secondaryContainer,
                                     shape: BoxShape.circle,
-                                  ),
-                                  child: Text(
-                                    '${index + 1}',
-                                    style: TextStyle(
-                                      color: isActive
-                                          ? Theme.of(
-                                              context,
-                                            ).colorScheme.onPrimaryContainer
-                                          : Theme.of(
-                                              context,
-                                            ).colorScheme.onSecondaryContainer,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                    color: statusDotColor,
                                   ),
                                 ),
-                                CircleAvatar(
-                                  radius: 14,
-                                  backgroundColor: isActive
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(
-                                          context,
-                                        ).colorScheme.surfaceContainerHighest,
-                                  child: Builder(
-                                    builder: (context) {
-                                      final Color fgColor = isActive
-                                          ? Theme.of(
-                                              context,
-                                            ).colorScheme.onPrimary
-                                          : Theme.of(
-                                              context,
-                                            ).colorScheme.onSurfaceVariant;
-
-                                      Widget buildImage(String path) {
-                                        if (path.isEmpty) {
-                                          return Icon(
-                                            Icons.dns,
-                                            size: 24,
-                                            color: fgColor,
-                                          );
-                                        }
-                                        return ClipOval(
-                                          child: Image.asset(
-                                            path,
-                                            width: 24,
-                                            height: 24,
-                                            fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                                  return Image.asset(
-                                                    'assets/sites_icon/_default_nexusphp.png',
-                                                    width: 24,
-                                                    height: 24,
-                                                    fit: BoxFit.cover,
-                                                  );
-                                                },
-                                          ),
-                                        );
-                                      }
-
-                                      final cached = _logoPathCache[site.id];
-                                      if (cached != null) {
-                                        return buildImage(cached);
-                                      }
-
-                                      return FutureBuilder<String>(
-                                        future: _resolveLogoPath(site),
-                                        builder: (context, snapshot) {
-                                          if (snapshot.connectionState !=
-                                                  ConnectionState.done ||
-                                              (snapshot.data == null ||
-                                                  snapshot.data!.isEmpty)) {
-                                            return Icon(
-                                              Icons.dns,
-                                              size: 24,
-                                              color: fgColor,
-                                            );
-                                          }
-                                          return buildImage(snapshot.data!);
-                                        },
-                                      );
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    children: [
-                                      Flexible(
-                                        child: Text(
-                                          site.name,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                      if (hs?.profile?.lastAccess != null &&
-                                          _isLastAccessOverMonth(
-                                            hs!.profile!.lastAccess,
-                                          )) ...[
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            left: 6,
-                                          ),
-                                          child: Tooltip(
-                                            message: '超过一个月未登录',
-                                            child: Icon(
-                                              Icons.priority_high,
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.error,
-                                              size: 18,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                      const SizedBox(width: 8),
-                                    ],
-                                  ),
-                                ),
+                                const SizedBox(width: 4),
                                 Text(
-                                  hs?.username ?? '',
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.primary,
-                                      ),
-                                ),
-                                if (hs != null)
-                                  Text(
-                                    '(${Formatters.formatTorrentCreatedDate(hs.updatedAt)})',
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.onSurfaceVariant,
-                                        ),
+                                  statusText,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    fontSize: 11,
                                   ),
+                                ),
                               ],
                             ),
-                            const SizedBox(height: 6),
-                            if (hs != null)
-                              _buildHealthStatus(site, hs)
-                            else
-                              _buildHealthStatusSkeleton(),
                           ],
                         ),
                       ),
-                      if (isLarge) _buildSiteMenuButton(site, isActive),
+                      
+                      // Stats for large screens
+                      if (isLarge) ...() {
+                        final profile = hs?.profile;
+                        return [
+                          // Upload
+                          Expanded(
+                            flex: 1,
+                            child: profile != null ? _buildStatArrow(
+                              Icons.arrow_upward, Colors.green, profile.uploadedBytesString,
+                            ) : const Text('-'),
+                          ),
+                          // Download
+                          Expanded(
+                            flex: 1,
+                            child: profile != null ? _buildStatArrow(
+                              Icons.arrow_downward, Colors.red, profile.downloadedBytesString,
+                            ) : const Text('-'),
+                          ),
+                          // Seeding (Now Magic points)
+                          Expanded(
+                            flex: 1,
+                            child: profile != null ? Row(
+                              children: [
+                                Icon(Icons.star, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    '${Formatters.bonus(profile.bonus)}${profile.bonusPerHour != null ? ' (${profile.bonusPerHour!.toInt()})' : ''}',
+                                    style: const TextStyle(fontSize: 13),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ) : const Text('-'),
+                          ),
+                          // Ratio
+                          Expanded(
+                            flex: 1,
+                            child: profile != null ? Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.trending_up, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    profile.shareRate.toStringAsFixed(2),
+                                    style: const TextStyle(
+                                      color: Color(0xFF009688),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ) : const Center(child: Text('-')),
+                          ),
+                          // Date
+                          Expanded(
+                            flex: 1,
+                            child: _buildDateColumn(hs),
+                          ),
+                        ];
+                      }(),
+
+                      // Date (Both mobile and large)
+                      if (!isLarge)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: _buildDateColumn(hs),
+                        ),
+                      
+                      // Trailing Menu
+                      if (isLarge)
+                        _buildSiteMenuButton(site, isActive),
                     ],
                   ),
-                ),
-              );
-            },
+                  
+                  // Stats for Mobile
+                  if (!isLarge) ...() {
+                    final profile = hs?.profile;
+                    return [
+                      const SizedBox(height: 8),
+                      Divider(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3), height: 1),
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // Upload
+                          Expanded(
+                            child: Center(
+                              child: profile != null 
+                                  ? _buildStatArrow(Icons.arrow_upward, Colors.green, profile.uploadedBytesString) 
+                                  : const Text('-', style: TextStyle(fontSize: 13)),
+                            ),
+                          ),
+                          // Download
+                          Expanded(
+                            child: Center(
+                              child: profile != null 
+                                  ? _buildStatArrow(Icons.arrow_downward, Colors.red, profile.downloadedBytesString) 
+                                  : const Text('-', style: TextStyle(fontSize: 13)),
+                            ),
+                          ),
+                          // Bonus (Magic points)
+                          Expanded(
+                            child: Center(
+                              child: profile != null ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.star, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      '${Formatters.bonus(profile.bonus)}${profile.bonusPerHour != null ? ' (${profile.bonusPerHour!.toInt()})' : ''}', 
+                                      style: const TextStyle(fontSize: 13),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ]
+                              ) : const Text('-', style: TextStyle(fontSize: 13)),
+                            ),
+                          ),
+                          // Ratio
+                          Expanded(
+                            child: Center(
+                              child: profile != null ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.trending_up, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    profile.shareRate.toStringAsFixed(2),
+                                    style: const TextStyle(color: Color(0xFF009688), fontWeight: FontWeight.bold, fontSize: 14),
+                                  ),
+                                ],
+                              ) : const Text('-', style: TextStyle(fontSize: 14)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ];
+                  }()
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
 
-    // Mobile swipe
-    if (!ScreenUtils.isLargeScreen(context)) {
+    // On mobile we already added the menu, so no need for SwipeableSiteItem anymore.
+    // But we might want to keep it if we still want swipe actions. 
+    // Since the new design adds a 3-dots menu button inside the card, we probably don't need the swipe.
+    // However, I'll keep the Swipeable wrapping just in case they like both, but let's just return `card`.
+    if (!isLarge) {
       return _SwipeableSiteItem(
         actions: _buildSwipeActions(context, site, isActive),
         onTap: isActive ? null : () => _setActiveSite(site.id),
-        // Keep null or use _showSiteMenu if user still wants it on long press,
-        // but typically swipe replaces it. Requirement says "change to left slide".
         onLongPress: null,
         child: card,
       );
     }
-
     return card;
-  }
-
-  Widget _buildHealthStatus(SiteConfig site, _HealthStatus hs) {
-    return Builder(
-      builder: (context) {
-        if (hs.ok && hs.profile != null) {
-          final p = hs.profile!;
-          Widget buildItem(IconData icon, Color color, String label) {
-            return Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 14, color: color),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    softWrap: false,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(height: 1.0),
-                  ),
-                ),
-              ],
-            );
-          }
-
-          final items = <Widget>[
-            buildItem(
-              Icons.stars,
-              Theme.of(context).colorScheme.primary,
-              '${Formatters.bonus(p.bonus)}${p.bonusPerHour != null ? '(${ScreenUtils.isLargeScreen(context) ? p.bonusPerHour! : p.bonusPerHour!.toInt()})' : ''}',
-            ),
-            buildItem(Icons.upload, Colors.green, p.uploadedBytesString),
-            buildItem(Icons.download, Colors.red, p.downloadedBytesString),
-            buildItem(
-              Icons.trending_up,
-              Theme.of(context).colorScheme.primary,
-              p.shareRate.toStringAsFixed(2),
-            ),
-            if (p.seedingSizeBytes != null)
-              buildItem(
-                Icons.cloud_upload,
-                Theme.of(context).colorScheme.primary,
-                Formatters.dataFromBytes(p.seedingSizeBytes!),
-              ),
-            if (p.lastAccess != null)
-              buildItem(
-                Icons.schedule,
-                Theme.of(context).colorScheme.primary,
-                p.lastAccess?.toIso8601String().substring(0, 10) ?? '',
-              ),
-          ];
-
-          final isLarge = ScreenUtils.isLargeScreen(context);
-          if (isLarge) {
-            return Row(
-              children: [
-                for (int i = 0; i < items.length; i++) ...[
-                  items[i],
-                  if (i != items.length - 1)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(
-                        '•',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
-                ],
-              ],
-            );
-          } else {
-            return GridView.count(
-              crossAxisCount: 3,
-              crossAxisSpacing: 6,
-              mainAxisSpacing: 6,
-              childAspectRatio: 8.0,
-              padding: EdgeInsets.zero,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              children: items,
-            );
-          }
-        } else if (hs.notApplicable && hs.ok) {
-          // 不支持用户资料但连接正常
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.check_circle_outline,
-                size: 18,
-                color: Theme.of(context).colorScheme.outline,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  '连接正常（不支持用户资料）',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                ),
-              ),
-            ],
-          );
-        } else {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.error_outline,
-                  size: 18,
-                  color: Colors.red,
-                ),
-                tooltip: '查看错误详情',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onPressed: () {
-                  final msg = hs.message ?? '异常';
-                  NotificationHelper.showError(context, msg);
-                },
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  '请求失败，请检查站点状态，点击感叹号查看详情',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-            ],
-          );
-        }
-      },
-    );
-  }
-
-  Widget _buildHealthStatusSkeleton() {
-    return Builder(
-      builder: (context) {
-        Widget buildSkeletonItem() {
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.outlineVariant.withValues(alpha: 0.5),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Container(
-                  height: 10,
-                  width: 40,
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.outlineVariant.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-            ],
-          );
-        }
-
-        final items = List.generate(6, (index) => buildSkeletonItem());
-
-        final isLarge = ScreenUtils.isLargeScreen(context);
-        if (isLarge) {
-          return Row(
-            children: [
-              for (int i = 0; i < items.length; i++) ...[
-                items[i],
-                if (i != items.length - 1)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Text(
-                      '•',
-                      style: TextStyle(color: Colors.transparent),
-                    ),
-                  ),
-              ],
-            ],
-          );
-        } else {
-          return GridView.count(
-            crossAxisCount: 3,
-            crossAxisSpacing: 6,
-            mainAxisSpacing: 6,
-            childAspectRatio: 8.0,
-            padding: EdgeInsets.zero,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            children: items,
-          );
-        }
-      },
-    );
   }
 
   Widget _buildTopBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
           Expanded(
@@ -1428,28 +1454,35 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                 });
               },
               decoration: InputDecoration(
+                hintText: '请输入站点名称',
                 prefixIcon: const Icon(Icons.search, size: 20),
                 prefixIconConstraints: const BoxConstraints(
                   minWidth: 36,
                   minHeight: 36,
                 ),
                 isDense: true,
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 8,
                 ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(25)),
+                  borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.3),
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
                   ),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 6),
           if (_reorderMode)
             Row(
               children: [
@@ -1475,11 +1508,16 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                       }
                     }
                   },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                   icon: const Icon(Icons.check),
                   label: const Text('完成'),
                 ),
-                const SizedBox(width: 8),
-                TextButton.icon(
+                const SizedBox(width: 6),
+                OutlinedButton.icon(
                   onPressed: () {
                     if (!mounted) return;
                     setState(() {
@@ -1490,14 +1528,13 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                       _sitesBackup = [];
                     });
                   },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    side: BorderSide(color: Theme.of(context).colorScheme.primary),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                   icon: const Icon(Icons.close),
                   label: const Text('取消'),
-                  style: TextButton.styleFrom(
-                    side: BorderSide(
-                      color: Theme.of(context).colorScheme.outline,
-                      width: 1.0,
-                    ),
-                  ),
                 ),
               ],
             )
@@ -1505,50 +1542,52 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
               !_searchFocusNode.hasFocus) ...[
             FilledButton.icon(
               onPressed: _addSite,
-              icon: const Icon(Icons.add),
-              label: const Text('新增'),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('新增', style: TextStyle(fontSize: 13)),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                minimumSize: const Size(0, 36),
+              ),
             ),
-            const SizedBox(width: 12),
-            FilledButton.icon(
+            const SizedBox(width: 6),
+            OutlinedButton.icon(
               onPressed: _healthChecking ? null : _runHealthCheck,
-              icon: const Icon(Icons.refresh),
-              label: Text(_healthChecking ? '刷新中…' : '刷新'),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: Text(_healthChecking ? '刷新中…' : '刷新', style: const TextStyle(fontSize: 13)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.primary,
+                side: BorderSide(color: Theme.of(context).colorScheme.primary),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                minimumSize: const Size(0, 36),
+              ),
             ),
-            const SizedBox(width: 12),
-            Builder(
-              builder: (context) {
-                final isLarge = ScreenUtils.isLargeScreen(context);
-                if (isLarge) {
-                  return FilledButton.tonalIcon(
-                    onPressed: () {
-                      setState(() {
-                        _sitesBackup = List<SiteConfig>.from(_sites);
-                        _reorderMode = true;
-                      });
-                    },
-                    icon: const Icon(Icons.drag_indicator),
-                    label: const Text('排序'),
-                  );
-                } else {
-                  return IconButton.filledTonal(
-                    onPressed: () {
-                      setState(() {
-                        _sitesBackup = List<SiteConfig>.from(_sites);
-                        _reorderMode = true;
-                      });
-                    },
-                    icon: const Icon(Icons.drag_indicator),
-                    tooltip: '排序',
-                  );
-                }
+            const SizedBox(width: 6),
+            OutlinedButton(
+              onPressed: () {
+                setState(() {
+                  _sitesBackup = List<SiteConfig>.from(_sites);
+                  _reorderMode = true;
+                });
               },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)), // Almost a circle like in the image
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(36, 36),
+                maximumSize: const Size(36, 36),
+              ),
+              child: const Icon(Icons.more_horiz, size: 20), // "..." icon in mobile design
             ),
           ],
         ],
       ),
     );
   }
-
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
       title: const Text('站点配置'),
@@ -2567,7 +2606,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                             Icons.language,
                             color: Theme.of(context).colorScheme.primary,
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Text(
                             '选择站点',
                             style: Theme.of(context).textTheme.titleMedium
@@ -2609,7 +2648,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                           });
                         },
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
 
                       // 预设站点列表（只在_showPresetList为true时显示）
                       if (_showPresetList)
@@ -2727,7 +2766,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 Row(
                   children: [
                     Text('站点颜色', style: Theme.of(context).textTheme.bodyMedium),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 6),
                     GestureDetector(
                       onTap: () async {
                         final picked = await showDialog<Color>(
@@ -2756,7 +2795,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         _siteColor != null
@@ -2852,7 +2891,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                                         ).colorScheme.onSurfaceVariant,
                                   size: 16,
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 6),
                                 Flexible(
                                   child: Text(
                                     url,
@@ -2944,7 +2983,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         Row(
                           children: [
                             const Icon(Icons.login),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             const Text(
                               '登录认证',
                               style: TextStyle(
@@ -2954,7 +2993,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
 
                         // 根据平台显示不同的认证方式
                         if (Platform.isAndroid || Platform.isIOS) ...[
@@ -3022,7 +3061,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         ],
 
                         if (_cookieStatus != null) ...[
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
@@ -3047,7 +3086,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                                       : Colors.orange,
                                   size: 20,
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
                                     _cookieStatus!,
@@ -3082,7 +3121,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         Row(
                           children: [
                             const Icon(Icons.category),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             const Text(
                               '查询分类配置',
                               style: TextStyle(
@@ -3103,7 +3142,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         if (_searchCategories.isEmpty)
                           const Text(
                             '暂无查询分类配置',
@@ -3170,7 +3209,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                           '配置此站点支持的功能',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         _buildFeatureSwitch(
                           '用户资料',
                           '获取用户个人信息和统计数据',
@@ -3315,7 +3354,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                         Icons.error_outline,
                         color: Theme.of(context).colorScheme.onErrorContainer,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           _error!,
@@ -3440,7 +3479,7 @@ class _ProfileView extends StatelessWidget {
                 Icons.check_circle,
                 color: Theme.of(context).colorScheme.primary,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Text(
                 '连接成功',
                 style: TextStyle(
@@ -3450,7 +3489,7 @@ class _ProfileView extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text('用户名: ${profile.username}'),
           Text(
             '魔力值: ${Formatters.bonus(profile.bonus)}'
@@ -3587,7 +3626,7 @@ class _SiteColorPickerDialogState extends State<_SiteColorPickerDialog> {
                     );
                   }).toList(),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.palette_outlined),
@@ -3687,7 +3726,7 @@ class _SiteColorPickerDialogState extends State<_SiteColorPickerDialog> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               // 下方色相滑条
               SizedBox(
                 width: 260,
@@ -3764,7 +3803,7 @@ class _SiteColorPickerDialogState extends State<_SiteColorPickerDialog> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Container(
@@ -3778,7 +3817,7 @@ class _SiteColorPickerDialogState extends State<_SiteColorPickerDialog> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: TextFormField(
                       controller: _hexController,
