@@ -663,7 +663,7 @@ class TorrentInfo extends StatelessWidget {
           width: 75, // Fixed width for right column for alignment
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: isMobile ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
 // discount
               if (torrent.discount != DiscountType.normal)
@@ -759,6 +759,7 @@ class TorrentInfo extends StatelessWidget {
             ],
           ),
         ),
+        if (isMobile) const SizedBox(width: 8),
       ],
     );
   }
