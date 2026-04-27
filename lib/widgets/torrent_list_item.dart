@@ -660,31 +660,35 @@ class TorrentInfo extends StatelessWidget {
         const SizedBox(width: 8),
         // 右侧数据列
         SizedBox(
-          width: 75, // Fixed width for right column for alignment
+          width: 55, // Fixed width for right column for alignment
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: isMobile ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
 // discount
               if (torrent.discount != DiscountType.normal)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 2,
-                  ),
-                  margin: const EdgeInsets.only(bottom: 4),
-                  decoration: BoxDecoration(
-                    color: _discountColor(
-                      torrent.discount,
-                    ).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    _discountText(torrent.discount, torrent.discountEndTime),
-                    style: TextStyle(
-                      color: _discountColor(torrent.discount),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    margin: const EdgeInsets.only(bottom: 4),
+                    decoration: BoxDecoration(
+                      color: _discountColor(
+                        torrent.discount,
+                      ).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      _discountText(torrent.discount, torrent.discountEndTime),
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        color: _discountColor(torrent.discount),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -1197,7 +1201,7 @@ class _SwipeableItemState extends State<_SwipeableItem>
       child: Container(
         margin: widget.isAggregateMode
             ? EdgeInsets.zero
-            : const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+            : const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
         child: ClipRect(
           child: Stack(
             children: [
