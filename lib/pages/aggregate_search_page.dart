@@ -710,6 +710,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                 context,
                               ).colorScheme.errorContainer,
                               child: ExpansionTile(
+                                visualDensity: VisualDensity.compact,
                                 title: Text(
                                   '部分站点搜索失败',
                                   style: Theme.of(context).textTheme.titleSmall
@@ -727,13 +728,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                 ).colorScheme.onErrorContainer,
                                 tilePadding: const EdgeInsets.symmetric(
                                   horizontal: 16.0,
-                                  vertical: 2.0,
+                                  vertical: 0,
                                 ),
                                 childrenPadding: const EdgeInsets.fromLTRB(
-                                  16.0,
+                                  4.0,
                                   0,
-                                  16.0,
-                                  16.0,
+                                  8.0,
+                                  8.0,
                                 ),
                                 children: [
                                   Container(
@@ -800,7 +801,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                             );
                           },
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 8),
                       ],
                       if (_batchProgress != null) _buildBatchProgressCard(),
                       Expanded(
