@@ -980,31 +980,31 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                       ),
 
                       // 选择模式下的操作栏
-                      if (_isSelectionMode) ...[
-                        const SizedBox(height: 8),
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0,
-                              vertical: 12.0,
+                      if (_isSelectionMode)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            border: Border(
+                              top: BorderSide(
+                                color: Theme.of(context).dividerColor,
+                                width: 1,
+                              ),
                             ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  '已选择 ${_selectedItems.length} 项',
-                                  style: Theme.of(context).textTheme.titleSmall
-                                      ?.copyWith(fontSize: 13),
-                                ),
-                                const Spacer(),
-                                TextButton(
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Expanded(
+                                child: TextButton(
                                   onPressed: _isBatchRunning
                                       ? null
                                       : _onCancelSelection,
                                   style: TextButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
+                                      horizontal: 0,
                                     ),
-                                    textStyle: const TextStyle(fontSize: 12),
+                                    textStyle: const TextStyle(fontSize: 13),
                                     side: BorderSide(
                                       color: Theme.of(
                                         context,
@@ -1014,9 +1014,10 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                   ),
                                   child: const Text('取消'),
                                 ),
-                                const SizedBox(width: 6),
-                                // 全选按钮
-                                TextButton(
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextButton(
                                   onPressed: _isBatchRunning
                                       ? null
                                       : () {
@@ -1037,9 +1038,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                         },
                                   style: TextButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
+                                      horizontal: 0,
                                     ),
-                                    textStyle: const TextStyle(fontSize: 12),
+                                    textStyle: const TextStyle(fontSize: 13),
                                     side: BorderSide(
                                       color: Theme.of(
                                         context,
@@ -1054,27 +1055,34 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                         : '全选',
                                   ),
                                 ),
-                                const SizedBox(width: 6),
-                                ElevatedButton.icon(
-                                  onPressed:
-                                      !_isBatchRunning &&
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: !_isBatchRunning &&
                                           _selectedItems.isNotEmpty
                                       ? _onBatchDownload
                                       : null,
                                   style: ElevatedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
+                                      horizontal: 0,
                                     ),
-                                    textStyle: const TextStyle(fontSize: 12),
+                                    textStyle: const TextStyle(fontSize: 13),
+                                    backgroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                    foregroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimary,
                                   ),
-                                  icon: const Icon(Icons.download, size: 16),
-                                  label: const Text('下载'),
+                                  child: Text(
+                                    '下载 (${_selectedItems.length})',
+                                  ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ),
