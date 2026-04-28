@@ -417,6 +417,49 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           ),
 
                                           PopupMenuItem(
+                                            value: 'time',
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: provider.sortBy == 'time'
+                                                    ? Theme.of(context)
+                                                          .colorScheme
+                                                          .primary
+                                                          .withValues(
+                                                            alpha: 0.1,
+                                                          )
+                                                    : null,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 4,
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    provider.sortBy == 'time' &&
+                                                            provider
+                                                                .sortAscending
+                                                        ? Icons.arrow_upward
+                                                        : Icons.arrow_downward,
+                                                    color:
+                                                        provider.sortBy ==
+                                                            'time'
+                                                        ? Theme.of(context)
+                                                              .colorScheme
+                                                              .secondary
+                                                        : null,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  const Text('按时间排序'),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+
+                                          PopupMenuItem(
                                             value: 'size',
                                             child: Container(
                                               decoration: BoxDecoration(
@@ -433,9 +476,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                               ),
                                               padding:
                                                   const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
+                                                horizontal: 8,
+                                                vertical: 4,
+                                              ),
                                               child: Row(
                                                 children: [
                                                   Icon(
@@ -1053,6 +1096,12 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     final sortedItems = List<AggregateSearchResultItem>.from(items);
 
     switch (sortBy) {
+      case 'time':
+        sortedItems.sort((a, b) {
+          final comparison = a.torrent.createdDate.compareTo(b.torrent.createdDate);
+          return sortAscending ? comparison : -comparison;
+        });
+        break;
       case 'size':
         // 按文件大小排序
         sortedItems.sort((a, b) {
