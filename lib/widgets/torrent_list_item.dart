@@ -177,29 +177,35 @@ class TorrentListItem extends StatelessWidget {
                               onRetryBatchAction: onRetryBatchAction,
                             ),
                           ),
-        // 桌面端显示操作按钮
-                        if (!isMobile) ...[
-                          const SizedBox(width: 8),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8.0),
-                            child: Container(
-                              width: 1,
-                              height: math.max(60, rightMinHeight - 16),
-                              color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                          // 桌面端显示操作按钮
+                          if (!isMobile) ...[
+                            const SizedBox(width: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 8.0,
+                              ),
+                              child: Container(
+                                width: 1,
+                                height: math.max(60, rightMinHeight - 16),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.outlineVariant.withValues(
+                                  alpha: 0.5,
+                                ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 4),
-                          SizedBox(
-                            height: math.max(60, rightMinHeight - 8),
-                            child: TorrentActions(
-                              torrent: torrent,
-                              currentSite: currentSite,
-                              onToggleCollection: onToggleCollection,
-                              onDownload: onDownload,
+                            const SizedBox(width: 4),
+                            SizedBox(
+                              height: math.max(60, rightMinHeight - 8),
+                              child: TorrentActions(
+                                torrent: torrent,
+                                currentSite: currentSite,
+                                onToggleCollection: onToggleCollection,
+                                onDownload: onDownload,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
-                      ],
                       ),
                     ),
                   ),
@@ -207,6 +213,12 @@ class TorrentListItem extends StatelessWidget {
               ),
             ),
           ),
+          if (isAggregateMode && siteName != null)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: _AggregateSiteChip(siteName: siteName!),
+            ),
         ],
       ),
     );
@@ -586,31 +598,12 @@ class TorrentInfo extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Tags, Pin and Site
-              if (torrent.isTop || torrent.tags.isNotEmpty || (isAggregateMode && siteName != null))
+              if (torrent.isTop || torrent.tags.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      if (torrent.isTop)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: Transform.rotate(
-                            angle: math.pi / 4,
-                            child: Icon(
-                              Icons.push_pin,
-                              size: 14,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                      if (isAggregateMode && siteName != null)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: _AggregateSiteChip(siteName: siteName!),
-                        ),
-                      if (torrent.tags.isNotEmpty)
-                        Expanded(child: _TagsView(tags: torrent.tags)),
-                    ],
+                  child: _TagsView(
+                    tags: torrent.tags,
+                    isTop: torrent.isTop,
                   ),
                 ),
 
@@ -1012,23 +1005,20 @@ class _AggregateSiteChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _resolveSiteColor(context, siteName);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
+        color: _resolveSiteColor(context, siteName),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color, width: 1.0),
       ),
       child: Text(
         siteName,
-        style:
-            Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-              fontSize: 10,
-            ) ??
-            TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 10),
+        style: TextStyle(
+          color: const Color.fromARGB(255, 255, 255, 255),
+          fontWeight: FontWeight.w600,
+          fontSize: 10,
+          height: 1.2,
+        ),
       ),
     );
   }
@@ -1232,7 +1222,8 @@ class _SwipeableItemState extends State<_SwipeableItem>
 
 class _TagsView extends StatelessWidget {
   final List<TagType> tags;
-  const _TagsView({required this.tags});
+  final bool isTop;
+  const _TagsView({required this.tags, this.isTop = false});
 
   Widget _buildChip(TagType tag) {
     return Container(
@@ -1258,7 +1249,19 @@ class _TagsView extends StatelessWidget {
     return Wrap(
       spacing: 4,
       runSpacing: 2,
-      children: tags.map(_buildChip).toList(),
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (isTop)
+          Transform.rotate(
+            angle: math.pi / 4,
+            child: Icon(
+              Icons.push_pin,
+              size: 14,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ...tags.map(_buildChip),
+      ],
     );
   }
 }
