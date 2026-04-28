@@ -1040,17 +1040,68 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     return Colors.green;
   }
 
+  String? _extractBriefError(String? message) {
+    if (message == null || message.isEmpty) return null;
+    var msg = message;
+    for (final prefix in [
+      'SiteException: ',
+      'Exception: ',
+      'FormatException: ',
+      'SocketException: ',
+      'HttpException: ',
+      'TimeoutException: ',
+      'HandshakeException: ',
+    ]) {
+      if (msg.startsWith(prefix)) {
+        msg = msg.substring(prefix.length);
+        break;
+      }
+    }
+    msg = msg.replaceAll('\n', ' ').replaceAll('\r', '');
+    if (msg.length > 15) msg = '${msg.substring(0, 12)}...';
+    return msg.isEmpty ? null : msg;
+  }
+
   String _getStatusText(_HealthStatus? hs) {
     if (hs == null) return '未获取';
     if (!hs.ok) {
-      if (hs.message != null && hs.message!.contains('超时')) return '连接超时';
-      return '异常 (无数据)';
+      if (hs.message != null && hs.message!.contains('超时')) return '异常 (连接超时)';
+      final reason = _extractBriefError(hs.message);
+      return reason != null ? '异常 ($reason)' : '异常';
     }
     if (hs.notApplicable) return '正常 (无数据)';
     if (hs.profile?.lastAccess != null && _isLastAccessOverMonth(hs.profile!.lastAccess)) {
-      return '警告';
+      return '警告 (最后访问超过30天)';
     }
     return '正常';
+  }
+
+  void _showStatusDetail(_HealthStatus hs, String statusLabel) {
+    String detail;
+    if (!hs.ok) {
+      detail = hs.message ?? '未知错误';
+    } else if (hs.notApplicable) {
+      detail = '站点连接正常，但不支持用户资料接口。';
+    } else if (hs.profile?.lastAccess != null && _isLastAccessOverMonth(hs.profile!.lastAccess)) {
+      final lastAccess = hs.profile!.lastAccess!;
+      final days = DateTime.now().difference(lastAccess).inDays;
+      detail = '最后访问时间：${lastAccess.year}-${lastAccess.month.toString().padLeft(2, '0')}-${lastAccess.day.toString().padLeft(2, '0')}\n距今已超过 $days 天，账号可能存在风险。';
+    } else {
+      detail = '状态正常。';
+    }
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('站点状态：$statusLabel'),
+        content: SelectableText(detail),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildDateColumn(_HealthStatus? hs) {
@@ -1250,25 +1301,34 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: statusDotColor,
+                            GestureDetector(
+                              onTap: (hs != null && (!hs.ok || (hs.profile?.lastAccess != null && _isLastAccessOverMonth(hs.profile!.lastAccess))))
+                                  ? () => _showStatusDetail(hs, statusText)
+                                  : null,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: statusDotColor,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  statusText,
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                    fontSize: 11,
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      statusText,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        fontSize: 11,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -1581,7 +1641,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                 minimumSize: const Size(36, 36),
                 maximumSize: const Size(36, 36),
               ),
-              child: const Icon(Icons.more_horiz, size: 20), // "..." icon in mobile design
+              child: const Icon(Icons.sort, size: 20),
             ),
           ],
         ],
