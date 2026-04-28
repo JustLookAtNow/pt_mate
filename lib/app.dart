@@ -22,6 +22,7 @@ import 'services/site_config_service.dart';
 import 'services/downloader/downloader_config.dart';
 import 'services/downloader/downloader_service.dart';
 import 'services/downloader/downloader_models.dart';
+import 'services/local_download_service.dart';
 
 import 'pages/server_settings_page.dart';
 import 'widgets/qb_speed_indicator.dart';
@@ -1507,30 +1508,50 @@ class _HomePageState extends State<HomePage> {
 
       if (result == null) return; // 用户取消了
 
-      final downloadContext = BatchDownloadContext(
-        clientConfig: result['clientConfig'] as DownloaderConfig,
-        password: result['password'] as String,
-        category: result['category'] as String?,
-        tags: result['tags'] as List<String>? ?? const [],
-        savePath: result['savePath'] as String?,
-        autoTMM: result['autoTMM'] as bool?,
-        startPaused: result['startPaused'] as bool?,
-        useToken: result['useToken'] as bool?,
-      );
+      // 3. 判断下载模式
+      final downloadToLocal = result['downloadToLocal'] as bool? ?? false;
 
-      // 3. 发送到下载器
-      String finalUrl = url;
-      if (downloadContext.useToken == true &&
-          !finalUrl.contains('usetoken=1')) {
-        finalUrl += '&usetoken=1';
-      }
-      await _enqueueDownload(item, downloadContext, resolvedUrl: finalUrl);
-
-      if (mounted) {
-        NotificationHelper.showInfo(
-          context,
-          '已成功发送"${item.name}"到 ${downloadContext.clientConfig.name}',
+      if (downloadToLocal) {
+        // 本地下载模式
+        final savedPath = await LocalDownloadService.instance.downloadAndSaveTorrent(
+          downloadUrl: url,
+          torrentName: item.name,
+          siteConfig: _currentSite,
         );
+
+        if (mounted && savedPath != null) {
+          NotificationHelper.showInfo(
+            context,
+            '种子文件已保存到: $savedPath',
+          );
+        }
+      } else {
+        // 远程下载器模式
+        final downloadContext = BatchDownloadContext(
+          clientConfig: result['clientConfig'] as DownloaderConfig,
+          password: result['password'] as String,
+          category: result['category'] as String?,
+          tags: result['tags'] as List<String>? ?? const [],
+          savePath: result['savePath'] as String?,
+          autoTMM: result['autoTMM'] as bool?,
+          startPaused: result['startPaused'] as bool?,
+          useToken: result['useToken'] as bool?,
+        );
+
+        // 4. 发送到下载器
+        String finalUrl = url;
+        if (downloadContext.useToken == true &&
+            !finalUrl.contains('usetoken=1')) {
+          finalUrl += '&usetoken=1';
+        }
+        await _enqueueDownload(item, downloadContext, resolvedUrl: finalUrl);
+
+        if (mounted) {
+          NotificationHelper.showInfo(
+            context,
+            '已成功发送"${item.name}"到 ${downloadContext.clientConfig!.name}',
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -1722,22 +1743,33 @@ class _HomePageState extends State<HomePage> {
             id: item.id,
             url: item.downloadUrl,
           );
-      if (downloadContext.useToken == true && !url.contains('usetoken=1')) {
-        url += '&usetoken=1';
+
+      if (downloadContext.downloadToLocal) {
+        // 本地下载模式
+        await LocalDownloadService.instance.downloadAndSaveTorrent(
+          downloadUrl: url,
+          torrentName: item.name,
+          siteConfig: _currentSite,
+        );
+      } else {
+        // 远程下载器模式
+        if (downloadContext.useToken == true && !url.contains('usetoken=1')) {
+          url += '&usetoken=1';
+        }
+        await DownloaderService.instance.addTask(
+          config: downloadContext.clientConfig!,
+          password: downloadContext.password!,
+          params: AddTaskParams(
+            url: url,
+            category: downloadContext.category,
+            tags: downloadContext.tags.isEmpty ? null : downloadContext.tags,
+            savePath: downloadContext.savePath,
+            autoTMM: downloadContext.autoTMM,
+            startPaused: downloadContext.startPaused,
+          ),
+          siteConfig: _currentSite,
+        );
       }
-      await DownloaderService.instance.addTask(
-        config: downloadContext.clientConfig,
-        password: downloadContext.password,
-        params: AddTaskParams(
-          url: url,
-          category: downloadContext.category,
-          tags: downloadContext.tags.isEmpty ? null : downloadContext.tags,
-          savePath: downloadContext.savePath,
-          autoTMM: downloadContext.autoTMM,
-          startPaused: downloadContext.startPaused,
-        ),
-        siteConfig: _currentSite,
-      );
     } finally {
       _pendingDownloadRequests.remove(item.id);
     }
@@ -2505,18 +2537,28 @@ class _HomePageState extends State<HomePage> {
 
     _onCancelSelection(); // 取消选择模式
 
-    final downloadContext = BatchDownloadContext(
-      clientConfig: result['clientConfig'] as DownloaderConfig,
-      password: result['password'] as String,
-      category: result['category'] as String?,
-      tags: result['tags'] as List<String>? ?? const [],
-      savePath: result['savePath'] as String?,
-      autoTMM: result['autoTMM'] as bool?,
-      startPaused: result['startPaused'] as bool?,
-      useToken: result['useToken'] as bool?,
-    );
+    // 判断下载模式
+    final downloadToLocal = result['downloadToLocal'] as bool? ?? false;
 
-    unawaited(_performBatchDownload(selectedItems, downloadContext));
+    if (downloadToLocal) {
+      // 本地下载模式：打包成zip保存
+      unawaited(_performBatchLocalDownload(selectedItems));
+    } else {
+      // 远程下载器模式
+      final downloadContext = BatchDownloadContext(
+        downloadToLocal: false,
+        clientConfig: result['clientConfig'] as DownloaderConfig,
+        password: result['password'] as String,
+        category: result['category'] as String?,
+        tags: result['tags'] as List<String>? ?? const [],
+        savePath: result['savePath'] as String?,
+        autoTMM: result['autoTMM'] as bool?,
+        startPaused: result['startPaused'] as bool?,
+        useToken: result['useToken'] as bool?,
+      );
+
+      unawaited(_performBatchDownload(selectedItems, downloadContext));
+    }
   }
 
   Future<void> _performBatchDownload(
@@ -2530,6 +2572,107 @@ class _HomePageState extends State<HomePage> {
       retryableContext: downloadContext,
       preserveExistingState: false,
     );
+  }
+
+  Future<void> _performBatchLocalDownload(List<TorrentItem> items) async {
+    if (items.isEmpty) return;
+
+    if (mounted) {
+      setState(() {
+        _batchTrackedItems.clear();
+        _batchItemStates.clear();
+        _batchItemErrors.clear();
+        for (final item in items) {
+          _batchTrackedItems[item.id] = item;
+          _batchItemStates[item.id] = BatchItemState.idle;
+          _batchItemErrors.remove(item.id);
+        }
+        _batchProgress = _buildBatchProgressState(
+          actionType: BatchOperationType.download,
+          isRunning: true,
+          runTotalCount: items.length,
+          runCompletedCount: 0,
+        );
+      });
+    }
+
+    // 构建下载项列表
+    final downloadItems = <TorrentDownloadItem>[];
+    for (final item in items) {
+      try {
+        var url = await ApiService.instance.genDlToken(
+          id: item.id,
+          url: item.downloadUrl,
+        );
+        downloadItems.add(TorrentDownloadItem(
+          downloadUrl: url,
+          torrentName: item.name,
+          siteConfig: _currentSite,
+        ));
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _batchItemStates[item.id] = BatchItemState.failed;
+            _batchItemErrors[item.id] = '获取下载链接失败: $e';
+          });
+        }
+      }
+    }
+
+    // 批量下载并打包成zip
+    try {
+      final savedPath = await LocalDownloadService.instance.batchDownloadAndSaveAsZip(
+        items: downloadItems,
+        onProgress: (current, total, currentName) {
+          if (mounted) {
+            setState(() {
+              _batchProgress = _buildBatchProgressState(
+                actionType: BatchOperationType.download,
+                isRunning: true,
+                runTotalCount: items.length,
+                runCompletedCount: current,
+                currentItemName: currentName,
+              );
+            });
+          }
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _batchProgress = _buildBatchProgressState(
+            actionType: BatchOperationType.download,
+            isRunning: false,
+            runTotalCount: items.length,
+            runCompletedCount: items.length,
+          );
+        });
+
+        if (savedPath != null) {
+          NotificationHelper.showInfo(
+            context,
+            '批量下载完成，已保存到: $savedPath',
+            duration: const Duration(seconds: 3),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _batchProgress = _buildBatchProgressState(
+            actionType: BatchOperationType.download,
+            isRunning: false,
+            runTotalCount: items.length,
+            runCompletedCount: items.length,
+          );
+        });
+        NotificationHelper.showError(
+          context,
+          '批量下载失败: $e',
+          duration: const Duration(seconds: 3),
+        );
+      }
+    }
   }
 
   Future<void> _runBatchOperation({

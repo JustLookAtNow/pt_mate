@@ -16,6 +16,7 @@ import '../models/app_models.dart';
 import '../services/downloader/downloader_config.dart';
 import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
+import '../services/local_download_service.dart';
 import '../widgets/torrent_download_dialog.dart';
 import '../widgets/cached_network_image.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
@@ -702,44 +703,66 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
       if (result == null) return; // 用户取消了
 
-      // 3. 从对话框结果中获取设置
-      final clientConfig = result['clientConfig'] as DownloaderConfig;
-      final password = result['password'] as String;
-      final category = result['category'] as String?;
-      final tags = result['tags'] as List<String>?;
-      final savePath = result['savePath'] as String?;
-      final autoTMM = result['autoTMM'] as bool?;
-      final startPaused = result['startPaused'] as bool?;
-      final useToken = result['useToken'] as bool?;
+      // 3. 判断下载模式
+      final downloadToLocal = result['downloadToLocal'] as bool? ?? false;
 
-      // 4. 发送到下载器
-      String finalUrl = url;
-      if (useToken == true && !finalUrl.contains('usetoken=1')) {
-        finalUrl += '&usetoken=1';
-      }
+      if (downloadToLocal) {
+        // 本地下载模式
+        final savedPath = await LocalDownloadService.instance.downloadAndSaveTorrent(
+          downloadUrl: url,
+          torrentName: widget.torrentItem.name,
+          siteConfig: widget.siteConfig,
+        );
 
-      await DownloaderService.instance.addTask(
-        config: clientConfig,
-        password: password,
-        params: AddTaskParams(
-          url: finalUrl,
-          category: category,
-          tags: tags,
-          savePath: savePath,
-          autoTMM: autoTMM,
-          startPaused: startPaused,
-        ),
-        siteConfig: widget.siteConfig,
-      );
+        if (mounted && savedPath != null) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          if (mounted) {
+            NotificationHelper.showInfo(
+              context,
+              '种子文件已保存到: $savedPath',
+            );
+          }
+        }
+      } else {
+        // 远程下载器模式
+        final clientConfig = result['clientConfig'] as DownloaderConfig;
+        final password = result['password'] as String;
+        final category = result['category'] as String?;
+        final tags = result['tags'] as List<String>?;
+        final savePath = result['savePath'] as String?;
+        final autoTMM = result['autoTMM'] as bool?;
+        final startPaused = result['startPaused'] as bool?;
+        final useToken = result['useToken'] as bool?;
 
-      if (mounted) {
-        // 添加短暂延迟，确保对话框完全关闭后再显示SnackBar
-        await Future.delayed(const Duration(milliseconds: 100));
+        // 4. 发送到下载器
+        String finalUrl = url;
+        if (useToken == true && !finalUrl.contains('usetoken=1')) {
+          finalUrl += '&usetoken=1';
+        }
+
+        await DownloaderService.instance.addTask(
+          config: clientConfig,
+          password: password,
+          params: AddTaskParams(
+            url: finalUrl,
+            category: category,
+            tags: tags,
+            savePath: savePath,
+            autoTMM: autoTMM,
+            startPaused: startPaused,
+          ),
+          siteConfig: widget.siteConfig,
+        );
+
         if (mounted) {
-          NotificationHelper.showInfo(
-            context,
-            '已成功发送"${widget.torrentItem.name}"到 ${clientConfig.name}',
-          );
+          // 添加短暂延迟，确保对话框完全关闭后再显示SnackBar
+          await Future.delayed(const Duration(milliseconds: 100));
+          if (mounted) {
+            NotificationHelper.showInfo(
+              context,
+              '已成功发送"${widget.torrentItem.name}"到 ${clientConfig.name}',
+            );
+          }
         }
       }
     } catch (e) {

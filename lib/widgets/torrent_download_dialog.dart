@@ -36,6 +36,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
   String? _error;
   bool _startPaused = false; // 不立即开始（添加后暂停）
   bool _useToken = false; // Gazelle类型站点使用FL Token选项
+  bool _downloadToLocal = false; // 是否下载到本地
 
   @override
   void initState() {
@@ -171,6 +172,24 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
   }
 
   Future<void> _onSubmit() async {
+    // 本地下载模式：直接返回，不需要选择下载器
+    if (_downloadToLocal) {
+      if (!mounted) return;
+      Navigator.pop(context, {
+        'downloadToLocal': true,
+        'clientConfig': null,
+        'password': null,
+        'category': null,
+        'tags': null,
+        'savePath': null,
+        'autoTMM': null,
+        'startPaused': null,
+        'useToken': null,
+      });
+      return;
+    }
+
+    // 远程下载器模式：需要选择下载器
     if (_selectedClient == null) {
       setState(() => _error = '请选择下载器');
       return;
@@ -193,6 +212,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
 
     if (!mounted) return;
     Navigator.pop(context, {
+      'downloadToLocal': false,
       'clientConfig': _selectedClient!,
       'password': password,
       'category': _selectedCategory,
@@ -262,7 +282,12 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
           ),
           child: const Text('取消'),
         ),
-        if (_clients.isNotEmpty && _selectedClient != null)
+        if (_downloadToLocal)
+          FilledButton(
+            onPressed: _onSubmit,
+            child: Text(isBatchMode ? '批量下载到本地' : '下载到本地'),
+          )
+        else if (_clients.isNotEmpty && _selectedClient != null)
           FilledButton(
             onPressed: _onSubmit,
             child: Text(isBatchMode ? '开始批量下载' : '开始下载'),
@@ -272,227 +297,394 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
   }
 
   Widget _buildForm() {
+    final isBatchMode = widget.itemCount != null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 下载器选择
-        Text('下载器', style: Theme.of(context).textTheme.titleSmall),
+        // 下载模式选择
+        Text('下载方式', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        DropdownButtonFormField<DownloaderConfig>(
-          initialValue: _selectedClient,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            isDense: true,
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Theme.of(context).colorScheme.outline),
+            borderRadius: BorderRadius.circular(8),
           ),
-          selectedItemBuilder: (context) {
-            return _clients.map((client) {
-              final screenWidth = MediaQuery.of(context).size.width;
-              // 响应式宽度：手机上限制最大宽度，大屏上基于对话框容器宽度计算
-              final maxWidth = screenWidth > 600
-                  ? 400.0 * 0.6  // 大屏上使用对话框容器宽度的60%
-                  : 240.0;  // 小屏上限制240px
-
-              return SizedBox(
-                width: maxWidth,
-                child: Text(
-                  client is QbittorrentConfig
-                    ? '${client.name} (${client.host}:${client.port})'
-                    : client.name,
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-              );
-            }).toList();
-          },
-          items: _clients.map((client) {
-            return DropdownMenuItem(
-              value: client,
-              child: Builder(
-                builder: (context) {
-                  final screenWidth = MediaQuery.of(context).size.width;
-                  // 响应式宽度：手机上限制最大宽度，大屏上允许更宽
-                  final maxWidth = screenWidth > 600
-                      ? screenWidth * 0.6  // 大屏上使用60%宽度
-                      : 240.0;  // 小屏上限制200px
-
-                  return SizedBox(
-                    width: maxWidth,
-                    child: Text(
-                      client is QbittorrentConfig
-                        ? '${client.name} (${client.host}:${client.port})'
-                        : client.name,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
+          child: Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _downloadToLocal = false),
+                  borderRadius: const BorderRadius.horizontal(
+                    left: Radius.circular(8),
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: !_downloadToLocal
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : null,
+                      borderRadius: const BorderRadius.horizontal(
+                        left: Radius.circular(7),
+                      ),
                     ),
-                  );
-                },
-              ),
-            );
-          }).toList(),
-          onChanged: (client) {
-            setState(() {
-              _selectedClient = client;
-              _selectedCategory = null;
-              _selectedTags.clear();
-            });
-            if (client != null) {
-              _loadCategoriesTagsAndPaths();
-            }
-          },
-        ),
-        const SizedBox(height: 16),
-
-
-
-        // 分类选择
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                '分类（选择后使用分类路径）',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-            ),
-            if (_loading)
-              const SizedBox(
-                height: 16,
-                width: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            if (!_loading)
-              IconButton(
-                onPressed: _refreshCategoriesTagsAndPaths,
-                icon: const Icon(Icons.refresh, size: 20),
-                tooltip: '刷新',
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String?>(
-          initialValue: _selectedCategory,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            isDense: true,
-            hintText: '选择分类（可选）',
-          ),
-          isExpanded: true,
-          items: [
-            const DropdownMenuItem<String?>(
-              value: null,
-              child: Text('不使用分类'),
-            ),
-            ..._categories.map(
-              (cat) => DropdownMenuItem<String?>(
-                value: cat,
-                child: Text(cat, overflow: TextOverflow.ellipsis),
-              ),
-            ),
-          ],
-          onChanged: (cat) => setState(() => _selectedCategory = cat),
-        ),
-        const SizedBox(height: 16),
-
-        // 标签选择
-        Text('标签（可选）', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        if (_tags.isNotEmpty)
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: _tags.map((tag) {
-              final isSelected = _selectedTags.contains(tag);
-              return FilterChip(
-                label: Text(tag),
-                selected: isSelected,
-                onSelected: (selected) {
-                  setState(() {
-                    if (selected) {
-                      _selectedTags.add(tag);
-                    } else {
-                      _selectedTags.remove(tag);
-                    }
-                  });
-                },
-              );
-            }).toList(),
-          )
-        else
-          const Text('暂无可用标签', style: TextStyle(color: Colors.grey)),
-        // 保存路径
-        const SizedBox(height: 16),
-        Text('保存路径（可选）', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _savePathCtrl,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: '留空使用默认路径',
-                  isDense: true,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.cloud_upload_outlined,
+                          size: 20,
+                          color: !_downloadToLocal
+                              ? Theme.of(context).colorScheme.onPrimaryContainer
+                              : Theme.of(context).colorScheme.onSurface,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '发送到下载器',
+                          style: TextStyle(
+                            color: !_downloadToLocal
+                                ? Theme.of(context).colorScheme.onPrimaryContainer
+                                : Theme.of(context).colorScheme.onSurface,
+                            fontWeight: !_downloadToLocal
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-            if (_paths.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.folder_open),
-                tooltip: '选择已有路径',
-                onSelected: (path) {
-                  _savePathCtrl.text = path;
-                },
-                itemBuilder: (context) => _paths.map((path) {
-                  return PopupMenuItem<String>(
-                    value: path,
-                    child: Text(
-                      path,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
+              Container(
+                width: 1,
+                height: 40,
+                color: Theme.of(context).colorScheme.outline,
+              ),
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _downloadToLocal = true),
+                  borderRadius: const BorderRadius.horizontal(
+                    right: Radius.circular(8),
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: _downloadToLocal
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : null,
+                      borderRadius: const BorderRadius.horizontal(
+                        right: Radius.circular(7),
+                      ),
                     ),
-                  );
-                }).toList(),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.save_outlined,
+                          size: 20,
+                          color: _downloadToLocal
+                              ? Theme.of(context).colorScheme.onPrimaryContainer
+                              : Theme.of(context).colorScheme.onSurface,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '下载到本地',
+                          style: TextStyle(
+                            color: _downloadToLocal
+                                ? Theme.of(context).colorScheme.onPrimaryContainer
+                                : Theme.of(context).colorScheme.onSurface,
+                            fontWeight: _downloadToLocal
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ],
-          ],
+          ),
         ),
-
         const SizedBox(height: 16),
-        // 不立即开始（添加后暂停）选项
-        Row(
-          children: [
-            Expanded(
-              child: Text('不立即开始（添加后暂停）',
-                  style: Theme.of(context).textTheme.titleSmall),
-            ),
-            Switch(
-              value: _startPaused,
-              onChanged: (val) async {
-                setState(() => _startPaused = val);
-                // 保存用户偏好以便下次打开默认状态
-                await StorageService.instance.saveDefaultDownloadStartPaused(val);
-              },
-            ),
-          ],
-        ),
 
-        // Gazelle类型站点 使用 Token 选项
-        if (widget.isGazelleSite == true) ...[
+        // 根据下载模式显示不同的内容
+        if (_downloadToLocal) ...[
+          // 本地下载模式：显示说明
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '下载说明',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (isBatchMode) ...[
+                  Text(
+                    '将下载 ${widget.itemCount} 个种子文件到本地设备。',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '点击"批量下载到本地"后，需要选择一个文件夹来保存所有种子文件。',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ] else ...[
+                  Text(
+                    '将下载种子文件到本地设备。',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '点击"下载到本地"后，可以选择保存位置。',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ] else ...[
+          // 远程下载器模式：显示下载器配置表单
+          // 下载器选择
+          Text('下载器', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<DownloaderConfig>(
+            initialValue: _selectedClient,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            selectedItemBuilder: (context) {
+              return _clients.map((client) {
+                final screenWidth = MediaQuery.of(context).size.width;
+                // 响应式宽度：手机上限制最大宽度，大屏上基于对话框容器宽度计算
+                final maxWidth = screenWidth > 600
+                    ? 400.0 * 0.6  // 大屏上使用对话框容器宽度的60%
+                    : 240.0;  // 小屏上限制240px
+
+                return SizedBox(
+                  width: maxWidth,
+                  child: Text(
+                    client is QbittorrentConfig
+                        ? '${client.name} (${client.host}:${client.port})'
+                        : client.name,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                );
+              }).toList();
+            },
+            items: _clients.map((client) {
+              return DropdownMenuItem(
+                value: client,
+                child: Builder(
+                  builder: (context) {
+                    final screenWidth = MediaQuery.of(context).size.width;
+                    // 响应式宽度：手机上限制最大宽度，大屏上允许更宽
+                    final maxWidth = screenWidth > 600
+                        ? screenWidth * 0.6  // 大屏上使用60%宽度
+                        : 240.0;  // 小屏上限制200px
+
+                    return SizedBox(
+                      width: maxWidth,
+                      child: Text(
+                        client is QbittorrentConfig
+                            ? '${client.name} (${client.host}:${client.port})'
+                            : client.name,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  },
+                ),
+              );
+            }).toList(),
+            onChanged: (client) {
+              setState(() {
+                _selectedClient = client;
+                _selectedCategory = null;
+                _selectedTags.clear();
+              });
+              if (client != null) {
+                _loadCategoriesTagsAndPaths();
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // 分类选择
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '分类（选择后使用分类路径）',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              if (_loading)
+                const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              if (!_loading)
+                IconButton(
+                  onPressed: _refreshCategoriesTagsAndPaths,
+                  icon: const Icon(Icons.refresh, size: 20),
+                  tooltip: '刷新',
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String?>(
+            initialValue: _selectedCategory,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              isDense: true,
+              hintText: '选择分类（可选）',
+            ),
+            isExpanded: true,
+            items: [
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('不使用分类'),
+              ),
+              ..._categories.map(
+                (cat) => DropdownMenuItem<String?>(
+                  value: cat,
+                  child: Text(cat, overflow: TextOverflow.ellipsis),
+                ),
+              ),
+            ],
+            onChanged: (cat) => setState(() => _selectedCategory = cat),
+          ),
+          const SizedBox(height: 16),
+
+          // 标签选择
+          Text('标签（可选）', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          if (_tags.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: _tags.map((tag) {
+                final isSelected = _selectedTags.contains(tag);
+                return FilterChip(
+                  label: Text(tag),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedTags.add(tag);
+                      } else {
+                        _selectedTags.remove(tag);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            )
+          else
+            const Text('暂无可用标签', style: TextStyle(color: Colors.grey)),
+          // 保存路径
+          const SizedBox(height: 16),
+          Text('保存路径（可选）', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
-                child: Text('使用 FL Token',
+                child: TextField(
+                  controller: _savePathCtrl,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: '留空使用默认路径',
+                    isDense: true,
+                  ),
+                ),
+              ),
+              if (_paths.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.folder_open),
+                  tooltip: '选择已有路径',
+                  onSelected: (path) {
+                    _savePathCtrl.text = path;
+                  },
+                  itemBuilder: (context) => _paths.map((path) {
+                    return PopupMenuItem<String>(
+                      value: path,
+                      child: Text(
+                        path,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ],
+          ),
+
+          const SizedBox(height: 16),
+          // 不立即开始（添加后暂停）选项
+          Row(
+            children: [
+              Expanded(
+                child: Text('不立即开始（添加后暂停）',
                     style: Theme.of(context).textTheme.titleSmall),
               ),
               Switch(
-                value: _useToken,
-                onChanged: (val) {
-                  setState(() => _useToken = val);
+                value: _startPaused,
+                onChanged: (val) async {
+                  setState(() => _startPaused = val);
+                  // 保存用户偏好以便下次打开默认状态
+                  await StorageService.instance.saveDefaultDownloadStartPaused(val);
                 },
               ),
             ],
           ),
+
+          // Gazelle类型站点 使用 Token 选项
+          if (widget.isGazelleSite == true) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('使用 FL Token',
+                      style: Theme.of(context).textTheme.titleSmall),
+                ),
+                Switch(
+                  value: _useToken,
+                  onChanged: (val) {
+                    setState(() => _useToken = val);
+                  },
+                ),
+              ],
+            ),
+          ],
         ],
       ],
     );

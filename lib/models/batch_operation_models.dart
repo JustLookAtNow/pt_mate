@@ -6,29 +6,34 @@ abstract class BatchRetryContext {
 }
 
 class BatchDownloadContext extends BatchRetryContext {
-  final DownloaderConfig clientConfig;
-  final String password;
+  final bool downloadToLocal;
+  final DownloaderConfig? clientConfig;
+  final String? password;
   final String? category;
   final List<String> tags;
   final String? savePath;
   final bool? autoTMM;
   final bool? startPaused;
   final bool? useToken;
+  final String? localSaveDirectory;
   final Map<String, SiteConfig>? sitesById;
 
   const BatchDownloadContext({
-    required this.clientConfig,
-    required this.password,
-    required this.category,
-    required this.tags,
-    required this.savePath,
-    required this.autoTMM,
-    required this.startPaused,
+    this.downloadToLocal = false,
+    this.clientConfig,
+    this.password,
+    this.category,
+    this.tags = const [],
+    this.savePath,
+    this.autoTMM,
+    this.startPaused,
     this.useToken,
+    this.localSaveDirectory,
     this.sitesById,
   });
 
   BatchDownloadContext copyWith({
+    bool? downloadToLocal,
     DownloaderConfig? clientConfig,
     String? password,
     String? category,
@@ -37,8 +42,10 @@ class BatchDownloadContext extends BatchRetryContext {
     bool? autoTMM,
     bool? startPaused,
     bool? useToken,
+    String? localSaveDirectory,
     Map<String, SiteConfig>? sitesById,
   }) => BatchDownloadContext(
+    downloadToLocal: downloadToLocal ?? this.downloadToLocal,
     clientConfig: clientConfig ?? this.clientConfig,
     password: password ?? this.password,
     category: category ?? this.category,
@@ -47,6 +54,7 @@ class BatchDownloadContext extends BatchRetryContext {
     autoTMM: autoTMM ?? this.autoTMM,
     startPaused: startPaused ?? this.startPaused,
     useToken: useToken ?? this.useToken,
+    localSaveDirectory: localSaveDirectory ?? this.localSaveDirectory,
     sitesById: sitesById ?? this.sitesById,
   );
 }
