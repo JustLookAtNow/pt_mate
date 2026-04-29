@@ -500,7 +500,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
     final isLargeScreen = ScreenUtils.isLargeScreen(context);
     final size = MediaQuery.of(context).size;
     final dialogWidth = isLargeScreen ? 680.0 : size.width * 0.92;
-    final dialogHeight = isLargeScreen ? 600.0 : size.height * 0.75;
+    final dialogHeight = isLargeScreen ? 600.0 : size.height * 0.5;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
@@ -513,7 +513,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 16, 12),
+              padding: const EdgeInsets.fromLTRB(24, 20, 16, 0),
               child: Row(
                 children: [
                   Container(
@@ -554,7 +554,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
 
             // Search and Toggle
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
               child: Row(
                 children: [
                   Expanded(
