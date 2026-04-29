@@ -115,7 +115,7 @@ class TorrentListItem extends StatelessWidget {
             decoration: BoxDecoration(
               color: isSelected
                   ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-                  : Theme.of(context).colorScheme.surface,
+                  : Theme.of(context).colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isSelected
@@ -187,11 +187,10 @@ class TorrentListItem extends StatelessWidget {
                               child: Container(
                                 width: 1,
                                 height: math.max(60, rightMinHeight - 16),
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.outlineVariant.withValues(
-                                  alpha: 0.5,
-                                ),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outlineVariant
+                                    .withValues(alpha: 0.5),
                               ),
                             ),
                             const SizedBox(width: 4),
@@ -588,157 +587,122 @@ class TorrentInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final batchStatus = _buildBatchStatus(context);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // 中间内容列
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Tags, Pin and Site
-              if (torrent.isTop || torrent.tags.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: _TagsView(
-                    tags: torrent.tags,
-                    isTop: torrent.isTop,
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 中间内容列
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Tags, Pin and Site
+                if (torrent.isTop || torrent.tags.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: _TagsView(tags: torrent.tags, isTop: torrent.isTop),
+                  ),
+
+                Tooltip(
+                  message: torrent.name,
+                  child: Text(
+                    torrent.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Theme.of(context).textTheme.titleMedium?.color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      height: 1.2,
+                    ),
                   ),
                 ),
-
-              Tooltip(
-                message: torrent.name,
-                child: Text(
-                  torrent.name,
-                  maxLines: 2,
+                const SizedBox(height: 2),
+                // Subtitle
+                Text(
+                  torrent.smallDescr,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.titleMedium?.color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     height: 1.2,
                   ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              // Subtitle
-              Text(
-                torrent.smallDescr,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  height: 1.2,
+                // Date
+                Text(
+                  '发布于 ${Formatters.formatTorrentCreatedDate(torrent.createdDate)}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                 ),
-              ),
-              // Date
-              Text(
-                '发布于 ${Formatters.formatTorrentCreatedDate(torrent.createdDate)}',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-              if (batchStatus != null) ...[
-                const SizedBox(height: 4),
-                batchStatus,
+                if (batchStatus != null) ...[
+                  const SizedBox(height: 4),
+                  batchStatus,
+                ],
               ],
-            ],
+            ),
           ),
-        ),
-        SizedBox(width:isMobile ? 4 : 20),
-        // 右侧数据列
-        SizedBox(
-          width: isMobile ? 55:100, // Fixed width for right column for alignment
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: isMobile ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-// discount
-              if (torrent.discount != DiscountType.normal)
-                Align(
-                  alignment: isMobile ? Alignment.centerRight:Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 2,
-                    ),
-                    margin: const EdgeInsets.only(bottom: 4),
-                    decoration: BoxDecoration(
-                      color: _discountColor(
-                        torrent.discount,
-                      ).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      _discountText(torrent.discount, torrent.discountEndTime),
-                      textAlign: TextAlign.right,
-                      style: TextStyle(
-                        color: _discountColor(torrent.discount),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
+          SizedBox(width: isMobile ? 4 : 20),
+          // 右侧数据列
+          SizedBox(
+            width: isMobile
+                ? 55
+                : 100, // Fixed width for right column for alignment
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: isMobile
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
+              children: [
+                // discount
+                if (torrent.discount != DiscountType.normal)
+                  Align(
+                    alignment: isMobile
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
+                      margin: const EdgeInsets.only(bottom: 4),
+                      decoration: BoxDecoration(
+                        color: _discountColor(
+                          torrent.discount,
+                        ).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _discountText(
+                          torrent.discount,
+                          torrent.discountEndTime,
+                        ),
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          color: _discountColor(torrent.discount),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              // seeders
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.arrow_upward, color: Colors.green, size: 12),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${torrent.seeders}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              // leechers
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.arrow_downward, color: Colors.red, size: 12),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${torrent.leechers}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              // size
-              Text(
-                Formatters.dataFromBytes(torrent.sizeBytes),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 6),
-              // comments
-              if (currentSite?.siteType == SiteType.mteam ||
-                  currentSite?.siteType == SiteType.nexusphp)
+                // seeders
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.chat,
-                      size: 10,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    const Icon(
+                      Icons.arrow_upward,
+                      color: Colors.green,
+                      size: 12,
                     ),
                     const SizedBox(width: 2),
                     Text(
-                      '${torrent.comments}',
+                      '${torrent.seeders}',
                       style: TextStyle(
                         fontSize: 11,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -746,17 +710,69 @@ class TorrentInfo extends StatelessWidget {
                     ),
                   ],
                 ),
-              // history download status
-              if (currentSite?.features.supportHistory ?? true)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: _buildDownloadStatusIcon(torrent.downloadStatus),
+                const SizedBox(height: 2),
+                // leechers
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.arrow_downward,
+                      color: Colors.red,
+                      size: 12,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      '${torrent.leechers}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
-            ],
+                const SizedBox(height: 6),
+                // size
+                Text(
+                  Formatters.dataFromBytes(torrent.sizeBytes),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                // comments
+                if (currentSite?.siteType == SiteType.mteam ||
+                    currentSite?.siteType == SiteType.nexusphp)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.chat,
+                        size: 10,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${torrent.comments}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                // history download status
+                if (currentSite?.features.supportHistory ?? true)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: _buildDownloadStatusIcon(torrent.downloadStatus),
+                  ),
+              ],
+            ),
           ),
-        ),
-        if (isMobile) const SizedBox(width: 8),
-      ],
+          if (isMobile) const SizedBox(width: 8),
+        ],
+      ),
     );
   }
 }
@@ -808,7 +824,7 @@ class TorrentCover extends StatelessWidget {
     return Container(
       width: 80,
       height: 115,
-      margin: const EdgeInsets.only(right: 12),
+      // margin: const EdgeInsets.only(right: 12),
       child: Stack(
         children: [
           Container(
@@ -892,12 +908,17 @@ class TorrentCover extends StatelessWidget {
                 children: [
                   if (hasImdb)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF5C518),
                         borderRadius: BorderRadius.only(
                           topRight: const Radius.circular(6),
-                          bottomLeft: hasDouban ? Radius.zero : const Radius.circular(6),
+                          bottomLeft: hasDouban
+                              ? Radius.zero
+                              : const Radius.circular(6),
                         ),
                       ),
                       child: Text(
@@ -911,7 +932,10 @@ class TorrentCover extends StatelessWidget {
                     ),
                   if (hasDouban)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: const BoxDecoration(
                         color: Color(0xFF007711),
                         borderRadius: BorderRadius.only(
