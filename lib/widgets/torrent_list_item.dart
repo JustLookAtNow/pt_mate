@@ -821,7 +821,7 @@ class TorrentCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: 80,
       height: 115,
       // margin: const EdgeInsets.only(right: 12),

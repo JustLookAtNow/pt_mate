@@ -398,6 +398,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
   late List<SiteConfig> _filteredSites;
   bool _isGridView = true;
   Map<String, HealthStatus> _healthStatuses = {};
+  late ScrollController _scrollController;
 
   final Map<String, String> _logoPathCache = {};
 
@@ -432,7 +433,55 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
     _selectedSiteId = widget.activeSiteId;
     _searchController = TextEditingController();
     _filteredSites = widget.sites;
+    _scrollController = ScrollController();
     _loadHealthStatuses();
+
+    // 在首帧渲染后滚动到当前选中的站点
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToActiveSite();
+    });
+  }
+
+  void _scrollToActiveSite() {
+    if (!mounted || _selectedSiteId.isEmpty) return;
+
+    final index = _filteredSites.indexWhere((s) => s.id == _selectedSiteId);
+    if (index == -1) return;
+
+    final isLargeScreen = ScreenUtils.isLargeScreen(context);
+    final size = MediaQuery.of(context).size;
+    final dialogWidth = isLargeScreen ? 680.0 : size.width * 0.92;
+
+    double offset = 0;
+    if (_isGridView) {
+      final crossAxisCount = isLargeScreen ? 5 : 3;
+      final horizontalPadding = 24.0 * 2;
+      final spacing = 12.0;
+      final availableWidth = dialogWidth - horizontalPadding;
+      final itemWidth =
+          (availableWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
+      final itemHeight = itemWidth; // childAspectRatio: 1.0
+      final row = index ~/ crossAxisCount;
+      // 减去 16 像素的缓冲，确保顶部不会被遮挡且留出一定视觉间距
+      offset = (row * (itemHeight + spacing) - 16).clamp(0.0, double.infinity);
+    } else {
+      // 估算列表项高度：Container padding(12*2) + Logo(30) + Padding bottom(8) = 62
+      // 考虑到文字可能有两行，这里取一个保守值 72
+      const itemHeight = 72.0;
+      // 列表模式用户反馈“刚刚好”，稍微减去 8 像素缓冲以防万一
+      offset = (index * itemHeight).clamp(0.0, double.infinity);
+    }
+
+    if (offset > 0) {
+      // 检查 controller 是否已附加到任何滚动视图
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          offset,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    }
   }
 
   Future<void> _loadHealthStatuses() async {
@@ -449,6 +498,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -588,13 +638,23 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _buildToggleButton(Icons.grid_view_rounded, _isGridView, () {
-                          setState(() => _isGridView = true);
+                          if (!_isGridView) {
+                            setState(() => _isGridView = true);
+                            WidgetsBinding.instance.addPostFrameCallback(
+                              (_) => _scrollToActiveSite(),
+                            );
+                          }
                         }),
                         _buildToggleButton(
                           Icons.format_list_bulleted_rounded,
                           !_isGridView,
                           () {
-                            setState(() => _isGridView = false);
+                            if (_isGridView) {
+                              setState(() => _isGridView = false);
+                              WidgetsBinding.instance.addPostFrameCallback(
+                                (_) => _scrollToActiveSite(),
+                              );
+                            }
                           },
                         ),
                       ],
@@ -630,6 +690,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: _isGridView
                           ? GridView.builder(
+                              controller: _scrollController,
                               padding: const EdgeInsets.only(bottom: 24),
                               itemCount: _filteredSites.length,
                               gridDelegate:
@@ -644,6 +705,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                                       _buildGridItem(_filteredSites[index]),
                             )
                           : ListView.builder(
+                              controller: _scrollController,
                               padding: const EdgeInsets.only(bottom: 24),
                               itemCount: _filteredSites.length,
                               itemBuilder:

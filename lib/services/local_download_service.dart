@@ -167,9 +167,6 @@ class LocalDownloadService with TorrentFileDownloaderMixin {
 
       // 编码zip文件
       final zipData = ZipEncoder().encode(archive);
-      if (zipData == null) {
-        throw Exception('创建zip文件失败');
-      }
 
       // 生成zip文件名
       final timestamp = DateTime.now().millisecondsSinceEpoch;
