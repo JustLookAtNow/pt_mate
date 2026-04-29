@@ -600,7 +600,7 @@ class TorrentInfo extends StatelessWidget {
               // Tags, Pin and Site
               if (torrent.isTop || torrent.tags.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.only(bottom: 2),
                   child: _TagsView(
                     tags: torrent.tags,
                     isTop: torrent.isTop,
@@ -625,7 +625,7 @@ class TorrentInfo extends StatelessWidget {
               // Subtitle
               Text(
                 torrent.smallDescr,
-                maxLines: 2,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 12,
@@ -633,7 +633,6 @@ class TorrentInfo extends StatelessWidget {
                   height: 1.2,
                 ),
               ),
-              const SizedBox(height: 4),
               // Date
               Text(
                 '发布于 ${Formatters.formatTorrentCreatedDate(torrent.createdDate)}',
@@ -650,10 +649,10 @@ class TorrentInfo extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width:isMobile ? 4 : 20),
         // 右侧数据列
         SizedBox(
-          width: 55, // Fixed width for right column for alignment
+          width: isMobile ? 55:100, // Fixed width for right column for alignment
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: isMobile ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -661,7 +660,7 @@ class TorrentInfo extends StatelessWidget {
 // discount
               if (torrent.discount != DiscountType.normal)
                 Align(
-                  alignment: Alignment.centerRight,
+                  alignment: isMobile ? Alignment.centerRight:Alignment.centerLeft,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 4,

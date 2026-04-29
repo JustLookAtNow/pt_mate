@@ -16,82 +16,6 @@ import '../utils/format.dart';
 import '../app.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
 
-class _HealthStatus {
-  final bool ok;
-
-  /// 功能不适用（站点不支持该接口，无需检查，非失败）
-  final bool notApplicable;
-  final String? message;
-  final String? username;
-  final MemberProfile? profile;
-  final DateTime updatedAt;
-  const _HealthStatus({
-    required this.ok,
-    this.notApplicable = false,
-    this.message,
-    this.username,
-    this.profile,
-    required this.updatedAt,
-  });
-
-  factory _HealthStatus.fromJson(Map<String, dynamic> json) {
-    final ok = json['ok'] == true || json['ok'] == 'true';
-    final notApplicable =
-        json['notApplicable'] == true || json['notApplicable'] == 'true';
-    final message = json['message']?.toString();
-    final username = json['username']?.toString();
-    final updatedAtStr = json['updatedAt']?.toString();
-    DateTime updatedAt;
-    try {
-      updatedAt = DateTime.parse(
-        updatedAtStr ?? DateTime.now().toIso8601String(),
-      );
-    } catch (_) {
-      updatedAt = DateTime.now();
-    }
-    MemberProfile? profile;
-    final p = json['profile'];
-    if (p is Map<String, dynamic>) {
-      try {
-        profile = MemberProfile.fromJson(p);
-      } catch (_) {
-        profile = null;
-      }
-    }
-    return _HealthStatus(
-      ok: ok,
-      notApplicable: notApplicable,
-      message: message,
-      username: username,
-      profile: profile,
-      updatedAt: updatedAt,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'ok': ok,
-      'notApplicable': notApplicable,
-      'message': message,
-      'username': username,
-      'profile': profile?.toJson(),
-      'updatedAt': updatedAt.toIso8601String(),
-    };
-  }
-}
-
-/// 解析 "yyyy-MM-dd HH:mm:ss" 格式的时间字符串
-// _parseLastAccess 已废弃，字段现为 DateTime 类型
-
-/// 判断最后访问时间是否超过一个月
-bool _isLastAccessOverMonth(DateTime? lastAccess) {
-  if (lastAccess == null) return false;
-  final now = DateTime.now();
-  return now.difference(lastAccess).inDays >= 30;
-}
-
-// 站点排序下拉功能已移除
-
 class ServerSettingsPage extends StatefulWidget {
   const ServerSettingsPage({super.key});
 
@@ -108,7 +32,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   bool _healthChecking = false;
-  Map<String, _HealthStatus> _healthStatuses = {}; // siteId -> status
+  Map<String, HealthStatus> _healthStatuses = {}; // siteId -> status
   // 排序状态已移除
   bool _reorderMode = false;
   List<SiteConfig> _sitesBackup = [];
@@ -290,7 +214,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       if (mounted) {
         setState(() {
           _healthStatuses = map.map(
-            (siteId, json) => MapEntry(siteId, _HealthStatus.fromJson(json)),
+            (siteId, json) => MapEntry(siteId, HealthStatus.fromJson(json)),
           );
         });
       }
@@ -357,7 +281,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             .catchError((error) {
               if (mounted) {
                 setState(() {
-                  _healthStatuses[site.id] = _HealthStatus(
+                  _healthStatuses[site.id] = HealthStatus(
                     ok: false,
                     message: error.toString(),
                     username: null,
@@ -396,13 +320,13 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     await startNext();
   }
 
-  Future<_HealthStatus> _checkSingleSite(SiteConfig site) async {
+  Future<HealthStatus> _checkSingleSite(SiteConfig site) async {
     // 站点不支持用户资料接口时，改用 testConnection 测试连通性
     // testConnection 失败会抛出 SiteException，由 catch 块统一处理
     if (!site.features.supportMemberProfile) {
       try {
         await ApiService.instance.testConnectionWithSite(site);
-        return _HealthStatus(
+        return HealthStatus(
           ok: true,
           notApplicable: true,
           message: '连接正常（不支持用户资料）',
@@ -411,7 +335,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           updatedAt: DateTime.now(),
         );
       } catch (e) {
-        return _HealthStatus(
+        return HealthStatus(
           ok: false,
           notApplicable: true,
           message: e.toString(),
@@ -424,7 +348,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     try {
       final adapter = await ApiService.instance.getAdapter(site);
       final profile = await adapter.fetchMemberProfile(apiKey: site.apiKey);
-      return _HealthStatus(
+      return HealthStatus(
         ok: true,
         message: '正常',
         username: profile.username,
@@ -432,7 +356,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         updatedAt: DateTime.now(),
       );
     } catch (e) {
-      return _HealthStatus(
+      return HealthStatus(
         ok: false,
         message: e.toString(),
         username: null,
@@ -740,7 +664,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           // 失败会抛出 SiteException，由外层 catch 统一展示错误
           await ApiService.instance.testConnection();
           setState(() {
-            _healthStatuses[site.id] = _HealthStatus(
+            _healthStatuses[site.id] = HealthStatus(
               ok: true,
               notApplicable: true,
               message: '连接正常（不支持用户资料）',
@@ -756,7 +680,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           try {
             final profile = await ApiService.instance.fetchMemberProfile();
             setState(() {
-              _healthStatuses[site.id] = _HealthStatus(
+              _healthStatuses[site.id] = HealthStatus(
                 ok: true,
                 message: '正常',
                 username: profile.username,
@@ -769,7 +693,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             );
           } catch (e) {
             setState(() {
-              _healthStatuses[site.id] = _HealthStatus(
+              _healthStatuses[site.id] = HealthStatus(
                 ok: false,
                 message: e.toString(),
                 username: null,
@@ -1027,14 +951,14 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     );
   }
 
-  Color _getStatusColor(_HealthStatus? hs) {
+  Color _getStatusColor(HealthStatus? hs) {
     if (hs == null) return Colors.grey;
     if (!hs.ok) {
       if (hs.message != null && hs.message!.contains('超时')) return Colors.grey;
       return Colors.red;
     }
     if (hs.notApplicable) return Colors.green;
-    if (hs.profile?.lastAccess != null && _isLastAccessOverMonth(hs.profile!.lastAccess)) {
+    if (hs.profile?.lastAccess != null && HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess)) {
       return Colors.orange;
     }
     return Colors.green;
@@ -1062,7 +986,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     return msg.isEmpty ? null : msg;
   }
 
-  String _getStatusText(_HealthStatus? hs) {
+  String _getStatusText(HealthStatus? hs) {
     if (hs == null) return '未获取';
     if (!hs.ok) {
       if (hs.message != null && hs.message!.contains('超时')) return '异常 (连接超时)';
@@ -1070,19 +994,19 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       return reason != null ? '异常 ($reason)' : '异常';
     }
     if (hs.notApplicable) return '正常 (无数据)';
-    if (hs.profile?.lastAccess != null && _isLastAccessOverMonth(hs.profile!.lastAccess)) {
+    if (hs.profile?.lastAccess != null && HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess)) {
       return '警告 (最后访问超过30天)';
     }
     return '正常';
   }
 
-  void _showStatusDetail(_HealthStatus hs, String statusLabel) {
+  void _showStatusDetail(HealthStatus hs, String statusLabel) {
     String detail;
     if (!hs.ok) {
       detail = hs.message ?? '未知错误';
     } else if (hs.notApplicable) {
       detail = '站点连接正常，但不支持用户资料接口。';
-    } else if (hs.profile?.lastAccess != null && _isLastAccessOverMonth(hs.profile!.lastAccess)) {
+    } else if (hs.profile?.lastAccess != null && HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess)) {
       final lastAccess = hs.profile!.lastAccess!;
       final days = DateTime.now().difference(lastAccess).inDays;
       detail = '最后访问时间：${lastAccess.year}-${lastAccess.month.toString().padLeft(2, '0')}-${lastAccess.day.toString().padLeft(2, '0')}\n距今已超过 $days 天，账号可能存在风险。';
@@ -1104,7 +1028,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     );
   }
 
-  Widget _buildDateColumn(_HealthStatus? hs) {
+  Widget _buildDateColumn(HealthStatus? hs) {
     if (hs == null) {
       return Center(
         child: Text(
@@ -1302,7 +1226,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                             ),
                             const SizedBox(height: 2),
                             GestureDetector(
-                              onTap: (hs != null && (!hs.ok || (hs.profile?.lastAccess != null && _isLastAccessOverMonth(hs.profile!.lastAccess))))
+                              onTap: (hs != null && (!hs.ok || (hs.profile?.lastAccess != null && HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess))))
                                   ? () => _showStatusDetail(hs, statusText)
                                   : null,
                               child: Row(
@@ -2255,7 +2179,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
         try {
           final statuses = await StorageService.instance.loadHealthStatuses();
-          statuses[site.id] = _HealthStatus(
+          statuses[site.id] = HealthStatus(
             ok: true,
             message: '正常',
             username: profile.username,
@@ -2288,7 +2212,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
         try {
           final statuses = await StorageService.instance.loadHealthStatuses();
-          statuses[site.id] = _HealthStatus(
+          statuses[site.id] = HealthStatus(
             ok: true,
             notApplicable: true,
             message: '连接正常（不支持用户资料）',
@@ -2318,7 +2242,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       try {
         final site = _composeCurrentSite();
         final statuses = await StorageService.instance.loadHealthStatuses();
-        statuses[site.id] = _HealthStatus(
+        statuses[site.id] = HealthStatus(
           ok: false,
           message: e.toString(),
           username: null,

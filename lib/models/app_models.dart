@@ -1702,6 +1702,78 @@ class Defaults {
   }
 }
 
+class HealthStatus {
+  final bool ok;
+
+  /// 功能不适用（站点不支持该接口，无需检查，非失败）
+  final bool notApplicable;
+  final String? message;
+  final String? username;
+  final MemberProfile? profile;
+  final DateTime updatedAt;
+
+  const HealthStatus({
+    required this.ok,
+    this.notApplicable = false,
+    this.message,
+    this.username,
+    this.profile,
+    required this.updatedAt,
+  });
+
+  factory HealthStatus.fromJson(Map<String, dynamic> json) {
+    final ok = json['ok'] == true || json['ok'] == 'true';
+    final notApplicable =
+        json['notApplicable'] == true || json['notApplicable'] == 'true';
+    final message = json['message']?.toString();
+    final username = json['username']?.toString();
+    final updatedAtStr = json['updatedAt']?.toString();
+    DateTime updatedAt;
+    try {
+      updatedAt = DateTime.parse(
+        updatedAtStr ?? DateTime.now().toIso8601String(),
+      );
+    } catch (_) {
+      updatedAt = DateTime.now();
+    }
+    MemberProfile? profile;
+    final p = json['profile'];
+    if (p is Map<String, dynamic>) {
+      try {
+        profile = MemberProfile.fromJson(p);
+      } catch (_) {
+        profile = null;
+      }
+    }
+    return HealthStatus(
+      ok: ok,
+      notApplicable: notApplicable,
+      message: message,
+      username: username,
+      profile: profile,
+      updatedAt: updatedAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'ok': ok,
+      'notApplicable': notApplicable,
+      'message': message,
+      'username': username,
+      'profile': profile?.toJson(),
+      'updatedAt': updatedAt.toIso8601String(),
+    };
+  }
+
+  /// 判断最后访问时间是否超过一个月
+  static bool isLastAccessOverMonth(DateTime? lastAccess) {
+    if (lastAccess == null) return false;
+    final now = DateTime.now();
+    return now.difference(lastAccess).inDays >= 30;
+  }
+}
+
 // 种子评论
 class TorrentComment {
   final String id;

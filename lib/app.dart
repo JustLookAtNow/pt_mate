@@ -396,6 +396,8 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
   late String _selectedSiteId;
   late TextEditingController _searchController;
   late List<SiteConfig> _filteredSites;
+  bool _isGridView = true;
+  Map<String, HealthStatus> _healthStatuses = {};
 
   final Map<String, String> _logoPathCache = {};
 
@@ -415,8 +417,8 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
         path = lower.endsWith('.png')
             ? logo
             : (logo.contains('.')
-                  ? '${logo.substring(0, logo.lastIndexOf('.'))}.png'
-                  : logo);
+                ? '${logo.substring(0, logo.lastIndexOf('.'))}.png'
+                : logo);
       }
     } catch (_) {}
 
@@ -430,6 +432,18 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
     _selectedSiteId = widget.activeSiteId;
     _searchController = TextEditingController();
     _filteredSites = widget.sites;
+    _loadHealthStatuses();
+  }
+
+  Future<void> _loadHealthStatuses() async {
+    final map = await StorageService.instance.loadHealthStatuses();
+    if (mounted) {
+      setState(() {
+        _healthStatuses = map.map(
+          (siteId, json) => MapEntry(siteId, HealthStatus.fromJson(json)),
+        );
+      });
+    }
   }
 
   @override
@@ -452,171 +466,433 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
     });
   }
 
+  Color _getStatusColor(HealthStatus? hs) {
+    if (hs == null) return Colors.grey;
+    if (!hs.ok) {
+      if (hs.message != null && hs.message!.contains('超时')) return Colors.grey;
+      return Colors.red;
+    }
+    if (hs.notApplicable) return Colors.green;
+    if (hs.profile?.lastAccess != null &&
+        HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess)) {
+      return Colors.orange;
+    }
+    return Colors.green;
+  }
+
+  String _getStatusText(HealthStatus? hs) {
+    if (hs == null) return '未知';
+    if (!hs.ok) {
+      if (hs.message != null && hs.message!.contains('超时')) return '离线';
+      return '异常';
+    }
+    if (hs.notApplicable) return '正常';
+    if (hs.profile?.lastAccess != null &&
+        HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess)) {
+      return '警告';
+    }
+    return '正常';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isLargeScreen = ScreenUtils.isLargeScreen(context);
-    final dialogContentWidth = isLargeScreen ? 500.0 : double.maxFinite;
+    final size = MediaQuery.of(context).size;
+    final dialogWidth = isLargeScreen ? 680.0 : size.width * 0.92;
+    final dialogHeight = isLargeScreen ? 600.0 : size.height * 0.75;
 
-    return AlertDialog(
-      title: const Text('切换站点'),
-      content: SizedBox(
-        width: dialogContentWidth,
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        width: dialogWidth,
+        height: dialogHeight,
+        color: theme.colorScheme.surface,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: _searchController,
-              onTapOutside: (event) => FocusScope.of(context).unfocus(),
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: '搜索站点名称或网址',
-                isDense: true,
-                prefixIcon: Icon(Icons.search),
-              ),
-              onChanged: _filterSites,
-            ),
-            const SizedBox(height: 16),
-            if (_filteredSites.isEmpty)
-              const Text('未找到匹配的站点', style: TextStyle(color: Colors.grey))
-            else
-              SizedBox(
-                height: 300,
-                child: GridView.builder(
-                  itemCount: _filteredSites.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: isLargeScreen ? 5 : 3,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 1,
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 16, 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer.withValues(
+                        alpha: 0.2,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.swap_horiz,
+                      color: theme.colorScheme.primary,
+                      size: 20,
+                    ),
                   ),
-                  itemBuilder: (context, index) {
-                    final site = _filteredSites[index];
-                    final isSelected = site.id == _selectedSiteId;
-                    final Color? siteColor = site.siteColor != null
-                        ? Color(site.siteColor!)
-                        : null;
-                    final theme = Theme.of(context);
+                  const SizedBox(width: 12),
+                  Text(
+                    '切换站点',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                    style: IconButton.styleFrom(
+                      backgroundColor: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.4),
+                      padding: const EdgeInsets.all(8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-                    Widget buildImage(String path, Color fgColor) {
-                      if (path.isEmpty) {
-                        return Icon(Icons.dns, size: 28, color: fgColor);
-                      }
-                      return ClipOval(
-                        child: Image.asset(
-                          path,
-                          width: 30,
-                          height: 30,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Image.asset(
-                              'assets/sites_icon/_default_nexusphp.png',
-                              width: 30,
-                              height: 30,
-                              fit: BoxFit.cover,
-                            );
+            // Search and Toggle
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      onTapOutside: (event) => FocusScope.of(context).unfocus(),
+                      decoration: InputDecoration(
+                        hintText: '搜索站点名称或网址',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.3),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onChanged: _filterSites,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildToggleButton(Icons.grid_view_rounded, _isGridView, () {
+                          setState(() => _isGridView = true);
+                        }),
+                        _buildToggleButton(
+                          Icons.format_list_bulleted_rounded,
+                          !_isGridView,
+                          () {
+                            setState(() => _isGridView = false);
                           },
                         ),
-                      );
-                    }
-
-                    return Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => Navigator.of(context).pop(site.id),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? theme.colorScheme.primaryContainer.withValues(
-                                    alpha: 0.45,
-                                  )
-                                : theme.colorScheme.surfaceContainerHighest
-                                      .withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.outlineVariant,
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor: isSelected
-                                    ? theme.colorScheme.primary
-                                    : siteColor?.withValues(alpha: 0.2) ??
-                                          theme
-                                              .colorScheme
-                                              .surfaceContainerHighest,
-                                child: Builder(
-                                  builder: (context) {
-                                    final fgColor = isSelected
-                                        ? theme.colorScheme.onPrimary
-                                        : siteColor ??
-                                              theme
-                                                  .colorScheme
-                                                  .onSurfaceVariant;
-
-                                    final cached = _logoPathCache[site.id];
-                                    if (cached != null) {
-                                      return buildImage(cached, fgColor);
-                                    }
-
-                                    return FutureBuilder<String>(
-                                      future: _resolveLogoPath(site),
-                                      builder: (context, snapshot) {
-                                        if (snapshot.connectionState !=
-                                                ConnectionState.done ||
-                                            (snapshot.data == null ||
-                                                snapshot.data!.isEmpty)) {
-                                          return Icon(
-                                            Icons.dns,
-                                            size: 28,
-                                            color: fgColor,
-                                          );
-                                        }
-                                        return buildImage(
-                                          snapshot.data!,
-                                          fgColor,
-                                        );
-                                      },
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                site.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Sites List
+            Expanded(
+              child: _filteredSites.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.search_off,
+                            size: 48,
+                            color: theme.colorScheme.outline,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            '未找到匹配的站点',
+                            style: TextStyle(color: theme.colorScheme.outline),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: _isGridView
+                          ? GridView.builder(
+                              padding: const EdgeInsets.only(bottom: 24),
+                              itemCount: _filteredSites.length,
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: isLargeScreen ? 5 : 3,
+                                    mainAxisSpacing: 12,
+                                    crossAxisSpacing: 12,
+                                    childAspectRatio: 1.0,
+                                  ),
+                              itemBuilder:
+                                  (context, index) =>
+                                      _buildGridItem(_filteredSites[index]),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.only(bottom: 24),
+                              itemCount: _filteredSites.length,
+                              itemBuilder:
+                                  (context, index) =>
+                                      _buildListItem(_filteredSites[index]),
+                            ),
+                    ),
+            ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildToggleButton(IconData icon, bool active, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: active ? theme.colorScheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color:
+              active
+                  ? theme.colorScheme.onPrimary
+                  : theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGridItem(SiteConfig site) {
+    final isSelected = site.id == _selectedSiteId;
+    final theme = Theme.of(context);
+    final hs = _healthStatuses[site.id];
+
+    return InkWell(
+      onTap: () => Navigator.of(context).pop(site.id),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color:
+                isSelected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+            width: isSelected ? 1.5 : 1,
+          ),
+          color:
+              isSelected
+                  ? theme.colorScheme.primaryContainer.withValues(alpha: 0.15)
+                  : Colors.transparent,
+        ),
+        child: Stack(
+          children: [
+            if (isSelected)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Icon(
+                  Icons.check_circle,
+                  color: theme.colorScheme.primary,
+                  size: 18,
+                ),
+              ),
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildSiteLogo(site, isSelected, 30),
+                  const SizedBox(height: 4),
+                  Text(
+                    site.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _buildStatusRow(hs),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListItem(SiteConfig site) {
+    final isSelected = site.id == _selectedSiteId;
+    final theme = Theme.of(context);
+    final hs = _healthStatuses[site.id];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: () => Navigator.of(context).pop(site.id),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color:
+                  isSelected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              width: isSelected ? 1.5 : 1,
+            ),
+            color:
+                isSelected
+                    ? theme.colorScheme.primaryContainer.withValues(alpha: 0.15)
+                    : Colors.transparent,
+          ),
+          child: Row(
+            children: [
+              _buildSiteLogo(site, isSelected, 30),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            site.name,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight:
+                                  isSelected ? FontWeight.bold : FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isSelected) ...[
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.check_circle,
+                            color: theme.colorScheme.primary,
+                            size: 16,
+                          ),
+                        ],
+                      ],
+                    ),
+                    Text(
+                      site.baseUrl,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _buildStatusRow(hs),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusRow(HealthStatus? hs) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: _getStatusColor(hs),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          _getStatusText(hs),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSiteLogo(SiteConfig site, bool isSelected, double size) {
+    final theme = Theme.of(context);
+    final Color? siteColor =
+        site.siteColor != null ? Color(site.siteColor!) : null;
+
+    return Container(
+      width: size,
+      height: size,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color:
+            isSelected
+                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.2)
+                : (siteColor?.withValues(alpha: 0.1) ??
+                    theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.3,
+                    )),
+        shape: BoxShape.circle,
+      ),
+      child: FutureBuilder<String>(
+        future: _resolveLogoPath(site),
+        builder: (context, snapshot) {
+          String path =
+              snapshot.data ?? 'assets/sites_icon/_default_nexusphp.png';
+          if (snapshot.connectionState != ConnectionState.done &&
+              snapshot.data == null) {
+            return Icon(
+              Icons.dns,
+              size: size * 0.6,
+              color: theme.colorScheme.onSurfaceVariant,
+            );
+          }
+          return ClipOval(
+            child: Image.asset(
+              path,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(
+                  Icons.dns,
+                  size: size * 0.6,
+                  color: theme.colorScheme.onSurfaceVariant,
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
+
 
 class MTeamApp extends StatefulWidget {
   const MTeamApp({super.key});
