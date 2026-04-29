@@ -57,6 +57,9 @@ jobs:
         distribution: 'zulu'
         java-version: '17'
         
+    - name: Get Java Version
+      run: echo "JAVA_VERSION=$(java -XshowSettings:properties -version 2>&1 | grep 'java.runtime.version' | awk '{print $3}')" >> $GITHUB_ENV
+        
     # Flutter SDK 缓存
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
@@ -121,17 +124,23 @@ jobs:
     
     # CMake 缓存
     - name: Cache CMake
+      id: cache_cmake_release
       uses: actions/cache@v5
       with:
         path: |
           build/linux
           ~/.cmake
-        key: ${{ runner.os }}-cmake-release-${{ hashFiles('pubspec.lock', '**/CMakeLists.txt') }}
+        key: ${{ runner.os }}-java-${{ env.JAVA_VERSION }}-cmake-release-${{ hashFiles('pubspec.lock', '**/CMakeLists.txt') }}
         restore-keys: |
-          ${{ runner.os }}-cmake-release-
+          ${{ runner.os }}-java-${{ env.JAVA_VERSION }}-cmake-release-
         
     - name: Build Linux
-      run: flutter build linux --release
+      run: |
+        if [ "${{ steps.cache_cmake_release.outputs.cache-hit }}" != "true" ]; then
+          echo "Cache miss or partial hit, cleaning build directory to avoid stale JDK paths..."
+          rm -rf build/linux
+        fi
+        flutter build linux --release
       
     # AppImageTool 缓存
     - name: Cache AppImageTool

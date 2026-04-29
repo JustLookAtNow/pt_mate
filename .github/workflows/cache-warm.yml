@@ -23,6 +23,9 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Get Java Version
+        run: echo "JAVA_VERSION=$(java -XshowSettings:properties -version 2>&1 | grep 'java.runtime.version' | awk '{print $3}')" >> $GITHUB_ENV
+
       - name: Setup Flutter (cached)
         id: cache_flutter_linux
         uses: subosito/flutter-action@v2
@@ -76,9 +79,9 @@ jobs:
           path: |
             build/linux
             ~/.cmake
-          key: ${{ runner.os }}-cmake-debug-${{ hashFiles('pubspec.lock', '**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-java-${{ env.JAVA_VERSION }}-cmake-debug-${{ hashFiles('pubspec.lock', '**/CMakeLists.txt') }}
           restore-keys: |
-            ${{ runner.os }}-cmake-debug-
+            ${{ runner.os }}-java-${{ env.JAVA_VERSION }}-cmake-debug-
 
       - name: Install Linux dependencies
         if: ${{ steps.cache_cmake_linux.outputs.cache-hit != 'true' || steps.cache_flutter_linux.outputs.cache-hit != 'true' }}
@@ -89,6 +92,10 @@ jobs:
       - name: Build Linux (Debug)
         if: ${{ steps.cache_cmake_linux.outputs.cache-hit != 'true' || steps.cache_flutter_linux.outputs.cache-hit != 'true' }}
         run: |
+          if [ "${{ steps.cache_cmake_linux.outputs.cache-hit }}" != "true" ]; then
+            echo "Cache miss or partial hit, cleaning build directory to avoid stale JDK paths..."
+            rm -rf build/linux
+          fi
           flutter build linux --debug
 
       - name: Cache AppImageTool
