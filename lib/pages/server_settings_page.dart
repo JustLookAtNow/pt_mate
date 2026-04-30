@@ -874,8 +874,10 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             : Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(
           side: BorderSide(
-            color: siteColor ?? Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
-            width: 1.0,
+            color: isActive 
+                ? Theme.of(context).colorScheme.primary 
+                : (siteColor ?? Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            width: isActive ? 2.0 : 1.0,
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -885,17 +887,25 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             height: 28,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              color: isActive 
+                  ? Theme.of(context).colorScheme.primary 
+                  : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(4),
             ),
-            child: Text(
-              '${index + 1}',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: isActive
+                ? const Icon(
+                    Icons.check,
+                    size: 18,
+                    color: Colors.white,
+                  )
+                : Text(
+                    '${index + 1}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
           ),
           title: Text(site.name, overflow: TextOverflow.ellipsis),
           subtitle: Text(
@@ -1140,8 +1150,10 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
         side: BorderSide(
-          color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
-          width: 1.0,
+          color: isActive 
+              ? Theme.of(context).colorScheme.primary 
+              : Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: isActive ? 2.0 : 1.0,
         ),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -1169,17 +1181,25 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                         height: 24,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          color: isActive 
+                              ? Theme.of(context).colorScheme.primary 
+                              : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Text(
-                          '${index + 1}',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        child: isActive 
+                            ? const Icon(
+                                Icons.check,
+                                size: 16,
+                                color: Colors.white,
+                              )
+                            : Text(
+                                '${index + 1}',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                       const SizedBox(width: 6),
                       Container(
