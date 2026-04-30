@@ -302,11 +302,6 @@ jobs:
       with:
         ref: ${{ github.ref }}
         
-    - name: Set Xcode version
-      uses: apple-actions/setup-xcode@v1
-      with:
-        xcode-version: '15.4'
-
     - name: Extract version from tag
       id: version
       run: |
