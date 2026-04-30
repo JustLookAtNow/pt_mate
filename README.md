@@ -38,8 +38,8 @@ The following list is based on `assets/sites/*.json` (37 total):
 
 <p align="center">
   <img src="screenshots/1.png" width="600" alt="Screenshot 1">
-  <img src="screenshots/2.png" width="300" alt="Screenshot 2">
-  <img src="screenshots/3.png" width="300" alt="Screenshot 3">
+  <img src="screenshots/2.jpg" width="300" alt="Screenshot 2">
+  <img src="screenshots/3.jpg" width="300" alt="Screenshot 3">
 </p>
 
 ## Quick Start
