@@ -1670,16 +1670,35 @@ class _HomePageState extends State<HomePage> {
     final trimmedKeyword = _keywordCtrl.text.trim();
 
     if (reset) {
-      _pageNumber = 1;
-      _items.clear();
-      _hasMore = true;
-      _totalPages = 1;
-      // 重置排序状态
-      _sortBy = 'none';
-      _sortAscending = false;
-      // 重置标签筛选
-      // _includedTags.clear(); // 标签筛选由用户手动控制，不随搜索重置
-      // _excludedTags.clear();
+      if (mounted) {
+        setState(() {
+          _pageNumber = 1;
+          _items.clear();
+          _hasMore = true;
+          _totalPages = 1;
+          // 重置排序状态
+          _sortBy = 'none';
+          _sortAscending = false;
+          // 重置显示状态
+          _headerProgress = 1.0;
+          _fabVisible = true;
+          _lastScrollOffset = 0.0;
+        });
+      } else {
+        _pageNumber = 1;
+        _items.clear();
+        _hasMore = true;
+        _totalPages = 1;
+        _sortBy = 'none';
+        _sortAscending = false;
+        _headerProgress = 1.0;
+        _fabVisible = true;
+        _lastScrollOffset = 0.0;
+      }
+
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.jumpTo(0);
+      }
     }
 
     if (!supportTorrentSearch) {
