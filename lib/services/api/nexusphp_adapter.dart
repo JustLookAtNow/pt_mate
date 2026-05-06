@@ -175,6 +175,7 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
       passKey: null, // NexusPHP API类型不提供passKey
       lastAccess: Formatters.parseDateTimeCustom(
         data['last_access']?.toString(),
+        fieldName: 'lastAccess',
       ),
       bonusPerHour: data['seed_bonus_per_hour']?.toDouble(),
       seedingSizeBytes: data['seeding_leeching_data']?['seeding_size']?.toInt(),
@@ -329,6 +330,7 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
       cover: item['cover'] as String? ?? '',
       createdDate: Formatters.parseDateTimeCustom(
         item['added'] != null ? item['added'] + ':00' : null,
+        fieldName: 'createdDate',
       ),
       isTop: item['pos_state'] != 'normal',
       tags: tags,
@@ -402,9 +404,11 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
           id: (commentData['id'] ?? '').toString(),
           createdDate: Formatters.parseDateTimeCustom(
             commentData['created_at']?.toString(),
+            fieldName: 'createdDate',
           ),
           lastModifiedDate: Formatters.parseDateTimeCustom(
             commentData['created_at']?.toString(),
+            fieldName: 'lastModifiedDate',
           ),
           torrentId: id,
           author: createUser?['username']?.toString() ?? '',

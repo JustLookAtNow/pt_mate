@@ -83,7 +83,7 @@ class MemberProfile {
       lastAccess: json['lastAccess'] != null
           ? DateTime.tryParse(json['lastAccess'].toString())?.toLocal()
           : (json['last_access'] != null
-                ? Formatters.parseDateTimeCustom(json['last_access'].toString())
+                ? Formatters.parseDateTimeCustom(json['last_access'].toString(), fieldName: 'lastAccess')
                 : null),
       bonusPerHour: bonusPerHourVal == null
           ? null
@@ -1801,9 +1801,11 @@ class TorrentComment {
       id: (json['id'] ?? '').toString(),
       createdDate: Formatters.parseDateTimeCustom(
         json['createdDate']?.toString(),
+        fieldName: 'createdDate',
       ),
       lastModifiedDate: Formatters.parseDateTimeCustom(
         json['lastModifiedDate']?.toString(),
+        fieldName: 'lastModifiedDate',
       ),
       torrentId: (json['torrent'] ?? '').toString(),
       author: (json['author'] ?? '').toString(),

@@ -1208,6 +1208,7 @@ class NexusPHPWebAdapter extends SiteAdapter
                       discountEndTime,
                       format: discountEndTimeTimeConfig?['format'] as String?,
                       zone: discountEndTimeTimeConfig?['zone'] as String?,
+                      fieldName: 'discountEndTime',
                     )
                   : null,
               downloadUrl: downloadUrl.isNotEmpty ? downloadUrl : null,
@@ -1222,6 +1223,7 @@ class NexusPHPWebAdapter extends SiteAdapter
                 createDate,
                 format: createDateTimeConfig?['format'] as String?,
                 zone: createDateTimeConfig?['zone'] as String?,
+                fieldName: 'createdDate',
               ),
               doubanRating: doubanRating.isNotEmpty ? doubanRating : 'N/A',
               imdbRating: imdbRating.isNotEmpty ? imdbRating : 'N/A',

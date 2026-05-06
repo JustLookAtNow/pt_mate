@@ -158,6 +158,7 @@ class GazelleAdapter extends SiteAdapter {
       authKey: json['authkey']?.toString(),
       lastAccess: Formatters.parseDateTimeCustom(
         userstats['lastAccess']?.toString(),
+        fieldName: 'lastAccess',
       ),
       bonusPerHour: parseDouble(userstats['seedingBonusPointsPerHour']),
       seedingSizeBytes: parseInt(userstats['seedingSize']),
@@ -270,6 +271,7 @@ class GazelleAdapter extends SiteAdapter {
             sizeBytes: FormatUtil.parseInt(torrent['size']) ?? 0,
             createdDate: Formatters.parseDateTimeCustom(
               torrent['time']?.toString(),
+              fieldName: 'createdDate',
             ),
             imageList: cover.isNotEmpty ? [cover] : const [],
             cover: cover,
@@ -345,6 +347,7 @@ class GazelleAdapter extends SiteAdapter {
             sizeBytes: FormatUtil.parseInt(torrent['size']) ?? 0,
             createdDate: Formatters.parseDateTimeCustom(
               torrent['time']?.toString(),
+              fieldName: 'createdDate',
             ),
             imageList: cover.isNotEmpty ? [cover] : const [],
             cover: cover,
