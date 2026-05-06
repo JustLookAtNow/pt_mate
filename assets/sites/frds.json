@@ -127,7 +127,7 @@
           },
           "time": {
             "format": "yyyy-MM-dd HH:mm:ss",
-            "zone": "+08:00"
+            "zone": "+00:00"
           }
         },
         "downloadUrl": {
