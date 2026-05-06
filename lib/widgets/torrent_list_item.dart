@@ -421,8 +421,7 @@ class TorrentInfo extends StatelessWidget {
   String _discountText(DiscountType discount, DateTime? endTime) {
     final baseText = discount.displayText;
 
-    if ((discount == DiscountType.free || discount == DiscountType.twoXFree) &&
-        endTime != null) {
+    if (discount != DiscountType.normal && endTime != null) {
       final endDateTime = endTime;
       final now = DateTime.now();
       final difference = endDateTime.difference(now);
