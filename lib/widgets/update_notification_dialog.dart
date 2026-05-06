@@ -200,7 +200,7 @@ class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
       if (!mounted) return;
 
       setState(() {
-        _progressMessage = '正在准备下载更新包...';
+        _progressMessage = '正在测速下载源...';
       });
       _scrollToBottom();
 

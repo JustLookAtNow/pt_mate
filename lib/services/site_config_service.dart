@@ -152,7 +152,10 @@ class SiteConfigService {
       final existingValue = merged[key];
       if (existingValue is Map &&
           defaultValue is Map &&
-          (deepMergeMaps || key == 'features')) {
+          (deepMergeMaps ||
+              key == 'features' ||
+              key == 'discountMapping' ||
+              key == 'tagMapping')) {
         merged[key] = _mergeMissingKeys(
           _asStringDynamicMap(existingValue),
           _asStringDynamicMap(defaultValue),
@@ -340,6 +343,8 @@ class SiteConfigService {
         tagMapping: tagMapping,
         infoFinder: infoFinder,
         request: request,
+        operationIntervalMs:
+            defaultTemplate['operationIntervalMs'] as int? ?? 500,
       );
     } catch (e) {
       return null;

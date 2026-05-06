@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:ui';
 import 'dart:io';
+import 'package:html/dom.dart' as dom;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_bbcode/flutter_bbcode.dart';
@@ -11,12 +12,13 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api/api_service.dart';
 import '../services/storage/storage_service.dart';
-import '../services/image_http_client.dart';
 import '../models/app_models.dart';
 import '../services/downloader/downloader_config.dart';
 import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
+import '../services/local_download_service.dart';
 import '../widgets/torrent_download_dialog.dart';
+import '../widgets/cached_network_image.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
 import '../utils/screen_utils.dart';
 
@@ -141,7 +143,9 @@ class CustomQuoteDisplay extends StatelessWidget {
 
 // 自定义IMG标签处理器
 class CustomImgTag extends AdvancedTag {
-  CustomImgTag() : super("img");
+  final SiteConfig? siteConfig;
+
+  CustomImgTag({this.siteConfig}) : super("img");
 
   @override
   List<InlineSpan> parse(FlutterRenderer renderer, element) {
@@ -152,37 +156,25 @@ class CustomImgTag extends AdvancedTag {
     // 图片URL是第一个子节点的文本内容
     String imageUrl = element.children.first.textContent;
 
-    final image = FutureBuilder<List<int>>(
-      future: ImageHttpClient.instance
-          .fetchImage(imageUrl)
-          .then((response) => response.data!),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
-            height: 200,
-            alignment: Alignment.center,
-            child: const CircularProgressIndicator(),
-          );
+    final image = CachedNetworkImage(
+      imageUrl: imageUrl,
+      siteConfig: siteConfig,
+      fit: BoxFit.contain,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          return child;
         }
-
-        if (snapshot.hasError || !snapshot.hasData) {
-          return Text("[$tag]");
-        }
-
-        final imageWidget = Image.memory(
-          Uint8List.fromList(snapshot.data!),
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stack) => Text("[$tag]"),
-        );
-
-        // 添加点击全屏查看功能
-        return GestureDetector(
-          onTap: () {
-            _showFullScreenImage(context, snapshot.data!);
-          },
-          child: imageWidget,
+        return Container(
+          height: 200,
+          alignment: Alignment.center,
+          child: const CircularProgressIndicator(),
         );
       },
+      errorBuilder: (context, error, stackTrace) => Text("[$tag]"),
+      imageBuilder: (context, imageData, image) => GestureDetector(
+        onTap: () => _showFullScreenImage(context, imageData),
+        child: image,
+      ),
     );
 
     if (renderer.peekTapAction() != null) {
@@ -200,8 +192,9 @@ class CustomImgTag extends AdvancedTag {
   void _showFullScreenImage(BuildContext context, List<int> imageData) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) =>
-            FullScreenImageViewer(imageData: Uint8List.fromList(imageData)),
+        builder: (context) => FullScreenImageViewer.memory(
+          imageData: Uint8List.fromList(imageData),
+        ),
         fullscreenDialog: true,
       ),
     );
@@ -212,7 +205,7 @@ class CustomImgTag extends AdvancedTag {
 class FullScreenImageViewer extends StatefulWidget {
   final Uint8List imageData;
 
-  const FullScreenImageViewer({super.key, required this.imageData});
+  const FullScreenImageViewer.memory({super.key, required this.imageData});
 
   @override
   State<FullScreenImageViewer> createState() => _FullScreenImageViewerState();
@@ -275,6 +268,16 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
     }
   }
 
+  Widget _buildImage() {
+    return Image.memory(
+      widget.imageData,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stack) => const Center(
+        child: Text('图片加载失败', style: TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -299,13 +302,7 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
             maxScale: 5.0,
             constrained: true,
             clipBehavior: Clip.none,
-            child: Image.memory(
-              widget.imageData,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stack) => const Center(
-                child: Text('图片加载失败', style: TextStyle(color: Colors.white)),
-              ),
-            ),
+            child: _buildImage(),
           ),
         ),
       ),
@@ -700,43 +697,72 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         builder: (_) => TorrentDownloadDialog(
           torrentName: widget.torrentItem.name,
           downloadUrl: url,
+          isGazelleSite: widget.siteConfig?.siteType == SiteType.gazelle,
         ),
       );
 
       if (result == null) return; // 用户取消了
 
-      // 3. 从对话框结果中获取设置
-      final clientConfig = result['clientConfig'] as DownloaderConfig;
-      final password = result['password'] as String;
-      final category = result['category'] as String?;
-      final tags = result['tags'] as List<String>?;
-      final savePath = result['savePath'] as String?;
-      final autoTMM = result['autoTMM'] as bool?;
-      final startPaused = result['startPaused'] as bool?;
+      // 3. 判断下载模式
+      final downloadToLocal = result['downloadToLocal'] as bool? ?? false;
 
-      // 4. 发送到下载器
-      await DownloaderService.instance.addTask(
-        config: clientConfig,
-        password: password,
-        params: AddTaskParams(
-          url: url,
-          category: category,
-          tags: tags,
-          savePath: savePath,
-          autoTMM: autoTMM,
-          startPaused: startPaused,
-        ),
-        siteConfig: widget.siteConfig,
-      );
+      if (downloadToLocal) {
+        // 本地下载模式
+        final savedPath = await LocalDownloadService.instance.downloadAndSaveTorrent(
+          downloadUrl: url,
+          torrentName: widget.torrentItem.name,
+          siteConfig: widget.siteConfig,
+        );
 
-      if (mounted) {
-        // 添加短暂延迟，确保对话框完全关闭后再显示SnackBar
-        await Future.delayed(const Duration(milliseconds: 100));
+        if (mounted && savedPath != null) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          if (mounted) {
+            NotificationHelper.showInfo(
+              context,
+              '种子文件已保存到: $savedPath',
+            );
+          }
+        }
+      } else {
+        // 远程下载器模式
+        final clientConfig = result['clientConfig'] as DownloaderConfig;
+        final password = result['password'] as String;
+        final category = result['category'] as String?;
+        final tags = result['tags'] as List<String>?;
+        final savePath = result['savePath'] as String?;
+        final autoTMM = result['autoTMM'] as bool?;
+        final startPaused = result['startPaused'] as bool?;
+        final useToken = result['useToken'] as bool?;
+
+        // 4. 发送到下载器
+        String finalUrl = url;
+        if (useToken == true && !finalUrl.contains('usetoken=1')) {
+          finalUrl += '&usetoken=1';
+        }
+
+        await DownloaderService.instance.addTask(
+          config: clientConfig,
+          password: password,
+          params: AddTaskParams(
+            url: finalUrl,
+            category: category,
+            tags: tags,
+            savePath: savePath,
+            autoTMM: autoTMM,
+            startPaused: startPaused,
+          ),
+          siteConfig: widget.siteConfig,
+        );
+
         if (mounted) {
-          NotificationHelper.showInfo(
-            context,
-            '已成功发送"${widget.torrentItem.name}"到 ${clientConfig.name}',
-          );
+          // 添加短暂延迟，确保对话框完全关闭后再显示SnackBar
+          await Future.delayed(const Duration(milliseconds: 100));
+          if (mounted) {
+            NotificationHelper.showInfo(
+              context,
+              '已成功发送"${widget.torrentItem.name}"到 ${clientConfig.name}',
+            );
+          }
         }
       }
     } catch (e) {
@@ -753,10 +779,11 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   Future<void> _onToggleCollection() async {
     final newCollectionState = !_isCollected;
 
-    // 立即更新UI状态 - 只更新收藏状态变量
+    // 立即更新UI状态 - 更新收藏状态变量并乐观更新传入的torrentItem对象
     if (mounted) {
       setState(() {
         _isCollected = newCollectionState;
+        widget.torrentItem.collection = newCollectionState;
       });
     }
 
@@ -766,14 +793,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         id: widget.torrentItem.id,
         make: newCollectionState,
       );
-
-      // 请求成功，直接更新传入的torrentItem对象
-      widget.torrentItem.collection = newCollectionState;
     } catch (e) {
-      // 请求失败，恢复原状态 - 只恢复收藏状态变量
+      // 请求失败，恢复原状态 - 恢复收藏状态变量和torrentItem对象
       if (mounted) {
         setState(() {
           _isCollected = !newCollectionState;
+          widget.torrentItem.collection = !newCollectionState;
         });
         // 添加短暂延迟，确保UI稳定后再显示SnackBar
         await Future.delayed(const Duration(milliseconds: 50));
@@ -1136,8 +1161,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
     // 如果显示图片，添加自定义IMG标签处理器
     if (_showImages) {
-      stylesheet.tags['img'] = CustomImgTag();
-      stylesheet.tags['IMG'] = CustomImgTag();
+      stylesheet.tags['img'] = CustomImgTag(siteConfig: widget.siteConfig);
+      stylesheet.tags['IMG'] = CustomImgTag(siteConfig: widget.siteConfig);
     }
     // 添加自定义size标签处理逻辑
     stylesheet.tags['size'] = CustomSizeTag();
@@ -1148,7 +1173,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     stylesheet.tags['HIDE'] = CustomHideTag();
 
     // 构建最终的Widget
-    final widget = Column(
+    final contentWidget = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 添加调试信息
@@ -1657,17 +1682,86 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       ],
     );
 
-    // 更新缓存并返回widget
+    // 这里只缓存渲染后的内容组件，不能缓存 State.widget 本身，
+    // 否则下次命中缓存时会把整个 TorrentDetailPage 再次嵌进详情内容里。
     _cachedRawContent = cacheKey;
-    _cachedBBCodeWidget = widget;
-    return widget;
+    _cachedBBCodeWidget = contentWidget;
+    return contentWidget;
   }
 
-  // 构建WebView内容
-  /// 构建 HTML 原生渲染内容
+  void _showFullScreenImageFromBytes(List<int> imageData) {
+    if (imageData.isEmpty) {
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => FullScreenImageViewer.memory(
+          imageData: Uint8List.fromList(imageData),
+        ),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
+  /// 构建 HTML 原生渲染内容中的图片节点。
+  Widget? _buildHtmlImage(dom.Element element) {
+    if (element.localName != 'img') {
+      return null;
+    }
+
+    final imageUrl = element.attributes['src']?.trim() ?? '';
+    if (imageUrl.isEmpty) {
+      return null;
+    }
+
+    final width = double.tryParse(element.attributes['width'] ?? '');
+    final height = double.tryParse(element.attributes['height'] ?? '');
+    final semanticsLabel =
+        element.attributes['alt'] ?? element.attributes['title'];
+
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      siteConfig: widget.siteConfig,
+      width: width,
+      height: height,
+      fit: BoxFit.contain,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          return child;
+        }
+        return Container(
+          width: width,
+          height: height ?? 200,
+          alignment: Alignment.center,
+          child: const CircularProgressIndicator(),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) => Container(
+        width: width,
+        height: height,
+        alignment: Alignment.centerLeft,
+        child: Text(
+          semanticsLabel?.isNotEmpty == true ? semanticsLabel! : '[图片加载失败]',
+        ),
+      ),
+      imageBuilder: (context, imageData, image) {
+        Widget built = image;
+        if (semanticsLabel?.isNotEmpty == true) {
+          built = Semantics(label: semanticsLabel, image: true, child: built);
+        }
+        return GestureDetector(
+          onTap: () => _showFullScreenImageFromBytes(imageData),
+          child: built,
+        );
+      },
+    );
+  }
+
   Widget buildHtmlContent(String html) {
     return HtmlWidget(
       html,
+      customWidgetBuilder: _buildHtmlImage,
       onTapUrl: (url) {
         launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
         return true;
@@ -2308,7 +2402,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                       ),
                     ],
                     // 底部留白，防止被FAB遮挡
-                    const SizedBox(height: 80),
+                    const SizedBox(height: 160),
                   ],
                 ),
               )

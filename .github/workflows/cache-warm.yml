@@ -15,13 +15,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '17'
+
+      - name: Get Java Version
+        run: echo "JAVA_VERSION=$(java -XshowSettings:properties -version 2>&1 | grep 'java.runtime.version' | awk '{print $3}')" >> $GITHUB_ENV
 
       - name: Setup Flutter (cached)
         id: cache_flutter_linux
@@ -38,6 +41,14 @@ jobs:
           flutter config --enable-linux-desktop
           flutter precache --linux
 
+      - name: Cache Pub dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-cache-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-cache-
+
       - name: Get dependencies
         run: |
           # 如果 pubspec.lock 未变化，actions/cache 会命中，跳过更新
@@ -46,14 +57,12 @@ jobs:
 
       - name: Cache Gradle
         id: cache_gradle_linux
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            android/.gradle
-            android/app/.gradle
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('pubspec.lock', '**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
 
@@ -65,14 +74,14 @@ jobs:
           flutter build apk --debug --target-platform=android-arm64
       - name: Cache CMake
         id: cache_cmake_linux
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             build/linux
             ~/.cmake
-          key: ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-java-${{ env.JAVA_VERSION }}-cmake-debug-${{ hashFiles('pubspec.lock', '**/CMakeLists.txt') }}
           restore-keys: |
-            ${{ runner.os }}-cmake-
+            ${{ runner.os }}-java-${{ env.JAVA_VERSION }}-cmake-debug-
 
       - name: Install Linux dependencies
         if: ${{ steps.cache_cmake_linux.outputs.cache-hit != 'true' || steps.cache_flutter_linux.outputs.cache-hit != 'true' }}
@@ -83,10 +92,14 @@ jobs:
       - name: Build Linux (Debug)
         if: ${{ steps.cache_cmake_linux.outputs.cache-hit != 'true' || steps.cache_flutter_linux.outputs.cache-hit != 'true' }}
         run: |
+          if [ "${{ steps.cache_cmake_linux.outputs.cache-hit }}" != "true" ]; then
+            echo "Cache miss or partial hit, cleaning build directory to avoid stale JDK paths..."
+            rm -rf build/linux
+          fi
           flutter build linux --debug
 
       - name: Cache AppImageTool
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: appimagetool-x86_64.AppImage
           key: ${{ runner.os }}-appimagetool-continuous
@@ -107,7 +120,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Flutter (cached)
         id: cache_flutter_windows
@@ -124,20 +137,28 @@ jobs:
           flutter config --enable-windows-desktop
           flutter precache --windows
 
+      - name: Cache Pub dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~\AppData\Local\Pub\Cache
+          key: ${{ runner.os }}-pub-cache-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-cache-
+
       - name: Get dependencies
         run: |
           flutter pub get
 
       - name: Cache Visual Studio
         id: cache_vs_windows
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             C:\Users\runneradmin\AppData\Local\Microsoft\VisualStudio
             build/windows
-          key: ${{ runner.os }}-vs-${{ hashFiles('**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-vs-debug-${{ hashFiles('pubspec.lock', '**/CMakeLists.txt') }}
           restore-keys: |
-            ${{ runner.os }}-vs-
+            ${{ runner.os }}-vs-debug-
 
       - name: Build Windows (Debug)
         if: ${{ steps.cache_vs_windows.outputs.cache-hit != 'true' || steps.cache_flutter_windows.outputs.cache-hit != 'true' }}
@@ -150,7 +171,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Flutter (cached)
         id: cache_flutter_macos
@@ -159,7 +180,7 @@ jobs:
           flutter-version-file: .flutter-version
           channel: 'main'
           cache: true
-          cache-key: 'flutter-:os:-:channel:-:version:-:arch:'
+          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
           cache-path: '${{ runner.tool_cache }}/flutter'
 
       - name: Flutter precache (macOS & iOS)
@@ -167,18 +188,27 @@ jobs:
           flutter config --enable-macos-desktop
           flutter precache --macos --ios
 
+      - name: Cache Pub dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-cache-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-cache-
+
       - name: Get dependencies
         run: |
           flutter pub get
 
       - name: Cache CocoaPods
         id: cache_pods_macos
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ios/Pods
+            macos/Pods
             ~/.cocoapods
-          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          key: ${{ runner.os }}-pods-${{ hashFiles('pubspec.lock', 'ios/Podfile', 'macos/Podfile') }}
           restore-keys: |
             ${{ runner.os }}-pods-
 
@@ -189,18 +219,21 @@ jobs:
             cd ios
             pod install --repo-update
             cd -
-          else
-            echo "No Podfile found; skip CocoaPods"
+          fi
+          if [ -f macos/Podfile ]; then
+            cd macos
+            pod install --repo-update
+            cd -
           fi
 
       - name: Cache Xcode DerivedData
         id: cache_xcode_macos
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/Library/Developer/Xcode/DerivedData
-          key: ${{ runner.os }}-xcode-${{ hashFiles('**/project.pbxproj') }}
+          key: ${{ runner.os }}-xcode-debug-${{ hashFiles('pubspec.lock', '**/project.pbxproj') }}
           restore-keys: |
-            ${{ runner.os }}-xcode-
+            ${{ runner.os }}-xcode-debug-
 
       - name: Build macOS (Debug)
         if: ${{ steps.cache_xcode_macos.outputs.cache-hit != 'true' || steps.cache_pods_macos.outputs.cache-hit != 'true' || steps.cache_flutter_macos.outputs.cache-hit != 'true' }}

@@ -223,10 +223,12 @@ class QbittorrentClient
         // 从响应头中提取会话ID
         final cookies = response.headers['set-cookie'];
         if (cookies != null && cookies.isNotEmpty) {
-          final sidMatch = RegExp(r'SID=([^;]+)').firstMatch(cookies.first);
-          if (sidMatch != null) {
-            _sessionId = sidMatch.group(1);
-            return;
+          for (final cookie in cookies) {
+            final sidMatch = RegExp(r'SID=([^;]+)').firstMatch(cookie);
+            if (sidMatch != null) {
+              _sessionId = sidMatch.group(1);
+              return;
+            }
           }
         }
         throw Exception('Failed to extract session ID from login response');

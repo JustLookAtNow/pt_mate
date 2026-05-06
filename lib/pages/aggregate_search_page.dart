@@ -5,14 +5,17 @@ import 'package:provider/provider.dart';
 import 'package:flutter/rendering.dart';
 import 'dart:math' as math;
 import '../models/app_models.dart';
+import '../models/batch_operation_models.dart';
 import '../services/storage/storage_service.dart';
 import '../services/api/api_service.dart';
 import '../services/aggregate_search_service.dart';
 import '../services/downloader/downloader_config.dart';
 import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
+import '../services/local_download_service.dart';
 
 import '../providers/aggregate_search_provider.dart';
+import '../widgets/batch_progress_card.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/torrent_list_item.dart';
@@ -59,6 +62,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
   // 封面图片显示设置（用户偏好）
   bool _showCoverSetting = true; // 默认自动显示
+
+  BatchProgressState<AggregateSearchResultItem>? _batchProgress;
+  final Map<String, BatchItemState> _batchItemStates =
+      <String, BatchItemState>{};
+  final Map<String, String> _batchItemErrors = <String, String>{};
+  final Map<String, AggregateSearchResultItem> _batchTrackedItems =
+      <String, AggregateSearchResultItem>{};
 
   Color _colorForSite(String siteId) {
     if (_siteColors.containsKey(siteId)) return _siteColors[siteId]!;
@@ -216,352 +226,391 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                           heightFactor: _headerProgress,
                           child: Opacity(
                             opacity: _headerProgress,
-                            child: Card(
-                              child: Padding(
-                                padding: const EdgeInsets.all(2.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // 紧凑的搜索控件行
-                                    Row(
-                                      children: [
-                                        // 搜索策略选择
-                                        Expanded(
-                                          flex: 1,
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 0,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              border: Border.all(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .primary
-                                                    .withValues(alpha: 0.3),
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(25),
-                                            ),
-                                            child: DropdownButton<String>(
-                                              value:
-                                                  provider
-                                                      .selectedStrategy
-                                                      .isEmpty
-                                                  ? null
-                                                  : provider.selectedStrategy,
-                                              hint: const Text('选择搜索策略'),
-                                              isExpanded: true,
-                                              underline: const SizedBox(),
-                                              icon: const SizedBox.shrink(),
-                                              items: provider.searchConfigs.map(
-                                                (config) {
-                                                  return DropdownMenuItem<
-                                                    String
-                                                  >(
-                                                    value: config.id,
-                                                    child: Row(
-                                                      children: [
-                                                        Icon(
-                                                          config.isAllSitesType
-                                                              ? Icons.public
-                                                              : Icons.group,
-                                                          size: 16,
-                                                          color: Theme.of(
-                                                            context,
-                                                          ).colorScheme.primary,
-                                                        ),
-                                                        const SizedBox(
-                                                          width: 8,
-                                                        ),
-                                                        Expanded(
-                                                          child: Text(
-                                                            config.name,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  );
-                                                },
-                                              ).toList(),
-                                              onChanged: (value) {
-                                                if (value != null) {
-                                                  provider.setSelectedStrategy(
-                                                    value,
-                                                  );
-                                                }
-                                              },
+                            child: Padding(
+                              padding: const EdgeInsets.all(2.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // 紧凑的搜索控件行
+                                  Row(
+                                    children: [
+                                      // 搜索策略选择
+                                      Expanded(
+                                        flex: 1,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 0,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainer,
+                                            borderRadius: BorderRadius.circular(
+                                              25,
                                             ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        // 搜索输入框
-                                        Expanded(
-                                          flex: 3,
-                                          child: TextField(
-                                            controller: _searchController,
-                                            decoration: InputDecoration(
-                                              hintText: '输入搜索关键词',
-                                              border: OutlineInputBorder(
-                                                borderRadius:
-                                                    const BorderRadius.all(
-                                                      Radius.circular(25),
+                                          child: DropdownButton<String>(
+                                            value:
+                                                provider
+                                                    .selectedStrategy
+                                                    .isEmpty
+                                                ? null
+                                                : provider.selectedStrategy,
+                                            hint: const Text('选择搜索策略'),
+                                            isExpanded: true,
+                                            underline: const SizedBox(),
+                                            icon: const SizedBox.shrink(),
+                                            items: provider.searchConfigs.map((
+                                              config,
+                                            ) {
+                                              return DropdownMenuItem<String>(
+                                                value: config.id,
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      config.isAllSitesType
+                                                          ? Icons.public
+                                                          : Icons.group,
+                                                      size: 16,
+                                                      color: Theme.of(
+                                                        context,
+                                                      ).colorScheme.primary,
                                                     ),
-                                                borderSide: BorderSide(
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .primary
-                                                      .withValues(alpha: 0.3),
+                                                    const SizedBox(width: 8),
+                                                    Expanded(
+                                                      child: Text(
+                                                        config.name,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ),
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                    vertical: 8,
-                                                  ),
-                                              suffixIcon: IconButton(
-                                                icon: const Icon(Icons.search),
-                                                tooltip: '搜索',
-                                                onPressed: () => _performSearch(
-                                                  _searchController.text,
-                                                ),
-                                              ),
-                                            ),
-                                            onSubmitted: _performSearch,
+                                              );
+                                            }).toList(),
                                             onChanged: (value) {
-                                              provider.setSearchKeyword(value);
+                                              if (value != null) {
+                                                provider.setSelectedStrategy(
+                                                  value,
+                                                );
+                                              }
                                             },
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
-                                        // 排序选择
-                                        PopupMenuButton<String>(
-                                          icon: Icon(
-                                            Icons.sort,
-                                            color: provider.sortBy != 'none'
-                                                ? Theme.of(
-                                                    context,
-                                                  ).colorScheme.secondary
-                                                : null,
-                                          ),
-                                          tooltip: '排序',
-                                          onSelected: (value) {
-                                            // 与 app.dart 的行为保持一致：
-                                            // 选择相同的排序类型时切换升降序；选择新的类型时默认降序
-                                            if (value == provider.sortBy) {
-                                              provider.setSortAscending(
-                                                !provider.sortAscending,
-                                              );
-                                            } else {
-                                              provider.setSortBy(value);
-                                              provider.setSortAscending(false);
-                                            }
-                                            _resortCurrentResults();
-                                          },
-                                          itemBuilder: (context) => [
-                                            PopupMenuItem(
-                                              value: 'none',
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      provider.sortBy == 'none'
-                                                      ? Theme.of(context)
-                                                            .colorScheme
-                                                            .primary
-                                                            .withValues(
-                                                              alpha: 0.1,
-                                                            )
-                                                      : null,
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                ),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4,
-                                                    ),
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      Icons.clear,
-                                                      color:
-                                                          provider.sortBy ==
-                                                              'none'
-                                                          ? Theme.of(context)
-                                                                .colorScheme
-                                                                .secondary
-                                                          : null,
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    const Text('默认排序'),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-
-                                            PopupMenuItem(
-                                              value: 'size',
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      provider.sortBy == 'size'
-                                                      ? Theme.of(context)
-                                                            .colorScheme
-                                                            .primary
-                                                            .withValues(
-                                                              alpha: 0.1,
-                                                            )
-                                                      : null,
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                ),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4,
-                                                    ),
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      provider.sortBy ==
-                                                                  'size' &&
-                                                              provider
-                                                                  .sortAscending
-                                                          ? Icons.arrow_upward
-                                                          : Icons
-                                                                .arrow_downward,
-                                                      color:
-                                                          provider.sortBy ==
-                                                              'size'
-                                                          ? Theme.of(context)
-                                                                .colorScheme
-                                                                .secondary
-                                                          : null,
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    const Text('按大小排序'),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-
-                                            PopupMenuItem(
-                                              value: 'upload',
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      provider.sortBy ==
-                                                          'upload'
-                                                      ? Theme.of(context)
-                                                            .colorScheme
-                                                            .primary
-                                                            .withValues(
-                                                              alpha: 0.1,
-                                                            )
-                                                      : null,
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                ),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4,
-                                                    ),
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      provider.sortBy ==
-                                                                  'upload' &&
-                                                              provider
-                                                                  .sortAscending
-                                                          ? Icons.arrow_upward
-                                                          : Icons
-                                                                .arrow_downward,
-                                                      color:
-                                                          provider.sortBy ==
-                                                              'upload'
-                                                          ? Theme.of(context)
-                                                                .colorScheme
-                                                                .secondary
-                                                          : null,
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    const Text('按上传量排序'),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-
-                                            PopupMenuItem(
-                                              value: 'download',
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      provider.sortBy ==
-                                                          'download'
-                                                      ? Theme.of(context)
-                                                            .colorScheme
-                                                            .primary
-                                                            .withValues(
-                                                              alpha: 0.1,
-                                                            )
-                                                      : null,
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                ),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4,
-                                                    ),
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      provider.sortBy ==
-                                                                  'download' &&
-                                                              provider
-                                                                  .sortAscending
-                                                          ? Icons.arrow_upward
-                                                          : Icons
-                                                                .arrow_downward,
-                                                      color:
-                                                          provider.sortBy ==
-                                                              'download'
-                                                          ? Theme.of(context)
-                                                                .colorScheme
-                                                                .secondary
-                                                          : null,
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    const Text('按下载量排序'),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                    // 标签筛选栏
-                                    TagFilterBar(
-                                      includedTags: provider.includedTags,
-                                      excludedTags: provider.excludedTags,
-                                      onIncludedChanged:
-                                          provider.setIncludedTags,
-                                      onExcludedChanged:
-                                          provider.setExcludedTags,
-                                      padding: const EdgeInsets.fromLTRB(
-                                        8.0,
-                                        8.0,
-                                        8.0,
-                                        4.0,
                                       ),
+                                      const SizedBox(width: 4),
+                                      // 搜索输入框
+                                      Expanded(
+                                        flex: 3,
+                                        child: TextField(
+                                          controller: _searchController,
+                                          decoration: InputDecoration(
+                                            hintText: '输入搜索关键词',
+                                            border: const OutlineInputBorder(
+                                              borderRadius: BorderRadius.all(
+                                                Radius.circular(25),
+                                              ),
+                                              borderSide: BorderSide.none,
+                                            ),
+                                            enabledBorder:
+                                                const OutlineInputBorder(
+                                                  borderRadius:
+                                                      BorderRadius.all(
+                                                        Radius.circular(25),
+                                                      ),
+                                                  borderSide: BorderSide.none,
+                                                ),
+                                            focusedBorder:
+                                                const OutlineInputBorder(
+                                                  borderRadius:
+                                                      BorderRadius.all(
+                                                        Radius.circular(25),
+                                                      ),
+                                                  borderSide: BorderSide.none,
+                                                ),
+                                            filled: true,
+                                            fillColor: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainer,
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 12,
+                                                  vertical: 8,
+                                                ),
+                                            suffixIcon: IconButton(
+                                              icon: const Icon(Icons.search),
+                                              tooltip: '搜索',
+                                              onPressed: () => _performSearch(
+                                                _searchController.text,
+                                              ),
+                                            ),
+                                          ),
+                                          onSubmitted: _performSearch,
+                                          onChanged: (value) {
+                                            provider.setSearchKeyword(value);
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      // 排序选择
+                                      PopupMenuButton<String>(
+                                        icon: Icon(
+                                          Icons.sort,
+                                          color: provider.sortBy != 'none'
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.secondary
+                                              : null,
+                                        ),
+                                        tooltip: '排序',
+                                        onSelected: (value) {
+                                          // 与 app.dart 的行为保持一致：
+                                          // 选择相同的排序类型时切换升降序；选择新的类型时默认降序
+                                          if (value == provider.sortBy) {
+                                            provider.setSortAscending(
+                                              !provider.sortAscending,
+                                            );
+                                          } else {
+                                            provider.setSortBy(value);
+                                            provider.setSortAscending(false);
+                                          }
+                                          _resortCurrentResults();
+                                        },
+                                        itemBuilder: (context) => [
+                                          PopupMenuItem(
+                                            value: 'none',
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: provider.sortBy == 'none'
+                                                    ? Theme.of(context)
+                                                          .colorScheme
+                                                          .primary
+                                                          .withValues(
+                                                            alpha: 0.1,
+                                                          )
+                                                    : null,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.clear,
+                                                    color:
+                                                        provider.sortBy ==
+                                                            'none'
+                                                        ? Theme.of(context)
+                                                              .colorScheme
+                                                              .secondary
+                                                        : null,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  const Text('默认排序'),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+
+                                          PopupMenuItem(
+                                            value: 'time',
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: provider.sortBy == 'time'
+                                                    ? Theme.of(context)
+                                                          .colorScheme
+                                                          .primary
+                                                          .withValues(
+                                                            alpha: 0.1,
+                                                          )
+                                                    : null,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 4,
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    provider.sortBy == 'time' &&
+                                                            provider
+                                                                .sortAscending
+                                                        ? Icons.arrow_upward
+                                                        : Icons.arrow_downward,
+                                                    color:
+                                                        provider.sortBy ==
+                                                            'time'
+                                                        ? Theme.of(context)
+                                                              .colorScheme
+                                                              .secondary
+                                                        : null,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  const Text('按时间排序'),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+
+                                          PopupMenuItem(
+                                            value: 'size',
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: provider.sortBy == 'size'
+                                                    ? Theme.of(context)
+                                                          .colorScheme
+                                                          .primary
+                                                          .withValues(
+                                                            alpha: 0.1,
+                                                          )
+                                                    : null,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 4,
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    provider.sortBy == 'size' &&
+                                                            provider
+                                                                .sortAscending
+                                                        ? Icons.arrow_upward
+                                                        : Icons.arrow_downward,
+                                                    color:
+                                                        provider.sortBy ==
+                                                            'size'
+                                                        ? Theme.of(context)
+                                                              .colorScheme
+                                                              .secondary
+                                                        : null,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  const Text('按大小排序'),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+
+                                          PopupMenuItem(
+                                            value: 'upload',
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color:
+                                                    provider.sortBy == 'upload'
+                                                    ? Theme.of(context)
+                                                          .colorScheme
+                                                          .primary
+                                                          .withValues(
+                                                            alpha: 0.1,
+                                                          )
+                                                    : null,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    provider.sortBy ==
+                                                                'upload' &&
+                                                            provider
+                                                                .sortAscending
+                                                        ? Icons.arrow_upward
+                                                        : Icons.arrow_downward,
+                                                    color:
+                                                        provider.sortBy ==
+                                                            'upload'
+                                                        ? Theme.of(context)
+                                                              .colorScheme
+                                                              .secondary
+                                                        : null,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  const Text('按上传量排序'),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+
+                                          PopupMenuItem(
+                                            value: 'download',
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color:
+                                                    provider.sortBy ==
+                                                        'download'
+                                                    ? Theme.of(context)
+                                                          .colorScheme
+                                                          .primary
+                                                          .withValues(
+                                                            alpha: 0.1,
+                                                          )
+                                                    : null,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    provider.sortBy ==
+                                                                'download' &&
+                                                            provider
+                                                                .sortAscending
+                                                        ? Icons.arrow_upward
+                                                        : Icons.arrow_downward,
+                                                    color:
+                                                        provider.sortBy ==
+                                                            'download'
+                                                        ? Theme.of(context)
+                                                              .colorScheme
+                                                              .secondary
+                                                        : null,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  const Text('按下载量排序'),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  // 标签筛选栏
+                                  TagFilterBar(
+                                    includedTags: provider.includedTags,
+                                    excludedTags: provider.excludedTags,
+                                    onIncludedChanged: provider.setIncludedTags,
+                                    onExcludedChanged: provider.setExcludedTags,
+                                    padding: const EdgeInsets.fromLTRB(
+                                      8.0,
+                                      8.0,
+                                      8.0,
+                                      4.0,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -662,6 +711,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                 context,
                               ).colorScheme.errorContainer,
                               child: ExpansionTile(
+                                visualDensity: VisualDensity.compact,
                                 title: Text(
                                   '部分站点搜索失败',
                                   style: Theme.of(context).textTheme.titleSmall
@@ -679,13 +729,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                 ).colorScheme.onErrorContainer,
                                 tilePadding: const EdgeInsets.symmetric(
                                   horizontal: 16.0,
-                                  vertical: 2.0,
+                                  vertical: 0,
                                 ),
                                 childrenPadding: const EdgeInsets.fromLTRB(
-                                  16.0,
+                                  4.0,
                                   0,
-                                  16.0,
-                                  16.0,
+                                  8.0,
+                                  8.0,
                                 ),
                                 children: [
                                   Container(
@@ -752,8 +802,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                             );
                           },
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 8),
                       ],
+                      if (_batchProgress != null) _buildBatchProgressCard(),
                       Expanded(
                         child:
                             provider.searchResults.isEmpty &&
@@ -822,6 +873,21 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                                   siteName: item.siteName,
                                                   showCoverSetting:
                                                       _showCoverSetting,
+                                                  batchOperationType:
+                                                      _batchProgress
+                                                          ?.actionType,
+                                                  batchItemState:
+                                                      _batchItemStateFor(
+                                                        item.torrent.id,
+                                                      ),
+                                                  batchErrorMessage:
+                                                      _batchItemErrorFor(
+                                                        item.torrent.id,
+                                                      ),
+                                                  onRetryBatchAction:
+                                                      _buildRetryCallbackForItem(
+                                                        item,
+                                                      ),
                                                   suspendImageLoading:
                                                       _isFastScrolling,
                                                   onTap: _isSelectionMode
@@ -834,8 +900,16 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                                             _onTorrentTap(item),
                                                   onLongPress: () =>
                                                       _onLongPress(item, index),
-                                                  onDownload: () =>
-                                                      _showDownloadDialog(item),
+                                                  onDownload:
+                                                      _isBatchActionRunning(
+                                                        BatchOperationType
+                                                            .download,
+                                                      )
+                                                      ? null
+                                                      : () =>
+                                                            _showDownloadDialog(
+                                                              item,
+                                                            ),
                                                   onToggleCollection: () =>
                                                       _onToggleCollection(item),
                                                 ),
@@ -896,42 +970,43 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           }
                                           return _AggregateSearchScrollbar(
                                             controller: _listController,
-                                                sections: sections,
+                                            sections: sections,
                                             onFastScrollingChanged:
                                                 _setFastScrolling,
                                           );
                                         },
                                       ),
                                     ),
-
                                 ],
                               ),
                       ),
 
                       // 选择模式下的操作栏
-                      if (_isSelectionMode) ...[
-                        const SizedBox(height: 8),
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0,
-                              vertical: 12.0,
+                      if (_isSelectionMode)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            border: Border(
+                              top: BorderSide(
+                                color: Theme.of(context).dividerColor,
+                                width: 1,
+                              ),
                             ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  '已选择 ${_selectedItems.length} 项',
-                                  style: Theme.of(context).textTheme.titleSmall
-                                      ?.copyWith(fontSize: 13),
-                                ),
-                                const Spacer(),
-                                TextButton(
-                                  onPressed: _onCancelSelection,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Expanded(
+                                child: TextButton(
+                                  onPressed: _isBatchRunning
+                                      ? null
+                                      : _onCancelSelection,
                                   style: TextButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
+                                      horizontal: 0,
                                     ),
-                                    textStyle: const TextStyle(fontSize: 12),
+                                    textStyle: const TextStyle(fontSize: 13),
                                     side: BorderSide(
                                       color: Theme.of(
                                         context,
@@ -941,28 +1016,33 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                   ),
                                   child: const Text('取消'),
                                 ),
-                                const SizedBox(width: 6),
-                                // 全选按钮
-                                TextButton(
-                                  onPressed: () {
-                                    if (_selectedItems.length ==
-                                        provider.filteredResults.length) {
-                                      setState(() => _selectedItems.clear());
-                                    } else {
-                                      setState(() {
-                                        _selectedItems.addAll(
-                                          provider.filteredResults.map(
-                                            (e) => e.torrent.id,
-                                          ),
-                                        );
-                                      });
-                                    }
-                                  },
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextButton(
+                                  onPressed: _isBatchRunning
+                                      ? null
+                                      : () {
+                                          if (_selectedItems.length ==
+                                              provider.filteredResults.length) {
+                                            setState(
+                                              () => _selectedItems.clear(),
+                                            );
+                                          } else {
+                                            setState(() {
+                                              _selectedItems.addAll(
+                                                provider.filteredResults.map(
+                                                  (e) => e.torrent.id,
+                                                ),
+                                              );
+                                            });
+                                          }
+                                        },
                                   style: TextButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
+                                      horizontal: 0,
                                     ),
-                                    textStyle: const TextStyle(fontSize: 12),
+                                    textStyle: const TextStyle(fontSize: 13),
                                     side: BorderSide(
                                       color: Theme.of(
                                         context,
@@ -977,25 +1057,34 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                         : '全选',
                                   ),
                                 ),
-                                const SizedBox(width: 6),
-                                ElevatedButton.icon(
-                                  onPressed: _selectedItems.isEmpty
-                                      ? null
-                                      : _onBatchDownload,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: !_isBatchRunning &&
+                                          _selectedItems.isNotEmpty
+                                      ? _onBatchDownload
+                                      : null,
                                   style: ElevatedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
+                                      horizontal: 0,
                                     ),
-                                    textStyle: const TextStyle(fontSize: 12),
+                                    textStyle: const TextStyle(fontSize: 13),
+                                    backgroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                    foregroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimary,
                                   ),
-                                  icon: const Icon(Icons.download, size: 16),
-                                  label: const Text('下载'),
+                                  child: Text(
+                                    '下载 (${_selectedItems.length})',
+                                  ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ),
@@ -1017,6 +1106,12 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     final sortedItems = List<AggregateSearchResultItem>.from(items);
 
     switch (sortBy) {
+      case 'time':
+        sortedItems.sort((a, b) {
+          final comparison = a.torrent.createdDate.compareTo(b.torrent.createdDate);
+          return sortAscending ? comparison : -comparison;
+        });
+        break;
       case 'size':
         // 按文件大小排序
         sortedItems.sort((a, b) {
@@ -1140,7 +1235,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
       // 4. 跳转到详情页面
       if (!mounted) return;
-      Navigator.of(context).push(
+      await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => TorrentDetailPage(
             torrentItem: item.torrent,
@@ -1150,6 +1245,11 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           ),
         ),
       );
+
+      // 从详情页返回后，刷新列表页状态以确保收藏状态同步
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
       if (mounted) {
         NotificationHelper.showError(context, '打开详情失败: $e');
@@ -1181,6 +1281,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         builder: (_) => TorrentDownloadDialog(
           torrentName: item.torrent.name,
           downloadUrl: url,
+          isGazelleSite: siteConfig.siteType == SiteType.gazelle,
         ),
       );
 
@@ -1194,13 +1295,19 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       final savePath = result['savePath'] as String?;
       final autoTMM = result['autoTMM'] as bool?;
       final startPaused = result['startPaused'] as bool?;
+      final useToken = result['useToken'] as bool?;
 
       // 5. 发送到 qBittorrent
+      String finalUrl = url;
+      if (useToken == true && !finalUrl.contains('usetoken=1')) {
+        finalUrl += '&usetoken=1';
+      }
+
       await _onTorrentDownload(
         item,
         clientConfig,
         password,
-        url,
+        finalUrl,
         category,
         tags,
         savePath,
@@ -1254,6 +1361,96 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         NotificationHelper.showError(context, '下载失败: $e');
       }
     }
+  }
+
+  BatchItemState _batchItemStateFor(String itemId) {
+    return _batchItemStates[itemId] ?? BatchItemState.idle;
+  }
+
+  String? _batchItemErrorFor(String itemId) {
+    return _batchItemErrors[itemId];
+  }
+
+  bool get _isBatchRunning => _batchProgress?.isRunning ?? false;
+
+  bool _isBatchActionRunning(BatchOperationType actionType) {
+    return _isBatchRunning && _batchProgress?.actionType == actionType;
+  }
+
+  void _closeBatchProgress() {
+    if (!mounted || _isBatchRunning) return;
+    setState(() {
+      _batchProgress = null;
+      _batchTrackedItems.clear();
+      _batchItemStates.clear();
+      _batchItemErrors.clear();
+    });
+  }
+
+  BatchProgressState<AggregateSearchResultItem> _buildBatchProgressState({
+    required BatchOperationType actionType,
+    required bool isRunning,
+    required int runTotalCount,
+    required int runCompletedCount,
+    String? currentItemName,
+    BatchRetryContext? retryableContext,
+  }) {
+    return buildBatchProgressState<AggregateSearchResultItem>(
+      actionType: actionType,
+      isRunning: isRunning,
+      runTotalCount: runTotalCount,
+      runCompletedCount: runCompletedCount,
+      itemStates: _batchItemStates,
+      itemErrors: _batchItemErrors,
+      trackedItems: _batchTrackedItems,
+      itemNameOf: (item) => item.torrent.name,
+      currentItemName: currentItemName,
+      retryableContext: retryableContext,
+    );
+  }
+
+  Future<Map<String, SiteConfig>> _loadSitesById() async {
+    final storage = Provider.of<StorageService>(context, listen: false);
+    final allSites = await storage.loadSiteConfigs();
+    return {for (final site in allSites) site.id: site};
+  }
+
+  Future<void> _enqueueAggregateDownload(
+    AggregateSearchResultItem item,
+    BatchDownloadContext downloadContext,
+  ) async {
+    final sitesById = downloadContext.sitesById ?? await _loadSitesById();
+    final siteConfig = sitesById[item.siteId];
+    if (siteConfig == null) {
+      throw Exception('找不到站点配置: ${item.siteId}');
+    }
+
+    var url = await ApiService.instance.genDlToken(
+      id: item.torrent.id,
+      url: item.torrent.downloadUrl,
+      siteConfig: siteConfig,
+    );
+
+    // 远程下载器模式
+    if (downloadContext.useToken == true &&
+        siteConfig.siteType == SiteType.gazelle &&
+        !url.contains('usetoken=1')) {
+      url += '&usetoken=1';
+    }
+
+    await DownloaderService.instance.addTask(
+      config: downloadContext.clientConfig!,
+      password: downloadContext.password!,
+      params: AddTaskParams(
+        url: url,
+        category: downloadContext.category,
+        tags: downloadContext.tags.isEmpty ? null : downloadContext.tags,
+        savePath: downloadContext.savePath,
+        autoTMM: downloadContext.autoTMM,
+        startPaused: downloadContext.startPaused,
+      ),
+      siteConfig: siteConfig,
+    );
   }
 
   void _onPointerUp(PointerUpEvent event) {
@@ -1387,7 +1584,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
   // 批量下载
   Future<void> _onBatchDownload() async {
-    if (_selectedItems.isEmpty) return;
+    if (_selectedItems.isEmpty || _isBatchRunning) return;
 
     final provider = Provider.of<AggregateSearchProvider>(
       context,
@@ -1397,104 +1594,295 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         .where((item) => _selectedItems.contains(item.torrent.id))
         .toList();
 
+    final storage = Provider.of<StorageService>(context, listen: false);
+    final allSites = await storage.loadSiteConfigs();
+    if (!mounted) return;
+
+    final sitesById = {for (final site in allSites) site.id: site};
+    bool hasGazelle = selectedItems.any(
+      (item) => sitesById[item.siteId]?.siteType == SiteType.gazelle,
+    );
+
     // 显示批量下载设置对话框
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) =>
-          TorrentDownloadDialog(itemCount: selectedItems.length),
+      builder: (context) => TorrentDownloadDialog(
+        itemCount: selectedItems.length,
+        isGazelleSite: hasGazelle,
+      ),
     );
 
     if (result == null) return; // 用户取消了
 
     _onCancelSelection(); // 取消选择模式
 
-    // 显示开始下载的提示
-    if (mounted) {
-      final clientConfig = result['clientConfig'] as QbClientConfig;
-      NotificationHelper.showInfo(
-        context,
-        '开始批量下载${selectedItems.length}个项目到${clientConfig.name}...',
-      );
-    }
+    // 判断下载模式
+    final downloadToLocal = result['downloadToLocal'] as bool? ?? false;
 
-    // 异步处理下载
-    _performBatchDownload(
-      selectedItems,
-      result['clientConfig'] as DownloaderConfig,
-      result['password'] as String,
-      result['category'] as String?,
-      result['tags'] as List<String>? ?? [],
-      result['savePath'] as String?,
-      result['autoTMM'] as bool?,
-    );
+    if (downloadToLocal) {
+      // 本地下载模式：打包成zip保存
+      unawaited(_performBatchLocalDownload(selectedItems, sitesById));
+    } else {
+      // 远程下载器模式
+      final downloadContext = BatchDownloadContext(
+        downloadToLocal: false,
+        clientConfig: result['clientConfig'] as DownloaderConfig,
+        password: result['password'] as String,
+        category: result['category'] as String?,
+        tags: result['tags'] as List<String>? ?? const [],
+        savePath: result['savePath'] as String?,
+        autoTMM: result['autoTMM'] as bool?,
+        startPaused: result['startPaused'] as bool?,
+        useToken: result['useToken'] as bool?,
+        sitesById: sitesById,
+      );
+
+      unawaited(_performBatchDownload(selectedItems, downloadContext));
+    }
   }
 
   Future<void> _performBatchDownload(
     List<AggregateSearchResultItem> items,
-    DownloaderConfig clientConfig,
-    String password,
-    String? category,
-    List<String> tags,
-    String? savePath,
-    bool? autoTMM,
+    BatchDownloadContext downloadContext,
   ) async {
-    int successCount = 0;
-    int failureCount = 0;
+    await _runBatchDownloadOperation(
+      items: items,
+      downloadContext: downloadContext,
+      preserveExistingState: false,
+    );
+  }
 
-    for (final item in items) {
-      try {
-        // 1. 获取种子所属站点的配置
-        final storage = Provider.of<StorageService>(context, listen: false);
-        final allSites = await storage.loadSiteConfigs();
-        final siteConfig = allSites.firstWhere(
-          (site) => site.id == item.siteId,
-          orElse: () => throw Exception('找不到站点配置: ${item.siteId}'),
+  Future<void> _performBatchLocalDownload(
+    List<AggregateSearchResultItem> items,
+    Map<String, SiteConfig> sitesById,
+  ) async {
+    if (items.isEmpty) return;
+
+    if (mounted) {
+      setState(() {
+        _batchTrackedItems.clear();
+        _batchItemStates.clear();
+        _batchItemErrors.clear();
+        for (final item in items) {
+          _batchTrackedItems[item.torrent.id] = item;
+          _batchItemStates[item.torrent.id] = BatchItemState.idle;
+          _batchItemErrors.remove(item.torrent.id);
+        }
+        _batchProgress = _buildBatchProgressState(
+          actionType: BatchOperationType.download,
+          isRunning: true,
+          runTotalCount: items.length,
+          runCompletedCount: 0,
         );
+      });
+    }
 
-        // 2. 获取下载 URL
-        final url = await ApiService.instance.genDlToken(
+    // 构建下载项列表
+    final downloadItems = <TorrentDownloadItem>[];
+    for (final item in items) {
+      final siteConfig = sitesById[item.siteId];
+      if (siteConfig == null) {
+        if (mounted) {
+          setState(() {
+            _batchItemStates[item.torrent.id] = BatchItemState.failed;
+            _batchItemErrors[item.torrent.id] = '找不到站点配置';
+          });
+        }
+        continue;
+      }
+
+      try {
+        var url = await ApiService.instance.genDlToken(
           id: item.torrent.id,
           url: item.torrent.downloadUrl,
           siteConfig: siteConfig,
         );
-
-        // 3. 发送到下载器
-        await DownloaderService.instance.addTask(
-          config: clientConfig,
-          password: password,
-          params: AddTaskParams(
-            url: url,
-            category: category,
-            tags: tags.isEmpty ? null : tags,
-            savePath: savePath,
-            autoTMM: autoTMM,
-          ),
+        downloadItems.add(TorrentDownloadItem(
+          downloadUrl: url,
+          torrentName: item.torrent.name,
           siteConfig: siteConfig,
-        );
-
-        successCount++;
-
-        // 添加延迟避免请求过快
-        await Future.delayed(const Duration(milliseconds: 500));
+        ));
       } catch (e) {
-        failureCount++;
         if (mounted) {
-          NotificationHelper.showError(
-            context,
-            '下载失败: ${item.torrent.name}, 错误: $e',
-            duration: const Duration(seconds: 2),
-          );
+          setState(() {
+            _batchItemStates[item.torrent.id] = BatchItemState.failed;
+            _batchItemErrors[item.torrent.id] = '获取下载链接失败: $e';
+          });
         }
       }
     }
 
-    // 显示最终结果
-    if (mounted) {
-      final message = failureCount == 0
-          ? '批量下载完成，成功$successCount个项目'
-          : '批量下载完成，成功$successCount个，失败$failureCount个';
+    // 批量下载并打包成zip
+    try {
+      final savedPath = await LocalDownloadService.instance.batchDownloadAndSaveAsZip(
+        items: downloadItems,
+        onProgress: (current, total, currentName) {
+          if (mounted) {
+            setState(() {
+              _batchProgress = _buildBatchProgressState(
+                actionType: BatchOperationType.download,
+                isRunning: true,
+                runTotalCount: items.length,
+                runCompletedCount: current,
+                currentItemName: currentName,
+              );
+            });
+          }
+        },
+      );
 
-      if (failureCount == 0) {
+      if (mounted) {
+        setState(() {
+          _batchProgress = _buildBatchProgressState(
+            actionType: BatchOperationType.download,
+            isRunning: false,
+            runTotalCount: items.length,
+            runCompletedCount: items.length,
+          );
+        });
+
+        if (savedPath != null) {
+          NotificationHelper.showInfo(
+            context,
+            '批量下载完成，已保存到: $savedPath',
+            duration: const Duration(seconds: 3),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _batchProgress = _buildBatchProgressState(
+            actionType: BatchOperationType.download,
+            isRunning: false,
+            runTotalCount: items.length,
+            runCompletedCount: items.length,
+          );
+        });
+        NotificationHelper.showError(
+          context,
+          '批量下载失败: $e',
+          duration: const Duration(seconds: 3),
+        );
+      }
+    }
+  }
+
+  Future<void> _runBatchDownloadOperation({
+    required List<AggregateSearchResultItem> items,
+    required BatchDownloadContext downloadContext,
+    required bool preserveExistingState,
+  }) async {
+    if (items.isEmpty || _isBatchRunning) return;
+    final effectiveContext = downloadContext.sitesById == null
+        ? downloadContext.copyWith(sitesById: await _loadSitesById())
+        : downloadContext;
+
+    if (mounted) {
+      setState(() {
+        if (!preserveExistingState) {
+          _batchTrackedItems.clear();
+          _batchItemStates.clear();
+          _batchItemErrors.clear();
+        }
+        for (final item in items) {
+          _batchTrackedItems[item.torrent.id] = item;
+          _batchItemStates[item.torrent.id] = BatchItemState.idle;
+          _batchItemErrors.remove(item.torrent.id);
+        }
+        _batchProgress = _buildBatchProgressState(
+          actionType: BatchOperationType.download,
+          isRunning: true,
+          runTotalCount: items.length,
+          runCompletedCount: 0,
+          retryableContext: effectiveContext,
+        );
+      });
+    }
+
+    for (int index = 0; index < items.length; index++) {
+      final item = items[index];
+
+      if (mounted) {
+        setState(() {
+          _batchItemStates[item.torrent.id] = BatchItemState.running;
+          _batchItemErrors.remove(item.torrent.id);
+          _batchProgress = _buildBatchProgressState(
+            actionType: BatchOperationType.download,
+            isRunning: true,
+            runTotalCount: items.length,
+            runCompletedCount: index,
+            currentItemName: item.torrent.name,
+            retryableContext: effectiveContext,
+          );
+        });
+      }
+
+      try {
+        await _enqueueAggregateDownload(item, effectiveContext);
+        if (mounted) {
+          setState(() {
+            _batchItemStates[item.torrent.id] = BatchItemState.success;
+            _batchItemErrors.remove(item.torrent.id);
+          });
+        }
+      } catch (e) {
+        final errorMessage = formatBatchError(e);
+        if (mounted) {
+          setState(() {
+            _batchItemStates[item.torrent.id] = BatchItemState.failed;
+            _batchItemErrors[item.torrent.id] = errorMessage;
+          });
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _batchProgress = _buildBatchProgressState(
+            actionType: BatchOperationType.download,
+            isRunning: true,
+            runTotalCount: items.length,
+            runCompletedCount: index + 1,
+            currentItemName: index == items.length - 1
+                ? null
+                : item.torrent.name,
+            retryableContext: effectiveContext,
+          );
+        });
+      }
+
+      if (index < items.length - 1) {
+        final nextSiteConfig =
+            effectiveContext.sitesById?[items[index + 1].siteId];
+        final intervalMs = math.max(
+          0,
+          nextSiteConfig?.operationIntervalMs ?? 500,
+        );
+        if (intervalMs > 0) {
+          await Future.delayed(Duration(milliseconds: intervalMs));
+        }
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _batchProgress = _buildBatchProgressState(
+          actionType: BatchOperationType.download,
+          isRunning: false,
+          runTotalCount: items.length,
+          runCompletedCount: items.length,
+          retryableContext: effectiveContext,
+        );
+      });
+
+      final batchProgress = _batchProgress!;
+      final actionLabel = batchProgress.actionLabel;
+      final message = batchProgress.failureCount == 0
+          ? '$actionLabel完成，成功${batchProgress.successCount}个项目'
+          : '$actionLabel完成，成功${batchProgress.successCount}个，失败${batchProgress.failureCount}个';
+
+      if (batchProgress.failureCount == 0) {
+        _closeBatchProgress();
         NotificationHelper.showInfo(
           context,
           message,
@@ -1508,6 +1896,74 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         );
       }
     }
+  }
+
+  Future<void> _retryFailedBatchItems() async {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null ||
+        batchProgress.isRunning ||
+        batchProgress.failedItems.isEmpty) {
+      return;
+    }
+
+    final retryContext = batchProgress.retryableContext;
+    if (retryContext is! BatchDownloadContext) return;
+
+    await _runBatchDownloadOperation(
+      items: batchProgress.failedItems.map((failure) => failure.item).toList(),
+      downloadContext: retryContext,
+      preserveExistingState: true,
+    );
+  }
+
+  Future<void> _retrySingleBatchItem(AggregateSearchResultItem item) async {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null ||
+        batchProgress.isRunning ||
+        _batchItemStateFor(item.torrent.id) != BatchItemState.failed) {
+      return;
+    }
+
+    final retryContext = batchProgress.retryableContext;
+    if (retryContext is! BatchDownloadContext) return;
+
+    await _runBatchDownloadOperation(
+      items: [item],
+      downloadContext: retryContext,
+      preserveExistingState: true,
+    );
+  }
+
+  VoidCallback? _buildRetryCallbackForItem(AggregateSearchResultItem item) {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null ||
+        batchProgress.isRunning ||
+        _batchItemStateFor(item.torrent.id) != BatchItemState.failed) {
+      return null;
+    }
+
+    final isTrackedFailure = batchProgress.failedItems.any(
+      (failure) => failure.itemId == item.torrent.id,
+    );
+    if (!isTrackedFailure) {
+      return null;
+    }
+
+    return () => unawaited(_retrySingleBatchItem(item));
+  }
+
+  Widget _buildBatchProgressCard() {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null) {
+      return const SizedBox.shrink();
+    }
+    return BatchProgressCard<AggregateSearchResultItem>(
+      progress: batchProgress,
+      margin: const EdgeInsets.only(top: 8),
+      onRetryAll: _retryFailedBatchItems,
+      onRetryItem: (item) => unawaited(_retrySingleBatchItem(item)),
+      onClose: _closeBatchProgress,
+    );
   }
 
   // 取消选中模式
@@ -1813,8 +2269,6 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
       },
     );
   }
-
-
 }
 
 class _SiteSection {

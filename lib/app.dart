@@ -9,6 +9,7 @@ import 'package:flutter/rendering.dart';
 import 'dart:math' as math;
 
 import 'models/app_models.dart';
+import 'models/batch_operation_models.dart';
 import 'pages/torrent_detail_page.dart';
 import 'services/api/api_service.dart';
 import 'services/storage/storage_service.dart';
@@ -21,9 +22,11 @@ import 'services/site_config_service.dart';
 import 'services/downloader/downloader_config.dart';
 import 'services/downloader/downloader_service.dart';
 import 'services/downloader/downloader_models.dart';
+import 'services/local_download_service.dart';
 
 import 'pages/server_settings_page.dart';
 import 'widgets/qb_speed_indicator.dart';
+import 'widgets/batch_progress_card.dart';
 import 'widgets/responsive_layout.dart';
 import 'widgets/torrent_download_dialog.dart';
 import 'widgets/torrent_list_item.dart';
@@ -393,6 +396,9 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
   late String _selectedSiteId;
   late TextEditingController _searchController;
   late List<SiteConfig> _filteredSites;
+  bool _isGridView = true;
+  Map<String, HealthStatus> _healthStatuses = {};
+  late ScrollController _scrollController;
 
   final Map<String, String> _logoPathCache = {};
 
@@ -412,8 +418,8 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
         path = lower.endsWith('.png')
             ? logo
             : (logo.contains('.')
-                  ? '${logo.substring(0, logo.lastIndexOf('.'))}.png'
-                  : logo);
+                ? '${logo.substring(0, logo.lastIndexOf('.'))}.png'
+                : logo);
       }
     } catch (_) {}
 
@@ -427,11 +433,72 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
     _selectedSiteId = widget.activeSiteId;
     _searchController = TextEditingController();
     _filteredSites = widget.sites;
+    _scrollController = ScrollController();
+    _loadHealthStatuses();
+
+    // 在首帧渲染后滚动到当前选中的站点
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToActiveSite();
+    });
+  }
+
+  void _scrollToActiveSite() {
+    if (!mounted || _selectedSiteId.isEmpty) return;
+
+    final index = _filteredSites.indexWhere((s) => s.id == _selectedSiteId);
+    if (index == -1) return;
+
+    final isLargeScreen = ScreenUtils.isLargeScreen(context);
+    final size = MediaQuery.of(context).size;
+    final dialogWidth = isLargeScreen ? 680.0 : size.width * 0.92;
+
+    double offset = 0;
+    if (_isGridView) {
+      final crossAxisCount = isLargeScreen ? 5 : 3;
+      final horizontalPadding = 24.0 * 2;
+      final spacing = 12.0;
+      final availableWidth = dialogWidth - horizontalPadding;
+      final itemWidth =
+          (availableWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
+      final itemHeight = itemWidth; // childAspectRatio: 1.0
+      final row = index ~/ crossAxisCount;
+      // 减去 16 像素的缓冲，确保顶部不会被遮挡且留出一定视觉间距
+      offset = (row * (itemHeight + spacing) - 16).clamp(0.0, double.infinity);
+    } else {
+      // 估算列表项高度：Container padding(12*2) + Logo(30) + Padding bottom(8) = 62
+      // 考虑到文字可能有两行，这里取一个保守值 72
+      const itemHeight = 72.0;
+      // 列表模式用户反馈“刚刚好”，稍微减去 8 像素缓冲以防万一
+      offset = (index * itemHeight).clamp(0.0, double.infinity);
+    }
+
+    if (offset > 0) {
+      // 检查 controller 是否已附加到任何滚动视图
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          offset,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    }
+  }
+
+  Future<void> _loadHealthStatuses() async {
+    final map = await StorageService.instance.loadHealthStatuses();
+    if (mounted) {
+      setState(() {
+        _healthStatuses = map.map(
+          (siteId, json) => MapEntry(siteId, HealthStatus.fromJson(json)),
+        );
+      });
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -449,171 +516,445 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
     });
   }
 
+  Color _getStatusColor(HealthStatus? hs) {
+    if (hs == null) return Colors.grey;
+    if (!hs.ok) {
+      if (hs.message != null && hs.message!.contains('超时')) return Colors.grey;
+      return Colors.red;
+    }
+    if (hs.notApplicable) return Colors.green;
+    if (hs.profile?.lastAccess != null &&
+        HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess)) {
+      return Colors.orange;
+    }
+    return Colors.green;
+  }
+
+  String _getStatusText(HealthStatus? hs) {
+    if (hs == null) return '未知';
+    if (!hs.ok) {
+      if (hs.message != null && hs.message!.contains('超时')) return '离线';
+      return '异常';
+    }
+    if (hs.notApplicable) return '正常';
+    if (hs.profile?.lastAccess != null &&
+        HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess)) {
+      return '警告';
+    }
+    return '正常';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isLargeScreen = ScreenUtils.isLargeScreen(context);
-    final dialogContentWidth = isLargeScreen ? 500.0 : double.maxFinite;
+    final size = MediaQuery.of(context).size;
+    final dialogWidth = isLargeScreen ? 680.0 : size.width * 0.92;
+    final dialogHeight = isLargeScreen ? 600.0 : size.height * 0.5;
 
-    return AlertDialog(
-      title: const Text('切换站点'),
-      content: SizedBox(
-        width: dialogContentWidth,
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        width: dialogWidth,
+        height: dialogHeight,
+        color: theme.colorScheme.surface,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: _searchController,
-              onTapOutside: (event) => FocusScope.of(context).unfocus(),
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: '搜索站点名称或网址',
-                isDense: true,
-                prefixIcon: Icon(Icons.search),
-              ),
-              onChanged: _filterSites,
-            ),
-            const SizedBox(height: 16),
-            if (_filteredSites.isEmpty)
-              const Text('未找到匹配的站点', style: TextStyle(color: Colors.grey))
-            else
-              SizedBox(
-                height: 300,
-                child: GridView.builder(
-                  itemCount: _filteredSites.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: isLargeScreen ? 5 : 3,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 1,
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 16, 0),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer.withValues(
+                        alpha: 0.2,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.swap_horiz,
+                      color: theme.colorScheme.primary,
+                      size: 20,
+                    ),
                   ),
-                  itemBuilder: (context, index) {
-                    final site = _filteredSites[index];
-                    final isSelected = site.id == _selectedSiteId;
-                    final Color? siteColor = site.siteColor != null
-                        ? Color(site.siteColor!)
-                        : null;
-                    final theme = Theme.of(context);
+                  const SizedBox(width: 12),
+                  Text(
+                    '切换站点',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                    style: IconButton.styleFrom(
+                      backgroundColor: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.4),
+                      padding: const EdgeInsets.all(8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-                    Widget buildImage(String path, Color fgColor) {
-                      if (path.isEmpty) {
-                        return Icon(Icons.dns, size: 28, color: fgColor);
-                      }
-                      return ClipOval(
-                        child: Image.asset(
-                          path,
-                          width: 30,
-                          height: 30,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Image.asset(
-                              'assets/sites_icon/_default_nexusphp.png',
-                              width: 30,
-                              height: 30,
-                              fit: BoxFit.cover,
+            // Search and Toggle
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      onTapOutside: (event) => FocusScope.of(context).unfocus(),
+                      decoration: InputDecoration(
+                        hintText: '搜索站点名称或网址',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.3),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onChanged: _filterSites,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildToggleButton(Icons.grid_view_rounded, _isGridView, () {
+                          if (!_isGridView) {
+                            setState(() => _isGridView = true);
+                            WidgetsBinding.instance.addPostFrameCallback(
+                              (_) => _scrollToActiveSite(),
                             );
+                          }
+                        }),
+                        _buildToggleButton(
+                          Icons.format_list_bulleted_rounded,
+                          !_isGridView,
+                          () {
+                            if (_isGridView) {
+                              setState(() => _isGridView = false);
+                              WidgetsBinding.instance.addPostFrameCallback(
+                                (_) => _scrollToActiveSite(),
+                              );
+                            }
                           },
                         ),
-                      );
-                    }
-
-                    return Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => Navigator.of(context).pop(site.id),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? theme.colorScheme.primaryContainer.withValues(
-                                    alpha: 0.45,
-                                  )
-                                : theme.colorScheme.surfaceContainerHighest
-                                      .withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.outlineVariant,
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor: isSelected
-                                    ? theme.colorScheme.primary
-                                    : siteColor?.withValues(alpha: 0.2) ??
-                                          theme
-                                              .colorScheme
-                                              .surfaceContainerHighest,
-                                child: Builder(
-                                  builder: (context) {
-                                    final fgColor = isSelected
-                                        ? theme.colorScheme.onPrimary
-                                        : siteColor ??
-                                              theme
-                                                  .colorScheme
-                                                  .onSurfaceVariant;
-
-                                    final cached = _logoPathCache[site.id];
-                                    if (cached != null) {
-                                      return buildImage(cached, fgColor);
-                                    }
-
-                                    return FutureBuilder<String>(
-                                      future: _resolveLogoPath(site),
-                                      builder: (context, snapshot) {
-                                        if (snapshot.connectionState !=
-                                                ConnectionState.done ||
-                                            (snapshot.data == null ||
-                                                snapshot.data!.isEmpty)) {
-                                          return Icon(
-                                            Icons.dns,
-                                            size: 28,
-                                            color: fgColor,
-                                          );
-                                        }
-                                        return buildImage(
-                                          snapshot.data!,
-                                          fgColor,
-                                        );
-                                      },
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                site.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Sites List
+            Expanded(
+              child: _filteredSites.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.search_off,
+                            size: 48,
+                            color: theme.colorScheme.outline,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            '未找到匹配的站点',
+                            style: TextStyle(color: theme.colorScheme.outline),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: _isGridView
+                          ? GridView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.only(bottom: 24),
+                              itemCount: _filteredSites.length,
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: isLargeScreen ? 5 : 3,
+                                    mainAxisSpacing: 12,
+                                    crossAxisSpacing: 12,
+                                    childAspectRatio: 1.0,
+                                  ),
+                              itemBuilder:
+                                  (context, index) =>
+                                      _buildGridItem(_filteredSites[index]),
+                            )
+                          : ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.only(bottom: 24),
+                              itemCount: _filteredSites.length,
+                              itemBuilder:
+                                  (context, index) =>
+                                      _buildListItem(_filteredSites[index]),
+                            ),
+                    ),
+            ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildToggleButton(IconData icon, bool active, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: active ? theme.colorScheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color:
+              active
+                  ? theme.colorScheme.onPrimary
+                  : theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGridItem(SiteConfig site) {
+    final isSelected = site.id == _selectedSiteId;
+    final theme = Theme.of(context);
+    final hs = _healthStatuses[site.id];
+
+    return InkWell(
+      onTap: () => Navigator.of(context).pop(site.id),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color:
+                isSelected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+            width: isSelected ? 1.5 : 1,
+          ),
+          color:
+              isSelected
+                  ? theme.colorScheme.primaryContainer.withValues(alpha: 0.15)
+                  : Colors.transparent,
+        ),
+        child: Stack(
+          children: [
+            if (isSelected)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Icon(
+                  Icons.check_circle,
+                  color: theme.colorScheme.primary,
+                  size: 18,
+                ),
+              ),
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildSiteLogo(site, isSelected, 30),
+                  const SizedBox(height: 4),
+                  Text(
+                    site.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _buildStatusRow(hs),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListItem(SiteConfig site) {
+    final isSelected = site.id == _selectedSiteId;
+    final theme = Theme.of(context);
+    final hs = _healthStatuses[site.id];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: () => Navigator.of(context).pop(site.id),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color:
+                  isSelected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              width: isSelected ? 1.5 : 1,
+            ),
+            color:
+                isSelected
+                    ? theme.colorScheme.primaryContainer.withValues(alpha: 0.15)
+                    : Colors.transparent,
+          ),
+          child: Row(
+            children: [
+              _buildSiteLogo(site, isSelected, 30),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            site.name,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight:
+                                  isSelected ? FontWeight.bold : FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isSelected) ...[
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.check_circle,
+                            color: theme.colorScheme.primary,
+                            size: 16,
+                          ),
+                        ],
+                      ],
+                    ),
+                    Text(
+                      site.baseUrl,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _buildStatusRow(hs),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusRow(HealthStatus? hs) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: _getStatusColor(hs),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          _getStatusText(hs),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSiteLogo(SiteConfig site, bool isSelected, double size) {
+    final theme = Theme.of(context);
+    final Color? siteColor =
+        site.siteColor != null ? Color(site.siteColor!) : null;
+
+    return Container(
+      width: size,
+      height: size,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color:
+            isSelected
+                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.2)
+                : (siteColor?.withValues(alpha: 0.1) ??
+                    theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.3,
+                    )),
+        shape: BoxShape.circle,
+      ),
+      child: FutureBuilder<String>(
+        future: _resolveLogoPath(site),
+        builder: (context, snapshot) {
+          String path =
+              snapshot.data ?? 'assets/sites_icon/_default_nexusphp.png';
+          if (snapshot.connectionState != ConnectionState.done &&
+              snapshot.data == null) {
+            return Icon(
+              Icons.dns,
+              size: size * 0.6,
+              color: theme.colorScheme.onSurfaceVariant,
+            );
+          }
+          return ClipOval(
+            child: Image.asset(
+              path,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(
+                  Icons.dns,
+                  size: size * 0.6,
+                  color: theme.colorScheme.onSurfaceVariant,
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
+
 
 class MTeamApp extends StatefulWidget {
   const MTeamApp({super.key});
@@ -742,6 +1083,12 @@ class _HomePageState extends State<HomePage> {
 
   // 下载请求状态管理
   final Set<String> _pendingDownloadRequests = <String>{};
+
+  BatchProgressState<TorrentItem>? _batchProgress;
+  final Map<String, BatchItemState> _batchItemStates =
+      <String, BatchItemState>{};
+  final Map<String, String> _batchItemErrors = <String, String>{};
+  final Map<String, TorrentItem> _batchTrackedItems = <String, TorrentItem>{};
 
   // 当前站点配置
   SiteConfig? _currentSite;
@@ -982,46 +1329,60 @@ class _HomePageState extends State<HomePage> {
     if (_searchFocusNode.hasFocus) {
       _searchFocusNode.unfocus();
     }
+
+    if (!mounted) return;
+
     final currentOffset = _scrollCtrl.position.pixels;
     final delta = currentOffset - _lastScrollOffset;
+    _lastScrollOffset = currentOffset;
 
     // 基于滚动距离的连续进度控制：向下滚动逐步隐藏，向上滚动逐步显示
     double newProgress = _headerProgress;
+    bool shouldUpdateFab = false;
+    bool nextFabVisible = _fabVisible;
+
     if (delta > 0) {
       // 向下滚动（内容上移）：减少头部显示进度，隐藏 FAB
       newProgress = (newProgress - delta / _maxHideDistance).clamp(0.0, 1.0);
       if (_fabVisible) {
-        setState(() {
-          _headerProgress = newProgress;
-          _fabVisible = false;
-        });
-      } else if (newProgress != _headerProgress) {
-        setState(() {
-          _headerProgress = newProgress;
-        });
+        nextFabVisible = false;
+        shouldUpdateFab = true;
       }
     } else if (delta < 0) {
       // 向上滚动（内容下移）：增加头部显示进度，显示 FAB
       newProgress = (newProgress + (-delta) / _maxHideDistance).clamp(0.0, 1.0);
       if (!_fabVisible) {
-        setState(() {
-          _headerProgress = newProgress;
-          _fabVisible = true;
-        });
-      } else if (newProgress != _headerProgress) {
-        setState(() {
-          _headerProgress = newProgress;
-        });
+        nextFabVisible = true;
+        shouldUpdateFab = true;
       }
     }
-    _lastScrollOffset = currentOffset;
+
+    if (newProgress != _headerProgress || shouldUpdateFab) {
+      // 优化：使用 WidgetsBinding 确保在布局完成后更新状态，
+      // 避免在 resize 等导致 layout 的过程中触发 setState 报错
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _headerProgress = newProgress;
+            if (shouldUpdateFab) {
+              _fabVisible = nextFabVisible;
+            }
+          });
+        }
+      });
+    }
 
     // 原有的分页加载逻辑
     if (!_hasMore || _loading) return;
     // 使用筛选后的列表长度来判断是否触底加载可能不太准确，但通常加载更多是基于原始列表
     // 这里保持原逻辑，只要滚动到底部就加载更多
     if (currentOffset >= _scrollCtrl.position.maxScrollExtent - 200) {
-      _loadMore();
+      // 同样在下一帧执行，避免在 layout 过程中触发
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _loadMore();
+        }
+      });
     }
   }
 
@@ -1045,17 +1406,15 @@ class _HomePageState extends State<HomePage> {
                       },
                       icon: const Icon(Icons.category, size: 20),
                       style: IconButton.styleFrom(
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.primaryContainer,
-                        foregroundColor: Theme.of(
-                          context,
-                        ).colorScheme.onPrimaryContainer,
-                        elevation: 2,
+                        backgroundColor:
+                            Theme.of(context).colorScheme.primaryContainer,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimaryContainer,
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(10),
                       ),
                       tooltip:
                           _categories.isNotEmpty &&
@@ -1083,34 +1442,20 @@ class _HomePageState extends State<HomePage> {
                                   ? '输入关键词（可选）'
                                   : '输入关键词（必填）')
                             : '当前站点不支持搜索功能',
-                        border: OutlineInputBorder(
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(25),
-                          ),
-                          borderSide: BorderSide(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.3),
-                          ),
+                        border: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(25)),
+                          borderSide: BorderSide.none,
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(25),
-                          ),
-                          borderSide: BorderSide(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.3),
-                          ),
+                        enabledBorder: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(25)),
+                          borderSide: BorderSide.none,
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(25),
-                          ),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                        focusedBorder: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(25)),
+                          borderSide: BorderSide.none,
                         ),
+                        filled: true,
+                        fillColor: Theme.of(context).colorScheme.surfaceContainer,
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -1325,16 +1670,35 @@ class _HomePageState extends State<HomePage> {
     final trimmedKeyword = _keywordCtrl.text.trim();
 
     if (reset) {
-      _pageNumber = 1;
-      _items.clear();
-      _hasMore = true;
-      _totalPages = 1;
-      // 重置排序状态
-      _sortBy = 'none';
-      _sortAscending = false;
-      // 重置标签筛选
-      // _includedTags.clear(); // 标签筛选由用户手动控制，不随搜索重置
-      // _excludedTags.clear();
+      if (mounted) {
+        setState(() {
+          _pageNumber = 1;
+          _items.clear();
+          _hasMore = true;
+          _totalPages = 1;
+          // 重置排序状态
+          _sortBy = 'none';
+          _sortAscending = false;
+          // 重置显示状态
+          _headerProgress = 1.0;
+          _fabVisible = true;
+          _lastScrollOffset = 0.0;
+        });
+      } else {
+        _pageNumber = 1;
+        _items.clear();
+        _hasMore = true;
+        _totalPages = 1;
+        _sortBy = 'none';
+        _sortAscending = false;
+        _headerProgress = 1.0;
+        _fabVisible = true;
+        _lastScrollOffset = 0.0;
+      }
+
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.jumpTo(0);
+      }
     }
 
     if (!supportTorrentSearch) {
@@ -1492,41 +1856,59 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
       final result = await showDialog<Map<String, dynamic>>(
         context: context,
-        builder: (_) =>
-            TorrentDownloadDialog(torrentName: item.name, downloadUrl: url),
+        builder: (_) => TorrentDownloadDialog(
+          torrentName: item.name,
+          downloadUrl: url,
+          isGazelleSite: _currentSite?.siteType == SiteType.gazelle,
+        ),
       );
 
       if (result == null) return; // 用户取消了
 
-      // 3. 从对话框结果中获取设置
-      final clientConfig = result['clientConfig'] as DownloaderConfig;
-      final password = result['password'] as String;
-      final category = result['category'] as String?;
-      final tags = result['tags'] as List<String>?;
-      final savePath = result['savePath'] as String?;
-      final autoTMM = result['autoTMM'] as bool?;
-      final startPaused = result['startPaused'] as bool?;
+      // 3. 判断下载模式
+      final downloadToLocal = result['downloadToLocal'] as bool? ?? false;
 
-      // 4. 发送到下载器
-      await DownloaderService.instance.addTask(
-        config: clientConfig,
-        password: password,
-        params: AddTaskParams(
-          url: url,
-          category: category,
-          tags: tags,
-          savePath: savePath,
-          autoTMM: autoTMM,
-          startPaused: startPaused,
-        ),
-        siteConfig: _currentSite,
-      );
-
-      if (mounted) {
-        NotificationHelper.showInfo(
-          context,
-          '已成功发送"${item.name}"到 ${clientConfig.name}',
+      if (downloadToLocal) {
+        // 本地下载模式
+        final savedPath = await LocalDownloadService.instance.downloadAndSaveTorrent(
+          downloadUrl: url,
+          torrentName: item.name,
+          siteConfig: _currentSite,
         );
+
+        if (mounted && savedPath != null) {
+          NotificationHelper.showInfo(
+            context,
+            '种子文件已保存到: $savedPath',
+          );
+        }
+      } else {
+        // 远程下载器模式
+        final downloadContext = BatchDownloadContext(
+          clientConfig: result['clientConfig'] as DownloaderConfig,
+          password: result['password'] as String,
+          category: result['category'] as String?,
+          tags: result['tags'] as List<String>? ?? const [],
+          savePath: result['savePath'] as String?,
+          autoTMM: result['autoTMM'] as bool?,
+          startPaused: result['startPaused'] as bool?,
+          useToken: result['useToken'] as bool?,
+        );
+
+        // 4. 发送到下载器
+        String finalUrl = url;
+        if (downloadContext.useToken == true &&
+            !finalUrl.contains('usetoken=1')) {
+          finalUrl += '&usetoken=1';
+        }
+        await _enqueueDownload(item, downloadContext, resolvedUrl: finalUrl);
+
+        if (mounted) {
+          NotificationHelper.showInfo(
+            context,
+            '已成功发送"${item.name}"到 ${downloadContext.clientConfig!.name}',
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -1536,19 +1918,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _onToggleCollection(TorrentItem item) async {
-    final newCollectionState = !item.collection;
-
-    // 立即更新UI状态 - 直接修改现有对象
-    if (mounted) {
-      setState(() {
-        item.collection = newCollectionState;
-      });
-    }
-
-    // 不显示开始通知，直接进行后台处理
-
-    // 异步后台请求
-    _performCollectionRequest(item, newCollectionState);
+    await _toggleCollectionWithOptimisticUpdate(item);
   }
 
   Future<void> _showCategoryFilterDialog() async {
@@ -1588,21 +1958,78 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _performCollectionRequest(
-    TorrentItem item,
-    bool newCollectionState,
-  ) async {
-    // 检查请求间隔
+  BatchItemState _batchItemStateFor(String itemId) {
+    return _batchItemStates[itemId] ?? BatchItemState.idle;
+  }
+
+  String? _batchItemErrorFor(String itemId) {
+    return _batchItemErrors[itemId];
+  }
+
+  bool get _isBatchRunning => _batchProgress?.isRunning ?? false;
+
+  bool _isBatchActionRunning(BatchOperationType actionType) {
+    return _isBatchRunning && _batchProgress?.actionType == actionType;
+  }
+
+  void _closeBatchProgress() {
+    if (!mounted || _isBatchRunning) return;
+    setState(() {
+      _batchProgress = null;
+      _batchTrackedItems.clear();
+      _batchItemStates.clear();
+      _batchItemErrors.clear();
+    });
+  }
+
+  BatchProgressState<TorrentItem> _buildBatchProgressState({
+    required BatchOperationType actionType,
+    required bool isRunning,
+    required int runTotalCount,
+    required int runCompletedCount,
+    String? currentItemName,
+    BatchRetryContext? retryableContext,
+  }) {
+    return buildBatchProgressState<TorrentItem>(
+      actionType: actionType,
+      isRunning: isRunning,
+      runTotalCount: runTotalCount,
+      runCompletedCount: runCompletedCount,
+      itemStates: _batchItemStates,
+      itemErrors: _batchItemErrors,
+      trackedItems: _batchTrackedItems,
+      itemNameOf: (item) => item.name,
+      currentItemName: currentItemName,
+      retryableContext: retryableContext,
+    );
+  }
+
+  int _currentOperationIntervalMs() {
+    return math.max(0, _currentSite?.operationIntervalMs ?? 500);
+  }
+
+  Future<void> _waitForCollectionInterval(int intervalMs) async {
+    if (intervalMs <= 0) return;
     final now = DateTime.now();
     if (_lastCollectionRequest != null) {
       final timeDiff = now.difference(_lastCollectionRequest!);
-      if (timeDiff.inMilliseconds < 1000) {
+      if (timeDiff.inMilliseconds < intervalMs) {
         await Future.delayed(
-          Duration(milliseconds: 1000 - timeDiff.inMilliseconds),
+          Duration(milliseconds: intervalMs - timeDiff.inMilliseconds),
         );
       }
     }
     _lastCollectionRequest = DateTime.now();
+  }
+
+  Future<void> _performCollectionRequest(
+    TorrentItem item,
+    bool newCollectionState, {
+    bool applyRateLimit = true,
+  }) async {
+    if (applyRateLimit) {
+      await _waitForCollectionInterval(_currentOperationIntervalMs());
+    }
 
     // 标记为处理中
     _pendingCollectionRequests[item.id] = newCollectionState;
@@ -1612,27 +2039,96 @@ class _HomePageState extends State<HomePage> {
         id: item.id,
         make: newCollectionState,
       );
-
-      // 请求成功，移除处理标记
+    } finally {
       _pendingCollectionRequests.remove(item.id);
-      // 不显示成功通知
+    }
+  }
+
+  Future<void> _toggleCollectionWithOptimisticUpdate(
+    TorrentItem item, {
+    bool showErrorToast = true,
+    bool applyRateLimit = true,
+    bool rethrowOnError = false,
+  }) async {
+    final newCollectionState = !item.collection;
+
+    if (mounted) {
+      setState(() {
+        item.collection = newCollectionState;
+      });
+    }
+
+    try {
+      await _performCollectionRequest(
+        item,
+        newCollectionState,
+        applyRateLimit: applyRateLimit,
+      );
     } catch (e) {
-      // 请求失败，恢复原状态
-      _pendingCollectionRequests.remove(item.id);
-
       if (mounted) {
         setState(() {
-          item.collection = !newCollectionState; // 恢复原状态
+          item.collection = !newCollectionState;
         });
       }
-
-      if (mounted) {
+      if (mounted && showErrorToast) {
         NotificationHelper.showError(
           context,
           '收藏操作失败：$e',
           duration: const Duration(seconds: 2),
         );
       }
+      if (rethrowOnError) {
+        rethrow;
+      }
+    }
+  }
+
+  Future<void> _enqueueDownload(
+    TorrentItem item,
+    BatchDownloadContext downloadContext, {
+    String? resolvedUrl,
+  }) async {
+    if (_pendingDownloadRequests.contains(item.id)) {
+      throw Exception('该项目正在处理下载请求');
+    }
+
+    _pendingDownloadRequests.add(item.id);
+    try {
+      var url =
+          resolvedUrl ??
+          await ApiService.instance.genDlToken(
+            id: item.id,
+            url: item.downloadUrl,
+          );
+
+      if (downloadContext.downloadToLocal) {
+        // 本地下载模式
+        await LocalDownloadService.instance.downloadAndSaveTorrent(
+          downloadUrl: url,
+          torrentName: item.name,
+          siteConfig: _currentSite,
+        );
+      } else {
+        // 远程下载器模式
+        if (downloadContext.useToken == true && !url.contains('usetoken=1')) {
+          url += '&usetoken=1';
+        }
+        await DownloaderService.instance.addTask(
+          config: downloadContext.clientConfig!,
+          password: downloadContext.password!,
+          params: AddTaskParams(
+            url: url,
+            category: downloadContext.category,
+            tags: downloadContext.tags.isEmpty ? null : downloadContext.tags,
+            savePath: downloadContext.savePath,
+            autoTMM: downloadContext.autoTMM,
+            startPaused: downloadContext.startPaused,
+          ),
+          siteConfig: _currentSite,
+        );
+      }
+    } finally {
+      _pendingDownloadRequests.remove(item.id);
     }
   }
 
@@ -1862,6 +2358,7 @@ class _HomePageState extends State<HomePage> {
                       style: const TextStyle(color: Colors.red),
                     ),
                   ),
+                if (_batchProgress != null) _buildBatchProgressCard(),
                 Expanded(
                   child: _currentSite == null
                       ? Center(
@@ -2026,14 +2523,33 @@ class _HomePageState extends State<HomePage> {
                                         isSelectionMode: _isSelectionMode,
                                         currentSite: _currentSite,
                                         showCoverSetting: _showCoverSetting,
+                                        batchOperationType:
+                                            _batchProgress?.actionType,
+                                        batchItemState: _batchItemStateFor(
+                                          item.id,
+                                        ),
+                                        batchErrorMessage: _batchItemErrorFor(
+                                          item.id,
+                                        ),
+                                        onRetryBatchAction:
+                                            _buildRetryCallbackForItem(item),
                                         onTap: () => _isSelectionMode
                                             ? _onToggleSelection(item, index)
                                             : _onTorrentTap(item),
                                         onLongPress: () =>
                                             _onLongPress(item, index),
-                                        onToggleCollection: () =>
-                                            _onToggleCollection(item),
-                                        onDownload: () => _onDownload(item),
+                                        onToggleCollection:
+                                            _isBatchActionRunning(
+                                              BatchOperationType.favorite,
+                                            )
+                                            ? null
+                                            : () => _onToggleCollection(item),
+                                        onDownload:
+                                            _isBatchActionRunning(
+                                              BatchOperationType.download,
+                                            )
+                                            ? null
+                                            : () => _onDownload(item),
                                       ),
                                     );
                                   },
@@ -2061,7 +2577,9 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         Expanded(
                           child: TextButton(
-                            onPressed: _onCancelSelection,
+                            onPressed: _isBatchRunning
+                                ? null
+                                : _onCancelSelection,
                             style: TextButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 0,
@@ -2079,18 +2597,20 @@ class _HomePageState extends State<HomePage> {
                         // 全选按钮
                         Expanded(
                           child: TextButton(
-                            onPressed: () {
-                              if (_selectedItems.length ==
-                                  _filteredItems.length) {
-                                setState(() => _selectedItems.clear());
-                              } else {
-                                setState(() {
-                                  _selectedItems.addAll(
-                                    _filteredItems.map((e) => e.id),
-                                  );
-                                });
-                              }
-                            },
+                            onPressed: _isBatchRunning
+                                ? null
+                                : () {
+                                    if (_selectedItems.length ==
+                                        _filteredItems.length) {
+                                      setState(() => _selectedItems.clear());
+                                    } else {
+                                      setState(() {
+                                        _selectedItems.addAll(
+                                          _filteredItems.map((e) => e.id),
+                                        );
+                                      });
+                                    }
+                                  },
                             style: TextButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 0,
@@ -2114,7 +2634,8 @@ class _HomePageState extends State<HomePage> {
                             true) ...[
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: _selectedItems.isNotEmpty
+                              onPressed:
+                                  !_isBatchRunning && _selectedItems.isNotEmpty
                                   ? _onBatchFavorite
                                   : null,
                               style: ElevatedButton.styleFrom(
@@ -2134,7 +2655,8 @@ class _HomePageState extends State<HomePage> {
                         if (_currentSite?.features.supportDownload ?? true)
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: _selectedItems.isNotEmpty
+                              onPressed:
+                                  !_isBatchRunning && _selectedItems.isNotEmpty
                                   ? _onBatchDownload
                                   : null,
                               style: ElevatedButton.styleFrom(
@@ -2327,71 +2849,33 @@ class _HomePageState extends State<HomePage> {
 
   // 批量收藏
   Future<void> _onBatchFavorite() async {
-    if (_selectedItems.isEmpty) return;
+    if (_selectedItems.isEmpty || _isBatchRunning) return;
 
     final selectedItems = _items
         .where((item) => _selectedItems.contains(item.id))
         .toList();
     _onCancelSelection(); // 立即取消选择模式
 
-    // 显示开始收藏的提示
-    if (mounted) {
-      NotificationHelper.showInfo(
-        context,
-        '开始批量收藏${selectedItems.length}个项目...',
-      );
-    }
-
-    // 异步处理收藏
-    _performBatchFavorite(selectedItems);
+    unawaited(_performBatchFavorite(selectedItems));
   }
 
   Future<void> _performBatchFavorite(List<TorrentItem> items) async {
-    int successCount = 0;
-    int failureCount = 0;
-
-    for (int i = 0; i < items.length; i++) {
-      final item = items[i];
-      try {
-        await _onToggleCollection(item);
-        successCount++;
-
-        // 间隔控制
-        if (i < items.length - 1) {
-          await Future.delayed(Duration(seconds: 2));
-        }
-      } catch (e) {
-        failureCount++;
-        if (mounted) {
-          NotificationHelper.showError(context, '收藏失败: ${item.name}, 错误: $e');
-        }
-      }
-    }
-
-    // 显示最终结果
-    if (mounted) {
-      final total = items.length;
-      final message = '已成功收藏/取消收藏 $successCount/$total 个';
-
-      if (failureCount == 0) {
-        NotificationHelper.showInfo(
-          context,
-          message,
-          duration: const Duration(seconds: 2),
-        );
-      } else {
-        NotificationHelper.showError(
-          context,
-          message,
-          duration: const Duration(seconds: 2),
-        );
-      }
-    }
+    await _runBatchOperation(
+      actionType: BatchOperationType.favorite,
+      items: items,
+      executeItem: (item) => _toggleCollectionWithOptimisticUpdate(
+        item,
+        showErrorToast: false,
+        applyRateLimit: false,
+        rethrowOnError: true,
+      ),
+      preserveExistingState: false,
+    );
   }
 
   // 批量下载
   Future<void> _onBatchDownload() async {
-    if (_selectedItems.isEmpty) return;
+    if (_selectedItems.isEmpty || _isBatchRunning) return;
 
     final selectedItems = _items
         .where((item) => _selectedItems.contains(item.id))
@@ -2400,100 +2884,261 @@ class _HomePageState extends State<HomePage> {
     // 显示批量下载设置对话框
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) =>
-          TorrentDownloadDialog(itemCount: selectedItems.length),
+      builder: (context) => TorrentDownloadDialog(
+        itemCount: selectedItems.length,
+        isGazelleSite: _currentSite?.siteType == SiteType.gazelle,
+      ),
     );
 
     if (result == null) return; // 用户取消了
 
     _onCancelSelection(); // 取消选择模式
 
-    // 显示开始下载的提示
-    if (mounted) {
-      final clientConfig = result['clientConfig'] as DownloaderConfig;
-      NotificationHelper.showInfo(
-        context,
-        '开始批量下载${selectedItems.length}个项目到${clientConfig.name}...',
-      );
-    }
+    // 判断下载模式
+    final downloadToLocal = result['downloadToLocal'] as bool? ?? false;
 
-    // 异步处理下载
-    _performBatchDownload(
-      selectedItems,
-      result['clientConfig'] as DownloaderConfig,
-      result['password'] as String,
-      result['category'] as String?,
-      result['tags'] as List<String>? ?? [],
-      result['savePath'] as String?,
-      result['autoTMM'] as bool?,
-    );
+    if (downloadToLocal) {
+      // 本地下载模式：打包成zip保存
+      unawaited(_performBatchLocalDownload(selectedItems));
+    } else {
+      // 远程下载器模式
+      final downloadContext = BatchDownloadContext(
+        downloadToLocal: false,
+        clientConfig: result['clientConfig'] as DownloaderConfig,
+        password: result['password'] as String,
+        category: result['category'] as String?,
+        tags: result['tags'] as List<String>? ?? const [],
+        savePath: result['savePath'] as String?,
+        autoTMM: result['autoTMM'] as bool?,
+        startPaused: result['startPaused'] as bool?,
+        useToken: result['useToken'] as bool?,
+      );
+
+      unawaited(_performBatchDownload(selectedItems, downloadContext));
+    }
   }
 
   Future<void> _performBatchDownload(
     List<TorrentItem> items,
-    DownloaderConfig clientConfig,
-    String password,
-    String? category,
-    List<String> tags,
-    String? savePath,
-    bool? autoTMM,
+    BatchDownloadContext downloadContext,
   ) async {
-    int successCount = 0;
-    int failureCount = 0;
+    await _runBatchOperation(
+      actionType: BatchOperationType.download,
+      items: items,
+      executeItem: (item) => _enqueueDownload(item, downloadContext),
+      retryableContext: downloadContext,
+      preserveExistingState: false,
+    );
+  }
 
+  Future<void> _performBatchLocalDownload(List<TorrentItem> items) async {
+    if (items.isEmpty) return;
+
+    if (mounted) {
+      setState(() {
+        _batchTrackedItems.clear();
+        _batchItemStates.clear();
+        _batchItemErrors.clear();
+        for (final item in items) {
+          _batchTrackedItems[item.id] = item;
+          _batchItemStates[item.id] = BatchItemState.idle;
+          _batchItemErrors.remove(item.id);
+        }
+        _batchProgress = _buildBatchProgressState(
+          actionType: BatchOperationType.download,
+          isRunning: true,
+          runTotalCount: items.length,
+          runCompletedCount: 0,
+        );
+      });
+    }
+
+    // 构建下载项列表
+    final downloadItems = <TorrentDownloadItem>[];
     for (final item in items) {
       try {
-        // 检查是否在待处理列表中
-        if (_pendingDownloadRequests.contains(item.id)) {
-          continue;
-        }
-
-        _pendingDownloadRequests.add(item.id);
-
-        // 获取下载 URL
-        final url = await ApiService.instance.genDlToken(
+        var url = await ApiService.instance.genDlToken(
           id: item.id,
           url: item.downloadUrl,
         );
-
-        // 发送到下载器
-        await DownloaderService.instance.addTask(
-          config: clientConfig,
-          password: password,
-          params: AddTaskParams(
-            url: url,
-            category: category,
-            tags: tags.isEmpty ? null : tags,
-            savePath: savePath,
-            autoTMM: autoTMM,
-          ),
-        );
-
-        successCount++;
-
-        // 添加延迟避免请求过快
-        await Future.delayed(const Duration(milliseconds: 500));
+        downloadItems.add(TorrentDownloadItem(
+          downloadUrl: url,
+          torrentName: item.name,
+          siteConfig: _currentSite,
+        ));
       } catch (e) {
-        failureCount++;
         if (mounted) {
-          NotificationHelper.showError(
-            context,
-            '下载失败: ${item.name}, 错误: $e',
-            duration: const Duration(seconds: 2),
-          );
+          setState(() {
+            _batchItemStates[item.id] = BatchItemState.failed;
+            _batchItemErrors[item.id] = '获取下载链接失败: $e';
+          });
         }
-      } finally {
-        _pendingDownloadRequests.remove(item.id);
       }
     }
 
-    // 显示最终结果
-    if (mounted) {
-      final message = failureCount == 0
-          ? '批量下载完成，成功$successCount个项目'
-          : '批量下载完成，成功$successCount个，失败$failureCount个';
+    // 批量下载并打包成zip
+    try {
+      final savedPath = await LocalDownloadService.instance.batchDownloadAndSaveAsZip(
+        items: downloadItems,
+        onProgress: (current, total, currentName) {
+          if (mounted) {
+            setState(() {
+              _batchProgress = _buildBatchProgressState(
+                actionType: BatchOperationType.download,
+                isRunning: true,
+                runTotalCount: items.length,
+                runCompletedCount: current,
+                currentItemName: currentName,
+              );
+            });
+          }
+        },
+      );
 
-      if (failureCount == 0) {
+      if (mounted) {
+        setState(() {
+          _batchProgress = _buildBatchProgressState(
+            actionType: BatchOperationType.download,
+            isRunning: false,
+            runTotalCount: items.length,
+            runCompletedCount: items.length,
+          );
+        });
+
+        if (savedPath != null) {
+          NotificationHelper.showInfo(
+            context,
+            '批量下载完成，已保存到: $savedPath',
+            duration: const Duration(seconds: 3),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _batchProgress = _buildBatchProgressState(
+            actionType: BatchOperationType.download,
+            isRunning: false,
+            runTotalCount: items.length,
+            runCompletedCount: items.length,
+          );
+        });
+        NotificationHelper.showError(
+          context,
+          '批量下载失败: $e',
+          duration: const Duration(seconds: 3),
+        );
+      }
+    }
+  }
+
+  Future<void> _runBatchOperation({
+    required BatchOperationType actionType,
+    required List<TorrentItem> items,
+    required Future<void> Function(TorrentItem item) executeItem,
+    BatchRetryContext? retryableContext,
+    required bool preserveExistingState,
+  }) async {
+    if (items.isEmpty || _isBatchRunning) return;
+
+    if (mounted) {
+      setState(() {
+        if (!preserveExistingState) {
+          _batchTrackedItems.clear();
+          _batchItemStates.clear();
+          _batchItemErrors.clear();
+        }
+        for (final item in items) {
+          _batchTrackedItems[item.id] = item;
+          _batchItemStates[item.id] = BatchItemState.idle;
+          _batchItemErrors.remove(item.id);
+        }
+        _batchProgress = _buildBatchProgressState(
+          actionType: actionType,
+          isRunning: true,
+          runTotalCount: items.length,
+          runCompletedCount: 0,
+          retryableContext: retryableContext,
+        );
+      });
+    }
+
+    for (int index = 0; index < items.length; index++) {
+      final item = items[index];
+
+      if (mounted) {
+        setState(() {
+          _batchItemStates[item.id] = BatchItemState.running;
+          _batchItemErrors.remove(item.id);
+          _batchProgress = _buildBatchProgressState(
+            actionType: actionType,
+            isRunning: true,
+            runTotalCount: items.length,
+            runCompletedCount: index,
+            currentItemName: item.name,
+            retryableContext: retryableContext,
+          );
+        });
+      }
+
+      try {
+        await executeItem(item);
+        if (mounted) {
+          setState(() {
+            _batchItemStates[item.id] = BatchItemState.success;
+            _batchItemErrors.remove(item.id);
+          });
+        }
+      } catch (e) {
+        final errorMessage = formatBatchError(e);
+        if (mounted) {
+          setState(() {
+            _batchItemStates[item.id] = BatchItemState.failed;
+            _batchItemErrors[item.id] = errorMessage;
+          });
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _batchProgress = _buildBatchProgressState(
+            actionType: actionType,
+            isRunning: true,
+            runTotalCount: items.length,
+            runCompletedCount: index + 1,
+            retryableContext: retryableContext,
+            currentItemName: index == items.length - 1 ? null : item.name,
+          );
+        });
+      }
+
+      if (index < items.length - 1) {
+        final intervalMs = _currentOperationIntervalMs();
+        if (intervalMs > 0) {
+          await Future.delayed(Duration(milliseconds: intervalMs));
+        }
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _batchProgress = _buildBatchProgressState(
+          actionType: actionType,
+          isRunning: false,
+          runTotalCount: items.length,
+          runCompletedCount: items.length,
+          retryableContext: retryableContext,
+        );
+      });
+
+      final batchProgress = _batchProgress!;
+      final actionLabel = batchProgress.actionLabel;
+      final message = batchProgress.failureCount == 0
+          ? '$actionLabel完成，成功${batchProgress.successCount}个项目'
+          : '$actionLabel完成，成功${batchProgress.successCount}个，失败${batchProgress.failureCount}个';
+
+      if (batchProgress.failureCount == 0) {
+        _closeBatchProgress();
         NotificationHelper.showInfo(
           context,
           message,
@@ -2507,6 +3152,114 @@ class _HomePageState extends State<HomePage> {
         );
       }
     }
+  }
+
+  Future<void> _retryFailedBatchItems() async {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null ||
+        batchProgress.isRunning ||
+        batchProgress.failedItems.isEmpty) {
+      return;
+    }
+
+    switch (batchProgress.actionType) {
+      case BatchOperationType.favorite:
+        await _runBatchOperation(
+          actionType: BatchOperationType.favorite,
+          items: batchProgress.failedItems
+              .map((failure) => failure.item)
+              .toList(),
+          executeItem: (item) => _toggleCollectionWithOptimisticUpdate(
+            item,
+            showErrorToast: false,
+            applyRateLimit: false,
+            rethrowOnError: true,
+          ),
+          preserveExistingState: true,
+        );
+        break;
+      case BatchOperationType.download:
+        final retryContext = batchProgress.retryableContext;
+        if (retryContext is! BatchDownloadContext) return;
+        await _runBatchOperation(
+          actionType: BatchOperationType.download,
+          items: batchProgress.failedItems
+              .map((failure) => failure.item)
+              .toList(),
+          executeItem: (item) => _enqueueDownload(item, retryContext),
+          retryableContext: retryContext,
+          preserveExistingState: true,
+        );
+        break;
+    }
+  }
+
+  Future<void> _retrySingleBatchItem(TorrentItem item) async {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null ||
+        batchProgress.isRunning ||
+        _batchItemStateFor(item.id) != BatchItemState.failed) {
+      return;
+    }
+
+    switch (batchProgress.actionType) {
+      case BatchOperationType.favorite:
+        await _runBatchOperation(
+          actionType: BatchOperationType.favorite,
+          items: [item],
+          executeItem: (retryItem) => _toggleCollectionWithOptimisticUpdate(
+            retryItem,
+            showErrorToast: false,
+            applyRateLimit: false,
+            rethrowOnError: true,
+          ),
+          preserveExistingState: true,
+        );
+        break;
+      case BatchOperationType.download:
+        final retryContext = batchProgress.retryableContext;
+        if (retryContext is! BatchDownloadContext) return;
+        await _runBatchOperation(
+          actionType: BatchOperationType.download,
+          items: [item],
+          executeItem: (retryItem) => _enqueueDownload(retryItem, retryContext),
+          retryableContext: retryContext,
+          preserveExistingState: true,
+        );
+        break;
+    }
+  }
+
+  VoidCallback? _buildRetryCallbackForItem(TorrentItem item) {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null ||
+        batchProgress.isRunning ||
+        _batchItemStateFor(item.id) != BatchItemState.failed) {
+      return null;
+    }
+
+    final isTrackedFailure = batchProgress.failedItems.any(
+      (failure) => failure.itemId == item.id,
+    );
+    if (!isTrackedFailure) {
+      return null;
+    }
+
+    return () => unawaited(_retrySingleBatchItem(item));
+  }
+
+  Widget _buildBatchProgressCard() {
+    final batchProgress = _batchProgress;
+    if (batchProgress == null) {
+      return const SizedBox.shrink();
+    }
+    return BatchProgressCard<TorrentItem>(
+      progress: batchProgress,
+      margin: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+      onRetryAll: _retryFailedBatchItems,
+      onRetryItem: (item) => unawaited(_retrySingleBatchItem(item)),
+      onClose: _closeBatchProgress,
+    );
   }
 }
 

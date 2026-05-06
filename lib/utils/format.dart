@@ -65,6 +65,42 @@ class FormatUtil {
 
     return int.tryParse(str);
   }
+
+  /// 处理 HTML 转义字符，支持命名实体、十进制和十六进制 Unicode 实体
+  static String unescapeHtml(String? input) {
+    if (input == null || input.isEmpty) return input ?? '';
+
+    // 1. 处理命名实体
+    var result = input
+        .replaceAll('&#039;', "'")
+        .replaceAll('&quot;', '"')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&nbsp;', ' ');
+
+    // 2. 处理十进制 Unicode 实体: &#123;
+    result = result.replaceAllMapped(RegExp(r'&#(\d+);'), (match) {
+      try {
+        final code = int.parse(match.group(1)!);
+        return String.fromCharCode(code);
+      } catch (_) {
+        return match.group(0)!;
+      }
+    });
+
+    // 3. 处理十六进制 Unicode 实体: &#x1f600;
+    result = result.replaceAllMapped(RegExp(r'&#[xX]([0-9a-fA-F]+);'), (match) {
+      try {
+        final code = int.parse(match.group(1)!, radix: 16);
+        return String.fromCharCode(code);
+      } catch (_) {
+        return match.group(0)!;
+      }
+    });
+
+    return result;
+  }
 }
 
 class Formatters {
@@ -176,6 +212,7 @@ class Formatters {
     String? dateStr, {
     String? format,
     String? zone,
+    String? fieldName,
   }) {
     if (dateStr == null || dateStr.isEmpty) return DateTime.now();
 
@@ -184,10 +221,8 @@ class Formatters {
       DateTime parsed;
 
       if (format != null && format.isNotEmpty) {
-        // 使用 DateFormat 解析自定义格式
         parsed = DateFormat(format).parse(dateStr.trim());
       } else {
-        // 回退逻辑：处理常见的 "yyyy-MM-dd HH:mm:ss" 或标准 ISO 格式
         String normalizedDate = dateStr.trim();
         if (normalizedDate.length >= 19 && normalizedDate[10] == ' ') {
           normalizedDate = normalizedDate.replaceRange(10, 11, 'T');
@@ -200,11 +235,10 @@ class Formatters {
         }
       }
 
-      // 修正时区：将 DateFormat 解析出的不带时区的时间视为指定时区的时间，再转换为本地时间
       String iso = parsed
           .toIso8601String()
           .split('.')
-          .first; // 取 yyyy-MM-ddTHH:mm:ss 部分
+          .first;
       if (iso.contains('.')) iso = iso.split('.').first;
 
       return DateTime.parse("$iso$actualZone").toLocal();
@@ -212,7 +246,11 @@ class Formatters {
       try {
         return DateTime.parse(dateStr).toLocal();
       } catch (_) {
-        return DateTime.now();
+        final field = fieldName ?? 'unknown';
+        throw FormatException(
+          '字段 $field 时间解析失败，原始字符串: "$dateStr"'
+          '${format != null ? '，解析时间格式: "$format"' : ''}',
+        );
       }
     }
   }

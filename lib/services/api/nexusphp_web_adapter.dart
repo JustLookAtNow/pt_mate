@@ -1072,7 +1072,14 @@ class NexusPHPWebAdapter extends SiteAdapter
             row,
             fieldsConfig['cover'] as Map<String, dynamic>? ?? {},
           );
-          final cover = coverList.isNotEmpty ? coverList.first : '';
+          var cover = coverList.isNotEmpty ? coverList.first : '';
+          if (cover.isNotEmpty && !cover.startsWith('http')) {
+            var finalBaseUrl = baseUrl;
+            if (baseUrl.endsWith("/")) {
+              finalBaseUrl = baseUrl.substring(0, baseUrl.length - 1);
+            }
+            cover = '$finalBaseUrl$cover';
+          }
 
           final createDateConfig =
               fieldsConfig['createDate'] as Map<String, dynamic>? ?? {};
@@ -1201,6 +1208,7 @@ class NexusPHPWebAdapter extends SiteAdapter
                       discountEndTime,
                       format: discountEndTimeTimeConfig?['format'] as String?,
                       zone: discountEndTimeTimeConfig?['zone'] as String?,
+                      fieldName: 'discountEndTime',
                     )
                   : null,
               downloadUrl: downloadUrl.isNotEmpty ? downloadUrl : null,
@@ -1215,6 +1223,7 @@ class NexusPHPWebAdapter extends SiteAdapter
                 createDate,
                 format: createDateTimeConfig?['format'] as String?,
                 zone: createDateTimeConfig?['zone'] as String?,
+                fieldName: 'createdDate',
               ),
               doubanRating: doubanRating.isNotEmpty ? doubanRating : 'N/A',
               imdbRating: imdbRating.isNotEmpty ? imdbRating : 'N/A',

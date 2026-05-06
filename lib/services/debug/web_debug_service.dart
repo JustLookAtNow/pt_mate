@@ -156,13 +156,13 @@ class WebDebugService {
               'smallDescr': e.smallDescr,
               'discount': e.discount.value,
               'discountText': e.discount.displayText,
-              'discountEndTime': e.discountEndTime,
+              'discountEndTime': e.discountEndTime?.toIso8601String(),
               'downloadUrl': e.downloadUrl,
               'seeders': e.seeders,
               'leechers': e.leechers,
               'sizeBytes': e.sizeBytes,
               'cover': e.cover,
-              'createdDate': e.createdDate,
+              'createdDate': e.createdDate.toIso8601String(),
               'doubanRating': e.doubanRating,
               'imdbRating': e.imdbRating,
               'isTop': e.isTop,
@@ -192,7 +192,8 @@ class WebDebugService {
         'torrentsTop3': top3,
       });
     } catch (e) {
-      _sendJson(req, {'error': e.toString()});
+      final msg = e is FormatException ? e.message : e.toString();
+      _sendJson(req, {'error': msg});
     }
   }
 

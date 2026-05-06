@@ -249,7 +249,7 @@ mixin BaseWebAdapterMixin {
               case '~': // 正则匹配
                 try {
                   final regex = _getCachedRegExp(value);
-                  matches = regex.hasMatch(normalizedAttrValue);
+                  matches = regex.hasMatch(attrValue);
                 } catch (e) {
                   // 正则表达式无效，跳过
                   matches = false;

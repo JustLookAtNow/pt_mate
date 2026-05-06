@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/app_models.dart';
 import '../utils/backup_migrators.dart';
@@ -85,6 +86,19 @@ class BackupService {
 
   BackupService(this._storageService) : _webdavService = WebDAVService.instance;
 
+  Future<_PreparedBackupFile> _prepareBackupFile() async {
+    final backup = await createBackup();
+    final timestamp = backup.timestamp.toIso8601String().replaceAll(':', '-');
+    final fileName =
+        '$_backupFilePrefix${backup.version}_$timestamp$_backupFileExtension';
+    final backupContent = jsonEncode(backup.toJson());
+
+    return _PreparedBackupFile(
+      fileName: fileName,
+      content: backupContent,
+    );
+  }
+
   // 创建备份
   Future<BackupData> createBackup() async {
     final data = <String, dynamic>{};
@@ -164,34 +178,38 @@ class BackupService {
   }
 
   // 导出备份到文件
-  Future<String?> exportBackup() async {
+  Future<String?> exportBackup({void Function(String message)? onProgress}) async {
     try {
-      final backup = await createBackup();
-      final timestamp = backup.timestamp.toIso8601String().replaceAll(':', '-');
-      final fileName = '$_backupFilePrefix${backup.version}_$timestamp$_backupFileExtension';
-      final backupContent = jsonEncode(backup.toJson());
+      onProgress?.call('正在创建备份...');
+      final prepared = await _prepareBackupFile();
 
       String? result;
       if (defaultTargetPlatform == TargetPlatform.linux) {
-        // Linux平台：使用传统的文件路径方式
-        result = await FilePicker.platform.saveFile(
-          dialogTitle: '导出备份文件 (建议文件名: $fileName)',
+        onProgress?.call('请选择导出位置...');
+        final initialDirectory =
+            (await getDownloadsDirectory())?.path ??
+            Platform.environment['HOME'] ??
+            Directory.current.path;
+        result = await FilePicker.saveFile(
+          dialogTitle: '导出备份文件',
+          fileName: prepared.fileName,
+          initialDirectory: initialDirectory,
           type: FileType.custom,
           allowedExtensions: ['json'],
         );
 
         if (result != null) {
           final file = File(result);
-          await file.writeAsString(backupContent);
+          await file.writeAsString(prepared.content);
         }
       } else {
-        // Android和iOS平台：使用bytes参数直接保存文件内容
-        result = await FilePicker.platform.saveFile(
+        onProgress?.call('正在导出备份...');
+        result = await FilePicker.saveFile(
           dialogTitle: '导出备份文件',
-          fileName: fileName,
+          fileName: prepared.fileName,
           type: FileType.custom,
           allowedExtensions: ['json'],
-          bytes: utf8.encode(backupContent),
+          bytes: utf8.encode(prepared.content),
         );
       }
 
@@ -204,7 +222,7 @@ class BackupService {
   // 从文件导入备份
   Future<BackupData?> importBackup() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['json'],
         dialogTitle: '选择备份文件',
@@ -374,18 +392,24 @@ class BackupService {
   // WebDAV集成方法
 
   /// 创建备份并自动上传到WebDAV（如果已配置且启用）
-  Future<String?> exportBackupWithWebDAV() async {
+  Future<String?> exportBackupWithWebDAV({
+    void Function(String message)? onProgress,
+  }) async {
     try {
-      // 创建备份数据
-      final backupData = await createBackup();
-      final backupJson = jsonEncode(backupData.toJson());
+      onProgress?.call('正在创建备份...');
+      final prepared = await _prepareBackupFile();
 
       // 检查WebDAV配置
+      onProgress?.call('正在检查导出方式...');
       final webdavConfig = await _webdavService.loadConfig();
       if (webdavConfig != null && webdavConfig.isEnabled) {
         try {
           // 直接上传到WebDAV，不创建本地文件
-          await _webdavService.uploadBackup(backupJson);
+          onProgress?.call('正在上传到 WebDAV...');
+          await _webdavService.uploadBackup(
+            prepared.content,
+            filename: prepared.fileName,
+          );
           // WebDAV上传成功，返回特殊标识表示上传到云端
           return 'WebDAV云端备份';
         } catch (e) {
@@ -398,7 +422,35 @@ class BackupService {
         }
       } else {
         // 没有配置WebDAV或未启用，直接导出到本地
-        return await exportBackup();
+        if (defaultTargetPlatform == TargetPlatform.linux) {
+          onProgress?.call('请选择导出位置...');
+          final initialDirectory =
+              (await getDownloadsDirectory())?.path ??
+              Platform.environment['HOME'] ??
+              Directory.current.path;
+          final result = await FilePicker.saveFile(
+            dialogTitle: '导出备份文件',
+            fileName: prepared.fileName,
+            initialDirectory: initialDirectory,
+            type: FileType.custom,
+            allowedExtensions: ['json'],
+          );
+
+          if (result != null) {
+            final file = File(result);
+            await file.writeAsString(prepared.content);
+          }
+          return result;
+        }
+
+        onProgress?.call('正在导出备份...');
+        return await FilePicker.saveFile(
+          dialogTitle: '导出备份文件',
+          fileName: prepared.fileName,
+          type: FileType.custom,
+          allowedExtensions: ['json'],
+          bytes: utf8.encode(prepared.content),
+        );
       }
     } catch (e) {
       throw BackupException('备份失败: $e');
@@ -505,5 +557,15 @@ class BackupRestoreResult {
   BackupRestoreResult({
     required this.success,
     required this.message,
+  });
+}
+
+class _PreparedBackupFile {
+  final String fileName;
+  final String content;
+
+  const _PreparedBackupFile({
+    required this.fileName,
+    required this.content,
   });
 }

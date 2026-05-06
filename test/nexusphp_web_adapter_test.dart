@@ -16,6 +16,14 @@ void main() {
 
     setUpAll(() async {
       adapter = NexusPHPWebAdapter();
+      await adapter.init(
+        const SiteConfig(
+          id: 'test-nexusphpweb',
+          name: 'Test NexusPHP Web',
+          baseUrl: 'https://example.com',
+          siteType: SiteType.nexusphpweb,
+        ),
+      );
       // 遍历html文件夹中的所有HTML文件
       final htmlDir = Directory('test/html');
       htmlFiles = htmlDir

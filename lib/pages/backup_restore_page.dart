@@ -98,16 +98,16 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
     });
 
     try {
-      // 使用集成WebDAV的导出方法
-      final filePath = await _backupService.exportBackupWithWebDAV();
+      final filePath = await _backupService.exportBackup(
+        onProgress: (message) {
+          if (!mounted) return;
+          setState(() {
+            _statusMessage = message;
+          });
+        },
+      );
       if (filePath != null) {
-        // 检查是否有WebDAV配置
-        final webdavConfig = await _webdavService.loadConfig();
-        if (webdavConfig != null && webdavConfig.isEnabled) {
-          _showMessage('备份已成功导出到: $filePath\n并已自动上传到WebDAV');
-        } else {
-          _showMessage('备份已成功导出到: $filePath');
-        }
+        _showMessage('备份已成功导出到: $filePath');
       } else {
         _showMessage('备份导出已取消', isError: false);
       }

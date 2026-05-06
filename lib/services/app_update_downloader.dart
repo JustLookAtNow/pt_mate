@@ -24,6 +24,45 @@ class AppUpdateProgress {
   });
 }
 
+@immutable
+class MirrorProbeResult {
+  final bool isAvailable;
+  final int? latencyMs;
+  final int bytesReceived;
+  final int elapsedMs;
+  final int? contentLength;
+
+  const MirrorProbeResult({
+    required this.isAvailable,
+    required this.latencyMs,
+    required this.bytesReceived,
+    required this.elapsedMs,
+    required this.contentLength,
+  });
+
+  int? get estimatedBytesPerSecond {
+    if (!isAvailable || bytesReceived <= 0 || elapsedMs <= 0) {
+      return null;
+    }
+    return ((bytesReceived * 1000) / elapsedMs).round();
+  }
+}
+
+@immutable
+class RankedMirrorSource {
+  final String url;
+  final String label;
+  final int? contentLength;
+  final MirrorProbeResult probeResult;
+
+  const RankedMirrorSource({
+    required this.url,
+    required this.label,
+    required this.contentLength,
+    required this.probeResult,
+  });
+}
+
 class AppUpdateDownloader {
   AppUpdateDownloader._();
 
@@ -36,13 +75,22 @@ class AppUpdateDownloader {
     'https://ghproxy.net/',
     'https://github.abskoop.workers.dev/',
   ];
+  static const Duration _probeConnectTimeout = Duration(seconds: 2);
+  static const Duration _probeReceiveTimeout = Duration(seconds: 4);
+  static const Duration _speedTestDuration = Duration(seconds: 3);
+  static const int _speedTestByteLimit = 1024 * 1024;
 
   final Dio _probeDio = Dio(
     BaseOptions(
-      connectTimeout: const Duration(seconds: 2),
-      receiveTimeout: const Duration(seconds: 2),
+      connectTimeout: _probeConnectTimeout,
+      receiveTimeout: _probeReceiveTimeout,
       followRedirects: true,
       validateStatus: (code) => code != null && code >= 200 && code < 400,
+      headers: const {
+        'User-Agent':
+            'Mozilla/5.0 (Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36',
+        'Accept-Encoding': 'identity',
+      },
     ),
   );
 
@@ -63,16 +111,28 @@ class AppUpdateDownloader {
     }
 
     final candidates = _buildCandidateUrls(directApkUrl);
+    onProgress(const AppUpdateProgress(message: '正在测速下载源...'));
     final ranked = await _rankCandidates(candidates);
     if (ranked.isEmpty) {
       throw StateError('未找到可用的下载源');
     }
 
+    final bestSource = ranked.first;
+    onProgress(
+      AppUpdateProgress(
+        message: _buildMirrorSelectedMessage(bestSource, ranked.length),
+      ),
+    );
+
     Object? lastError;
     for (var i = 0; i < ranked.length; i++) {
       final candidate = ranked[i];
       onProgress(
-        AppUpdateProgress(message: '正在尝试下载源 ${i + 1}/${ranked.length}'),
+        AppUpdateProgress(
+          message: i == 0
+              ? '正在使用 ${candidate.label} 下载更新包...'
+              : '正在切换到 ${candidate.label}（${i + 1}/${ranked.length}）...',
+        ),
       );
       try {
         await _executeOta(
@@ -141,53 +201,167 @@ class AppUpdateDownloader {
     return candidates.toList();
   }
 
-  Future<List<({String url, int? contentLength})>> _rankCandidates(
+  Future<List<RankedMirrorSource>> _rankCandidates(
     List<String> candidates,
   ) async {
-    final probes = await Future.wait(
+    final probeResults = <String, MirrorProbeResult>{};
+    await Future.wait(
       candidates.map((url) async {
-        final probe = await _probeUrl(url);
-        return (
-          url: url,
-          latency: probe.latency,
-          contentLength: probe.contentLength,
-        );
+        probeResults[url] = await _probeUrl(url);
       }),
     );
-
-    final available = probes.where((item) => item.latency != null).toList()
-      ..sort((a, b) => a.latency!.compareTo(b.latency!));
-
-    final unavailable = probes.where((item) => item.latency == null);
-    return <({String url, int? contentLength})>[
-      ...available.map(
-        (item) => (url: item.url, contentLength: item.contentLength),
-      ),
-      ...unavailable.map(
-        (item) => (url: item.url, contentLength: item.contentLength),
-      ),
-    ];
+    return rankCandidatesForTesting(candidates, probeResults);
   }
 
-  Future<({int? latency, int? contentLength})> _probeUrl(String url) async {
+  @visibleForTesting
+  List<RankedMirrorSource> rankCandidatesForTesting(
+    List<String> candidates,
+    Map<String, MirrorProbeResult> probeResults,
+  ) {
+    final ranked = <({int index, RankedMirrorSource source})>[];
+    for (var i = 0; i < candidates.length; i++) {
+      final url = candidates[i];
+      final probeResult =
+          probeResults[url] ??
+          const MirrorProbeResult(
+            isAvailable: false,
+            latencyMs: null,
+            bytesReceived: 0,
+            elapsedMs: 0,
+            contentLength: null,
+          );
+      ranked.add((
+        index: i,
+        source: RankedMirrorSource(
+          url: url,
+          label: _describeSource(url),
+          contentLength: probeResult.contentLength,
+          probeResult: probeResult,
+        ),
+      ));
+    }
+
+    ranked.sort((a, b) {
+      final availabilityCompare = _compareBool(
+        a.source.probeResult.isAvailable,
+        b.source.probeResult.isAvailable,
+      );
+      if (availabilityCompare != 0) {
+        return availabilityCompare;
+      }
+
+      if (!a.source.probeResult.isAvailable &&
+          !b.source.probeResult.isAvailable) {
+        return a.index.compareTo(b.index);
+      }
+
+      final speedA = a.source.probeResult.estimatedBytesPerSecond ?? 0;
+      final speedB = b.source.probeResult.estimatedBytesPerSecond ?? 0;
+      final speedCompare = speedB.compareTo(speedA);
+      if (speedCompare != 0) {
+        return speedCompare;
+      }
+
+      final latencyA = a.source.probeResult.latencyMs ?? 1 << 30;
+      final latencyB = b.source.probeResult.latencyMs ?? 1 << 30;
+      final latencyCompare = latencyA.compareTo(latencyB);
+      if (latencyCompare != 0) {
+        return latencyCompare;
+      }
+
+      return a.index.compareTo(b.index);
+    });
+
+    return ranked.map((item) => item.source).toList();
+  }
+
+  Future<MirrorProbeResult> _probeUrl(String url) async {
     final stopwatch = Stopwatch()..start();
+    final cancelToken = CancelToken();
+    Timer? timer;
+    ResponseBody? responseBody;
+    var bytesReceived = 0;
+    int? latencyMs;
+    int? contentLength;
+
     try {
-      final response = await _probeDio.head(url);
-      if ((response.statusCode ?? 500) < 400) {
-        return (
-          latency: stopwatch.elapsedMilliseconds,
-          contentLength: _extractContentLength(response),
+      timer = Timer(_speedTestDuration, () {
+        if (!cancelToken.isCancelled) {
+          cancelToken.cancel('speed-test-timeout');
+        }
+      });
+
+      final response = await _probeDio.get<ResponseBody>(
+        url,
+        cancelToken: cancelToken,
+        options: Options(
+          responseType: ResponseType.stream,
+          headers: const {'Range': 'bytes=0-1048575'},
+        ),
+      );
+      latencyMs = stopwatch.elapsedMilliseconds;
+      contentLength = _extractContentLength(response);
+      responseBody = response.data;
+      if ((response.statusCode ?? 500) >= 400 || responseBody == null) {
+        return MirrorProbeResult(
+          isAvailable: false,
+          latencyMs: latencyMs,
+          bytesReceived: 0,
+          elapsedMs: stopwatch.elapsedMilliseconds,
+          contentLength: contentLength,
         );
       }
-      return (latency: null, contentLength: _extractContentLength(response));
+
+      await for (final chunk in responseBody.stream) {
+        bytesReceived += chunk.length;
+        if (bytesReceived >= _speedTestByteLimit && !cancelToken.isCancelled) {
+          cancelToken.cancel('speed-test-sample-complete');
+        }
+      }
+    } on DioException catch (e) {
+      if (!CancelToken.isCancel(e)) {
+        return MirrorProbeResult(
+          isAvailable: false,
+          latencyMs: latencyMs,
+          bytesReceived: bytesReceived,
+          elapsedMs: stopwatch.elapsedMilliseconds,
+          contentLength: contentLength,
+        );
+      }
     } catch (_) {
-      return (latency: null, contentLength: null);
+      return MirrorProbeResult(
+        isAvailable: false,
+        latencyMs: latencyMs,
+        bytesReceived: bytesReceived,
+        elapsedMs: stopwatch.elapsedMilliseconds,
+        contentLength: contentLength,
+      );
     } finally {
+      timer?.cancel();
       stopwatch.stop();
     }
+
+    return MirrorProbeResult(
+      isAvailable: true,
+      latencyMs: latencyMs,
+      bytesReceived: bytesReceived,
+      elapsedMs: stopwatch.elapsedMilliseconds,
+      contentLength: contentLength,
+    );
   }
 
   int? _extractContentLength(Response<dynamic> response) {
+    final contentRange = response.headers.value('content-range');
+    if (contentRange != null && contentRange.isNotEmpty) {
+      final match = RegExp(r'/(\d+)$').firstMatch(contentRange);
+      if (match != null) {
+        return int.tryParse(match.group(1)!);
+      }
+      if ((response.statusCode ?? 0) == 206) {
+        return null;
+      }
+    }
+
     final header = response.headers.value(Headers.contentLengthHeader);
     if (header == null || header.isEmpty) {
       return null;
@@ -298,6 +472,43 @@ class AppUpdateDownloader {
       return '正在下载更新包 ${progressValue.toStringAsFixed(0)}%';
     }
     return '正在下载更新包...';
+  }
+
+  String _buildMirrorSelectedMessage(
+    RankedMirrorSource source,
+    int totalCandidates,
+  ) {
+    final speed = source.probeResult.estimatedBytesPerSecond;
+    final speedLabel = speed == null ? null : _formatBytes(speed);
+    if (speedLabel == null) {
+      return '已选择 ${source.label}，准备开始下载（共测速 $totalCandidates 个源）';
+    }
+    return '已选择 ${source.label}，测速约 $speedLabel/s，准备开始下载';
+  }
+
+  String _describeSource(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      return '下载源';
+    }
+
+    if (uri.host == 'github.com' ||
+        uri.host == 'objects.githubusercontent.com') {
+      return 'GitHub 官方源';
+    }
+
+    if (uri.host.isEmpty) {
+      return '下载源';
+    }
+
+    return uri.host;
+  }
+
+  int _compareBool(bool a, bool b) {
+    if (a == b) {
+      return 0;
+    }
+    return a ? -1 : 1;
   }
 
   String _formatBytes(int bytes) {

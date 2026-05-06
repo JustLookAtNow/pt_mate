@@ -83,7 +83,7 @@ class MemberProfile {
       lastAccess: json['lastAccess'] != null
           ? DateTime.tryParse(json['lastAccess'].toString())?.toLocal()
           : (json['last_access'] != null
-                ? Formatters.parseDateTimeCustom(json['last_access'].toString())
+                ? Formatters.parseDateTimeCustom(json['last_access'].toString(), fieldName: 'lastAccess')
                 : null),
       bonusPerHour: bonusPerHourVal == null
           ? null
@@ -128,6 +128,10 @@ enum DownloadStatus {
   downloading, // 下载中
   completed, // 已完成
 }
+
+enum BatchOperationType { favorite, download }
+
+enum BatchItemState { idle, running, success, failed }
 
 // 种子项目
 class TorrentItem {
@@ -240,8 +244,10 @@ class TorrentSearchResult {
 enum DiscountType {
   normal('NORMAL'),
   free('FREE'),
+  twoXUpload('2xUP'),
   twoXFree('2xFREE'),
   twoX50Percent('2x50%'),
+  zero('ZERO'),
   percent10('PERCENT_10'),
   percent20('PERCENT_20'),
   percent30('PERCENT_30'),
@@ -262,10 +268,14 @@ enum DiscountType {
         return '';
       case DiscountType.free:
         return 'FREE';
+      case DiscountType.twoXUpload:
+        return '2xUP';
       case DiscountType.twoXFree:
         return '2xFREE';
       case DiscountType.twoX50Percent:
         return '2x50%';
+      case DiscountType.zero:
+        return '0';
       case DiscountType.percent10:
         return '10%';
       case DiscountType.percent20:
@@ -293,10 +303,13 @@ enum DiscountType {
       case DiscountType.normal:
         return DiscountColorType.none;
       case DiscountType.free:
+      case DiscountType.twoXUpload:
       case DiscountType.twoXFree:
         return DiscountColorType.green;
       case DiscountType.twoX50Percent:
         return DiscountColorType.yellow;
+      case DiscountType.zero:
+        return DiscountColorType.blue;
       case DiscountType.percent10:
       case DiscountType.percent20:
       case DiscountType.percent30:
@@ -312,7 +325,7 @@ enum DiscountType {
 }
 
 // 优惠显示颜色类型
-enum DiscountColorType { none, green, yellow }
+enum DiscountColorType { none, green, yellow, blue }
 
 // 标签类型枚举
 enum TagType {
@@ -741,6 +754,7 @@ class SiteConfig {
   final SiteFeatures features; // 功能支持配置
   final String templateId; // 模板ID，记录创建时的模板，自定义为-1
   final int? siteColor; // 站点颜色（ARGB int），可选，缺失时使用哈希色
+  final int operationIntervalMs; // 批量操作间隔（毫秒）
 
   const SiteConfig({
     required this.id,
@@ -757,6 +771,7 @@ class SiteConfig {
     this.features = SiteFeatures.mteamDefault,
     this.templateId = '',
     this.siteColor,
+    this.operationIntervalMs = 500,
   });
 
   SiteConfig copyWith({
@@ -774,6 +789,7 @@ class SiteConfig {
     SiteFeatures? features,
     String? templateId,
     int? siteColor,
+    int? operationIntervalMs,
   }) => SiteConfig(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -789,6 +805,7 @@ class SiteConfig {
     features: features ?? this.features,
     templateId: templateId ?? this.templateId,
     siteColor: siteColor ?? this.siteColor,
+    operationIntervalMs: operationIntervalMs ?? this.operationIntervalMs,
   );
 
   Map<String, dynamic> toJson() => {
@@ -806,6 +823,7 @@ class SiteConfig {
     'features': features.toJson(),
     'templateId': templateId,
     'siteColor': siteColor,
+    'operationIntervalMs': operationIntervalMs,
   };
 
   factory SiteConfig.fromJson(Map<String, dynamic> json) {
@@ -881,6 +899,7 @@ class SiteConfig {
       features: features,
       templateId: templateId,
       siteColor: siteColor,
+      operationIntervalMs: json['operationIntervalMs'] as int? ?? 500,
     );
   }
 
@@ -1024,6 +1043,7 @@ class SiteConfig {
       features: features,
       templateId: templateId,
       siteColor: siteColor,
+      operationIntervalMs: json['operationIntervalMs'] as int? ?? 500,
     );
 
     final result = SiteConfigLoadResult(
@@ -1113,6 +1133,7 @@ class SiteConfigTemplate {
   final Map<String, dynamic>? infoFinder; // 信息提取器配置
   final Map<String, dynamic>? request; // 请求配置
   final String? logo; // 可选的 logo 资源路径（assets/sites_icon/...）
+  final int operationIntervalMs; // 批量操作间隔（毫秒）
 
   const SiteConfigTemplate({
     required this.id,
@@ -1128,6 +1149,7 @@ class SiteConfigTemplate {
     this.infoFinder,
     this.request,
     this.logo,
+    this.operationIntervalMs = 500,
   });
 
   SiteConfigTemplate copyWith({
@@ -1144,6 +1166,7 @@ class SiteConfigTemplate {
     Map<String, dynamic>? infoFinder,
     Map<String, dynamic>? request,
     String? logo,
+    int? operationIntervalMs,
   }) => SiteConfigTemplate(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -1158,6 +1181,7 @@ class SiteConfigTemplate {
     infoFinder: infoFinder ?? this.infoFinder,
     request: request ?? this.request,
     logo: logo ?? this.logo,
+    operationIntervalMs: operationIntervalMs ?? this.operationIntervalMs,
   );
 
   Map<String, dynamic> toJson() => {
@@ -1174,6 +1198,7 @@ class SiteConfigTemplate {
     'infoFinder': infoFinder,
     'request': request,
     if (logo != null) 'logo': logo,
+    'operationIntervalMs': operationIntervalMs,
   };
 
   factory SiteConfigTemplate.fromJson(Map<String, dynamic> json) {
@@ -1260,6 +1285,7 @@ class SiteConfigTemplate {
       tagMapping: json['tagMapping'] != null
           ? Map<String, String>.from(json['tagMapping'] as Map<String, dynamic>)
           : const {},
+      operationIntervalMs: json['operationIntervalMs'] as int? ?? 500,
     );
   }
 
@@ -1298,6 +1324,7 @@ class SiteConfigTemplate {
       searchCategories: searchCategories,
       features: features,
       templateId: id,
+      operationIntervalMs: operationIntervalMs,
     );
   }
 
@@ -1675,6 +1702,78 @@ class Defaults {
   }
 }
 
+class HealthStatus {
+  final bool ok;
+
+  /// 功能不适用（站点不支持该接口，无需检查，非失败）
+  final bool notApplicable;
+  final String? message;
+  final String? username;
+  final MemberProfile? profile;
+  final DateTime updatedAt;
+
+  const HealthStatus({
+    required this.ok,
+    this.notApplicable = false,
+    this.message,
+    this.username,
+    this.profile,
+    required this.updatedAt,
+  });
+
+  factory HealthStatus.fromJson(Map<String, dynamic> json) {
+    final ok = json['ok'] == true || json['ok'] == 'true';
+    final notApplicable =
+        json['notApplicable'] == true || json['notApplicable'] == 'true';
+    final message = json['message']?.toString();
+    final username = json['username']?.toString();
+    final updatedAtStr = json['updatedAt']?.toString();
+    DateTime updatedAt;
+    try {
+      updatedAt = DateTime.parse(
+        updatedAtStr ?? DateTime.now().toIso8601String(),
+      );
+    } catch (_) {
+      updatedAt = DateTime.now();
+    }
+    MemberProfile? profile;
+    final p = json['profile'];
+    if (p is Map<String, dynamic>) {
+      try {
+        profile = MemberProfile.fromJson(p);
+      } catch (_) {
+        profile = null;
+      }
+    }
+    return HealthStatus(
+      ok: ok,
+      notApplicable: notApplicable,
+      message: message,
+      username: username,
+      profile: profile,
+      updatedAt: updatedAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'ok': ok,
+      'notApplicable': notApplicable,
+      'message': message,
+      'username': username,
+      'profile': profile?.toJson(),
+      'updatedAt': updatedAt.toIso8601String(),
+    };
+  }
+
+  /// 判断最后访问时间是否超过一个月
+  static bool isLastAccessOverMonth(DateTime? lastAccess) {
+    if (lastAccess == null) return false;
+    final now = DateTime.now();
+    return now.difference(lastAccess).inDays >= 30;
+  }
+}
+
 // 种子评论
 class TorrentComment {
   final String id;
@@ -1702,9 +1801,11 @@ class TorrentComment {
       id: (json['id'] ?? '').toString(),
       createdDate: Formatters.parseDateTimeCustom(
         json['createdDate']?.toString(),
+        fieldName: 'createdDate',
       ),
       lastModifiedDate: Formatters.parseDateTimeCustom(
         json['lastModifiedDate']?.toString(),
+        fieldName: 'lastModifiedDate',
       ),
       torrentId: (json['torrent'] ?? '').toString(),
       author: (json['author'] ?? '').toString(),
