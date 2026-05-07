@@ -1,10 +1,10 @@
 {
   "name": "PT Mate",
   "identifier": "com.github.justlookatnow.ptmate.source",
-  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.22.4/altsource/AltSource.json",
-  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.22.4/screenshots/1.png",
+  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.0/altsource/AltSource.json",
+  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.0/screenshots/1.png",
   "website": "https://github.com/JustLookAtNow/pt_mate",
-  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.22.4/mt.png",
+  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.0/mt.png",
   "subtitle": "PT private tracker companion",
   "description": "This is the official source for PT Mate.\n\nFor full details, check the GitHub repository:\nhttps://github.com/JustLookAtNow/pt_mate",
   "tintColor": "1D4ED8",
@@ -15,21 +15,28 @@
       "bundleIdentifier": "com.github.justlookatnow.ptmate",
       "developerName": "JustLookAtNow",
       "subtitle": "PT private tracker companion",
-      "version": "2.22.4",
-      "versionDate": "2026-04-30T06:23:14Z",
-      "versionDescription": "Changes in this release\nrelease: 2.22.4\n\n🎉Highlights\n- 优化站点切换与服务器设置相关交互，当前激活项更直观，切换操作更顺滑。\n- 改进列表与布局细节，整体浏览体验更稳定一致。\n\n✨新增功能\n- 服务器设置界面新增/强化激活状态展示。\n- 视图切换器支持自动滚动定位到当前激活站点。\n\n🐛修复问题\n- 修复重置搜索条件时的状态更新与列表滚动行为，重置后可正确回到顶部。\n\n🔧性能优化\n- 优化网格布局组件实现，降低切换与渲染过程中的额外开销。\n\n📋其它\n- 升级部分依赖与 Android 构建工具链（Gradle/AGP/Kotlin），并修复相关构建告警。\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
-      "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.22.4/pt_mate-2.22.4-unsigned.ipa",
+      "version": "2.23.0",
+      "versionDate": "2026-05-07T07:46:18Z",
+      "versionDescription": "Changes in this release\nrelease: 2.23.0\n\n✨新增功能\n- 显示所有非 Normal 优惠类型的剩余时间\n- 改进 DateTime 解析失败的错误信息，所有字段均标识来源，调试更直观\n- 帮助信息 Issue 自动评论中新增计算出的过期日期\n\n🐛修复问题\n- 修复 `discountMapping` 和 `tagMapping` 为空时未从默认配置合并的问题\n- 修正 FRDS 站点时区配置\n- 修复 Audiences 站点的用户信息解析问题\n\n🔧性能优化\n- 解析适配器中缓存 RegExp，避免热路径中重复编译，提升大列表解析性能\n\n📋其它\n- 全新声明式 HtmlExtractor 框架：NexusPHPWeb 适配器解析代码量减少 83%，类型安全且可复用于其它站点适配器\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
+      "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.23.0/pt_mate-2.23.0-unsigned.ipa",
       "localizedDescription": "PT Mate is a Flutter-based private tracker client for browsing, searching, and managing downloads across multiple PT sites.",
-      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.22.4/mt.png",
+      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.0/mt.png",
       "tintColor": "1D4ED8",
       "category": "utilities",
-      "size": 16079590,
+      "size": 16084014,
       "screenshotURLs": [
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.22.4/screenshots/1.png",
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.22.4/screenshots/2.png",
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.22.4/screenshots/3.png"
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.0/screenshots/1.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.0/screenshots/2.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.0/screenshots/3.png"
       ],
       "versions": [
+        {
+          "version": "2.23.0",
+          "date": "2026-05-07T07:46:18Z",
+          "localizedDescription": "Changes in this release\nrelease: 2.23.0\n\n✨新增功能\n- 显示所有非 Normal 优惠类型的剩余时间\n- 改进 DateTime 解析失败的错误信息，所有字段均标识来源，调试更直观\n- 帮助信息 Issue 自动评论中新增计算出的过期日期\n\n🐛修复问题\n- 修复 `discountMapping` 和 `tagMapping` 为空时未从默认配置合并的问题\n- 修正 FRDS 站点时区配置\n- 修复 Audiences 站点的用户信息解析问题\n\n🔧性能优化\n- 解析适配器中缓存 RegExp，避免热路径中重复编译，提升大列表解析性能\n\n📋其它\n- 全新声明式 HtmlExtractor 框架：NexusPHPWeb 适配器解析代码量减少 83%，类型安全且可复用于其它站点适配器\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
+          "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.23.0/pt_mate-2.23.0-unsigned.ipa",
+          "size": 16084014
+        },
         {
           "version": "2.22.4",
           "date": "2026-04-30T06:23:14Z",
@@ -176,13 +183,6 @@
           "localizedDescription": "Changes in this release\nrelease: 2.19.0\n\n✨新增功能\n- 🚀 支持 15+ 站点的原生种子详情页渲染（包括 SSD, TTG, U2, OurBits 等），显著提升详情加载速度和阅读体验，若站点已添加需要手动在站点设置中打开“原生详情”开关\n- 🌓 详情页内嵌浏览器支持根据系统/应用主题自动开启深色模式，视护眼更周到\n- ⚙️ 在站点设置中增加“原生详情”开关，支持针对不同站点手动切换渲染模式\n\n📋其它\n- 🌐 更新 HHanClub 站点配置，新增多个可用候选域名\n- 🛡️ 增强发布自动化流程，提升 Telegram 通知的稳定性和异常恢复能力\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
           "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.19.0/pt_mate-2.19.0-unsigned.ipa",
           "size": 15636942
-        },
-        {
-          "version": "2.18.3",
-          "date": "2026-02-10T08:20:01Z",
-          "localizedDescription": "Changes in this release\r\nrelease: 2.18.3\r\n\r\n✨新增功能\r\n- 初步适配 HHanClub 站点。 24 45 \r\n- 新增 Gazelle 类型站点适配层，初步支持 classic ajax.php (Alpha 阶段)。\r\n\r\n📱 Android APK Downloads\r\n\r\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\r\n\r\n💻 Desktop Downloads\r\n\r\n- **Windows x64**: Windows installer for 64-bit systems\r\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\r\n- **macOS x64**: macOS DMG image for 64-bit systems\r\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\r\n\r\n🍎 iOS Downloads\r\n\r\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\r\n- **Xcode Archive**: For developers to re-sign and distribute",
-          "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.18.3/pt_mate-2.18.3-unsigned.ipa",
-          "size": 15410461
         }
       ],
       "appPermissions": {
@@ -194,14 +194,14 @@
   "news": [
     {
       "appID": "com.github.justlookatnow.ptmate",
-      "title": "2.22.4 - 30 Apr",
-      "identifier": "release-2.22.4",
+      "title": "2.23.0 - 07 May",
+      "identifier": "release-2.23.0",
       "caption": "Update for PT Mate now available!",
-      "date": "2026-04-30T06:23:14Z",
+      "date": "2026-05-07T07:46:18Z",
       "tintColor": "1D4ED8",
       "imageURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/1.png",
       "notify": true,
-      "url": "https://github.com/JustLookAtNow/pt_mate/releases/tag/v2.22.4"
+      "url": "https://github.com/JustLookAtNow/pt_mate/releases/tag/v2.23.0"
     }
   ]
 }
