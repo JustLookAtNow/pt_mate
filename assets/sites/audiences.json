@@ -53,40 +53,20 @@
           "attribute": "text"
         },
         "ratio": {
-          "selector": "",
-          "attribute": "text",
-          "filter": {
-            "name": "regexp",
-            "args": "分享率(:|：)\\s*([^\\s]+)",
-            "value": "$2"
-          }
+          "selector": "span.site-userbar__compact-metric--ratio",
+          "attribute": "text"
         },
         "upload": {
-          "selector": "",
-          "attribute": "text",
-          "filter": {
-            "name": "regexp",
-            "args": "(上传|上傳)量(:|：)\\s*(.*?B)",
-            "value": "$3"
-          }
+          "selector": "span.site-userbar__compact-metric--uploaded",
+          "attribute": "text"
         },
         "download": {
-          "selector": "",
-          "attribute": "text",
-          "filter": {
-            "name": "regexp",
-            "args": "(下载|下載)量(:|：)\\s*(.*?B)",
-            "value": "$3"
-          }
+          "selector": "span.site-userbar__compact-metric--downloaded",
+          "attribute": "text"
         },
         "bonus": {
-          "selector": "",
-          "attribute": "text",
-          "filter": {
-            "name": "regexp",
-            "args": "做种积分：\\s*([^\\s]+)\\s+",
-            "value": "$1"
-          }
+          "selector": "span.site-userbar__compact-metric--seeding-bonus",
+          "attribute": "text"
         }
       }
     },
@@ -175,8 +155,8 @@
           }
         },
         "collection": {
-          "selector": "table.torrentname > tbody > tr > td:nth-child(5) > img.bookmark",
-          "attribute": "src"
+          "selector": "table.torrentname > tbody > tr > td:nth-child(2) > span.is-active",
+          "attribute": "title"
         },
         "isTop": {
           "selector": "table.torrentname > img[title~=\"置顶|置頂\"]",
