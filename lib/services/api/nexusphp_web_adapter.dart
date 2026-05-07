@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
 import '../../models/app_models.dart';
-import '../../utils/format.dart';
 import 'site_adapter.dart';
 import 'api_exceptions.dart';
 import '../site_config_service.dart';
@@ -13,6 +12,8 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'dart:convert';
 import '../logging/log_file_service.dart';
 import 'nexusphp_helper.dart';
+import 'html_extractor.dart';
+import 'torrent_extractor.dart';
 
 /// 参数对象，用于 Isolate 搜索解析
 class ParseSearchParams {
@@ -54,9 +55,6 @@ class ParsedTorrentResult {
   });
 }
 
-/// Helper class for Isolate usage
-class _AdapterHelper with BaseWebAdapterMixin {}
-
 /// Isolate entry point for parsing search results
 Future<ParsedTorrentResult> _parseSearchResponseInIsolate(
   ParseSearchParams params,
@@ -88,10 +86,6 @@ Future<ParsedTorrentResult> _parseSearchResponseInIsolate(
   );
 }
 
-// ⚡ Bolt: Cache RegExp objects used in background isolates as top-level final
-// variables. Caching these objects outside of the static class methods prevents
-// recompilation on hot paths (e.g., list rendering and HTML parsing).
-final RegExp _sizeRegExp = RegExp(r'([\d.]+)\s*(\w+)');
 final RegExp _htmlUrlRegExp = RegExp(
   r'(src|href)="((?!https?://|//|data:|javascript:|#)[^"]+)"',
   caseSensitive: false,
@@ -285,48 +279,6 @@ class NexusPHPWebAdapter extends SiteAdapter
     }
   }
 
-  /// 从字符串解析标签类型（静态方法）
-  static TagType? _staticParseTagType(
-    String? str,
-    Map<String, String> mapping,
-  ) {
-    if (str == null || str.isEmpty) return null;
-
-    final enumName = mapping[str];
-
-    if (enumName != null) {
-      for (final type in TagType.values) {
-        if (type.name.toLowerCase() == enumName.toLowerCase()) {
-          return type;
-        }
-        // 也可以尝试匹配 content
-        if (type.content == enumName) {
-          return type;
-        }
-      }
-    }
-    return null;
-  }
-
-  /// 从字符串解析优惠类型（静态方法）
-  static DiscountType _staticParseDiscountType(
-    String? str,
-    Map<String, String> mapping,
-  ) {
-    if (str == null || str.isEmpty) return DiscountType.normal;
-
-    final enumValue = mapping[str];
-
-    if (enumValue != null) {
-      for (final type in DiscountType.values) {
-        if (type.value == enumValue) {
-          return type;
-        }
-      }
-    }
-
-    return DiscountType.normal;
-  }
 
   @override
   Future<MemberProfile> fetchMemberProfile({String? apiKey}) async {
@@ -508,9 +460,8 @@ class NexusPHPWebAdapter extends SiteAdapter
     BeautifulSoup soup,
     Map<String, dynamic> config,
   ) async {
-    final result = <String, String?>{};
+    final extractor = HtmlExtractor();
 
-    // 获取行选择器配置
     final rowsConfig = config['rows'] as Map<String, dynamic>?;
     final fieldsConfig = config['fields'] as Map<String, dynamic>?;
 
@@ -518,35 +469,31 @@ class NexusPHPWebAdapter extends SiteAdapter
       throw Exception('配置格式错误：缺少 rows 或 fields 配置');
     }
 
-    // 根据行选择器找到目标元素
     final rowSelector = rowsConfig['selector'] as String?;
     if (rowSelector == null || rowSelector.isEmpty) {
       throw Exception('配置错误：缺少行选择器');
     }
 
-    final targetElement = findFirstElementBySelector(soup, rowSelector);
+    final targetElement = extractor.findFirst(soup, rowSelector);
     if (targetElement == null) {
       _logRuleAndSoup('userInfo.rows.notFound', rowsConfig, soup);
       throw Exception('未找到目标元素：$rowSelector');
     }
 
-    // 遍历字段配置，提取每个字段的值
-    for (final fieldEntry in fieldsConfig.entries) {
-      final fieldName = fieldEntry.key;
-      final fieldConfig = fieldEntry.value as Map<String, dynamic>;
+    final result = <String, String?>{};
+    final parsedFields = HtmlExtractor.parseFieldConfigs(fieldsConfig);
 
+    for (final entry in parsedFields.entries) {
       try {
-        final value = await extractFirstFieldValue(targetElement, fieldConfig);
-
-        result[fieldName] = value;
+        final value = await extractor.extractField(targetElement, entry.value);
+        result[entry.key] = value.string;
       } catch (e) {
-        // 如果某个字段提取失败，记录但继续处理其他字段
         _logRuleAndSoup(
-          'userInfo.field.extractFailed.$fieldName',
-          fieldConfig,
+          'userInfo.field.extractFailed.${entry.key}',
+          entry.value.toJson(),
           targetElement,
         );
-        result[fieldName] = null;
+        result[entry.key] = null;
       }
     }
 
@@ -562,6 +509,7 @@ class NexusPHPWebAdapter extends SiteAdapter
       final response = await _dio.get('/$path');
       final soup = BeautifulSoup(response.data);
 
+      final extractor = HtmlExtractor();
       final rowsConfig = bonusConfig['rows'] as Map<String, dynamic>?;
       final fieldsConfig = bonusConfig['fields'] as Map<String, dynamic>?;
 
@@ -574,24 +522,24 @@ class NexusPHPWebAdapter extends SiteAdapter
         throw Exception('配置错误：缺少行选择器');
       }
 
-      final targetElement = findFirstElementBySelector(soup, rowSelector);
+      final targetElement = extractor.findFirst(soup, rowSelector);
       if (targetElement == null) {
         _logRuleAndSoup('bonus.rows.notFound', rowsConfig, soup);
         throw Exception('未找到目标元素：$rowSelector');
       }
 
-      final field = fieldsConfig['bonusPerHour'] as Map<String, dynamic>?;
+      final parsedFields = HtmlExtractor.parseFieldConfigs(fieldsConfig);
+      final field = parsedFields['bonusPerHour'];
       if (field == null) {
         _logRuleAndSoup('bonus.field.missing', fieldsConfig, soup);
         throw Exception('配置错误：缺少 bonusPerHour 字段');
       }
 
-      final value = await extractFirstFieldValue(targetElement, field);
+      final value = await extractor.extractField(targetElement, field);
 
-      if (value == null || value.isEmpty) return null;
+      if (!value.hasValue) return null;
 
-      final parsed = double.tryParse(value.replaceAll(',', ''));
-      return parsed;
+      return value.doubleValue;
     } catch (e) {
       _logRuleAndSoup('bonus.extract.failed', null, BeautifulSoup(''));
       return null;
@@ -612,6 +560,8 @@ class NexusPHPWebAdapter extends SiteAdapter
       final response = await _dio.get('/$path');
       final soup = BeautifulSoup(response.data);
 
+      final extractor = HtmlExtractor();
+
       // 获取行选择器配置
       final rowsConfig = passKeyConfig['rows'] as Map<String, dynamic>?;
 
@@ -626,25 +576,27 @@ class NexusPHPWebAdapter extends SiteAdapter
         throw Exception('配置错误：缺少行选择器');
       }
 
-      final targetElement = findFirstElementBySelector(soup, rowSelector);
+      final targetElement = extractor.findFirst(soup, rowSelector);
       if (targetElement == null) {
         _logRuleAndSoup('passKey.rows.notFound', rowsConfig, soup);
         throw Exception('未找到目标元素：$rowSelector');
       }
 
       // 根据配置提取PassKey
-      final fields = passKeyConfig['fields'] as Map<String, dynamic>?;
-      final passKeyField = fields?['passKey'] as Map<String, dynamic>?;
+      final parsedFields = HtmlExtractor.parseFieldConfigs(
+        passKeyConfig['fields'] as Map<String, dynamic>?,
+      );
+      final passKeyField = parsedFields['passKey'];
 
       if (passKeyField != null) {
-        final value = await extractFirstFieldValue(targetElement, passKeyField);
+        final value = await extractor.extractField(targetElement, passKeyField);
 
-        if (value != null && value.isNotEmpty) {
-          return value.trim();
+        if (value.hasValue) {
+          return value.string?.trim();
         } else {
           _logRuleAndSoup(
             'passKey.field.extractFailed',
-            passKeyField,
+            passKeyField.toJson(),
             targetElement,
           );
           _logRuleAndSoup('passKey.rows.info', rowsConfig, soup);
@@ -873,7 +825,7 @@ class NexusPHPWebAdapter extends SiteAdapter
     Map<String, dynamic> config, [
     List<String>? logs,
   ]) async {
-    final helper = _AdapterHelper();
+    final extractor = HtmlExtractor();
     int totalPages = 1;
     try {
       final rowsConfig = config['rows'] as Map<String, dynamic>?;
@@ -883,32 +835,27 @@ class NexusPHPWebAdapter extends SiteAdapter
         return 1;
       }
 
-      // 获取行选择器配置
       final rowSelector = rowsConfig['selector'] as String?;
       if (rowSelector == null || rowSelector.isEmpty) {
         return 1;
       }
 
-      // 找到目标行
-      final rows = helper.findElementBySelector(soup, rowSelector);
+      final rows = extractor.findRows(soup, rowSelector);
       if (rows.isEmpty) {
         return 1;
       }
 
-      final fieldConfig = fieldsConfig['totalPages'] as Map<String, dynamic>?;
+      final fieldConfig = HtmlExtractor.parseFieldConfigs(fieldsConfig)['totalPages'];
       if (fieldConfig == null) {
         return 1;
       }
 
-      List<int> pageValues = [];
+      final pageValues = <int>[];
       for (final row in rows) {
-        final values = await helper.extractFieldValue(row, fieldConfig);
-
-        for (final val in values) {
-          final parsed = FormatUtil.parseInt(val);
-          if (parsed != null) {
-            pageValues.add(parsed);
-          }
+        final value = await extractor.extractField(row, fieldConfig);
+        final parsed = value.intValue;
+        if (parsed != null) {
+          pageValues.add(parsed);
         }
       }
 
@@ -918,7 +865,6 @@ class NexusPHPWebAdapter extends SiteAdapter
     } catch (e) {
       logs?.add('解析总页数失败: $e');
       if (logs == null) {
-        // 在静态上下文中直接调用 _logger 是安全的，因为它是 static final
         _logger.e('解析总页数失败: $e');
       }
     }
@@ -952,7 +898,6 @@ class NexusPHPWebAdapter extends SiteAdapter
     String userId, [
     List<String>? logs,
   ]) async {
-    final helper = _AdapterHelper();
     final torrents = <TorrentItem>[];
 
     try {
@@ -970,277 +915,26 @@ class NexusPHPWebAdapter extends SiteAdapter
         return torrents;
       }
 
-      // 使用配置的选择器查找行
-      final rows = helper.findElementBySelector(soup, rowSelector);
+      final extractor = HtmlExtractor();
+      final rows = extractor.findRows(soup, rowSelector);
+
+      final torrentExtractor = TorrentRowExtractor(
+        fieldsConfig: fieldsConfig,
+        discountMapping: discountMapping,
+        tagMapping: tagMapping,
+      );
 
       for (final rowElement in rows) {
-        final row = rowElement as Bs4Element;
         try {
-          // 提取种子ID - 如果提取失败则跳过当前行
-          final torrentIdConfig =
-              fieldsConfig['torrentId'] as Map<String, dynamic>?;
-          if (torrentIdConfig == null) {
-            continue;
+          final item = await torrentExtractor.extract(
+            rowElement,
+            baseUrl: baseUrl,
+            passKey: passKey,
+            logs: logs,
+          );
+          if (item != null) {
+            torrents.add(item);
           }
-
-          final torrentIdList = await helper.extractFieldValue(
-            row,
-            torrentIdConfig,
-          );
-
-          final torrentId = torrentIdList.isNotEmpty ? torrentIdList.first : '';
-          if (torrentId.isEmpty) {
-            continue; // 种子ID提取失败，跳过当前行
-          }
-
-          // 提取其他字段
-          final torrentNameList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['torrentName'] as Map<String, dynamic>? ?? {},
-          );
-          final torrentName = torrentNameList.isNotEmpty
-              ? torrentNameList.first
-              : '';
-
-          final tagList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['tag'] as Map<String, dynamic>? ?? {},
-          );
-
-          final descriptionList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['description'] as Map<String, dynamic>? ?? {},
-          );
-          final description = descriptionList.isNotEmpty
-              ? descriptionList.first
-              : '';
-
-          final discountList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['discount'] as Map<String, dynamic>? ?? {},
-          );
-          final discount = discountList.isNotEmpty ? discountList.first : '';
-
-          final discountEndTimeConfig =
-              fieldsConfig['discountEndTime'] as Map<String, dynamic>? ?? {};
-          final discountEndTimeList = await helper.extractFieldValue(
-            row,
-            discountEndTimeConfig,
-          );
-          final discountEndTime = discountEndTimeList.isNotEmpty
-              ? discountEndTimeList.first
-              : '';
-          final discountEndTimeTimeConfig =
-              discountEndTimeConfig['time'] as Map<String, dynamic>?;
-
-          final seedersTextList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['seedersText'] as Map<String, dynamic>? ?? {},
-          );
-          final seedersText = seedersTextList.isNotEmpty
-              ? seedersTextList.first
-              : '';
-
-          final leechersTextList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['leechersText'] as Map<String, dynamic>? ?? {},
-          );
-          final leechersText = leechersTextList.isNotEmpty
-              ? leechersTextList.first
-              : '';
-
-          final sizeTextList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['sizeText'] as Map<String, dynamic>? ?? {},
-          );
-          final sizeText = sizeTextList.isNotEmpty ? sizeTextList.first : '';
-
-          final downloadStatusTextList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['downloadStatus'] as Map<String, dynamic>? ?? {},
-          );
-          final downloadUrlConfig =
-              fieldsConfig['downloadUrl'] as Map<String, dynamic>? ?? {};
-          var downloadUrl = '';
-          if (downloadUrlConfig['value'] != null) {
-            downloadUrl = downloadUrlConfig['value'] as String? ?? '';
-            downloadUrl = downloadUrl.replaceAll('{torrentId}', torrentId);
-            downloadUrl = downloadUrl.replaceAll('{passKey}', passKey);
-            var finalBaseUrl = baseUrl;
-            if (baseUrl.endsWith("/")) {
-              finalBaseUrl = baseUrl.substring(0, baseUrl.length - 1);
-            }
-            downloadUrl = downloadUrl.replaceAll('{baseUrl}', finalBaseUrl);
-          }
-
-          final downloadStatusText = downloadStatusTextList.isNotEmpty
-              ? downloadStatusTextList.first
-              : '';
-
-          final coverList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['cover'] as Map<String, dynamic>? ?? {},
-          );
-          var cover = coverList.isNotEmpty ? coverList.first : '';
-          if (cover.isNotEmpty && !cover.startsWith('http')) {
-            var finalBaseUrl = baseUrl;
-            if (baseUrl.endsWith("/")) {
-              finalBaseUrl = baseUrl.substring(0, baseUrl.length - 1);
-            }
-            cover = '$finalBaseUrl$cover';
-          }
-
-          final createDateConfig =
-              fieldsConfig['createDate'] as Map<String, dynamic>? ?? {};
-          final createDateList = await helper.extractFieldValue(
-            row,
-            createDateConfig,
-          );
-          final createDate = createDateList.isNotEmpty
-              ? createDateList.first
-              : '';
-          final createDateTimeConfig =
-              createDateConfig['time'] as Map<String, dynamic>?;
-
-          final doubanRatingList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['doubanRating'] as Map<String, dynamic>? ?? {},
-          );
-          final doubanRating = doubanRatingList.isNotEmpty
-              ? doubanRatingList.first
-              : '';
-
-          final imdbRatingList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['imdbRating'] as Map<String, dynamic>? ?? {},
-          );
-          final imdbRating = imdbRatingList.isNotEmpty
-              ? imdbRatingList.first
-              : '';
-
-          // 提取评论数
-          final commentsList = await helper.extractFieldValue(
-            row,
-            fieldsConfig['comments'] as Map<String, dynamic>? ?? {},
-          );
-          final commentsText = commentsList.isNotEmpty
-              ? commentsList.first
-              : '0';
-          final comments = FormatUtil.parseInt(commentsText) ?? 0;
-
-          // 检查收藏状态（布尔字段）
-          final collectionConfig =
-              fieldsConfig['collection'] as Map<String, dynamic>?;
-          bool collection = false;
-          if (collectionConfig != null) {
-            final collectionList = await helper.extractFieldValue(
-              row,
-              collectionConfig,
-            );
-            collection = collectionList.isNotEmpty; // 如果找不到元素说明未收藏
-          }
-          // 检查置顶状态（布尔字段）
-          final isTopConfig = fieldsConfig['isTop'] as Map<String, dynamic>?;
-          bool isTop = false;
-          if (isTopConfig != null) {
-            final isTopList = await helper.extractFieldValue(row, isTopConfig);
-
-            isTop = isTopList.isNotEmpty; // 如果找不到元素说明未置顶
-          }
-
-          DownloadStatus downloadStatus = DownloadStatus.none;
-          if (downloadStatusText.isNotEmpty) {
-            final percentInt = FormatUtil.parseInt(downloadStatusText);
-            if (percentInt != null) {
-              if (percentInt == 100) {
-                downloadStatus = DownloadStatus.completed;
-              } else {
-                downloadStatus = DownloadStatus.downloading;
-              }
-            }
-          }
-
-          // 解析文件大小为字节数
-          int sizeInBytes = 0;
-          if (sizeText.isNotEmpty) {
-            final sizeMatch = _sizeRegExp.firstMatch(sizeText);
-            if (sizeMatch != null) {
-              final sizeValue = double.tryParse(sizeMatch.group(1) ?? '0') ?? 0;
-              final unit = sizeMatch.group(2)?.toUpperCase() ?? 'B';
-
-              switch (unit) {
-                case 'KB':
-                case 'KIB':
-                  sizeInBytes = (sizeValue * 1024).round();
-                  break;
-                case 'MB':
-                case 'MIB':
-                  sizeInBytes = (sizeValue * 1024 * 1024).round();
-                  break;
-                case 'GB':
-                case 'GIB':
-                  sizeInBytes = (sizeValue * 1024 * 1024 * 1024).round();
-                  break;
-                case 'TB':
-                case 'TIB':
-                  sizeInBytes = (sizeValue * 1024 * 1024 * 1024 * 1024).round();
-                  break;
-                default:
-                  sizeInBytes = sizeValue.round();
-              }
-            }
-          }
-
-          // 计算标签并清理描述
-          final tags = TagType.matchTags(torrentName + description);
-
-          if (tagList.isNotEmpty) {
-            for (final tagStr in tagList) {
-              final mappedTag = _staticParseTagType(tagStr, tagMapping);
-              if (mappedTag != null && !tags.contains(mappedTag)) {
-                tags.add(mappedTag);
-              }
-            }
-          }
-
-          torrents.add(
-            TorrentItem(
-              id: torrentId,
-              name: torrentName,
-              smallDescr: description.trim(),
-              discount: _staticParseDiscountType(
-                discount.isNotEmpty ? discount : null,
-                discountMapping,
-              ),
-              discountEndTime: discountEndTime.isNotEmpty
-                  ? Formatters.parseDateTimeCustom(
-                      discountEndTime,
-                      format: discountEndTimeTimeConfig?['format'] as String?,
-                      zone: discountEndTimeTimeConfig?['zone'] as String?,
-                      fieldName: 'discountEndTime',
-                    )
-                  : null,
-              downloadUrl: downloadUrl.isNotEmpty ? downloadUrl : null,
-              seeders: FormatUtil.parseInt(seedersText) ?? 0,
-              leechers: FormatUtil.parseInt(leechersText) ?? 0,
-              sizeBytes: sizeInBytes,
-              downloadStatus: downloadStatus,
-              collection: collection,
-              imageList: [], // 暂时不解析图片列表
-              cover: cover,
-              createdDate: Formatters.parseDateTimeCustom(
-                createDate,
-                format: createDateTimeConfig?['format'] as String?,
-                zone: createDateTimeConfig?['zone'] as String?,
-                fieldName: 'createdDate',
-              ),
-              doubanRating: doubanRating.isNotEmpty ? doubanRating : 'N/A',
-              imdbRating: imdbRating.isNotEmpty ? imdbRating : 'N/A',
-              isTop: isTop,
-              tags: tags,
-              comments: comments,
-            ),
-          );
         } catch (e) {
           logs?.add('search.row.parseFailed: ${fieldsConfig.toString()}');
           continue;
@@ -1564,6 +1258,7 @@ class NexusPHPWebAdapter extends SiteAdapter
     Map<String, dynamic> categoriesConfig,
   ) async {
     final List<SearchCategoryConfig> categories = [];
+    final extractor = HtmlExtractor();
 
     // 获取行选择器配置
     final rowsConfig = categoriesConfig['rows'] as Map<String, dynamic>?;
@@ -1580,19 +1275,18 @@ class NexusPHPWebAdapter extends SiteAdapter
       throw Exception('配置错误：缺少行选择器');
     }
 
-    final rowElements = findElementBySelector(soup, rowSelector);
+    final rowElements = extractor.findRows(soup, rowSelector);
     if (rowElements.isEmpty) {
       _logRuleAndSoup('categories.rows.notFound', rowsConfig, soup);
       throw Exception('未找到目标元素：$rowSelector');
     }
 
     // 获取字段配置
-    final categoryIdConfig =
-        fieldsConfig['categoryId'] as Map<String, dynamic>?;
-    final categoryNameConfig =
-        fieldsConfig['categoryName'] as Map<String, dynamic>?;
+    final parsedFields = HtmlExtractor.parseFieldConfigs(fieldsConfig);
+    final categoryIdField = parsedFields['categoryId'];
+    final categoryNameField = parsedFields['categoryName'];
 
-    if (categoryIdConfig == null || categoryNameConfig == null) {
+    if (categoryIdField == null || categoryNameField == null) {
       throw Exception('配置错误：缺少 categoryId 或 categoryName 字段配置');
     }
 
@@ -1601,24 +1295,27 @@ class NexusPHPWebAdapter extends SiteAdapter
     // 遍历每个 row 元素（每个代表一个批次）
     for (final rowElement in rowElements) {
       // 提取当前 row 中的所有 categoryId
-      final categoryIds = await extractFieldValue(rowElement, categoryIdConfig);
+      final categoryIdValues = await extractor.extractFieldValue(
+        rowElement,
+        categoryIdField.toJson(),
+      );
 
       // 提取当前 row 中的所有 categoryName
-      final categoryNames = await extractFieldValue(
+      final categoryNameValues = await extractor.extractFieldValue(
         rowElement,
-        categoryNameConfig,
+        categoryNameField.toJson(),
       );
 
       // 检查是否有有效的字段提取结果
-      if (categoryIds.isEmpty && categoryNames.isEmpty) {
+      if (categoryIdValues.isEmpty && categoryNameValues.isEmpty) {
         // 未提取到有效fields的不计数
         continue;
       }
 
       // 确保 categoryId 和 categoryName 数量一致
-      final minLength = categoryIds.length < categoryNames.length
-          ? categoryIds.length
-          : categoryNames.length;
+      final minLength = categoryIdValues.length < categoryNameValues.length
+          ? categoryIdValues.length
+          : categoryNameValues.length;
 
       if (minLength == 0) {
         continue; // 跳过没有有效数据的批次
@@ -1626,8 +1323,8 @@ class NexusPHPWebAdapter extends SiteAdapter
 
       // 一一对应创建分类配置
       for (int i = 0; i < minLength; i++) {
-        final categoryId = categoryIds[i];
-        final categoryName = categoryNames[i];
+        final categoryId = categoryIdValues[i];
+        final categoryName = categoryNameValues[i];
 
         if (categoryId.isNotEmpty && categoryName.isNotEmpty) {
           // 确定前缀
