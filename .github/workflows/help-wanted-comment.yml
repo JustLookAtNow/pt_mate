@@ -19,10 +19,14 @@ jobs:
             const label = context.payload.label;
 
             if (label.name === "help wanted") {
+              const closeDate = new Date();
+              closeDate.setDate(closeDate.getDate() + 7);
+              const dateStr = closeDate.toISOString().split('T')[0];
+              
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
-                body: "该 issue 已被标记为 **help wanted**，如果 7 天内无人回复，将会自动关闭。"
+                body: `该 issue 已被标记为 **help wanted**，如果 7 天内无人回复，将会在 ${dateStr} 自动关闭。`
               });
             }
