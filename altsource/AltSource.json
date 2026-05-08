@@ -23,7 +23,7 @@
       "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.1/mt.png",
       "tintColor": "1D4ED8",
       "category": "utilities",
-      "size": 16091019,
+      "size": 16091020,
       "screenshotURLs": [
         "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.1/screenshots/1.png",
         "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.1/screenshots/2.png",
@@ -35,7 +35,7 @@
           "date": "2026-05-08T06:42:25Z",
           "localizedDescription": "Changes in this release\nfix: add flutter precache --ios before CocoaPods install\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
           "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.23.1/pt_mate-2.23.1-unsigned.ipa",
-          "size": 16091019
+          "size": 16091020
         },
         {
           "version": "2.23.0",
