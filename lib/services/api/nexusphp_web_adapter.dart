@@ -757,11 +757,16 @@ class NexusPHPWebAdapter extends SiteAdapter
   /// 返回种子文件的字节数据
   Future<List<int>> downloadTorrent(String url) async {
     try {
-      // 确保URL是相对路径或完整的BaseURL路径
+      // 处理 ## 前缀（强制本地中转标记）
       String downloadUrl = url;
-      if (url.startsWith('http')) {
+      if (downloadUrl.startsWith('##')) {
+        downloadUrl = downloadUrl.substring(2);
+      }
+
+      // 确保URL是相对路径或完整的BaseURL路径
+      if (downloadUrl.startsWith('http')) {
         // 如果是完整URL，检查是否属于当前站点
-        if (!url.startsWith(_siteConfig.baseUrl)) {
+        if (!downloadUrl.startsWith(_siteConfig.baseUrl)) {
           // 如果不属于当前站点，直接使用Dio下载（带Cookie可能会有问题，但尝试一下）
           // 或者这里应该抛出异常？通常下载链接应该是站内的
         }
@@ -922,6 +927,7 @@ class NexusPHPWebAdapter extends SiteAdapter
         fieldsConfig: fieldsConfig,
         discountMapping: discountMapping,
         tagMapping: tagMapping,
+        userId: userId,
       );
 
       for (final rowElement in rows) {

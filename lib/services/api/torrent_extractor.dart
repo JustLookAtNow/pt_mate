@@ -8,16 +8,19 @@ class TorrentRowExtractor {
   final Map<String, FieldConfig> _fields;
   final Map<String, String> _discountMapping;
   final Map<String, String> _tagMapping;
+  final String _userId;
   final HtmlExtractor _extractor = HtmlExtractor();
 
   TorrentRowExtractor({
     required Map<String, dynamic> fieldsConfig,
     required Map<String, String> discountMapping,
     required Map<String, String> tagMapping,
+    String userId = '',
   })  : _rawFieldsConfig = fieldsConfig,
         _fields = HtmlExtractor.parseFieldConfigs(fieldsConfig),
         _discountMapping = discountMapping,
-        _tagMapping = tagMapping;
+        _tagMapping = tagMapping,
+        _userId = userId;
 
   /// 从行元素提取 TorrentItem
   /// 如果 torrentId 缺失或为空，返回 null（跳过当前行）
@@ -62,16 +65,18 @@ class TorrentRowExtractor {
     // 解析下载链接
     var downloadUrl = '';
     final downloadUrlConfig = _fields['downloadUrl'];
-    if (downloadUrlConfig != null) {
-      final downloadUrlJson = downloadUrlConfig.toJson();
-      if (downloadUrlJson['value'] != null) {
-        downloadUrl = TypedConverter.resolveDownloadUrl(
-          downloadUrlJson['value'] as String,
-          torrentId,
-          passKey,
-          baseUrl,
-        );
-      }
+    if (downloadUrlConfig != null && downloadUrlConfig.hasValue) {
+      // 使用 value 模板生成下载链接
+      downloadUrl = TypedConverter.resolveDownloadUrl(
+        downloadUrlConfig.value!,
+        torrentId,
+        passKey,
+        baseUrl,
+        userId: _userId,
+      );
+    } else {
+      // fallback: 尝试从 HTML selector 提取的值
+      downloadUrl = values['downloadUrl']?.stringOrEmpty ?? '';
     }
 
     // 解析封面URL

@@ -11,6 +11,7 @@ class FieldConfig {
   final Map<String, dynamic>? filter;
   final dynamic defaultValue;
   final bool required;
+  final String? value;
 
   const FieldConfig({
     this.selector,
@@ -18,6 +19,7 @@ class FieldConfig {
     this.filter,
     this.defaultValue,
     this.required = false,
+    this.value,
   });
 
   /// 从 JSON/Map 构造，兼容现有配置格式
@@ -28,6 +30,7 @@ class FieldConfig {
       filter: json['filter'] as Map<String, dynamic>?,
       defaultValue: json['defaultValue'],
       required: json['required'] as bool? ?? false,
+      value: json['value'] as String?,
     );
   }
 
@@ -36,7 +39,13 @@ class FieldConfig {
     if (selector != null) 'selector': selector,
     if (attribute != null) 'attribute': attribute,
     if (filter != null) 'filter': filter,
+    if (value != null) 'value': value,
+    if (defaultValue != null) 'defaultValue': defaultValue,
+    if (required) 'required': required,
   };
+
+  /// 是否配置了 value 模板
+  bool get hasValue => value != null && value!.isNotEmpty;
 }
 
 /// 提取结果封装

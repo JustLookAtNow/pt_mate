@@ -38,6 +38,50 @@ void main() {
       expect(json['attribute'], 'href');
       expect(json['filter'], isNotNull);
     });
+
+    test('should parse value field from JSON', () {
+      final config = FieldConfig.fromJson({
+        'value': '{baseUrl}/download.php?id={torrentId}',
+      });
+
+      expect(config.value, '{baseUrl}/download.php?id={torrentId}');
+      expect(config.hasValue, true);
+      expect(config.selector, isNull);
+    });
+
+    test('should handle empty value as hasValue false', () {
+      final config = FieldConfig.fromJson({
+        'value': '',
+      });
+
+      expect(config.value, '');
+      expect(config.hasValue, false);
+    });
+
+    test('should handle null value as hasValue false', () {
+      final config = FieldConfig.fromJson({});
+
+      expect(config.value, isNull);
+      expect(config.hasValue, false);
+    });
+
+    test('should include value in toJson', () {
+      final config = FieldConfig(
+        value: '{baseUrl}/download.php?id={torrentId}',
+      );
+
+      final json = config.toJson();
+      expect(json['value'], '{baseUrl}/download.php?id={torrentId}');
+    });
+
+    test('should not include null value in toJson', () {
+      final config = FieldConfig(
+        selector: 'td.name',
+      );
+
+      final json = config.toJson();
+      expect(json.containsKey('value'), false);
+    });
   });
 
   group('ExtractedValue', () {
@@ -381,6 +425,29 @@ void main() {
         );
 
         expect(url, 'https://example.com/download.php?downhash=20148.jwt_token');
+      });
+
+      test('should not replace userId when not provided', () {
+        final url = TypedConverter.resolveDownloadUrl(
+          '{baseUrl}/download.php?downhash={userId}.{passKey}',
+          '999',
+          'jwt_token',
+          'https://example.com/',
+        );
+
+        expect(url, 'https://example.com/download.php?downhash={userId}.jwt_token');
+      });
+
+      test('should replace userId with empty string when empty', () {
+        final url = TypedConverter.resolveDownloadUrl(
+          '{baseUrl}/download.php?downhash={userId}.{passKey}',
+          '999',
+          'jwt_token',
+          'https://example.com/',
+          userId: '',
+        );
+
+        expect(url, 'https://example.com/download.php?downhash=.jwt_token');
       });
     });
   });
