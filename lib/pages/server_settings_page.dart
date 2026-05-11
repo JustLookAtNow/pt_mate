@@ -8,6 +8,7 @@ import '../services/storage/storage_service.dart';
 import '../services/api/api_service.dart';
 import '../utils/screen_utils.dart';
 import '../services/site_config_service.dart';
+import '../services/site_health_refresh_service.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/web_login_widget.dart';
 import '../widgets/responsive_layout.dart';
@@ -192,8 +193,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         _activeSiteId = activeSiteId;
       });
       _pruneSiteItemKeys();
-      // 加载已缓存的健康检查结果；若无缓存则自动触发一次刷新
-      await _loadCachedHealthStatuses(triggerRefreshWhenEmpty: true);
+      // 优先加载已缓存的健康检查结果；首次无缓存时静默补刷一次
+      await _loadCachedHealthStatuses(triggerSilentRefreshWhenEmpty: true);
     } catch (e) {
       if (mounted) {
         NotificationHelper.showError(context, '加载站点配置失败: $e');
@@ -207,7 +208,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   }
 
   Future<void> _loadCachedHealthStatuses({
-    bool triggerRefreshWhenEmpty = false,
+    bool triggerSilentRefreshWhenEmpty = false,
   }) async {
     try {
       final map = await StorageService.instance.loadHealthStatuses();
@@ -218,13 +219,15 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           );
         });
       }
-      // 若需要在无缓存时自动刷新，且当前未在刷新过程中
-      if (triggerRefreshWhenEmpty &&
-          _healthStatuses.isEmpty &&
-          !_healthChecking) {
-        // 站点列表为空时不触发，等待站点加载完成再触发
-        if (_sites.isNotEmpty) {
-          _runHealthCheck();
+
+      if (triggerSilentRefreshWhenEmpty &&
+          map.isEmpty &&
+          !_healthChecking &&
+          _sites.isNotEmpty) {
+        final lastRefresh = await StorageService.instance
+            .loadLastSiteHealthRefreshCheck();
+        if (lastRefresh == null && mounted) {
+          Future.microtask(() => _runHealthCheck(showNotification: false));
         }
       }
     } catch (_) {
@@ -242,127 +245,43 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     }).toList();
   }
 
-  Future<void> _runHealthCheck() async {
+  Future<void> _runHealthCheck({bool showNotification = true}) async {
     if (_healthChecking) return;
     setState(() {
       _healthChecking = true;
       _healthStatuses = {};
     });
-
-    // 加载包含API Key的站点，以便调用用户资料接口
-    final allSites = await StorageService.instance.loadSiteConfigs(
-      includeApiKeys: true,
-    );
-    final targetSites = _filteredSites.map((s) {
-      final found = allSites.firstWhere((x) => x.id == s.id, orElse: () => s);
-      return found;
-    }).toList();
-
-    // 并发控制：借鉴聚合搜索的思路，按线程数限制并发
-    final settings = await StorageService.instance
-        .loadAggregateSearchSettings();
-    final maxConcurrency = settings.searchThreads;
-
-    int index = 0;
-    int active = 0;
-
-    Future<void> startNext() async {
-      while (active < maxConcurrency && index < targetSites.length) {
-        final site = targetSites[index++];
-        active++;
-        _checkSingleSite(site)
-            .then((status) {
-              if (mounted) {
-                setState(() {
-                  _healthStatuses[site.id] = status;
-                });
-              }
-            })
-            .catchError((error) {
-              if (mounted) {
-                setState(() {
-                  _healthStatuses[site.id] = HealthStatus(
-                    ok: false,
-                    message: error.toString(),
-                    username: null,
-                    updatedAt: DateTime.now(),
-                  );
-                });
-              }
-            })
-            .whenComplete(() async {
-              active--;
-              // 继续下一个
-              startNext();
-              // 如果全部完成，结束检查
-              if (index >= targetSites.length && active == 0) {
-                if (mounted) {
-                  setState(() {
-                    _healthChecking = false;
-                  });
-                  // 持久化健康检查结果
-                  try {
-                    final jsonMap = _healthStatuses.map(
-                      (siteId, status) => MapEntry(siteId, status.toJson()),
-                    );
-                    await StorageService.instance.saveHealthStatuses(jsonMap);
-                  } catch (_) {
-                    // ignore save errors
-                  }
-                  if (!mounted) return;
-                  NotificationHelper.showInfo(context, '站点信息获取完成');
-                }
-              }
-            });
-      }
-    }
-
-    await startNext();
-  }
-
-  Future<HealthStatus> _checkSingleSite(SiteConfig site) async {
-    // 站点不支持用户资料接口时，改用 testConnection 测试连通性
-    // testConnection 失败会抛出 SiteException，由 catch 块统一处理
-    if (!site.features.supportMemberProfile) {
-      try {
-        await ApiService.instance.testConnectionWithSite(site);
-        return HealthStatus(
-          ok: true,
-          notApplicable: true,
-          message: '连接正常（不支持用户资料）',
-          username: null,
-          profile: null,
-          updatedAt: DateTime.now(),
-        );
-      } catch (e) {
-        return HealthStatus(
-          ok: false,
-          notApplicable: true,
-          message: e.toString(),
-          username: null,
-          profile: null,
-          updatedAt: DateTime.now(),
-        );
-      }
-    }
     try {
-      final adapter = await ApiService.instance.getAdapter(site);
-      final profile = await adapter.fetchMemberProfile(apiKey: site.apiKey);
-      return HealthStatus(
-        ok: true,
-        message: '正常',
-        username: profile.username,
-        profile: profile,
-        updatedAt: DateTime.now(),
+      final filteredIds = _filteredSites.map((site) => site.id).toSet();
+      final statuses = await SiteHealthRefreshService.instance.refreshAllSites(
+        force: true,
+        onStatus: (siteId, status) {
+          if (!mounted || !filteredIds.contains(siteId)) return;
+          setState(() {
+            _healthStatuses[siteId] = status;
+          });
+        },
       );
+
+      if (!mounted) return;
+      setState(() {
+        _healthStatuses = {
+          for (final entry in statuses.entries)
+            if (filteredIds.contains(entry.key)) entry.key: entry.value,
+        };
+        _healthChecking = false;
+      });
+      if (showNotification) {
+        NotificationHelper.showInfo(context, '站点信息获取完成');
+      }
     } catch (e) {
-      return HealthStatus(
-        ok: false,
-        message: e.toString(),
-        username: null,
-        profile: null,
-        updatedAt: DateTime.now(),
-      );
+      if (!mounted) return;
+      setState(() {
+        _healthChecking = false;
+      });
+      if (showNotification) {
+        NotificationHelper.showError(context, '刷新失败: $e');
+      }
     }
   }
 
@@ -658,54 +577,11 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           throw Exception('未找到活跃站点配置');
         }
         await ApiService.instance.setActiveSite(activeSite);
-
-        if (!activeSite.features.supportMemberProfile) {
-          // 不支持用户资料接口时，改用 testConnection 测试连通性
-          // 失败会抛出 SiteException，由外层 catch 统一展示错误
-          await ApiService.instance.testConnection();
-          setState(() {
-            _healthStatuses[site.id] = HealthStatus(
-              ok: true,
-              notApplicable: true,
-              message: '连接正常（不支持用户资料）',
-              username: null,
-              profile: null,
-              updatedAt: DateTime.now(),
-            );
-          });
-          await StorageService.instance.saveHealthStatuses(
-            _healthStatuses.map((k, v) => MapEntry(k, v.toJson())),
-          );
-        } else {
-          try {
-            final profile = await ApiService.instance.fetchMemberProfile();
-            setState(() {
-              _healthStatuses[site.id] = HealthStatus(
-                ok: true,
-                message: '正常',
-                username: profile.username,
-                profile: profile,
-                updatedAt: DateTime.now(),
-              );
-            });
-            await StorageService.instance.saveHealthStatuses(
-              _healthStatuses.map((k, v) => MapEntry(k, v.toJson())),
-            );
-          } catch (e) {
-            setState(() {
-              _healthStatuses[site.id] = HealthStatus(
-                ok: false,
-                message: e.toString(),
-                username: null,
-                profile: null,
-                updatedAt: DateTime.now(),
-              );
-            });
-            await StorageService.instance.saveHealthStatuses(
-              _healthStatuses.map((k, v) => MapEntry(k, v.toJson())),
-            );
-          }
-        }
+        final status = await SiteHealthRefreshService.instance
+            .refreshSingleSite(activeSite, recreateAdapter: false);
+        setState(() {
+          _healthStatuses[site.id] = status;
+        });
       } else {
         final allSites = await StorageService.instance.loadSiteConfigs(
           includeApiKeys: true,
@@ -714,13 +590,11 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           (s) => s.id == site.id,
           orElse: () => site,
         );
-        final status = await _checkSingleSite(fullSite);
+        final status = await SiteHealthRefreshService.instance
+            .refreshSingleSite(fullSite, recreateAdapter: true);
         setState(() {
           _healthStatuses[site.id] = status;
         });
-        await StorageService.instance.saveHealthStatuses(
-          _healthStatuses.map((k, v) => MapEntry(k, v.toJson())),
-        );
       }
 
       if (!mounted) return;
@@ -764,12 +638,12 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
 
   Widget _buildTableHeader() {
     if (!ScreenUtils.isLargeScreen(context)) return const SizedBox.shrink();
-    
+
     final headerStyle = TextStyle(
       fontSize: 12,
       color: Theme.of(context).colorScheme.onSurfaceVariant,
     );
-    
+
     return Padding(
       // 16 ListView padding + 10 Card padding = 26 left padding to match row start
       padding: const EdgeInsets.fromLTRB(26, 6, 26, 8),
@@ -778,21 +652,13 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           // Match Index (24) + space (6) + Logo (32) + space (6) = 68
           const SizedBox(width: 68),
           Expanded(
-            flex: 2, // Changed back to 2 to give Site Name space without overflowing
+            flex:
+                2, // Changed back to 2 to give Site Name space without overflowing
             child: Text('站点信息', style: headerStyle),
           ),
-          Expanded(
-            flex: 1,
-            child: Text('上传', style: headerStyle),
-          ),
-          Expanded(
-            flex: 1,
-            child: Text('下载', style: headerStyle),
-          ),
-          Expanded(
-            flex: 1,
-            child: Text('魔力值', style: headerStyle),
-          ),
+          Expanded(flex: 1, child: Text('上传', style: headerStyle)),
+          Expanded(flex: 1, child: Text('下载', style: headerStyle)),
+          Expanded(flex: 1, child: Text('魔力值', style: headerStyle)),
           Expanded(
             flex: 1,
             child: Center(child: Text('分享率', style: headerStyle)),
@@ -829,7 +695,10 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                     onReorderItem: (oldIndex, newIndex) {
                       setState(() {
                         final item = _sites.removeAt(oldIndex);
-                        _sites.insert(newIndex > oldIndex ? newIndex - 1 : newIndex, item);
+                        _sites.insert(
+                          newIndex > oldIndex ? newIndex - 1 : newIndex,
+                          item,
+                        );
                       });
                     },
                   ),
@@ -870,13 +739,18 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       margin: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: isActive
-            ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.15)
+            ? Theme.of(
+                context,
+              ).colorScheme.primaryContainer.withValues(alpha: 0.15)
             : Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(
           side: BorderSide(
-            color: isActive 
-                ? Theme.of(context).colorScheme.primary 
-                : (siteColor ?? Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            color: isActive
+                ? Theme.of(context).colorScheme.primary
+                : (siteColor ??
+                      Theme.of(
+                        context,
+                      ).colorScheme.outlineVariant.withValues(alpha: 0.5)),
             width: isActive ? 2.0 : 1.0,
           ),
           borderRadius: BorderRadius.circular(12),
@@ -887,17 +761,14 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             height: 28,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: isActive 
-                  ? Theme.of(context).colorScheme.primary 
-                  : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              color: isActive
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(4),
             ),
             child: isActive
-                ? const Icon(
-                    Icons.check,
-                    size: 18,
-                    color: Colors.white,
-                  )
+                ? const Icon(Icons.check, size: 18, color: Colors.white)
                 : Text(
                     '${index + 1}',
                     style: TextStyle(
@@ -968,7 +839,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       return Colors.red;
     }
     if (hs.notApplicable) return Colors.green;
-    if (hs.profile?.lastAccess != null && HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess)) {
+    if (hs.profile?.lastAccess != null &&
+        HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess)) {
       return Colors.orange;
     }
     return Colors.green;
@@ -1004,7 +876,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       return reason != null ? '异常 ($reason)' : '异常';
     }
     if (hs.notApplicable) return '正常 (无数据)';
-    if (hs.profile?.lastAccess != null && HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess)) {
+    if (hs.profile?.lastAccess != null &&
+        HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess)) {
       return '警告 (最后访问超过30天)';
     }
     return '正常';
@@ -1016,10 +889,12 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       detail = hs.message ?? '未知错误';
     } else if (hs.notApplicable) {
       detail = '站点连接正常，但不支持用户资料接口。';
-    } else if (hs.profile?.lastAccess != null && HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess)) {
+    } else if (hs.profile?.lastAccess != null &&
+        HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess)) {
       final lastAccess = hs.profile!.lastAccess!;
       final days = DateTime.now().difference(lastAccess).inDays;
-      detail = '最后访问时间：${lastAccess.year}-${lastAccess.month.toString().padLeft(2, '0')}-${lastAccess.day.toString().padLeft(2, '0')}\n距今已超过 $days 天，账号可能存在风险。';
+      detail =
+          '最后访问时间：${lastAccess.year}-${lastAccess.month.toString().padLeft(2, '0')}-${lastAccess.day.toString().padLeft(2, '0')}\n距今已超过 $days 天，账号可能存在风险。';
     } else {
       detail = '状态正常。';
     }
@@ -1043,11 +918,14 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       return Center(
         child: Text(
           '未连接',
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 12,
+          ),
         ),
       );
     }
-    
+
     // 相对时间（上方）：显示数据更新/刷新时间
     final now = DateTime.now();
     final diff = now.difference(hs.updatedAt);
@@ -1059,11 +937,12 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     } else {
       relativeTime = '${diff.inMinutes} 分钟前';
     }
-    
+
     // 绝对日期（下方）：如果有 lastAccess 则显示用户的最后访问时间，否则兜底显示更新日期
     final dateToShow = hs.profile?.lastAccess ?? hs.updatedAt;
-    final dateString = '${dateToShow.year}-${dateToShow.month.toString().padLeft(2, '0')}-${dateToShow.day.toString().padLeft(2, '0')}';
-    
+    final dateString =
+        '${dateToShow.year}-${dateToShow.month.toString().padLeft(2, '0')}-${dateToShow.day.toString().padLeft(2, '0')}';
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -1080,7 +959,11 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Icon(Icons.schedule, size: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.schedule,
+              size: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: 4),
             Text(
               dateString,
@@ -1101,10 +984,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       children: [
         Icon(icon, color: color, size: 14),
         const SizedBox(width: 4),
-        Text(
-          text,
-          style: const TextStyle(fontSize: 13),
-        ),
+        Text(text, style: const TextStyle(fontSize: 13)),
       ],
     );
   }
@@ -1150,15 +1030,19 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
         side: BorderSide(
-          color: isActive 
-              ? Theme.of(context).colorScheme.primary 
-              : Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+          color: isActive
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(
+                  context,
+                ).colorScheme.outlineVariant.withValues(alpha: 0.5),
           width: isActive ? 2.0 : 1.0,
         ),
         borderRadius: BorderRadius.circular(12),
       ),
       color: isActive
-          ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.15)
+          ? Theme.of(
+              context,
+            ).colorScheme.primaryContainer.withValues(alpha: 0.15)
           : Theme.of(context).colorScheme.surface,
       child: Stack(
         clipBehavior: Clip.none,
@@ -1181,12 +1065,15 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                         height: 24,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: isActive 
-                              ? Theme.of(context).colorScheme.primary 
-                              : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          color: isActive
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerHighest
+                                    .withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: isActive 
+                        child: isActive
                             ? const Icon(
                                 Icons.check,
                                 size: 16,
@@ -1195,7 +1082,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                             : Text(
                                 '${index + 1}',
                                 style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -1208,7 +1097,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: siteColor ?? Theme.of(context).colorScheme.outlineVariant,
+                            color:
+                                siteColor ??
+                                Theme.of(context).colorScheme.outlineVariant,
                             width: 1.5,
                           ),
                         ),
@@ -1218,7 +1109,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      
+
                       // 2. Identity Column
                       Expanded(
                         flex: 2,
@@ -1238,7 +1129,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                             Text(
                               hs?.username ?? '未登录',
                               style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                                 fontSize: 11,
                               ),
                               maxLines: 1,
@@ -1246,7 +1139,13 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                             ),
                             const SizedBox(height: 2),
                             GestureDetector(
-                              onTap: (hs != null && (!hs.ok || (hs.profile?.lastAccess != null && HealthStatus.isLastAccessOverMonth(hs.profile!.lastAccess))))
+                              onTap:
+                                  (hs != null &&
+                                      (!hs.ok ||
+                                          (hs.profile?.lastAccess != null &&
+                                              HealthStatus.isLastAccessOverMonth(
+                                                hs.profile!.lastAccess,
+                                              ))))
                                   ? () => _showStatusDetail(hs, statusText)
                                   : null,
                               child: Row(
@@ -1266,7 +1165,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
                                         fontSize: 11,
                                       ),
                                     ),
@@ -1277,70 +1178,96 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                           ],
                         ),
                       ),
-                      
+
                       // Stats for large screens
-                      if (isLarge) ...() {
-                        final profile = hs?.profile;
-                        return [
-                          // Upload
-                          Expanded(
-                            flex: 1,
-                            child: profile != null ? _buildStatArrow(
-                              Icons.arrow_upward, Colors.green, profile.uploadedBytesString,
-                            ) : const Text('-'),
-                          ),
-                          // Download
-                          Expanded(
-                            flex: 1,
-                            child: profile != null ? _buildStatArrow(
-                              Icons.arrow_downward, Colors.red, profile.downloadedBytesString,
-                            ) : const Text('-'),
-                          ),
-                          // Seeding (Now Magic points)
-                          Expanded(
-                            flex: 1,
-                            child: profile != null ? Row(
-                              children: [
-                                Icon(Icons.star, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    '${Formatters.bonus(profile.bonus)}${profile.bonusPerHour != null ? ' (${profile.bonusPerHour!.toInt()})' : ''}',
-                                    style: const TextStyle(fontSize: 13),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ) : const Text('-'),
-                          ),
-                          // Ratio
-                          Expanded(
-                            flex: 1,
-                            child: profile != null ? Center(
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.trending_up, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    profile.shareRate.toStringAsFixed(2),
-                                    style: const TextStyle(
-                                      color: Color(0xFF009688),
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ) : const Center(child: Text('-')),
-                          ),
-                          // Date
-                          Expanded(
-                            flex: 1,
-                            child: _buildDateColumn(hs),
-                          ),
-                        ];
-                      }(),
+                      if (isLarge)
+                        ...() {
+                          final profile = hs?.profile;
+                          return [
+                            // Upload
+                            Expanded(
+                              flex: 1,
+                              child: profile != null
+                                  ? _buildStatArrow(
+                                      Icons.arrow_upward,
+                                      Colors.green,
+                                      profile.uploadedBytesString,
+                                    )
+                                  : const Text('-'),
+                            ),
+                            // Download
+                            Expanded(
+                              flex: 1,
+                              child: profile != null
+                                  ? _buildStatArrow(
+                                      Icons.arrow_downward,
+                                      Colors.red,
+                                      profile.downloadedBytesString,
+                                    )
+                                  : const Text('-'),
+                            ),
+                            // Seeding (Now Magic points)
+                            Expanded(
+                              flex: 1,
+                              child: profile != null
+                                  ? Row(
+                                      children: [
+                                        Icon(
+                                          Icons.star,
+                                          size: 14,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            '${Formatters.bonus(profile.bonus)}${profile.bonusPerHour != null ? ' (${profile.bonusPerHour!.toInt()})' : ''}',
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : const Text('-'),
+                            ),
+                            // Ratio
+                            Expanded(
+                              flex: 1,
+                              child: profile != null
+                                  ? Center(
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.trending_up,
+                                            size: 14,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            profile.shareRate.toStringAsFixed(
+                                              2,
+                                            ),
+                                            style: const TextStyle(
+                                              color: Color(0xFF009688),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : const Center(child: Text('-')),
+                            ),
+                            // Date
+                            Expanded(flex: 1, child: _buildDateColumn(hs)),
+                          ];
+                        }(),
 
                       // Date (Both mobile and large)
                       if (!isLarge)
@@ -1348,78 +1275,129 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                           padding: const EdgeInsets.only(right: 8.0),
                           child: _buildDateColumn(hs),
                         ),
-                      
+
                       // Trailing Menu
-                      if (isLarge)
-                        _buildSiteMenuButton(site, isActive),
+                      if (isLarge) _buildSiteMenuButton(site, isActive),
                     ],
                   ),
-                  
+
                   // Stats for Mobile
-                  if (!isLarge) ...() {
-                    final profile = hs?.profile;
-                    return [
-                      const SizedBox(height: 8),
-                      Divider(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3), height: 1),
-                      const SizedBox(height: 8),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // Upload
-                          Expanded(
-                            child: Center(
-                              child: profile != null 
-                                  ? _buildStatArrow(Icons.arrow_upward, Colors.green, profile.uploadedBytesString) 
-                                  : const Text('-', style: TextStyle(fontSize: 13)),
+                  if (!isLarge)
+                    ...() {
+                      final profile = hs?.profile;
+                      return [
+                        const SizedBox(height: 8),
+                        Divider(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.outlineVariant.withValues(alpha: 0.3),
+                          height: 1,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Upload
+                            Expanded(
+                              child: Center(
+                                child: profile != null
+                                    ? _buildStatArrow(
+                                        Icons.arrow_upward,
+                                        Colors.green,
+                                        profile.uploadedBytesString,
+                                      )
+                                    : const Text(
+                                        '-',
+                                        style: TextStyle(fontSize: 13),
+                                      ),
+                              ),
                             ),
-                          ),
-                          // Download
-                          Expanded(
-                            child: Center(
-                              child: profile != null 
-                                  ? _buildStatArrow(Icons.arrow_downward, Colors.red, profile.downloadedBytesString) 
-                                  : const Text('-', style: TextStyle(fontSize: 13)),
+                            // Download
+                            Expanded(
+                              child: Center(
+                                child: profile != null
+                                    ? _buildStatArrow(
+                                        Icons.arrow_downward,
+                                        Colors.red,
+                                        profile.downloadedBytesString,
+                                      )
+                                    : const Text(
+                                        '-',
+                                        style: TextStyle(fontSize: 13),
+                                      ),
+                              ),
                             ),
-                          ),
-                          // Bonus (Magic points)
-                          Expanded(
-                            child: Center(
-                              child: profile != null ? Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.star, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                  const SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      '${Formatters.bonus(profile.bonus)}${profile.bonusPerHour != null ? ' (${profile.bonusPerHour!.toInt()})' : ''}', 
-                                      style: const TextStyle(fontSize: 13),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ]
-                              ) : const Text('-', style: TextStyle(fontSize: 13)),
+                            // Bonus (Magic points)
+                            Expanded(
+                              child: Center(
+                                child: profile != null
+                                    ? Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.star,
+                                            size: 14,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              '${Formatters.bonus(profile.bonus)}${profile.bonusPerHour != null ? ' (${profile.bonusPerHour!.toInt()})' : ''}',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : const Text(
+                                        '-',
+                                        style: TextStyle(fontSize: 13),
+                                      ),
+                              ),
                             ),
-                          ),
-                          // Ratio
-                          Expanded(
-                            child: Center(
-                              child: profile != null ? Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.trending_up, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    profile.shareRate.toStringAsFixed(2),
-                                    style: const TextStyle(color: Color(0xFF009688), fontWeight: FontWeight.bold, fontSize: 14),
-                                  ),
-                                ],
-                              ) : const Text('-', style: TextStyle(fontSize: 14)),
+                            // Ratio
+                            Expanded(
+                              child: Center(
+                                child: profile != null
+                                    ? Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.trending_up,
+                                            size: 14,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            profile.shareRate.toStringAsFixed(
+                                              2,
+                                            ),
+                                            style: const TextStyle(
+                                              color: Color(0xFF009688),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : const Text(
+                                        '-',
+                                        style: TextStyle(fontSize: 14),
+                                      ),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ];
-                  }()
+                          ],
+                        ),
+                      ];
+                    }(),
                 ],
               ),
             ),
@@ -1429,7 +1407,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     );
 
     // On mobile we already added the menu, so no need for SwipeableSiteItem anymore.
-    // But we might want to keep it if we still want swipe actions. 
+    // But we might want to keep it if we still want swipe actions.
     // Since the new design adds a 3-dots menu button inside the card, we probably don't need the swipe.
     // However, I'll keep the Swipeable wrapping just in case they like both, but let's just return `card`.
     if (!isLarge) {
@@ -1466,7 +1444,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                 ),
                 isDense: true,
                 filled: true,
-                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                fillColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 8,
@@ -1515,7 +1495,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                   style: FilledButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   icon: const Icon(Icons.check),
                   label: const Text('完成'),
@@ -1534,8 +1516,12 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Theme.of(context).colorScheme.primary,
-                    side: BorderSide(color: Theme.of(context).colorScheme.primary),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   icon: const Icon(Icons.close),
                   label: const Text('取消'),
@@ -1551,7 +1537,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
               style: FilledButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 minimumSize: const Size(0, 36),
               ),
@@ -1560,11 +1548,16 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             OutlinedButton.icon(
               onPressed: _healthChecking ? null : _runHealthCheck,
               icon: const Icon(Icons.refresh, size: 18),
-              label: Text(_healthChecking ? '刷新中…' : '刷新', style: const TextStyle(fontSize: 13)),
+              label: Text(
+                _healthChecking ? '刷新中…' : '刷新',
+                style: const TextStyle(fontSize: 13),
+              ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Theme.of(context).colorScheme.primary,
                 side: BorderSide(color: Theme.of(context).colorScheme.primary),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 minimumSize: const Size(0, 36),
               ),
@@ -1579,8 +1572,12 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
               },
               style: OutlinedButton.styleFrom(
                 foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-                side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)), // Almost a circle like in the image
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ), // Almost a circle like in the image
                 padding: EdgeInsets.zero,
                 minimumSize: const Size(36, 36),
                 maximumSize: const Size(36, 36),
@@ -1592,6 +1589,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       ),
     );
   }
+
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
       title: const Text('站点配置'),
@@ -2198,15 +2196,15 @@ class _SiteEditPageState extends State<SiteEditPage> {
         final profile = await adapter.fetchMemberProfile();
 
         try {
-          final statuses = await StorageService.instance.loadHealthStatuses();
-          statuses[site.id] = HealthStatus(
-            ok: true,
-            message: '正常',
-            username: profile.username,
-            profile: profile,
-            updatedAt: DateTime.now(),
-          ).toJson();
-          await StorageService.instance.saveHealthStatuses(statuses);
+          await StorageService.instance.mergeHealthStatuses({
+            site.id: HealthStatus(
+              ok: true,
+              message: '正常',
+              username: profile.username,
+              profile: profile,
+              updatedAt: DateTime.now(),
+            ).toJson(),
+          });
         } catch (_) {}
 
         if (!mounted) return;
@@ -2231,16 +2229,16 @@ class _SiteEditPageState extends State<SiteEditPage> {
         await adapter.testConnection();
 
         try {
-          final statuses = await StorageService.instance.loadHealthStatuses();
-          statuses[site.id] = HealthStatus(
-            ok: true,
-            notApplicable: true,
-            message: '连接正常（不支持用户资料）',
-            username: null,
-            profile: null,
-            updatedAt: DateTime.now(),
-          ).toJson();
-          await StorageService.instance.saveHealthStatuses(statuses);
+          await StorageService.instance.mergeHealthStatuses({
+            site.id: HealthStatus(
+              ok: true,
+              notApplicable: true,
+              message: '连接正常（不支持用户资料）',
+              username: null,
+              profile: null,
+              updatedAt: DateTime.now(),
+            ).toJson(),
+          });
         } catch (_) {}
 
         if (!mounted) return;
@@ -2261,15 +2259,15 @@ class _SiteEditPageState extends State<SiteEditPage> {
     } catch (e) {
       try {
         final site = _composeCurrentSite();
-        final statuses = await StorageService.instance.loadHealthStatuses();
-        statuses[site.id] = HealthStatus(
-          ok: false,
-          message: e.toString(),
-          username: null,
-          profile: null,
-          updatedAt: DateTime.now(),
-        ).toJson();
-        await StorageService.instance.saveHealthStatuses(statuses);
+        await StorageService.instance.mergeHealthStatuses({
+          site.id: HealthStatus(
+            ok: false,
+            message: e.toString(),
+            username: null,
+            profile: null,
+            updatedAt: DateTime.now(),
+          ).toJson(),
+        });
       } catch (_) {}
 
       if (!mounted) return;

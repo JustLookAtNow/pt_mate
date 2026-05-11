@@ -7,7 +7,9 @@ import 'package:flutter/services.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const MethodChannel channel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+  const MethodChannel channel = MethodChannel(
+    'plugins.it_nomads.com/flutter_secure_storage',
+  );
   late StorageService service;
 
   setUp(() {
@@ -16,12 +18,10 @@ void main() {
     service.resetForTest();
 
     // Mock FlutterSecureStorage
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
-      channel,
-      (MethodCall methodCall) async {
-        return null;
-      },
-    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+          return null;
+        });
   });
 
   test('StorageService caching optimization test (Add, Update, Delete)', () async {
@@ -50,7 +50,6 @@ void main() {
     // Verify instance identity (no re-decoding)
     expect(loadedConfigsAfterAdd.first, same(cacheAfterAdd.first));
 
-
     // --- UPDATE TEST ---
     final updatedConfig = newConfig.copyWith(name: 'Updated Test Site');
     await service.updateSiteConfig(updatedConfig);
@@ -67,7 +66,6 @@ void main() {
     // Verify instance identity with the cache
     expect(loadedConfigsAfterUpdate.first, same(cacheAfterUpdate.first));
 
-
     // --- DELETE TEST ---
     await service.deleteSiteConfig('test-site-1');
 
@@ -83,73 +81,109 @@ void main() {
     // ensuring correctness (empty list) is sufficient here.
   });
 
-  test('Linux keyring failure should disable further secure reads for current run', () async {
-    service.overridePlatformForTest(TargetPlatform.linux);
-    var secureReadCalls = 0;
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-          if (methodCall.method == 'read') {
-            secureReadCalls++;
-            throw PlatformException(
-              code: 'libsecret_error',
-              message: 'Failed to unlock the keyring',
-            );
-          }
-          return null;
-        });
+  test(
+    'Linux keyring failure should disable further secure reads for current run',
+    () async {
+      service.overridePlatformForTest(TargetPlatform.linux);
+      var secureReadCalls = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+            if (methodCall.method == 'read') {
+              secureReadCalls++;
+              throw PlatformException(
+                code: 'libsecret_error',
+                message: 'Failed to unlock the keyring',
+              );
+            }
+            return null;
+          });
 
-    await service.saveSiteConfigs([
-      const SiteConfig(
-        id: 'site-a',
-        name: 'Site A',
-        baseUrl: 'https://a.example.com',
-      ),
-      const SiteConfig(
-        id: 'site-b',
-        name: 'Site B',
-        baseUrl: 'https://b.example.com',
-      ),
-    ]);
+      await service.saveSiteConfigs([
+        const SiteConfig(
+          id: 'site-a',
+          name: 'Site A',
+          baseUrl: 'https://a.example.com',
+        ),
+        const SiteConfig(
+          id: 'site-b',
+          name: 'Site B',
+          baseUrl: 'https://b.example.com',
+        ),
+      ]);
 
-    final configs = await service.loadSiteConfigs(includeApiKeys: true);
-    expect(configs, hasLength(2));
-    expect(service.isSecureStorageBypassedForCurrentRun, isTrue);
-    expect(secureReadCalls, 1);
+      final configs = await service.loadSiteConfigs(includeApiKeys: true);
+      expect(configs, hasLength(2));
+      expect(service.isSecureStorageBypassedForCurrentRun, isTrue);
+      expect(secureReadCalls, 1);
 
-    await service.loadDownloaderPassword('downloader-1');
-    expect(secureReadCalls, 1);
-  });
+      await service.loadDownloaderPassword('downloader-1');
+      expect(secureReadCalls, 1);
+    },
+  );
 
-  test('Linux keyring failure should fallback to plaintext writes after first error', () async {
-    service.overridePlatformForTest(TargetPlatform.linux);
-    var secureWriteCalls = 0;
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-          if (methodCall.method == 'write') {
-            secureWriteCalls++;
-            throw PlatformException(
-              code: 'libsecret_error',
-              message: 'Failed to unlock the keyring',
-            );
-          }
-          return null;
-        });
+  test(
+    'Linux keyring failure should fallback to plaintext writes after first error',
+    () async {
+      service.overridePlatformForTest(TargetPlatform.linux);
+      var secureWriteCalls = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+            if (methodCall.method == 'write') {
+              secureWriteCalls++;
+              throw PlatformException(
+                code: 'libsecret_error',
+                message: 'Failed to unlock the keyring',
+              );
+            }
+            return null;
+          });
 
-    await service.saveDownloaderPassword('downloader-1', 'password-1');
-    expect(service.isSecureStorageBypassedForCurrentRun, isTrue);
-    expect(secureWriteCalls, 1);
+      await service.saveDownloaderPassword('downloader-1', 'password-1');
+      expect(service.isSecureStorageBypassedForCurrentRun, isTrue);
+      expect(secureWriteCalls, 1);
 
-    final prefs = await SharedPreferences.getInstance();
-    expect(
-      prefs.getString(StorageKeys.downloaderPasswordFallbackKey('downloader-1')),
-      'password-1',
-    );
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getString(
+          StorageKeys.downloaderPasswordFallbackKey('downloader-1'),
+        ),
+        'password-1',
+      );
 
-    await service.saveDownloaderPassword('downloader-2', 'password-2');
-    expect(secureWriteCalls, 1);
-    expect(
-      prefs.getString(StorageKeys.downloaderPasswordFallbackKey('downloader-2')),
-      'password-2',
-    );
+      await service.saveDownloaderPassword('downloader-2', 'password-2');
+      expect(secureWriteCalls, 1);
+      expect(
+        prefs.getString(
+          StorageKeys.downloaderPasswordFallbackKey('downloader-2'),
+        ),
+        'password-2',
+      );
+    },
+  );
+
+  test('mergeHealthStatuses should keep newer updatedAt', () async {
+    final older = DateTime(2026, 1, 1, 0, 0, 0);
+    final newer = DateTime(2026, 1, 1, 1, 0, 0);
+
+    await service.mergeHealthStatuses({
+      'site-a': HealthStatus(
+        ok: true,
+        message: 'new',
+        updatedAt: newer,
+      ).toJson(),
+    });
+
+    await service.mergeHealthStatuses({
+      'site-a': HealthStatus(
+        ok: false,
+        message: 'old',
+        updatedAt: older,
+      ).toJson(),
+    });
+
+    final statuses = await service.loadHealthStatuses();
+    expect(statuses['site-a'], isNotNull);
+    expect(statuses['site-a']!['message'], 'new');
+    expect(statuses['site-a']!['ok'], true);
   });
 }

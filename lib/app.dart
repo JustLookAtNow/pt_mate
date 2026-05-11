@@ -18,6 +18,7 @@ import 'services/backup_service.dart';
 import 'services/webdav_service.dart';
 import 'providers/aggregate_search_provider.dart';
 import 'services/site_config_service.dart';
+import 'services/site_health_refresh_service.dart';
 
 import 'services/downloader/downloader_config.dart';
 import 'services/downloader/downloader_service.dart';
@@ -150,6 +151,8 @@ class AppState extends ChangeNotifier {
 
       // 应用启动时检查自动同步
       Future.microtask(() => _checkAutoSync());
+      // 应用启动后静默刷新站点健康状态缓存
+      Future.microtask(() => _refreshSiteHealthStatusesInBackground());
 
       _initCompleter!.complete();
     } catch (e) {
@@ -255,6 +258,16 @@ class AppState extends ChangeNotifier {
         _logger.e('AppState: 检查自动同步配置失败: $e');
       }
       // 配置检查失败不影响应用正常启动
+    }
+  }
+
+  Future<void> _refreshSiteHealthStatusesInBackground() async {
+    try {
+      await SiteHealthRefreshService.instance.refreshIfNeeded();
+    } catch (e) {
+      if (kDebugMode) {
+        _logger.e('AppState: 后台刷新站点健康状态失败: $e');
+      }
     }
   }
 }
@@ -418,8 +431,8 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
         path = lower.endsWith('.png')
             ? logo
             : (logo.contains('.')
-                ? '${logo.substring(0, logo.lastIndexOf('.'))}.png'
-                : logo);
+                  ? '${logo.substring(0, logo.lastIndexOf('.'))}.png'
+                  : logo);
       }
     } catch (_) {}
 
@@ -622,7 +635,9 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                           borderSide: BorderSide.none,
                         ),
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                        ),
                       ),
                       onChanged: _filterSites,
                     ),
@@ -637,14 +652,18 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildToggleButton(Icons.grid_view_rounded, _isGridView, () {
-                          if (!_isGridView) {
-                            setState(() => _isGridView = true);
-                            WidgetsBinding.instance.addPostFrameCallback(
-                              (_) => _scrollToActiveSite(),
-                            );
-                          }
-                        }),
+                        _buildToggleButton(
+                          Icons.grid_view_rounded,
+                          _isGridView,
+                          () {
+                            if (!_isGridView) {
+                              setState(() => _isGridView = true);
+                              WidgetsBinding.instance.addPostFrameCallback(
+                                (_) => _scrollToActiveSite(),
+                              );
+                            }
+                          },
+                        ),
                         _buildToggleButton(
                           Icons.format_list_bulleted_rounded,
                           !_isGridView,
@@ -700,17 +719,15 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                                     crossAxisSpacing: 12,
                                     childAspectRatio: 1.0,
                                   ),
-                              itemBuilder:
-                                  (context, index) =>
-                                      _buildGridItem(_filteredSites[index]),
+                              itemBuilder: (context, index) =>
+                                  _buildGridItem(_filteredSites[index]),
                             )
                           : ListView.builder(
                               controller: _scrollController,
                               padding: const EdgeInsets.only(bottom: 24),
                               itemCount: _filteredSites.length,
-                              itemBuilder:
-                                  (context, index) =>
-                                      _buildListItem(_filteredSites[index]),
+                              itemBuilder: (context, index) =>
+                                  _buildListItem(_filteredSites[index]),
                             ),
                     ),
             ),
@@ -734,10 +751,9 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
         child: Icon(
           icon,
           size: 18,
-          color:
-              active
-                  ? theme.colorScheme.onPrimary
-                  : theme.colorScheme.onSurfaceVariant,
+          color: active
+              ? theme.colorScheme.onPrimary
+              : theme.colorScheme.onSurfaceVariant,
         ),
       ),
     );
@@ -755,16 +771,14 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color:
-                isSelected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
             width: isSelected ? 1.5 : 1,
           ),
-          color:
-              isSelected
-                  ? theme.colorScheme.primaryContainer.withValues(alpha: 0.15)
-                  : Colors.transparent,
+          color: isSelected
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.15)
+              : Colors.transparent,
         ),
         child: Stack(
           children: [
@@ -789,7 +803,9 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -818,16 +834,14 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color:
-                  isSelected
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+              color: isSelected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
               width: isSelected ? 1.5 : 1,
             ),
-            color:
-                isSelected
-                    ? theme.colorScheme.primaryContainer.withValues(alpha: 0.15)
-                    : Colors.transparent,
+            color: isSelected
+                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.15)
+                : Colors.transparent,
           ),
           child: Row(
             children: [
@@ -843,8 +857,9 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                           child: Text(
                             site.name,
                             style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight:
-                                  isSelected ? FontWeight.bold : FontWeight.w500,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.w500,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -906,21 +921,21 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
 
   Widget _buildSiteLogo(SiteConfig site, bool isSelected, double size) {
     final theme = Theme.of(context);
-    final Color? siteColor =
-        site.siteColor != null ? Color(site.siteColor!) : null;
+    final Color? siteColor = site.siteColor != null
+        ? Color(site.siteColor!)
+        : null;
 
     return Container(
       width: size,
       height: size,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color:
-            isSelected
-                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.2)
-                : (siteColor?.withValues(alpha: 0.1) ??
-                    theme.colorScheme.surfaceContainerHighest.withValues(
-                      alpha: 0.3,
-                    )),
+        color: isSelected
+            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.2)
+            : (siteColor?.withValues(alpha: 0.1) ??
+                  theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.3,
+                  )),
         shape: BoxShape.circle,
       ),
       child: FutureBuilder<String>(
@@ -954,7 +969,6 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
     );
   }
 }
-
 
 class MTeamApp extends StatefulWidget {
   const MTeamApp({super.key});
@@ -1406,10 +1420,12 @@ class _HomePageState extends State<HomePage> {
                       },
                       icon: const Icon(Icons.category, size: 20),
                       style: IconButton.styleFrom(
-                        backgroundColor:
-                            Theme.of(context).colorScheme.primaryContainer,
-                        foregroundColor:
-                            Theme.of(context).colorScheme.onPrimaryContainer,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.primaryContainer,
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onPrimaryContainer,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -1455,7 +1471,9 @@ class _HomePageState extends State<HomePage> {
                           borderSide: BorderSide.none,
                         ),
                         filled: true,
-                        fillColor: Theme.of(context).colorScheme.surfaceContainer,
+                        fillColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainer,
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -1870,17 +1888,15 @@ class _HomePageState extends State<HomePage> {
 
       if (downloadToLocal) {
         // 本地下载模式
-        final savedPath = await LocalDownloadService.instance.downloadAndSaveTorrent(
-          downloadUrl: url,
-          torrentName: item.name,
-          siteConfig: _currentSite,
-        );
+        final savedPath = await LocalDownloadService.instance
+            .downloadAndSaveTorrent(
+              downloadUrl: url,
+              torrentName: item.name,
+              siteConfig: _currentSite,
+            );
 
         if (mounted && savedPath != null) {
-          NotificationHelper.showInfo(
-            context,
-            '种子文件已保存到: $savedPath',
-          );
+          NotificationHelper.showInfo(context, '种子文件已保存到: $savedPath');
         }
       } else {
         // 远程下载器模式
@@ -2961,11 +2977,13 @@ class _HomePageState extends State<HomePage> {
           id: item.id,
           url: item.downloadUrl,
         );
-        downloadItems.add(TorrentDownloadItem(
-          downloadUrl: url,
-          torrentName: item.name,
-          siteConfig: _currentSite,
-        ));
+        downloadItems.add(
+          TorrentDownloadItem(
+            downloadUrl: url,
+            torrentName: item.name,
+            siteConfig: _currentSite,
+          ),
+        );
       } catch (e) {
         if (mounted) {
           setState(() {
@@ -2978,22 +2996,23 @@ class _HomePageState extends State<HomePage> {
 
     // 批量下载并打包成zip
     try {
-      final savedPath = await LocalDownloadService.instance.batchDownloadAndSaveAsZip(
-        items: downloadItems,
-        onProgress: (current, total, currentName) {
-          if (mounted) {
-            setState(() {
-              _batchProgress = _buildBatchProgressState(
-                actionType: BatchOperationType.download,
-                isRunning: true,
-                runTotalCount: items.length,
-                runCompletedCount: current,
-                currentItemName: currentName,
-              );
-            });
-          }
-        },
-      );
+      final savedPath = await LocalDownloadService.instance
+          .batchDownloadAndSaveAsZip(
+            items: downloadItems,
+            onProgress: (current, total, currentName) {
+              if (mounted) {
+                setState(() {
+                  _batchProgress = _buildBatchProgressState(
+                    actionType: BatchOperationType.download,
+                    isRunning: true,
+                    runTotalCount: items.length,
+                    runCompletedCount: current,
+                    currentItemName: currentName,
+                  );
+                });
+              }
+            },
+          );
 
       if (mounted) {
         setState(() {

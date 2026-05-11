@@ -84,6 +84,8 @@ class StorageKeys {
 
   // 健康检查结果缓存（站点ID -> 状态JSON）
   static const String healthStatuses = 'app.healthStatuses';
+  static const String lastSiteHealthRefreshCheck =
+      'app.lastSiteHealthRefreshCheck';
 
   // 查询条件配置已移至站点配置中，不再需要全局键
 }
@@ -121,6 +123,7 @@ class StorageService {
   );
 
   bool _hasPendingConfigUpdates = false;
+  Future<void> _healthStatusesWriteQueue = Future.value();
 
   // 站点配置内存缓存
   List<SiteConfig>? _siteConfigsCache;
@@ -152,10 +155,10 @@ class StorageService {
     // 我们统一首选最稳定的 PKCS1 (Compat) 进行写入。
     // OAEP (Modern) 仅放在序列中用于尝试读取现有数据。
     _cachedAndroidOptionsSequence = [
-      _androidCompatSecureOptions,  // 当前首选 (PKCS1+AES_GCM)
-      _androidLegacySecureOptions,  // 旧版默认格式 (PKCS1+AES_CBC)，pre-PR#126 数据
-      _androidModernSecureOptions,  // 历史回退 (OAEP+AES_GCM)
-      const AndroidOptions(),       // 兜底默认
+      _androidCompatSecureOptions, // 当前首选 (PKCS1+AES_GCM)
+      _androidLegacySecureOptions, // 旧版默认格式 (PKCS1+AES_CBC)，pre-PR#126 数据
+      _androidModernSecureOptions, // 历史回退 (OAEP+AES_GCM)
+      const AndroidOptions(), // 兜底默认
     ];
     return _cachedAndroidOptionsSequence!;
   }
@@ -1197,6 +1200,7 @@ class StorageService {
     _platformOverrideForTest = null;
     _secureStorageAvailability = _SecureStorageAvailability.unknown;
     _hasLoggedSecureStorageUnavailable = false;
+    _healthStatusesWriteQueue = Future.value();
   }
 
   @visibleForTesting
@@ -1235,6 +1239,39 @@ class StorageService {
     }
   }
 
+  Future<void> mergeHealthStatuses(
+    Map<String, Map<String, dynamic>> statuses, {
+    bool preferNewer = true,
+  }) {
+    _healthStatusesWriteQueue = _healthStatusesWriteQueue.then((_) async {
+      final current = await loadHealthStatuses();
+      final merged = Map<String, Map<String, dynamic>>.from(current);
+
+      for (final entry in statuses.entries) {
+        final siteId = entry.key;
+        final nextStatus = entry.value;
+        final currentStatus = merged[siteId];
+
+        if (!preferNewer || currentStatus == null) {
+          merged[siteId] = nextStatus;
+          continue;
+        }
+
+        final currentUpdatedAt = _parseHealthStatusUpdatedAt(currentStatus);
+        final nextUpdatedAt = _parseHealthStatusUpdatedAt(nextStatus);
+        if (currentUpdatedAt == null ||
+            nextUpdatedAt == null ||
+            !currentUpdatedAt.isAfter(nextUpdatedAt)) {
+          merged[siteId] = nextStatus;
+        }
+      }
+
+      await saveHealthStatuses(merged);
+    });
+
+    return _healthStatusesWriteQueue;
+  }
+
   Future<Map<String, Map<String, dynamic>>> loadHealthStatuses() async {
     final prefs = await _prefs;
     final str = prefs.getString(StorageKeys.healthStatuses);
@@ -1255,5 +1292,30 @@ class StorageService {
       // ignore decode errors
     }
     return <String, Map<String, dynamic>>{};
+  }
+
+  DateTime? _parseHealthStatusUpdatedAt(Map<String, dynamic> status) {
+    final raw = status['updatedAt']?.toString();
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return DateTime.parse(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveLastSiteHealthRefreshCheck(DateTime time) async {
+    final prefs = await _prefs;
+    await prefs.setInt(
+      StorageKeys.lastSiteHealthRefreshCheck,
+      time.millisecondsSinceEpoch,
+    );
+  }
+
+  Future<DateTime?> loadLastSiteHealthRefreshCheck() async {
+    final prefs = await _prefs;
+    final timestamp = prefs.getInt(StorageKeys.lastSiteHealthRefreshCheck);
+    if (timestamp == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(timestamp);
   }
 }
