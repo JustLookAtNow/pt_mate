@@ -56,13 +56,13 @@ class ParsedTorrentResult {
 }
 
 /// Isolate entry point for parsing search results
-Future<ParsedTorrentResult> _parseSearchResponseInIsolate(
+ParsedTorrentResult _parseSearchResponseInIsolate(
   ParseSearchParams params,
-) async {
+) {
   final soup = BeautifulSoup(params.html);
   final logs = <String>[];
 
-  final torrents = await NexusPHPWebAdapter._staticParseTorrentList(
+  final torrents = NexusPHPWebAdapter._staticParseTorrentList(
     soup,
     params.searchConfig,
     params.discountMapping,
@@ -73,7 +73,7 @@ Future<ParsedTorrentResult> _parseSearchResponseInIsolate(
     logs,
   );
 
-  final totalPages = await NexusPHPWebAdapter._staticParseTotalPages(
+  final totalPages = NexusPHPWebAdapter._staticParseTotalPages(
     soup,
     params.totalPagesConfig,
     logs,
@@ -99,6 +99,8 @@ class NexusPHPWebAdapter extends SiteAdapter
   late Dio _dio;
   Map<String, String>? _discountMapping;
   Map<String, String>? _tagMapping;
+  final Map<String, Map<String, dynamic>> _finderConfigCache = {};
+  final Map<String, Map<String, dynamic>?> _requestConfigCache = {};
 
   @override
   Map<String, String>? get tagMapping => _tagMapping;
@@ -236,6 +238,8 @@ class NexusPHPWebAdapter extends SiteAdapter
 
   void setCustomTemplate(SiteConfigTemplate template) {
     _customTemplate = template;
+    _finderConfigCache.clear();
+    _requestConfigCache.clear();
   }
 
   /// 加载优惠类型映射配置
@@ -278,7 +282,6 @@ class NexusPHPWebAdapter extends SiteAdapter
       _tagMapping = {};
     }
   }
-
 
   @override
   Future<MemberProfile> fetchMemberProfile({String? apiKey}) async {
@@ -345,10 +348,15 @@ class NexusPHPWebAdapter extends SiteAdapter
   /// 获取指定类型的配置
   /// [configType] 配置类型，如 'userInfo', 'passKey', 'search', 'categories' 等
   Future<Map<String, dynamic>> _getFinderConfig(String configType) async {
+    final cached = _finderConfigCache[configType];
+    if (cached != null) return cached;
+
     if (_customTemplate != null && _customTemplate!.infoFinder != null) {
       final infoFinder = _customTemplate!.infoFinder!;
       if (infoFinder[configType] != null) {
-        return infoFinder[configType] as Map<String, dynamic>;
+        final config = infoFinder[configType] as Map<String, dynamic>;
+        _finderConfigCache[configType] = config;
+        return config;
       }
     }
     // 优先读取 SiteConfig.templateId 对应的配置
@@ -361,15 +369,15 @@ class NexusPHPWebAdapter extends SiteAdapter
         if (template != null && template.infoFinder != null) {
           final infoFinder = template.infoFinder!;
           if (infoFinder[configType] != null) {
-            return infoFinder[configType] as Map<String, dynamic>;
+            final config = infoFinder[configType] as Map<String, dynamic>;
+            _finderConfigCache[configType] = config;
+            return config;
           }
         }
       } catch (e) {
         // 如果获取模板配置失败，继续使用默认配置
         if (kDebugMode) {
-          if (kDebugMode) {
-            _logger.e('获取模板配置失败: $e');
-          }
+          _logger.e('获取模板配置失败: $e');
         }
       }
     }
@@ -382,15 +390,23 @@ class NexusPHPWebAdapter extends SiteAdapter
     if (template != null && template.infoFinder != null) {
       final infoFinder = template.infoFinder!;
       if (infoFinder[configType] != null) {
-        return infoFinder[configType] as Map<String, dynamic>;
+        final config = infoFinder[configType] as Map<String, dynamic>;
+        _finderConfigCache[configType] = config;
+        return config;
       }
     }
-    return {};
+    const emptyConfig = <String, dynamic>{};
+    _finderConfigCache[configType] = emptyConfig;
+    return emptyConfig;
   }
 
   /// 获取指定类型的请求配置
   /// [action] 请求动作，如 'loginPage', 'collect', 'unCollect' 或 'search.normal' 等
   Future<Map<String, dynamic>?> _getRequestConfig(String action) async {
+    if (_requestConfigCache.containsKey(action)) {
+      return _requestConfigCache[action];
+    }
+
     final templatesToTry = <SiteConfigTemplate?>[];
 
     // 1. 尝试自定义模板
@@ -443,10 +459,12 @@ class NexusPHPWebAdapter extends SiteAdapter
       }
 
       if (found && current is Map<String, dynamic>) {
+        _requestConfigCache[action] = current;
         return current;
       }
     }
 
+    _requestConfigCache[action] = null;
     return null;
   }
 
@@ -485,7 +503,7 @@ class NexusPHPWebAdapter extends SiteAdapter
 
     for (final entry in parsedFields.entries) {
       try {
-        final value = await extractor.extractField(targetElement, entry.value);
+        final value = extractor.extractFieldSync(targetElement, entry.value);
         result[entry.key] = value.string;
       } catch (e) {
         _logRuleAndSoup(
@@ -535,7 +553,7 @@ class NexusPHPWebAdapter extends SiteAdapter
         throw Exception('配置错误：缺少 bonusPerHour 字段');
       }
 
-      final value = await extractor.extractField(targetElement, field);
+      final value = extractor.extractFieldSync(targetElement, field);
 
       if (!value.hasValue) return null;
 
@@ -589,7 +607,7 @@ class NexusPHPWebAdapter extends SiteAdapter
       final passKeyField = parsedFields['passKey'];
 
       if (passKeyField != null) {
-        final value = await extractor.extractField(targetElement, passKeyField);
+        final value = extractor.extractFieldSync(targetElement, passKeyField);
 
         if (value.hasValue) {
           return value.string?.trim();
@@ -825,11 +843,11 @@ class NexusPHPWebAdapter extends SiteAdapter
     return _staticParseTotalPages(soup, config);
   }
 
-  static Future<int> _staticParseTotalPages(
+  static int _staticParseTotalPages(
     BeautifulSoup soup,
     Map<String, dynamic> config, [
     List<String>? logs,
-  ]) async {
+  ]) {
     final extractor = HtmlExtractor();
     int totalPages = 1;
     try {
@@ -850,14 +868,16 @@ class NexusPHPWebAdapter extends SiteAdapter
         return 1;
       }
 
-      final fieldConfig = HtmlExtractor.parseFieldConfigs(fieldsConfig)['totalPages'];
+      final fieldConfig = HtmlExtractor.parseFieldConfigs(
+        fieldsConfig,
+      )['totalPages'];
       if (fieldConfig == null) {
         return 1;
       }
 
       final pageValues = <int>[];
       for (final row in rows) {
-        final value = await extractor.extractField(row, fieldConfig);
+        final value = extractor.extractFieldSync(row, fieldConfig);
         final parsed = value.intValue;
         if (parsed != null) {
           pageValues.add(parsed);
@@ -893,7 +913,7 @@ class NexusPHPWebAdapter extends SiteAdapter
     );
   }
 
-  static Future<List<TorrentItem>> _staticParseTorrentList(
+  static List<TorrentItem> _staticParseTorrentList(
     BeautifulSoup soup,
     Map<String, dynamic> searchConfig,
     Map<String, String> discountMapping,
@@ -902,7 +922,7 @@ class NexusPHPWebAdapter extends SiteAdapter
     String passKey,
     String userId, [
     List<String>? logs,
-  ]) async {
+  ]) {
     final torrents = <TorrentItem>[];
 
     try {
@@ -932,7 +952,7 @@ class NexusPHPWebAdapter extends SiteAdapter
 
       for (final rowElement in rows) {
         try {
-          final item = await torrentExtractor.extract(
+          final item = torrentExtractor.extract(
             rowElement,
             baseUrl: baseUrl,
             passKey: passKey,
@@ -1301,15 +1321,15 @@ class NexusPHPWebAdapter extends SiteAdapter
     // 遍历每个 row 元素（每个代表一个批次）
     for (final rowElement in rowElements) {
       // 提取当前 row 中的所有 categoryId
-      final categoryIdValues = await extractor.extractFieldValue(
+      final categoryIdValues = extractor.extractFieldValuesSync(
         rowElement,
-        categoryIdField.toJson(),
+        categoryIdField,
       );
 
       // 提取当前 row 中的所有 categoryName
-      final categoryNameValues = await extractor.extractFieldValue(
+      final categoryNameValues = extractor.extractFieldValuesSync(
         rowElement,
-        categoryNameField.toJson(),
+        categoryNameField,
       );
 
       // 检查是否有有效的字段提取结果

@@ -1,7 +1,13 @@
-
 import '../../models/app_models.dart';
 import '../../utils/format.dart';
 import 'base_web_adapter.dart';
+
+class FieldExtractionResult {
+  final ExtractedValue first;
+  final List<String> allValues;
+
+  const FieldExtractionResult({required this.first, required this.allValues});
+}
 
 /// 字段提取配置
 /// 与现有 JSON 配置 100% 兼容的 Dart 表示
@@ -12,40 +18,76 @@ class FieldConfig {
   final dynamic defaultValue;
   final bool required;
   final String? value;
+  final Map<String, dynamic> _json;
+  final RegExp? regexpFilter;
+  final String? filterFormat;
 
-  const FieldConfig({
+  FieldConfig({
     this.selector,
     this.attribute,
     this.filter,
     this.defaultValue,
     this.required = false,
     this.value,
-  });
+  }) : _json = {
+         'selector': ?selector,
+         'attribute': ?attribute,
+         'filter': ?filter,
+         'value': ?value,
+         'defaultValue': ?defaultValue,
+         if (required) 'required': required,
+       },
+       regexpFilter = _compileRegexpFilter(filter),
+       filterFormat = filter?['value'] as String?;
+
+  FieldConfig._({
+    this.selector,
+    this.attribute,
+    this.filter,
+    this.defaultValue,
+    this.required = false,
+    this.value,
+    required Map<String, dynamic> json,
+    this.regexpFilter,
+    this.filterFormat,
+  }) : _json = json;
 
   /// 从 JSON/Map 构造，兼容现有配置格式
   factory FieldConfig.fromJson(Map<String, dynamic> json) {
-    return FieldConfig(
+    final filter = json['filter'] as Map<String, dynamic>?;
+    return FieldConfig._(
       selector: json['selector'] as String?,
       attribute: json['attribute'] as String?,
-      filter: json['filter'] as Map<String, dynamic>?,
+      filter: filter,
       defaultValue: json['defaultValue'],
       required: json['required'] as bool? ?? false,
       value: json['value'] as String?,
+      json: Map<String, dynamic>.from(json),
+      regexpFilter: _compileRegexpFilter(filter),
+      filterFormat: filter?['value'] as String?,
     );
   }
 
   /// 转换为 Map，用于传给 BaseWebAdapterMixin.extractFieldValue
-  Map<String, dynamic> toJson() => {
-    if (selector != null) 'selector': selector,
-    if (attribute != null) 'attribute': attribute,
-    if (filter != null) 'filter': filter,
-    if (value != null) 'value': value,
-    if (defaultValue != null) 'defaultValue': defaultValue,
-    if (required) 'required': required,
-  };
+  Map<String, dynamic> toJson() => _json;
+
+  bool get hasDefaultValue => defaultValue != null;
+
+  String get defaultValueString => defaultValue.toString();
 
   /// 是否配置了 value 模板
   bool get hasValue => value != null && value!.isNotEmpty;
+
+  static RegExp? _compileRegexpFilter(Map<String, dynamic>? filter) {
+    if (filter == null || filter['name'] != 'regexp') return null;
+    final args = filter['args'] as String?;
+    if (args == null) return null;
+    try {
+      return RegExp(args);
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 /// 提取结果封装
@@ -152,10 +194,7 @@ class TypedConverter {
   }
 
   /// 解析优惠类型
-  static DiscountType parseDiscount(
-    String? raw,
-    Map<String, String> mapping,
-  ) {
+  static DiscountType parseDiscount(String? raw, Map<String, String> mapping) {
     if (raw == null || raw.isEmpty) return DiscountType.normal;
 
     final enumValue = mapping[raw];
@@ -205,7 +244,9 @@ class TypedConverter {
     if (relativeUrl == null || relativeUrl.isEmpty) return '';
     if (relativeUrl.startsWith('http')) return relativeUrl;
 
-    final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final cleanBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
     final separator = relativeUrl.startsWith('/') ? '' : '/';
     return '$cleanBase$separator$relativeUrl';
   }
@@ -224,7 +265,9 @@ class TypedConverter {
     if (userId != null) {
       url = url.replaceAll('{userId}', userId);
     }
-    final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final cleanBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
     url = url.replaceAll('{baseUrl}', cleanBase);
     return url;
   }
@@ -233,19 +276,101 @@ class TypedConverter {
 /// 声明式 HTML 提取器
 /// 基于 BaseWebAdapterMixin 提供的高层封装
 class HtmlExtractor with BaseWebAdapterMixin {
+  static final RegExp _filterGroupRegExp = RegExp(r'\$(\d+)');
+  static final RegExp _whitespaceRegExp = RegExp(r'\s+');
+
   /// 从单个元素提取字段
   Future<ExtractedValue> extractField(
     dynamic element,
     FieldConfig config,
   ) async {
-    final values = await extractFieldValue(element, config.toJson());
+    return extractFieldSync(element, config);
+  }
+
+  /// 从单个元素同步提取字段
+  ExtractedValue extractFieldSync(dynamic element, FieldConfig config) {
+    return extractFieldResultSync(element, config).first;
+  }
+
+  /// 同步提取字段，保留全部匹配值，供 tag/category 等多值字段复用。
+  FieldExtractionResult extractFieldResultSync(
+    dynamic element,
+    FieldConfig config,
+  ) {
+    final values = extractFieldValuesSync(element, config);
     if (values.isEmpty) {
-      if (config.defaultValue != null) {
-        return ExtractedValue.fromString(config.defaultValue.toString());
+      if (config.hasDefaultValue) {
+        final value = ExtractedValue.fromString(config.defaultValueString);
+        return FieldExtractionResult(first: value, allValues: const []);
       }
-      return ExtractedValue.missing();
+      return FieldExtractionResult(
+        first: ExtractedValue.missing(),
+        allValues: const [],
+      );
     }
-    return ExtractedValue.fromString(values.first);
+    return FieldExtractionResult(
+      first: ExtractedValue.fromString(values.first),
+      allValues: values,
+    );
+  }
+
+  /// 同步提取字段值列表，使用已编译的 FieldConfig 避免热循环 Map 分配。
+  List<String> extractFieldValuesSync(dynamic element, FieldConfig config) {
+    List<dynamic> targetElements = [element];
+
+    final selector = config.selector;
+    if (selector != null && selector.isNotEmpty) {
+      targetElements = findElementBySelector(element, selector);
+    }
+
+    if (targetElements.isEmpty) {
+      return [];
+    }
+
+    final values = <String>[];
+    for (final targetElement in targetElements) {
+      if (targetElement == null) continue;
+
+      String? value;
+      if (config.attribute == 'text') {
+        value = targetElement.text?.trim();
+      } else if (config.attribute == 'href') {
+        value = targetElement.attributes['href'];
+      } else {
+        value = targetElement.attributes[config.attribute ?? 'text'];
+      }
+
+      if (value != null) {
+        value = _applyCompiledFilter(value, config);
+      }
+
+      if (value != null && value.isNotEmpty) {
+        values.add(
+          value.replaceAll('\n', ' ').replaceAll(_whitespaceRegExp, ' '),
+        );
+      }
+    }
+
+    return values;
+  }
+
+  String? _applyCompiledFilter(String value, FieldConfig config) {
+    final regex = config.regexpFilter;
+    if (regex == null) {
+      if (config.filter == null) return value;
+      return applyFilter(value, config.filter!);
+    }
+    final match = regex.firstMatch(value);
+    if (match == null) return null;
+
+    final template = config.filterFormat ?? r'$0';
+    return template.replaceAllMapped(_filterGroupRegExp, (m) {
+      final groupIndex = int.parse(m.group(1)!);
+      if (groupIndex <= match.groupCount) {
+        return match.group(groupIndex) ?? '';
+      }
+      return m.group(0)!;
+    });
   }
 
   /// 提取整行/整组字段
@@ -254,10 +379,32 @@ class HtmlExtractor with BaseWebAdapterMixin {
     dynamic rowElement,
     Map<String, FieldConfig> fields,
   ) async {
+    return extractRowSync(rowElement, fields);
+  }
+
+  /// 同步提取整行/整组字段
+  Map<String, ExtractedValue> extractRowSync(
+    dynamic rowElement,
+    Map<String, FieldConfig> fields,
+  ) {
     final result = <String, ExtractedValue>{};
 
     for (final entry in fields.entries) {
-      result[entry.key] = await extractField(rowElement, entry.value);
+      result[entry.key] = extractFieldSync(rowElement, entry.value);
+    }
+
+    return result;
+  }
+
+  /// 同步提取整行/整组字段，并保留每个字段的全部匹配值。
+  Map<String, FieldExtractionResult> extractRowResultsSync(
+    dynamic rowElement,
+    Map<String, FieldConfig> fields,
+  ) {
+    final result = <String, FieldExtractionResult>{};
+
+    for (final entry in fields.entries) {
+      result[entry.key] = extractFieldResultSync(rowElement, entry.value);
     }
 
     return result;
@@ -272,7 +419,9 @@ class HtmlExtractor with BaseWebAdapterMixin {
     final result = <String, FieldConfig>{};
     for (final entry in fieldsConfig.entries) {
       if (entry.value is Map<String, dynamic>) {
-        result[entry.key] = FieldConfig.fromJson(entry.value as Map<String, dynamic>);
+        result[entry.key] = FieldConfig.fromJson(
+          entry.value as Map<String, dynamic>,
+        );
       }
     }
     return result;
