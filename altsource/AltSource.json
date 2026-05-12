@@ -1,10 +1,10 @@
 {
   "name": "PT Mate",
   "identifier": "com.github.justlookatnow.ptmate.source",
-  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.1/altsource/AltSource.json",
-  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.1/screenshots/1.png",
+  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.2/altsource/AltSource.json",
+  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.2/screenshots/1.png",
   "website": "https://github.com/JustLookAtNow/pt_mate",
-  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.1/mt.png",
+  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.2/mt.png",
   "subtitle": "PT private tracker companion",
   "description": "This is the official source for PT Mate.\n\nFor full details, check the GitHub repository:\nhttps://github.com/JustLookAtNow/pt_mate",
   "tintColor": "1D4ED8",
@@ -15,25 +15,32 @@
       "bundleIdentifier": "com.github.justlookatnow.ptmate",
       "developerName": "JustLookAtNow",
       "subtitle": "PT private tracker companion",
-      "version": "2.23.1",
-      "versionDate": "2026-05-08T06:42:25Z",
-      "versionDescription": "Changes in this release\nfix: add flutter precache --ios before CocoaPods install\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
-      "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.23.1/pt_mate-2.23.1-unsigned.ipa",
+      "version": "2.23.2",
+      "versionDate": "2026-05-12T06:03:24Z",
+      "versionDescription": "Changes in this release\nrelease: 2.23.2\n\n✨新增功能\n- 优化种子列表项布局，提升不同屏幕尺寸下的信息展示和操作体验。\n- 新增站点健康状态自动刷新，站点状态变化可以更及时地反馈到应用中。\n\n🐛修复问题\n- 修复 qBittorrent 鉴权 Cookie 适配问题，支持适配 `5.2.0` 版本，提升相关连接与登录场景的稳定性。\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
+      "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.23.2/pt_mate-2.23.2-unsigned.ipa",
       "localizedDescription": "PT Mate is a Flutter-based private tracker client for browsing, searching, and managing downloads across multiple PT sites.",
-      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.1/mt.png",
+      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.2/mt.png",
       "tintColor": "1D4ED8",
       "category": "utilities",
-      "size": 16091020,
+      "size": 16099120,
       "screenshotURLs": [
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.1/screenshots/1.png",
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.1/screenshots/2.png",
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.1/screenshots/3.png"
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.2/screenshots/1.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.2/screenshots/2.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.23.2/screenshots/3.png"
       ],
       "versions": [
         {
+          "version": "2.23.2",
+          "date": "2026-05-12T06:03:24Z",
+          "localizedDescription": "Changes in this release\nrelease: 2.23.2\n\n✨新增功能\n- 优化种子列表项布局，提升不同屏幕尺寸下的信息展示和操作体验。\n- 新增站点健康状态自动刷新，站点状态变化可以更及时地反馈到应用中。\n\n🐛修复问题\n- 修复 qBittorrent 鉴权 Cookie 适配问题，支持适配 `5.2.0` 版本，提升相关连接与登录场景的稳定性。\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
+          "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.23.2/pt_mate-2.23.2-unsigned.ipa",
+          "size": 16099120
+        },
+        {
           "version": "2.23.1",
           "date": "2026-05-08T06:42:25Z",
-          "localizedDescription": "Changes in this release\nfix: add flutter precache --ios before CocoaPods install\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
+          "localizedDescription": "Changes in this release\n\n🐛修复问题\n- 修复部分站点下载链接配置不生效的问题（影响 audiences, agsvpt, hddolby, pttime, hdkyl, ubits 等站点）\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
           "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.23.1/pt_mate-2.23.1-unsigned.ipa",
           "size": 16091020
         },
@@ -183,13 +190,6 @@
           "localizedDescription": "Changes in this release\nrelease: 2.19.1\n\n✨新增功能\n- Web登录成功后显示带有关闭操作的提示，并更新标题\n- NexusPHP Web 适配器支持动态分类参数请求\n\n🐛修复问题\n- 修复 HHanClub 站点分类查询及数据采集选择器\n- 修复 Android 和 iOS 平台的字体回退逻辑，优先使用系统默认字体\n\n📋其它\n- 优化“注意事项”卡片的视觉样式\n- 更新站点配置及运行规则\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
           "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.19.1/pt_mate-2.19.1-unsigned.ipa",
           "size": 15635995
-        },
-        {
-          "version": "2.19.0",
-          "date": "2026-02-11T12:36:00Z",
-          "localizedDescription": "Changes in this release\nrelease: 2.19.0\n\n✨新增功能\n- 🚀 支持 15+ 站点的原生种子详情页渲染（包括 SSD, TTG, U2, OurBits 等），显著提升详情加载速度和阅读体验，若站点已添加需要手动在站点设置中打开“原生详情”开关\n- 🌓 详情页内嵌浏览器支持根据系统/应用主题自动开启深色模式，视护眼更周到\n- ⚙️ 在站点设置中增加“原生详情”开关，支持针对不同站点手动切换渲染模式\n\n📋其它\n- 🌐 更新 HHanClub 站点配置，新增多个可用候选域名\n- 🛡️ 增强发布自动化流程，提升 Telegram 通知的稳定性和异常恢复能力\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
-          "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.19.0/pt_mate-2.19.0-unsigned.ipa",
-          "size": 15636942
         }
       ],
       "appPermissions": {
@@ -201,14 +201,14 @@
   "news": [
     {
       "appID": "com.github.justlookatnow.ptmate",
-      "title": "2.23.1 - 08 May",
-      "identifier": "release-2.23.1",
+      "title": "2.23.2 - 12 May",
+      "identifier": "release-2.23.2",
       "caption": "Update for PT Mate now available!",
-      "date": "2026-05-08T06:42:25Z",
+      "date": "2026-05-12T06:03:24Z",
       "tintColor": "1D4ED8",
       "imageURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/1.png",
       "notify": true,
-      "url": "https://github.com/JustLookAtNow/pt_mate/releases/tag/v2.23.1"
+      "url": "https://github.com/JustLookAtNow/pt_mate/releases/tag/v2.23.2"
     }
   ]
 }
