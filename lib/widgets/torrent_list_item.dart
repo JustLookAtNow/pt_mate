@@ -12,6 +12,11 @@ import 'cached_network_image.dart';
 // Using a static final RegExp to avoid recompiling the pattern on every call, improving performance.
 final RegExp _ratingRegExp = RegExp(r'([0-9]+(?:\.[0-9]+)?)');
 
+const double _mobileCoverWidth = 80;
+const double _mobileCoverHeight = 115;
+const double _desktopCoverWidth = 67;
+const double _desktopCoverHeight = 96;
+
 bool _hasRatingValue(String? r) {
   if (r == null) return false;
   final t = r.trim();
@@ -103,6 +108,7 @@ class TorrentListItem extends StatelessWidget {
     final double rightMinHeight = showCover
         ? (isMobile && hasAnyRating ? 130.0 : 100.0)
         : 70.0;
+    final double desktopSideHeight = showCover ? _desktopCoverHeight : 92.0;
 
     // 构建主要内容
     Widget mainContent = Container(
@@ -186,7 +192,7 @@ class TorrentListItem extends StatelessWidget {
                               ),
                               child: Container(
                                 width: 1,
-                                height: math.max(60, rightMinHeight - 16),
+                                height: math.max(60, desktopSideHeight - 16),
                                 color: Theme.of(context)
                                     .colorScheme
                                     .outlineVariant
@@ -195,7 +201,7 @@ class TorrentListItem extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             SizedBox(
-                              height: math.max(60, rightMinHeight - 8),
+                              height: math.max(60, desktopSideHeight - 8),
                               child: TorrentActions(
                                 torrent: torrent,
                                 currentSite: currentSite,
@@ -586,6 +592,11 @@ class TorrentInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final batchStatus = _buildBatchStatus(context);
+    final double rightColumnHeight = !isMobile && showCover
+        ? _desktopCoverHeight
+        : 0;
+    final double compactGap = isMobile ? 6 : 2;
+    final double smallGap = isMobile ? 2 : 1;
     return Padding(
       padding: const EdgeInsets.only(left: 8),
       child: Row(
@@ -652,107 +663,58 @@ class TorrentInfo extends StatelessWidget {
             width: isMobile
                 ? 55
                 : 100, // Fixed width for right column for alignment
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: isMobile
-                  ? CrossAxisAlignment.end
-                  : CrossAxisAlignment.start,
-              children: [
-                // discount
-                if (torrent.discount != DiscountType.normal)
-                  Align(
-                    alignment: isMobile
-                        ? Alignment.centerRight
-                        : Alignment.centerLeft,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
-                      ),
-                      margin: const EdgeInsets.only(bottom: 4),
-                      decoration: BoxDecoration(
-                        color: _discountColor(
-                          torrent.discount,
-                        ).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        _discountText(
-                          torrent.discount,
-                          torrent.discountEndTime,
+            child: SizedBox(
+              height: rightColumnHeight > 0 ? rightColumnHeight : null,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: isMobile
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
+                children: [
+                  // discount
+                  if (torrent.discount != DiscountType.normal)
+                    Align(
+                      alignment: isMobile
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
                         ),
-                        textAlign: TextAlign.right,
-                        style: TextStyle(
-                          color: _discountColor(torrent.discount),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
+                        margin: EdgeInsets.only(bottom: smallGap + 2),
+                        decoration: BoxDecoration(
+                          color: _discountColor(
+                            torrent.discount,
+                          ).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          _discountText(
+                            torrent.discount,
+                            torrent.discountEndTime,
+                          ),
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            color: _discountColor(torrent.discount),
+                            fontSize: 8,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                // seeders
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.arrow_upward,
-                      color: Colors.green,
-                      size: 12,
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${torrent.seeders}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                // leechers
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.arrow_downward,
-                      color: Colors.red,
-                      size: 12,
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${torrent.leechers}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                // size
-                Text(
-                  Formatters.dataFromBytes(torrent.sizeBytes),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                // comments
-                if (currentSite?.siteType == SiteType.mteam ||
-                    currentSite?.siteType == SiteType.nexusphp)
+                  // seeders
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.chat,
-                        size: 10,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      const Icon(
+                        Icons.arrow_upward,
+                        color: Colors.green,
+                        size: 12,
                       ),
                       const SizedBox(width: 2),
                       Text(
-                        '${torrent.comments}',
+                        '${torrent.seeders}',
                         style: TextStyle(
                           fontSize: 11,
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -760,13 +722,67 @@ class TorrentInfo extends StatelessWidget {
                       ),
                     ],
                   ),
-                // history download status
-                if (currentSite?.features.supportHistory ?? true)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: _buildDownloadStatusIcon(torrent.downloadStatus),
+                  SizedBox(height: smallGap),
+                  // leechers
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.arrow_downward,
+                        color: Colors.red,
+                        size: 12,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${torrent.leechers}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
-              ],
+                  SizedBox(height: compactGap),
+                  // size
+                  Text(
+                    Formatters.dataFromBytes(torrent.sizeBytes),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  SizedBox(height: compactGap),
+                  // comments
+                  if (currentSite?.siteType == SiteType.mteam ||
+                      currentSite?.siteType == SiteType.nexusphp)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.chat,
+                          size: 10,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${torrent.comments}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  // history download status
+                  if (currentSite?.features.supportHistory ?? true)
+                    Padding(
+                      padding: EdgeInsets.only(top: smallGap),
+                      child: _buildDownloadStatusIcon(torrent.downloadStatus),
+                    ),
+                ],
+              ),
             ),
           ),
           if (isMobile) const SizedBox(width: 8),
@@ -792,6 +808,11 @@ class TorrentCover extends StatelessWidget {
     required this.hasImdb,
   });
 
+  double get _coverWidth => isMobile ? _mobileCoverWidth : _desktopCoverWidth;
+
+  double get _coverHeight =>
+      isMobile ? _mobileCoverHeight : _desktopCoverHeight;
+
   Widget _buildCoverPlaceholder(
     BuildContext context, {
     required Widget icon,
@@ -800,8 +821,8 @@ class TorrentCover extends StatelessWidget {
     final color = Theme.of(context).colorScheme.onSurfaceVariant;
 
     return SizedBox(
-      width: 80,
-      height: 115,
+      width: _coverWidth,
+      height: _coverHeight,
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -821,8 +842,8 @@ class TorrentCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 80,
-      height: 115,
+      width: _coverWidth,
+      height: _coverHeight,
       // margin: const EdgeInsets.only(right: 12),
       child: Stack(
         children: [
@@ -864,8 +885,8 @@ class TorrentCover extends StatelessWidget {
                     ? CachedNetworkImage(
                         imageUrl: torrent.cover,
                         siteConfig: currentSite,
-                        width: 80,
-                        height: 115,
+                        width: _coverWidth,
+                        height: _coverHeight,
                         fit: BoxFit.cover,
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;
