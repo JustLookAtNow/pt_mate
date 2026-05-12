@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../models/app_models.dart';
 import '../../utils/format.dart';
@@ -20,7 +21,7 @@ class QbittorrentClient
 
   // HTTP客户端和会话管理
   late final Dio _dio;
-  String? _sessionId;
+  String? _authCookieHeader;
 
   // 缓存的版本信息，避免重复调用 API
   String? _cachedVersion;
@@ -32,8 +33,13 @@ class QbittorrentClient
     required this.config,
     required this.password,
     Function(QbittorrentConfig)? onConfigUpdated,
+    Dio? dio,
   }) : _onConfigUpdated = onConfigUpdated {
-    _dio = Dio(
+    _dio = dio ?? _createDio(config);
+  }
+
+  static Dio _createDio(QbittorrentConfig config) {
+    final dio = Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 30),
@@ -47,7 +53,7 @@ class QbittorrentClient
     );
     // 仅在用户明确允许时才禁用证书验证
     if (config.allowSelfSignedCert) {
-      _dio.httpClientAdapter = IOHttpClientAdapter(
+      dio.httpClientAdapter = IOHttpClientAdapter(
         createHttpClient: () {
           final HttpClient client = HttpClient()
             ..badCertificateCallback =
@@ -56,6 +62,7 @@ class QbittorrentClient
         },
       );
     }
+    return dio;
   }
 
   /// 获取基础URL
@@ -120,15 +127,15 @@ class QbittorrentClient
     final url = '$_baseUrl$_apiPrefix$endpoint';
 
     // 如果需要认证且没有会话，先登录
-    if (requireAuth && _sessionId == null) {
+    if (requireAuth && _authCookieHeader == null) {
       await _login();
     }
 
     final requestHeaders = <String, String>{...?headers};
 
     // 添加会话Cookie
-    if (_sessionId != null) {
-      requestHeaders['Cookie'] = 'SID=$_sessionId';
+    if (_authCookieHeader != null) {
+      requestHeaders['Cookie'] = _authCookieHeader!;
     }
 
     try {
@@ -184,8 +191,8 @@ class QbittorrentClient
       // 检查响应状态
       if (e.response?.statusCode == 403) {
         // 会话可能已过期，清除会话并重试一次
-        if (_sessionId != null) {
-          _sessionId = null;
+        if (_authCookieHeader != null) {
+          _authCookieHeader = null;
           return _request(
             method,
             endpoint,
@@ -219,25 +226,67 @@ class QbittorrentClient
         ),
       );
 
-      if (response.statusCode == 200 && response.data == 'Ok.') {
-        // 从响应头中提取会话ID
-        final cookies = response.headers['set-cookie'];
-        if (cookies != null && cookies.isNotEmpty) {
-          for (final cookie in cookies) {
-            final sidMatch = RegExp(r'SID=([^;]+)').firstMatch(cookie);
-            if (sidMatch != null) {
-              _sessionId = sidMatch.group(1);
-              return;
-            }
-          }
-        }
-        throw Exception('Failed to extract session ID from login response');
-      } else {
+      if (!_isSuccessfulStatus(response.statusCode)) {
         throw Exception('Login failed: ${response.data}');
       }
+
+      final cookieHeader = _extractCookieHeader(response.headers['set-cookie']);
+      if (cookieHeader == null || cookieHeader.isEmpty) {
+        throw Exception(
+          'Failed to extract authentication cookies from login response',
+        );
+      }
+
+      _authCookieHeader = cookieHeader;
     } on DioException catch (e) {
       throw Exception('Login failed: ${e.message}');
     }
+  }
+
+  bool _isSuccessfulStatus(int? statusCode) {
+    return statusCode != null && statusCode >= 200 && statusCode < 300;
+  }
+
+  String? _extractCookieHeader(List<String>? setCookieHeaders) {
+    if (setCookieHeaders == null || setCookieHeaders.isEmpty) {
+      return null;
+    }
+
+    final cookieMap = <String, String>{};
+    final cookieOrder = <String>[];
+
+    for (final header in setCookieHeaders) {
+      final firstPart = header.split(';').first.trim();
+      final separatorIndex = firstPart.indexOf('=');
+      if (separatorIndex <= 0) {
+        continue;
+      }
+
+      final name = firstPart.substring(0, separatorIndex).trim();
+      final value = firstPart.substring(separatorIndex + 1).trim();
+      if (name.isEmpty) {
+        continue;
+      }
+
+      if (!cookieMap.containsKey(name)) {
+        cookieOrder.add(name);
+      }
+      cookieMap[name] = value;
+    }
+
+    if (cookieMap.isEmpty) {
+      return null;
+    }
+
+    return cookieOrder.map((name) => '$name=${cookieMap[name]}').join('; ');
+  }
+
+  @visibleForTesting
+  String? get debugAuthCookieHeader => _authCookieHeader;
+
+  @visibleForTesting
+  String? debugExtractCookieHeader(List<String>? setCookieHeaders) {
+    return _extractCookieHeader(setCookieHeaders);
   }
 
   @override
@@ -310,7 +359,6 @@ class QbittorrentClient
       forceRelay = true;
     }
 
-
     final useRelay = config.useLocalRelay || forceRelay;
     if (!useRelay) {
       body['urls'] = url;
@@ -340,8 +388,6 @@ class QbittorrentClient
 
     await _request('POST', '/torrents/add', body: body);
   }
-
-
 
   /// 根据版本获取暂停任务的 API 路径
   String _getPauseApiPath(String? version) {
