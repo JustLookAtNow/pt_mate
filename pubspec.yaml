@@ -163,11 +163,11 @@ flutter_launcher_icons:
 flutter_native_splash:
   color: "#CDEAFF"
   color_dark: "#CDEAFF"
-  image: assets/logo/splash.png
+  image: assets/logo/splash_compact.png
   android: true
   ios: true
   web: false
   android_12:
-    image: assets/logo/splash.png
+    image: assets/logo/splash_android12_foreground.png
     color: "#CDEAFF"
     color_dark: "#CDEAFF"
