@@ -11,7 +11,7 @@ class LogFileService {
   IOSink? _sink;
   DateTime? _currentDate;
   String? _currentPath;
-  final _lock = <void>[]; // Simple lock mechanism
+  Future<void>? _pendingSinkOperation;
 
   bool get enabled => _enabled;
 
@@ -73,6 +73,41 @@ class LogFileService {
     return _currentPath;
   }
 
+  Future<File?> createShareSnapshot() async {
+    if (kIsWeb || !_enabled) return null;
+
+    await _ensureSinkForToday();
+    await _flushSink();
+
+    final sourcePath = _currentPath;
+    if (sourcePath == null) return null;
+
+    final source = File(sourcePath);
+    if (!await source.exists() || await source.length() == 0) {
+      return null;
+    }
+
+    final cacheDir = await getTemporaryDirectory();
+    final exportDir = Directory(
+      '${cacheDir.path}${Platform.pathSeparator}log_exports',
+    );
+    if (await exportDir.exists()) {
+      await for (final entity in exportDir.list()) {
+        try {
+          if (entity is File) await entity.delete();
+        } catch (_) {}
+      }
+    } else {
+      await exportDir.create(recursive: true);
+    }
+
+    final now = DateTime.now();
+    final snapshot = File(
+      '${exportDir.path}${Platform.pathSeparator}pt-mate-${_fileNameFor(now)}',
+    );
+    return source.copy(snapshot.path);
+  }
+
   Future<String> logsDirectoryPath() async {
     final dir = await _resolveBaseDir();
     final logs = Directory('${dir.path}${Platform.pathSeparator}logs');
@@ -87,11 +122,18 @@ class LogFileService {
     unawaited(_ensureSinkForToday());
   }
 
-  Future<void> _ensureSinkForToday() async {
-    // Simple lock check
-    if (_lock.isNotEmpty) return;
-    _lock.add(null); // Acquire lock
+  Future<void> _ensureSinkForToday() {
+    final pending = _pendingSinkOperation;
+    if (pending != null) return pending;
 
+    final operation = _ensureSinkForTodayLocked();
+    _pendingSinkOperation = operation.whenComplete(() {
+      _pendingSinkOperation = null;
+    });
+    return _pendingSinkOperation!;
+  }
+
+  Future<void> _ensureSinkForTodayLocked() async {
     try {
       final base = await _resolveBaseDir();
       final logsDir = Directory('${base.path}${Platform.pathSeparator}logs');
@@ -105,15 +147,17 @@ class LogFileService {
       _sink = file.openWrite(mode: FileMode.append);
     } catch (_) {
       // Ignore initialization errors
-    } finally {
-      if (_lock.isNotEmpty) _lock.removeLast(); // Release lock
     }
   }
 
-  Future<void> _closeSink() async {
+  Future<void> _flushSink() async {
     try {
       await _sink?.flush();
     } catch (_) {}
+  }
+
+  Future<void> _closeSink() async {
+    await _flushSink();
     try {
       await _sink?.close();
     } catch (_) {}

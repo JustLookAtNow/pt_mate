@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
-import 'dart:io';
 
 import '../services/storage/storage_service.dart';
 import '../models/app_models.dart';
@@ -1213,15 +1212,14 @@ class _ExportLogsTile extends StatelessWidget {
         return;
       }
 
-      final path = await LogFileService.instance.currentLogFilePath();
+      final snapshot = await LogFileService.instance.createShareSnapshot();
       if (!context.mounted) return;
-      if (path == null || !(await File(path).exists())) {
-        if (!context.mounted) return;
-        NotificationHelper.showError(context, '暂无日志文件或未开启记录');
+      if (snapshot == null) {
+        NotificationHelper.showError(context, '暂无可分享日志内容或未开启记录');
         return;
       }
       await SharePlus.instance.share(
-        ShareParams(files: [XFile(path)], text: 'PT Mate 日志'),
+        ShareParams(files: [XFile(snapshot.path)], text: 'PT Mate 日志'),
       );
     } catch (e) {
       if (!context.mounted) return;
@@ -1237,7 +1235,7 @@ class _ExportLogsTile extends StatelessWidget {
       }
       final dir = await LogFileService.instance.logsDirectoryPath();
       if (!context.mounted) return;
-      NotificationHelper.showInfo(context, '日志目录: $dir');
+      NotificationHelper.showInfo(context, '日志目录: $dir（应用私有目录，部分文件管理器不可见）');
     } catch (e) {
       NotificationHelper.showError(context, '打开目录失败: $e');
     }
