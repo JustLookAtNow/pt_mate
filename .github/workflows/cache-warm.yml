@@ -117,10 +117,16 @@ jobs:
 
   warm-caches-windows:
     name: Warm caches (Windows)
-    runs-on: windows-2025-vs2026
+    runs-on: windows-2022
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
 
       - name: Setup Flutter (cached)
         id: cache_flutter_windows
@@ -153,15 +159,19 @@ jobs:
         id: cache_vs_windows
         uses: actions/cache@v5
         with:
-          path: |
-            C:\Users\runneradmin\AppData\Local\Microsoft\VisualStudio
-            build/windows
-          key: ${{ runner.os }}-vs-debug-${{ hashFiles('pubspec.lock', '**/CMakeLists.txt') }}
+          path: C:\Users\runneradmin\AppData\Local\Microsoft\VisualStudio
+          key: ${{ runner.os }}-vs-state-v2-debug-${{ hashFiles('pubspec.lock', '**/CMakeLists.txt') }}
           restore-keys: |
-            ${{ runner.os }}-vs-debug-
+            ${{ runner.os }}-vs-state-v2-debug-
+
+      - name: Clear stale Windows CMake build
+        run: |
+          Remove-Item -Recurse -Force build/windows -ErrorAction SilentlyContinue
 
       - name: Build Windows (Debug)
         if: ${{ steps.cache_vs_windows.outputs.cache-hit != 'true' || steps.cache_flutter_windows.outputs.cache-hit != 'true' }}
+        env:
+          CMAKE_INCLUDE_PATH: ${{ env.JAVA_HOME }}\include;${{ env.JAVA_HOME }}\include\win32
         run: |
           flutter build windows --debug
 

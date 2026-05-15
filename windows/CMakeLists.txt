@@ -32,6 +32,18 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
+# Help CMake's FindJNI module resolve JDK headers when package:jni is built as
+# a Flutter Windows plugin in CI. The plugin calls find_package(JNI) internally.
+if(WIN32 AND DEFINED ENV{JAVA_HOME})
+  file(TO_CMAKE_PATH "$ENV{JAVA_HOME}" _JAVA_HOME_CMAKE)
+  set(JAVA_HOME "${_JAVA_HOME_CMAKE}" CACHE PATH "Java home for JNI")
+  set(JAVA_INCLUDE_PATH "${_JAVA_HOME_CMAKE}/include" CACHE PATH "JNI include path")
+  set(JAVA_INCLUDE_PATH2 "${_JAVA_HOME_CMAKE}/include/win32" CACHE PATH "JNI platform include path")
+  if(EXISTS "${_JAVA_HOME_CMAKE}/lib/jvm.lib")
+    set(JAVA_JVM_LIBRARY "${_JAVA_HOME_CMAKE}/lib/jvm.lib" CACHE FILEPATH "JVM import library")
+  endif()
+endif()
+
 # Compilation settings that should be applied to most targets.
 #
 # Be cautious about adding new options here, as plugins use this function by

@@ -210,7 +210,7 @@ jobs:
         retention-days: 1
 
   build-windows:
-    runs-on: windows-2025-vs2026
+    runs-on: windows-2022
     
     steps:
     - name: Checkout code
@@ -255,20 +255,23 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pub-cache-
 
-    # Visual Studio 缓存
+    # Visual Studio 状态缓存。不要缓存 build/windows；其中包含 CMake 生成目录，
+    # 会固化 FindJNI 的旧探测结果并导致 jni.h include 路径失效。
     - name: Cache Visual Studio
       uses: actions/cache@v5
       with:
-        path: |
-          C:\Users\runneradmin\AppData\Local\Microsoft\VisualStudio
-          build/windows
-        key: ${{ runner.os }}-vs-release-${{ hashFiles('pubspec.lock', '**/CMakeLists.txt') }}
+        path: C:\Users\runneradmin\AppData\Local\Microsoft\VisualStudio
+        key: ${{ runner.os }}-vs-state-v2-release-${{ hashFiles('pubspec.lock', '**/CMakeLists.txt') }}
         restore-keys: |
-          ${{ runner.os }}-vs-release-
+          ${{ runner.os }}-vs-state-v2-release-
     
     - name: Get dependencies
       run: flutter pub get
       
+    - name: Clear stale Windows CMake build
+      run: |
+        Remove-Item -Recurse -Force build/windows -ErrorAction SilentlyContinue
+
     - name: Build Windows
       env:
         CMAKE_INCLUDE_PATH: ${{ env.JAVA_HOME }}\include;${{ env.JAVA_HOME }}\include\win32
