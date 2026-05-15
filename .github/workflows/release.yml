@@ -230,6 +230,12 @@ jobs:
         VERSION=${TAG#v}
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+    - name: Setup Java
+      uses: actions/setup-java@v5
+      with:
+        distribution: 'zulu'
+        java-version: '17'
         
     # Flutter SDK 缓存
     - name: Setup Flutter
@@ -264,6 +270,8 @@ jobs:
       run: flutter pub get
       
     - name: Build Windows
+      env:
+        CMAKE_INCLUDE_PATH: ${{ env.JAVA_HOME }}\include;${{ env.JAVA_HOME }}\include\win32
       run: flutter build windows --release
     
     - name: Install Inno Setup
