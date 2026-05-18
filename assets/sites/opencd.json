@@ -1,0 +1,317 @@
+{
+  "id": "opencd",
+  "name": "皇后",
+  "isShow": true,
+  "baseUrls": [
+    "https://open.cd/"
+  ],
+  "primaryUrl": "https://open.cd/",
+  "siteType": "NexusPHPWeb",
+  "searchCategories": [
+    {
+      "id": "all",
+      "displayName": "综合",
+      "parameters": "{}"
+    },
+    {
+      "id": "music",
+      "displayName": "音乐(Music)",
+      "parameters": "{\"category\":\"normal#408\"}"
+    },
+    {
+      "id": "concert",
+      "displayName": "演唱会(Vocal Concert)",
+      "parameters": "{\"category\":\"normal#402\"}"
+    },
+    {
+      "id": "drama",
+      "displayName": "戏剧(Drama)",
+      "parameters": "{\"category\":\"normal#405\"}"
+    },
+    {
+      "id": "other",
+      "displayName": "其他(Other)",
+      "parameters": "{\"category\":\"normal#409\"}"
+    }
+  ],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentBrowse": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": true,
+    "downloadHistory": true,
+    "categorySearch": true,
+    "advancedSearch": true,
+    "showCover": true,
+    "commentDetail": false,
+    "nativeDetail": true
+  },
+  "discountMapping": {
+    "Free": "FREE",
+    "2X Free": "2xFREE",
+    "2X 50%": "2x50%",
+    "10%": "PERCENT_10",
+    "20%": "PERCENT_20",
+    "30%": "PERCENT_30",
+    "40%": "PERCENT_40",
+    "50%": "PERCENT_50",
+    "60%": "PERCENT_60",
+    "70%": "PERCENT_70",
+    "80%": "PERCENT_80",
+    "90%": "PERCENT_90",
+    "Normal": "NORMAL"
+  },
+  "tagMapping": {
+    "热门": "hot",
+    "熱門": "hot",
+    "官方": "official",
+    "官种": "official",
+    "官種": "official",
+    "中字": "chinese",
+    "中文": "chinese",
+    "简体": "chinese",
+    "繁体": "chineseTraditional",
+    "繁體": "chineseTraditional",
+    "国语": "mandarin",
+    "國語": "mandarin",
+    "自抓": "diy",
+    "自購": "diy",
+    "自购": "diy",
+    "原抓": "diy",
+    "禁转": "exclusive",
+    "禁轉": "exclusive",
+    "禁止轉載": "exclusive",
+    "完结": "complete",
+    "完結": "complete",
+    "合集": "complete",
+    "分集": "ep"
+  },
+  "logo": "assets/sites_icon/opencd.png",
+  "infoFinder": {
+    "detail": {
+      "isBbcode": false,
+      "rows": {
+        "selector": "div#divdescr"
+      }
+    },
+    "userInfo": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "table#info_block"
+      },
+      "fields": {
+        "userId": {
+          "selector": "a[href~=\"^/?userdetails\\.php\\?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "value": "$1"
+          }
+        },
+        "userName": {
+          "selector": "a[href~=\"^/?userdetails\\.php\\?id=\"] > b",
+          "attribute": "text"
+        },
+        "ratio": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "分享率(:|：)\\s*([^\\s]+)",
+            "value": "$2"
+          }
+        },
+        "upload": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(上传|上傳)量(:|：)\\s*(.*?B)",
+            "value": "$3"
+          }
+        },
+        "download": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(下载|下載)量(:|：)\\s*(.*?B)",
+            "value": "$3"
+          }
+        },
+        "bonus": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "魔力值\\s*: ?([^\\s]+)",
+            "value": "$1"
+          }
+        }
+      }
+    },
+    "passKey": {
+      "path": "usercp.php",
+      "rows": {
+        "selector": "#outer > table > tr > td:contains('密匙' || '密钥' || '密鑰' || 'Passkey') > next"
+      },
+      "fields": {
+        "passKey": {
+          "selector": "",
+          "attribute": "text"
+        }
+      }
+    },
+    "search": {
+      "rows": {
+        "selector": "table.torrents > tbody:nth-child > tr:nth-child"
+      },
+      "fields": {
+        "torrentId": {
+          "selector": "a[href~=\"^(plugin_)?details\\.php\\?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "value": "$1"
+          }
+        },
+        "torrentName": {
+          "selector": "a[href~=\"^(plugin_)?details\\.php\\?id=\"] > b",
+          "attribute": "text"
+        },
+        "tag": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > i > a",
+          "attribute": "text"
+        },
+        "description": {
+          "selector": "table.torrentname > font[color]",
+          "attribute": "text"
+        },
+        "discount": {
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
+          "attribute": "alt"
+        },
+        "discountEndTime": {
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
+          "attribute": "onmouseover",
+          "filter": {
+            "name": "regexp",
+            "args": "<span title=\\\"(.*?)\\\"",
+            "value": "$1"
+          },
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
+        },
+        "downloadUrl": {
+          "value": "##{baseUrl}/download.php?id={torrentId}"
+        },
+        "seedersText": {
+          "selector": "td:nth-child(8)",
+          "attribute": "text"
+        },
+        "leechersText": {
+          "selector": "td:nth-child(9)",
+          "attribute": "text"
+        },
+        "sizeText": {
+          "selector": "td:nth-child(7)",
+          "attribute": "text"
+        },
+        "collection": {
+          "selector": "table.torrentname > img[alt==\"Bookmarked\"]",
+          "attribute": "src"
+        },
+        "isTop": {
+          "selector": "table.torrentname > img[title~=\"置顶|置頂|Sticky\"]",
+          "attribute": "src"
+        },
+        "cover": {
+          "selector": "td:nth-child(2) > div.list_cover > img[src]",
+          "attribute": "src"
+        },
+        "createDate": {
+          "selector": "td:nth-child(6) > span[title]",
+          "attribute": "title",
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
+        },
+        "comments": {
+          "selector": "td:nth-child(5)",
+          "attribute": "text"
+        }
+      }
+    },
+    "totalPages": {
+      "rows": {
+        "selector": "div#footer"
+      },
+      "fields": {
+        "totalPages": {
+          "selector": "script",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "var\\s+maxpage\\s*=\\s*(\\d+);",
+            "value": "$1"
+          }
+        }
+      }
+    },
+    "categories": {
+      "path": "usercp.php?action=tracker",
+      "rows": {
+        "selector": "#outer > table > tbody > tr > td.rowfollow > table"
+      },
+      "fields": {
+        "categoryId": {
+          "selector": "a[href^=\"torrents.php\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "cat=(\\d+)",
+            "value": "$1"
+          }
+        },
+        "categoryName": {
+          "selector": "a[href^=\"torrents.php\"] > img",
+          "attribute": "title"
+        }
+      }
+    }
+  },
+  "request": {
+    "search": {
+      "normal": {
+        "path": "/torrents.php",
+        "method": "GET",
+        "params": {
+          "incldead": 1,
+          "inclbookmarked": "{onlyFav}",
+          "search": "{keyword}",
+          "search_area": 0,
+          "search_mode": 0,
+          "page": "{page}",
+          "cat": "{categoryId}"
+        }
+      }
+    },
+    "loginPage": {
+      "path": "/login.php"
+    },
+    "collect": {
+      "path": "/bookmark.php",
+      "method": "GET",
+      "params": {
+        "torrentid": "{torrentId}"
+      }
+    }
+  }
+}
