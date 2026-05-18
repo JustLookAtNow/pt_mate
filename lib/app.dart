@@ -441,6 +441,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
   late ScrollController _scrollController;
 
   final Map<String, String> _logoPathCache = {};
+  final Map<String, Future<String>> _logoPathFutureCache = {};
 
   Future<String> _resolveLogoPath(SiteConfig site) async {
     final cached = _logoPathCache[site.id];
@@ -465,6 +466,18 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
 
     _logoPathCache[site.id] = path;
     return path;
+  }
+
+  Future<String> _getLogoPathFuture(SiteConfig site) {
+    final cached = _logoPathCache[site.id];
+    if (cached != null && cached.isNotEmpty) {
+      return SynchronousFuture<String>(cached);
+    }
+
+    return _logoPathFutureCache.putIfAbsent(
+      site.id,
+      () => _resolveLogoPath(site),
+    );
   }
 
   @override
@@ -952,6 +965,37 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
         ? Color(site.siteColor!)
         : null;
 
+    final cachedPath = _logoPathCache[site.id];
+    if (cachedPath != null && cachedPath.isNotEmpty) {
+      return Container(
+        width: size,
+        height: size,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.2)
+              : (siteColor?.withValues(alpha: 0.1) ??
+                    theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.3,
+                    )),
+          shape: BoxShape.circle,
+        ),
+        child: ClipOval(
+          child: Image.asset(
+            cachedPath,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Icon(
+                Icons.dns,
+                size: size * 0.6,
+                color: theme.colorScheme.onSurfaceVariant,
+              );
+            },
+          ),
+        ),
+      );
+    }
+
     return Container(
       width: size,
       height: size,
@@ -966,12 +1010,10 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
         shape: BoxShape.circle,
       ),
       child: FutureBuilder<String>(
-        future: _resolveLogoPath(site),
+        future: _getLogoPathFuture(site),
         builder: (context, snapshot) {
-          String path =
-              snapshot.data ?? 'assets/sites_icon/_default_nexusphp.png';
-          if (snapshot.connectionState != ConnectionState.done &&
-              snapshot.data == null) {
+          final path = snapshot.data;
+          if (path == null || path.isEmpty) {
             return Icon(
               Icons.dns,
               size: size * 0.6,
@@ -1157,6 +1199,10 @@ class _HomePageState extends State<HomePage> {
   // 当前站点配置
   SiteConfig? _currentSite;
 
+  // 站点图标路径缓存：siteId -> asset path
+  final Map<String, String> _logoPathCache = {};
+  final Map<String, Future<String>> _logoPathFutureCache = {};
+
   // 配置版本号跟踪
   int _lastConfigVersion = -1;
 
@@ -1217,6 +1263,126 @@ class _HomePageState extends State<HomePage> {
         });
       }
     }
+  }
+
+  Future<String> _resolveLogoPath(SiteConfig site) async {
+    final cached = _logoPathCache[site.id];
+    if (cached != null && cached.isNotEmpty) return cached;
+
+    String path = 'assets/sites_icon/_default_nexusphp.png';
+    try {
+      final template = await SiteConfigService.getTemplateById(
+        site.templateId,
+        site.siteType,
+      );
+      final logo = template?.logo;
+      if (logo != null && logo.isNotEmpty) {
+        final lower = logo.toLowerCase();
+        path = lower.endsWith('.png')
+            ? logo
+            : (logo.contains('.')
+                  ? '${logo.substring(0, logo.lastIndexOf('.'))}.png'
+                  : logo);
+      }
+    } catch (_) {}
+
+    _logoPathCache[site.id] = path;
+    return path;
+  }
+
+  Future<String> _getLogoPathFuture(SiteConfig site) {
+    final cached = _logoPathCache[site.id];
+    if (cached != null && cached.isNotEmpty) {
+      return SynchronousFuture<String>(cached);
+    }
+
+    return _logoPathFutureCache.putIfAbsent(
+      site.id,
+      () => _resolveLogoPath(site),
+    );
+  }
+
+  Widget _buildAppBarLogo(SiteConfig site) {
+    final theme = Theme.of(context);
+    final Color? siteColor = site.siteColor != null
+        ? Color(site.siteColor!)
+        : null;
+
+    final cachedPath = _logoPathCache[site.id];
+    if (cachedPath != null && cachedPath.isNotEmpty) {
+      return Container(
+        width: 28,
+        height: 28,
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: theme.brightness == Brightness.light
+              ? Colors.white.withValues(alpha: 0.9)
+              : theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.4,
+                ),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: siteColor ?? theme.colorScheme.outlineVariant,
+            width: 1.0,
+          ),
+        ),
+        child: ClipOval(
+          child: Image.asset(
+            cachedPath,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Icon(
+                Icons.dns,
+                size: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              );
+            },
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: 28,
+      height: 28,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: theme.brightness == Brightness.light
+            ? Colors.white.withValues(alpha: 0.9)
+            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: siteColor ?? theme.colorScheme.outlineVariant,
+          width: 1.0,
+        ),
+      ),
+      child: FutureBuilder<String>(
+        future: _getLogoPathFuture(site),
+        builder: (context, snapshot) {
+          final path = snapshot.data;
+          if (path == null || path.isEmpty) {
+            return Icon(
+              Icons.dns,
+              size: 14,
+              color: theme.colorScheme.onSurfaceVariant,
+            );
+          }
+          return ClipOval(
+            child: Image.asset(
+              path,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(
+                  Icons.dns,
+                  size: 14,
+                  color: theme.colorScheme.onSurfaceVariant,
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -2373,16 +2539,28 @@ class _HomePageState extends State<HomePage> {
                     ),
                   );
                 },
-                child: Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(text: appState.site?.name ?? 'PT Mate'),
-                      TextSpan(
-                        text: ' - PT Mate',
-                        style: const TextStyle(fontSize: 14),
-                      ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_currentSite != null) ...[
+                      _buildAppBarLogo(_currentSite!),
+                      const SizedBox(width: 8),
                     ],
-                  ),
+                    Flexible(
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: appState.site?.name ?? 'PT Mate'),
+                            TextSpan(
+                              text: ' - PT Mate',
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          ],
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               actions: const [QbSpeedIndicator()],

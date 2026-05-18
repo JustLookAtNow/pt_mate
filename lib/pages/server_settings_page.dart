@@ -35,12 +35,15 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   String _searchQuery = '';
   bool _healthChecking = false;
   Map<String, HealthStatus> _healthStatuses = {}; // siteId -> status
+  final Set<String> _singleRefreshingSiteIds = <String>{};
+  final Set<String> _batchRefreshingSiteIds = <String>{};
   // 排序状态已移除
   bool _reorderMode = false;
   List<SiteConfig> _sitesBackup = [];
 
   // 站点图标路径缓存：siteId -> asset path
   final Map<String, String> _logoPathCache = {};
+  final Map<String, Future<String>> _logoPathFutureCache = {};
 
   // 普通列表项 key：用于自动滚动到当前活跃站点
   final Map<String, GlobalKey> _siteItemKeys = {};
@@ -147,6 +150,18 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     return path;
   }
 
+  Future<String> _getLogoPathFuture(SiteConfig site) {
+    final cached = _logoPathCache[site.id];
+    if (cached != null && cached.isNotEmpty) {
+      return Future<String>.value(cached);
+    }
+
+    return _logoPathFutureCache.putIfAbsent(
+      site.id,
+      () => _resolveLogoPath(site),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -248,29 +263,29 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
 
   Future<void> _runHealthCheck({bool showNotification = true}) async {
     if (_healthChecking) return;
+    final siteIds = _sites.map((site) => site.id).toSet();
     setState(() {
       _healthChecking = true;
-      _healthStatuses = {};
+      _batchRefreshingSiteIds
+        ..clear()
+        ..addAll(siteIds);
     });
     try {
-      final filteredIds = _filteredSites.map((site) => site.id).toSet();
-      final statuses = await SiteHealthRefreshService.instance.refreshAllSites(
+      await SiteHealthRefreshService.instance.refreshAllSites(
         force: true,
         onStatus: (siteId, status) {
-          if (!mounted || !filteredIds.contains(siteId)) return;
+          if (!mounted) return;
           setState(() {
             _healthStatuses[siteId] = status;
+            _batchRefreshingSiteIds.remove(siteId);
           });
         },
       );
 
       if (!mounted) return;
       setState(() {
-        _healthStatuses = {
-          for (final entry in statuses.entries)
-            if (filteredIds.contains(entry.key)) entry.key: entry.value,
-        };
         _healthChecking = false;
+        _batchRefreshingSiteIds.clear();
       });
       if (showNotification) {
         NotificationHelper.showInfo(context, '站点信息获取完成');
@@ -279,6 +294,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       if (!mounted) return;
       setState(() {
         _healthChecking = false;
+        _batchRefreshingSiteIds.clear();
       });
       if (showNotification) {
         NotificationHelper.showError(context, '刷新失败: $e');
@@ -568,7 +584,14 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   }
 
   Future<void> _refreshSingleSite(SiteConfig site) async {
-    if (!mounted) return;
+    if (!mounted ||
+        _healthChecking ||
+        _singleRefreshingSiteIds.contains(site.id)) {
+      return;
+    }
+    setState(() {
+      _singleRefreshingSiteIds.add(site.id);
+    });
     try {
       final activeId = await StorageService.instance.getActiveSiteId();
       if (activeId == site.id) {
@@ -582,6 +605,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             .refreshSingleSite(activeSite, recreateAdapter: false);
         setState(() {
           _healthStatuses[site.id] = status;
+          _singleRefreshingSiteIds.remove(site.id);
         });
       } else {
         final allSites = await StorageService.instance.loadSiteConfigs(
@@ -595,12 +619,18 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
             .refreshSingleSite(fullSite, recreateAdapter: true);
         setState(() {
           _healthStatuses[site.id] = status;
+          _singleRefreshingSiteIds.remove(site.id);
         });
       }
 
       if (!mounted) return;
       NotificationHelper.showInfo(context, '站点已刷新');
     } catch (e) {
+      if (mounted) {
+        setState(() {
+          _singleRefreshingSiteIds.remove(site.id);
+        });
+      }
       if (!mounted) return;
       NotificationHelper.showError(context, '刷新失败: $e');
     }
@@ -991,15 +1021,33 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   }
 
   Widget _buildSiteLogo(SiteConfig site) {
+    final cachedPath = _logoPathCache[site.id];
+    if (cachedPath != null && cachedPath.isNotEmpty) {
+      return Image.asset(
+        cachedPath,
+        width: 40,
+        height: 40,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Image.asset(
+            'assets/sites_icon/_default_nexusphp.png',
+            width: 32,
+            height: 32,
+            fit: BoxFit.cover,
+          );
+        },
+      );
+    }
+
     return FutureBuilder<String>(
-      future: _resolveLogoPath(site),
+      future: _getLogoPathFuture(site),
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done ||
-            (snapshot.data == null || snapshot.data!.isEmpty)) {
+        final path = snapshot.data;
+        if (path == null || path.isEmpty) {
           return const Icon(Icons.dns, size: 24, color: Colors.grey);
         }
         return Image.asset(
-          snapshot.data!,
+          path,
           width: 40,
           height: 40,
           fit: BoxFit.cover,
@@ -1016,14 +1064,70 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     );
   }
 
+  Widget _buildStatusIndicator(HealthStatus? hs, {required bool isRefreshing}) {
+    final textStyle = TextStyle(
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+      fontSize: 11,
+    );
+
+    if (isRefreshing) {
+      return Row(
+        children: [
+          SizedBox(
+            width: 10,
+            height: 10,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.6,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              '刷新中',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textStyle,
+            ),
+          ),
+        ],
+      );
+    }
+
+    final statusText = _getStatusText(hs);
+    return Row(
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _getStatusColor(hs),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            statusText,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textStyle,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSiteCard(SiteConfig site, bool isActive, int index) {
     final Color? siteColor = site.siteColor != null
         ? Color(site.siteColor!)
         : null;
     final hs = _healthStatuses[site.id];
+    final isRefreshing =
+        _singleRefreshingSiteIds.contains(site.id) ||
+        _batchRefreshingSiteIds.contains(site.id);
 
     final isLarge = ScreenUtils.isLargeScreen(context);
-    final statusDotColor = _getStatusColor(hs);
     final statusText = _getStatusText(hs);
 
     final card = Card(
@@ -1141,7 +1245,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                             const SizedBox(height: 2),
                             GestureDetector(
                               onTap:
-                                  (hs != null &&
+                                  (!isRefreshing &&
+                                      hs != null &&
                                       (!hs.ok ||
                                           (hs.profile?.lastAccess != null &&
                                               HealthStatus.isLastAccessOverMonth(
@@ -1149,31 +1254,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                               ))))
                                   ? () => _showStatusDetail(hs, statusText)
                                   : null,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: statusDotColor,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      statusText,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              child: _buildStatusIndicator(
+                                hs,
+                                isRefreshing: isRefreshing,
                               ),
                             ),
                           ],
