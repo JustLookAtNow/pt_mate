@@ -1,6 +1,6 @@
 # 当前支持的网站
 
-以下清单基于 `assets/sites/*.json`（共 34 个）。
+以下清单基于 `assets/sites/*.json`（共 35 个）。
 
 ## M-Team（1）
 - M-Team
@@ -20,7 +20,7 @@
 - 肉丝
 - 织梦
 
-## NexusPHPWeb（18）
+## NexusPHPWeb（19）
 - AFUN
 - 末日
 - Audiences
@@ -32,6 +32,7 @@
 - 麒麟
 - HHanClub
 - 老师
+- 皇后
 - OurBits
 - 青蛙
 - SSD
