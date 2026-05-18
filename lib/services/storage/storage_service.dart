@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/app_models.dart';
 import '../downloader/downloader_config.dart';
+import 'storage_permission_helper.dart';
 
 class StorageKeys {
   // 应用版本管理
@@ -50,6 +51,11 @@ class StorageKeys {
   static String siteApiKey(String siteId) => 'site.apiKey.$siteId';
   static String siteApiKeyFallback(String siteId) =>
       'site.apiKey.fallback.$siteId';
+
+  // 多站点 Cookie 安全存储
+  static String siteCookie(String siteId) => 'site.cookie.$siteId';
+  static String siteCookieFallback(String siteId) =>
+      'site.cookie.fallback.$siteId';
 
   // 兼容性：旧的API密钥存储
   static const String legacySiteApiKey = 'site.apiKey';
@@ -103,7 +109,9 @@ class StorageKeys {
 
   // Cookie Cloud 同步设置
   static const String cookieCloudUrl = 'cookieCloud.url';
+  static const String cookieCloudUrlFallback = 'cookieCloud.url.fallback';
   static const String cookieCloudUuid = 'cookieCloud.uuid';
+  static const String cookieCloudUuidFallback = 'cookieCloud.uuid.fallback';
   static const String cookieCloudPassword = 'cookieCloud.password';
   static const String cookieCloudPasswordFallback =
       'cookieCloud.password.fallback';
@@ -222,6 +230,7 @@ class StorageService {
   bool _siteConfigsCacheDirty = true;
   bool _siteConfigsCacheNeedsUpdate = false;
   final Map<String, String?> _siteApiKeysCache = {};
+  final Map<String, String?> _siteCookiesCache = {};
   List<SiteConfig>? get siteConfigsCache => _siteConfigsCache;
   TargetPlatform? _platformOverrideForTest;
   _SecureStorageAvailability _secureStorageAvailability =
@@ -417,6 +426,11 @@ class StorageService {
   // 版本管理
   static const String currentVersion = '1.2.0';
 
+  // 私有方法：保护 Linux/macOS 本地降级存储文件的权限位为 600
+  Future<void> _secureSharedPreferencesFile() async {
+    await secureSharedPreferencesFile();
+  }
+
   /// 检查并执行数据迁移
   Future<void> checkAndMigrate() async {
     final prefs = await _prefs;
@@ -435,6 +449,9 @@ class StorageService {
       }
       await prefs.setString(StorageKeys.appVersion, currentVersion);
     }
+
+    // 【安全加固】确保 Linux/macOS 下降级存储文件的权限位为 600
+    await _secureSharedPreferencesFile();
   }
 
   /// 从1.0.0迁移到1.1.0
@@ -579,8 +596,16 @@ class StorageService {
   // Site config
   Future<void> saveSite(SiteConfig config) async {
     final prefs = await _prefs;
-    await prefs.setString(StorageKeys.siteConfig, jsonEncode(config.toJson()));
-    // secure parts
+    await prefs.setString(
+      StorageKeys.siteConfig,
+      jsonEncode({
+        ...config.toJson(),
+        'apiKey': null,
+        'cookie': null,
+      }),
+    );
+    
+    // secure api key
     if ((config.apiKey ?? '').isNotEmpty) {
       final wrote = await _secureWrite(
         key: StorageKeys.legacySiteApiKey,
@@ -595,11 +620,31 @@ class StorageService {
           StorageKeys.legacySiteApiKeyFallback,
           config.apiKey!,
         );
+        await _secureSharedPreferencesFile();
       }
     } else {
       await _secureDelete(key: StorageKeys.legacySiteApiKey);
       // 同步清理降级存储
       await prefs.remove(StorageKeys.legacySiteApiKeyFallback);
+    }
+
+    // secure cookie
+    if ((config.cookie ?? '').isNotEmpty) {
+      final wrote = await _secureWrite(
+        key: StorageKeys.siteCookie(config.id),
+        value: config.cookie!,
+      );
+      if (wrote) {
+        await prefs.remove(StorageKeys.siteCookieFallback(config.id));
+      } else {
+        await prefs.setString(
+          StorageKeys.siteCookieFallback(config.id),
+          config.cookie!,
+        );
+        await _secureSharedPreferencesFile();
+      }
+    } else {
+      await _deleteSiteCookie(config.id);
     }
   }
 
@@ -625,7 +670,20 @@ class StorageService {
       }
     }
 
-    return base.copyWith(apiKey: apiKey);
+    String? cookie;
+    try {
+      cookie = await _secureRead(StorageKeys.siteCookie(base.id));
+    } catch (_) {
+      cookie = prefs.getString(StorageKeys.siteCookieFallback(base.id));
+    }
+    if (cookie == null || cookie.isEmpty) {
+      final fallback = prefs.getString(StorageKeys.siteCookieFallback(base.id));
+      if (fallback != null && fallback.isNotEmpty) {
+        cookie = fallback;
+      }
+    }
+
+    return base.copyWith(apiKey: apiKey, cookie: cookie);
   }
 
   // 多站点配置管理
@@ -636,24 +694,29 @@ class StorageService {
           (config) => {
             ...config.toJson(),
             'apiKey': null, // API密钥单独存储
+            'cookie': null, // Cookie也单独存储，明文不落地
           },
         )
         .toList();
     await prefs.setString(StorageKeys.siteConfigs, jsonEncode(jsonList));
 
-    // 保存每个站点的API密钥
+    // 保存每个站点的API密钥与Cookie
     for (final config in configs) {
       // 仅当传入的 apiKey 非空时才更新安全存储；
       // 为 null 表示“不修改当前存储的密钥”，避免误删其他站点的密钥。
       if (config.apiKey != null) {
         await _saveSiteApiKey(config.id, config.apiKey);
-        // 更新内存中的 apiKey 缓存
         _siteApiKeysCache[config.id] = config.apiKey;
+      }
+      // 仅当传入的 cookie 非空时才更新安全存储
+      if (config.cookie != null) {
+        await _saveSiteCookie(config.id, config.cookie);
+        _siteCookiesCache[config.id] = config.cookie;
       }
     }
 
-    // 更新基础配置缓存（不含 apiKey），避免下一次再次解析 JSON
-    _siteConfigsCache = configs.map((c) => c.copyWith(apiKey: null)).toList();
+    // 更新基础配置缓存（不含 apiKey 与 cookie），避免下一次再次解析 JSON
+    _siteConfigsCache = configs.map((c) => c.copyWith(clearApiKey: true, clearCookie: true)).toList();
     _siteConfigsCacheDirty = false;
     _siteConfigsCacheNeedsUpdate = false;
   }
@@ -691,6 +754,7 @@ class StorageService {
         baseConfigs = <SiteConfig>[];
         hasUpdates = false;
         int idx = 0;
+        bool needsCookieMigration = false;
 
         for (final json in jsonList) {
           final swItem = Stopwatch()..start();
@@ -701,11 +765,25 @@ class StorageService {
               'StorageService.loadSiteConfigs: 第${idx + 1}个站点 fromJsonAsync 耗时=${swItem.elapsedMilliseconds}ms，templateId=${result.config.templateId}，needsUpdate=${result.needsUpdate}',
             );
           }
-          baseConfigs.add(result.config);
+          var cfg = result.config;
+
+          // 【数据迁移】如果 SharedPreferences 的 JSON 中包含了明文 cookie，则触发透明安全迁移
+          if (cfg.cookie != null && cfg.cookie!.isNotEmpty) {
+            needsCookieMigration = true;
+            await _saveSiteCookie(cfg.id, cfg.cookie);
+            _siteCookiesCache[cfg.id] = cfg.cookie;
+            cfg = cfg.copyWith(clearCookie: true); // 清除明文以保存在内存的基础缓存中
+          }
+
+          baseConfigs.add(cfg);
           idx++;
           if (result.needsUpdate) {
             hasUpdates = true;
           }
+        }
+
+        if (needsCookieMigration) {
+          hasUpdates = true; // 强制标记更新以把清除明文 cookie 后的列表刷回磁盘
         }
 
         // 更新缓存
@@ -714,35 +792,53 @@ class StorageService {
         _siteConfigsCacheNeedsUpdate = hasUpdates;
       }
 
-      // 根据 includeApiKeys 构造返回列表
+      // 根据 includeApiKeys 构造返回列表：API Key 依据 includeApiKeys 决定是否加载，但 Cookie 必须总是加载
       final List<SiteConfig> configs = <SiteConfig>[];
       int idx = 0;
       for (final cfg in baseConfigs) {
-        SiteConfig finalConfig;
+        final swKey = Stopwatch()..start();
+        
+        String? cookie;
+        if (_siteCookiesCache.containsKey(cfg.id)) {
+          cookie = _siteCookiesCache[cfg.id];
+        } else {
+          cookie = await _loadSiteCookie(cfg.id);
+          _siteCookiesCache[cfg.id] = cookie; // 缓存读取结果
+        }
+
+        String? apiKey;
         if (includeApiKeys) {
-          final swKey = Stopwatch()..start();
-          String? apiKey;
           if (_siteApiKeysCache.containsKey(cfg.id)) {
             apiKey = _siteApiKeysCache[cfg.id];
           } else {
             apiKey = await _loadSiteApiKey(cfg.id);
-            _siteApiKeysCache[cfg.id] = apiKey; // 缓存读取结果（可为 null）
+            _siteApiKeysCache[cfg.id] = apiKey; // 缓存读取结果
           }
-          swKey.stop();
-          if (kDebugMode) {
-            _logger.d(
-              'StorageService.loadSiteConfigs: 第${idx + 1}个站点 加载API密钥耗时=${swKey.elapsedMilliseconds}ms',
-            );
-          }
-          finalConfig = cfg.copyWith(apiKey: apiKey);
-        } else {
-          finalConfig = cfg;
         }
-        configs.add(finalConfig);
+
+        swKey.stop();
+        if (kDebugMode && includeApiKeys) {
+          _logger.d(
+            'StorageService.loadSiteConfigs: 第${idx + 1}个站点 加载敏感数据耗时=${swKey.elapsedMilliseconds}ms',
+          );
+        }
+        
+        // 如果值完全一致，则直接返回基础配置实例，维持引用等价性优化
+        if (cfg.apiKey == apiKey && cfg.cookie == cookie) {
+          configs.add(cfg);
+        } else {
+          final finalConfig = cfg.copyWith(
+            apiKey: apiKey,
+            cookie: cookie,
+            clearApiKey: apiKey == null,
+            clearCookie: cookie == null,
+          );
+          configs.add(finalConfig);
+        }
         idx++;
       }
 
-      // 持久化模板更新：仅在 includeApiKeys=true 时执行
+      // 持久化模板更新与清除明文迁移结果：仅在 includeApiKeys=true 时执行
       if (hasUpdates && includeApiKeys) {
         final swSave = Stopwatch()..start();
         await saveSiteConfigs(configs);
@@ -756,7 +852,7 @@ class StorageService {
         _hasPendingConfigUpdates = true;
         if (kDebugMode) {
           _logger.i(
-            'StorageService.loadSiteConfigs: 检测到配置需要更新，但已跳过保存以避免清除API密钥（稍后持久化）',
+            'StorageService.loadSiteConfigs: 检测到配置需要更新，但已跳过保存以避免清除API密钥和Cookie（稍后持久化）',
           );
         }
       }
@@ -776,13 +872,17 @@ class StorageService {
 
   Future<void> addSiteConfig(SiteConfig config) async {
     final configs = await loadSiteConfigs(includeApiKeys: false);
-    // 新增时，避免触碰其他站点密钥；仅处理当前新增站点的密钥
-    configs.add(config.copyWith(apiKey: null));
+    // 新增时，避免触碰其他站点密钥；仅处理当前新增站点的密钥和Cookie
+    configs.add(config.copyWith(clearApiKey: true, clearCookie: true));
     await saveSiteConfigs(configs);
-    // 单独保存新增站点密钥（若提供）
+    // 单独保存新增站点密钥与Cookie（若提供）
     if (config.apiKey != null) {
       await _saveSiteApiKey(config.id, config.apiKey);
-      _siteApiKeysCache[config.id] = config.apiKey; // 更新缓存
+      _siteApiKeysCache[config.id] = config.apiKey;
+    }
+    if (config.cookie != null) {
+      await _saveSiteCookie(config.id, config.cookie);
+      _siteCookiesCache[config.id] = config.cookie;
     }
   }
 
@@ -790,13 +890,17 @@ class StorageService {
     final configs = await loadSiteConfigs(includeApiKeys: false);
     final index = configs.indexWhere((c) => c.id == config.id);
     if (index >= 0) {
-      // 更新列表时，将其他站点的 apiKey 保持为 null，避免被 saveSiteConfigs 误操作
-      configs[index] = config.copyWith(apiKey: null);
+      // 更新列表时，将其他站点的 apiKey 和 cookie 保持为 null，避免被 saveSiteConfigs 误操作
+      configs[index] = config.copyWith(clearApiKey: true, clearCookie: true);
       await saveSiteConfigs(configs);
-      // 单独更新当前站点密钥（如果提供）
+      // 单独更新当前站点密钥与Cookie（如果提供）
       if (config.apiKey != null) {
         await _saveSiteApiKey(config.id, config.apiKey);
-        _siteApiKeysCache[config.id] = config.apiKey; // 更新缓存
+        _siteApiKeysCache[config.id] = config.apiKey;
+      }
+      if (config.cookie != null) {
+        await _saveSiteCookie(config.id, config.cookie);
+        _siteCookiesCache[config.id] = config.cookie;
       }
     }
   }
@@ -804,13 +908,15 @@ class StorageService {
   Future<void> deleteSiteConfig(String siteId) async {
     final configs = await loadSiteConfigs();
     configs.removeWhere((c) => c.id == siteId);
-    // 删除站点后保存其余站点配置，但不传递 apiKey（保持为 null），
+    // 删除站点后保存其余站点配置，但不传递 apiKey 和 cookie（保持为 null），
     // 以避免在未加载密钥的场景下误删其他站点的密钥。
     await saveSiteConfigs(
-      configs.map((c) => c.copyWith(apiKey: null)).toList(),
+      configs.map((c) => c.copyWith(clearApiKey: true, clearCookie: true)).toList(),
     );
     await _deleteSiteApiKey(siteId);
+    await _deleteSiteCookie(siteId);
     _siteApiKeysCache.remove(siteId); // 移除缓存中的 apiKey
+    _siteCookiesCache.remove(siteId); // 移除缓存中的 cookie
 
     // 如果删除的是当前活跃站点，清除活跃站点设置
     final activeSiteId = await getActiveSiteId();
@@ -837,15 +943,53 @@ class StorageService {
     final activeSiteId = await getActiveSiteId();
     if (activeSiteId == null) return null;
 
-    // 加载站点配置但跳过API密钥，随后仅为活跃站点读取密钥
+    // 加载站点配置但跳过API密钥，随后仅为活跃站点读取密钥和Cookie
     final configs = await loadSiteConfigs(includeApiKeys: false);
     try {
       final base = configs.firstWhere((c) => c.id == activeSiteId);
       final apiKey = await _loadSiteApiKey(activeSiteId);
-      return base.copyWith(apiKey: apiKey);
+      final cookie = await _loadSiteCookie(activeSiteId);
+      return base.copyWith(apiKey: apiKey, cookie: cookie);
     } catch (_) {
       return null;
     }
+  }
+
+  // 私有方法：处理单个站点的Cookie安全存储与普通降级
+  Future<void> _saveSiteCookie(String siteId, String? cookie) async {
+    if (cookie == null) return;
+    if (cookie.isEmpty) {
+      await _deleteSiteCookie(siteId);
+      return;
+    }
+
+    final wrote = await _secureWrite(
+      key: StorageKeys.siteCookie(siteId),
+      value: cookie,
+    );
+    final prefs = await _prefs;
+    if (wrote) {
+      await prefs.remove(StorageKeys.siteCookieFallback(siteId));
+    } else {
+      await prefs.setString(StorageKeys.siteCookieFallback(siteId), cookie);
+      await _secureSharedPreferencesFile();
+    }
+  }
+
+  Future<String?> _loadSiteCookie(String siteId) async {
+    try {
+      final cookie = await _secureRead(StorageKeys.siteCookie(siteId));
+      if (cookie != null && cookie.isNotEmpty) return cookie;
+    } catch (_) {}
+
+    final prefs = await _prefs;
+    return prefs.getString(StorageKeys.siteCookieFallback(siteId));
+  }
+
+  Future<void> _deleteSiteCookie(String siteId) async {
+    await _secureDelete(key: StorageKeys.siteCookie(siteId));
+    final prefs = await _prefs;
+    await prefs.remove(StorageKeys.siteCookieFallback(siteId));
   }
 
   // 私有方法：处理单个站点的API密钥
@@ -872,6 +1016,7 @@ class StorageService {
       // 降级到本地存储
       final prefs = await _prefs;
       await prefs.setString(StorageKeys.siteApiKeyFallback(siteId), apiKey);
+      await _secureSharedPreferencesFile();
     }
   }
 
@@ -1041,10 +1186,90 @@ class StorageService {
     return prefs.getStringList(StorageKeys.proxyBypassRules) ?? [];
   }
 
+  Future<void> saveCookieCloudUrl(String url) async {
+    final wrote = await _secureWrite(
+      key: StorageKeys.cookieCloudUrl,
+      value: url,
+    );
+    final prefs = await _prefs;
+    await prefs.remove(StorageKeys.cookieCloudUrl); // 清除明文
+    if (wrote) {
+      await prefs.remove(StorageKeys.cookieCloudUrlFallback);
+    } else {
+      await prefs.setString(StorageKeys.cookieCloudUrlFallback, url);
+      await _secureSharedPreferencesFile();
+    }
+  }
+
+  Future<String> loadCookieCloudUrl() async {
+    try {
+      final url = await _secureRead(StorageKeys.cookieCloudUrl);
+      if (url != null && url.isNotEmpty) {
+        final prefs = await _prefs;
+        if (prefs.containsKey(StorageKeys.cookieCloudUrl)) {
+          await prefs.remove(StorageKeys.cookieCloudUrl);
+        }
+        return url;
+      }
+    } catch (_) {}
+
+    final prefs = await _prefs;
+    final legacyUrl = prefs.getString(StorageKeys.cookieCloudUrl);
+    if (legacyUrl != null && legacyUrl.isNotEmpty) {
+      final wrote = await _secureWrite(key: StorageKeys.cookieCloudUrl, value: legacyUrl);
+      if (wrote) {
+        await prefs.remove(StorageKeys.cookieCloudUrl);
+      }
+      return legacyUrl;
+    }
+
+    return prefs.getString(StorageKeys.cookieCloudUrlFallback) ?? '';
+  }
+
+  Future<void> saveCookieCloudUuid(String uuid) async {
+    final wrote = await _secureWrite(
+      key: StorageKeys.cookieCloudUuid,
+      value: uuid,
+    );
+    final prefs = await _prefs;
+    await prefs.remove(StorageKeys.cookieCloudUuid); // 清除明文
+    if (wrote) {
+      await prefs.remove(StorageKeys.cookieCloudUuidFallback);
+    } else {
+      await prefs.setString(StorageKeys.cookieCloudUuidFallback, uuid);
+      await _secureSharedPreferencesFile();
+    }
+  }
+
+  Future<String> loadCookieCloudUuid() async {
+    try {
+      final uuid = await _secureRead(StorageKeys.cookieCloudUuid);
+      if (uuid != null && uuid.isNotEmpty) {
+        final prefs = await _prefs;
+        if (prefs.containsKey(StorageKeys.cookieCloudUuid)) {
+          await prefs.remove(StorageKeys.cookieCloudUuid);
+        }
+        return uuid;
+      }
+    } catch (_) {}
+
+    final prefs = await _prefs;
+    final legacyUuid = prefs.getString(StorageKeys.cookieCloudUuid);
+    if (legacyUuid != null && legacyUuid.isNotEmpty) {
+      final wrote = await _secureWrite(key: StorageKeys.cookieCloudUuid, value: legacyUuid);
+      if (wrote) {
+        await prefs.remove(StorageKeys.cookieCloudUuid);
+      }
+      return legacyUuid;
+    }
+
+    return prefs.getString(StorageKeys.cookieCloudUuidFallback) ?? '';
+  }
+
   Future<void> saveCookieCloudConfig(CookieCloudConfig config) async {
     final prefs = await _prefs;
-    await prefs.setString(StorageKeys.cookieCloudUrl, config.url.trim());
-    await prefs.setString(StorageKeys.cookieCloudUuid, config.uuid.trim());
+    await saveCookieCloudUrl(config.url.trim());
+    await saveCookieCloudUuid(config.uuid.trim());
     await prefs.setBool(
       StorageKeys.cookieCloudAutoSyncEnabled,
       config.autoSyncEnabled,
@@ -1072,8 +1297,8 @@ class StorageService {
     final prefs = await _prefs;
     final lastSyncAtRaw = prefs.getString(StorageKeys.cookieCloudLastSyncAt);
     return CookieCloudConfig(
-      url: prefs.getString(StorageKeys.cookieCloudUrl) ?? '',
-      uuid: prefs.getString(StorageKeys.cookieCloudUuid) ?? '',
+      url: await loadCookieCloudUrl(),
+      uuid: await loadCookieCloudUuid(),
       password: await loadCookieCloudPassword(),
       autoSyncEnabled:
           prefs.getBool(StorageKeys.cookieCloudAutoSyncEnabled) ?? false,
@@ -1097,6 +1322,7 @@ class StorageService {
       await prefs.remove(StorageKeys.cookieCloudPasswordFallback);
     } else {
       await prefs.setString(StorageKeys.cookieCloudPasswordFallback, password);
+      await _secureSharedPreferencesFile();
     }
   }
 
@@ -1452,6 +1678,7 @@ class StorageService {
     _siteConfigsCacheDirty = true;
     _siteConfigsCacheNeedsUpdate = false;
     _siteApiKeysCache.clear();
+    _siteCookiesCache.clear();
     _visibleTagsCache = null;
     _platformOverrideForTest = null;
     _secureStorageAvailability = _SecureStorageAvailability.unknown;
