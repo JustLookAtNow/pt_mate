@@ -19,6 +19,7 @@ import 'services/webdav_service.dart';
 import 'providers/aggregate_search_provider.dart';
 import 'services/site_config_service.dart';
 import 'services/site_health_refresh_service.dart';
+import 'services/network/cookie_cloud_auto_sync_service.dart';
 
 import 'services/downloader/downloader_config.dart';
 import 'services/downloader/downloader_service.dart';
@@ -151,6 +152,7 @@ class AppState extends ChangeNotifier {
 
       // 应用启动时检查自动同步
       Future.microtask(() => _checkAutoSync());
+      Future.microtask(() => _checkCookieCloudAutoSync());
       // 应用启动后静默刷新站点健康状态缓存
       Future.microtask(() => _refreshSiteHealthStatusesInBackground());
 
@@ -189,6 +191,15 @@ class AppState extends ChangeNotifier {
     if (_site != null) {
       await ApiService.instance.setActiveSite(_site!);
     }
+    notifyListeners();
+  }
+
+  Future<void> reloadActiveSite() async {
+    final latest = await StorageService.instance.getActiveSiteConfig();
+    if (latest == null) return;
+    _site = latest;
+    await ApiService.instance.setActiveSite(latest);
+    _configVersion++;
     notifyListeners();
   }
 
@@ -268,6 +279,22 @@ class AppState extends ChangeNotifier {
       if (kDebugMode) {
         _logger.e('AppState: 后台刷新站点健康状态失败: $e');
       }
+    }
+  }
+
+  Future<void> _checkCookieCloudAutoSync() async {
+    final beforeCookie = _site?.cookie;
+    final beforeSiteId = _site?.id;
+    await CookieCloudAutoSyncService.instance.syncIfNeeded();
+    if (beforeSiteId == null) return;
+    final latest = await StorageService.instance.getActiveSiteConfig();
+    if (latest != null &&
+        latest.id == beforeSiteId &&
+        latest.cookie != beforeCookie) {
+      _site = latest;
+      await ApiService.instance.setActiveSite(latest);
+      _configVersion++;
+      notifyListeners();
     }
   }
 }
@@ -977,12 +1004,35 @@ class MTeamApp extends StatefulWidget {
   State<MTeamApp> createState() => _MTeamAppState();
 }
 
-class _MTeamAppState extends State<MTeamApp> {
+class _MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
+  final AppState _appState = AppState();
+
+  @override
+  void initState() {
+    super.initState();
+    _appState.loadInitial();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _appState.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      Future.microtask(() => _appState._checkCookieCloudAutoSync());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AppState()..loadInitial()),
+        ChangeNotifierProvider.value(value: _appState),
         ChangeNotifierProvider(
           create: (_) =>
               ThemeManager(StorageService.instance)..initializeDynamicColor(),

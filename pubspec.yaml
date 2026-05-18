@@ -53,8 +53,9 @@ dependencies:
   flutter_downloader: ^1.11.8
   ota_update: ^7.0.2
   device_info_plus: ^13.1.0
-  dart_jsonwebtoken: ^3.2.0
+  dart_jsonwebtoken: ^3.1.1
   crypto: ^3.0.3
+  encrypt: ^5.0.3
   flutter_bbcode: ^1.5.1
   bbob_dart: ^0.2.1
   archive: ^4.0.9

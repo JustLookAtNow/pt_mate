@@ -95,9 +95,67 @@ class StorageKeys {
   static const String proxyPort = 'network.proxyPort'; // int
   static const String proxyUsername = 'network.proxyUsername'; // String
   static const String proxyPassword = 'network.proxyPassword'; // String
-  static const String proxyPasswordFallback = 'network.proxyPassword.fallback'; // String
+  static const String proxyPasswordFallback =
+      'network.proxyPassword.fallback'; // String
   static const String proxyBypassLan = 'network.proxyBypassLan'; // bool
-  static const String proxyBypassRules = 'network.proxyBypassRules'; // List<String>
+  static const String proxyBypassRules =
+      'network.proxyBypassRules'; // List<String>
+
+  // Cookie Cloud 同步设置
+  static const String cookieCloudUrl = 'cookieCloud.url';
+  static const String cookieCloudUuid = 'cookieCloud.uuid';
+  static const String cookieCloudPassword = 'cookieCloud.password';
+  static const String cookieCloudPasswordFallback =
+      'cookieCloud.password.fallback';
+  static const String cookieCloudAutoSyncEnabled = 'cookieCloud.autoSync';
+  static const String cookieCloudSyncIntervalMinutes =
+      'cookieCloud.syncIntervalMinutes';
+  static const String cookieCloudLastSyncAt = 'cookieCloud.lastSyncAt';
+  static const String cookieCloudLastSyncSummary =
+      'cookieCloud.lastSyncSummary';
+}
+
+class CookieCloudConfig {
+  final String url;
+  final String uuid;
+  final String password;
+  final bool autoSyncEnabled;
+  final int syncIntervalMinutes;
+  final DateTime? lastSyncAt;
+  final String lastSyncSummary;
+
+  const CookieCloudConfig({
+    this.url = '',
+    this.uuid = '',
+    this.password = '',
+    this.autoSyncEnabled = false,
+    this.syncIntervalMinutes = 360,
+    this.lastSyncAt,
+    this.lastSyncSummary = '',
+  });
+
+  bool get isConfigured =>
+      url.trim().isNotEmpty &&
+      uuid.trim().isNotEmpty &&
+      password.trim().isNotEmpty;
+
+  CookieCloudConfig copyWith({
+    String? url,
+    String? uuid,
+    String? password,
+    bool? autoSyncEnabled,
+    int? syncIntervalMinutes,
+    DateTime? lastSyncAt,
+    String? lastSyncSummary,
+  }) => CookieCloudConfig(
+    url: url ?? this.url,
+    uuid: uuid ?? this.uuid,
+    password: password ?? this.password,
+    autoSyncEnabled: autoSyncEnabled ?? this.autoSyncEnabled,
+    syncIntervalMinutes: syncIntervalMinutes ?? this.syncIntervalMinutes,
+    lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+    lastSyncSummary: lastSyncSummary ?? this.lastSyncSummary,
+  );
 }
 
 enum _SecureStorageAvailability { unknown, available, unavailable }
@@ -957,6 +1015,86 @@ class StorageService {
   Future<List<String>> loadProxyBypassRules() async {
     final prefs = await _prefs;
     return prefs.getStringList(StorageKeys.proxyBypassRules) ?? [];
+  }
+
+  Future<void> saveCookieCloudConfig(CookieCloudConfig config) async {
+    final prefs = await _prefs;
+    await prefs.setString(StorageKeys.cookieCloudUrl, config.url.trim());
+    await prefs.setString(StorageKeys.cookieCloudUuid, config.uuid.trim());
+    await prefs.setBool(
+      StorageKeys.cookieCloudAutoSyncEnabled,
+      config.autoSyncEnabled,
+    );
+    await prefs.setInt(
+      StorageKeys.cookieCloudSyncIntervalMinutes,
+      config.syncIntervalMinutes,
+    );
+    if (config.lastSyncAt != null) {
+      await prefs.setString(
+        StorageKeys.cookieCloudLastSyncAt,
+        config.lastSyncAt!.toIso8601String(),
+      );
+    } else {
+      await prefs.remove(StorageKeys.cookieCloudLastSyncAt);
+    }
+    await prefs.setString(
+      StorageKeys.cookieCloudLastSyncSummary,
+      config.lastSyncSummary,
+    );
+    await saveCookieCloudPassword(config.password);
+  }
+
+  Future<CookieCloudConfig> loadCookieCloudConfig() async {
+    final prefs = await _prefs;
+    final lastSyncAtRaw = prefs.getString(StorageKeys.cookieCloudLastSyncAt);
+    return CookieCloudConfig(
+      url: prefs.getString(StorageKeys.cookieCloudUrl) ?? '',
+      uuid: prefs.getString(StorageKeys.cookieCloudUuid) ?? '',
+      password: await loadCookieCloudPassword(),
+      autoSyncEnabled:
+          prefs.getBool(StorageKeys.cookieCloudAutoSyncEnabled) ?? false,
+      syncIntervalMinutes:
+          prefs.getInt(StorageKeys.cookieCloudSyncIntervalMinutes) ?? 360,
+      lastSyncAt: lastSyncAtRaw == null
+          ? null
+          : DateTime.tryParse(lastSyncAtRaw),
+      lastSyncSummary:
+          prefs.getString(StorageKeys.cookieCloudLastSyncSummary) ?? '',
+    );
+  }
+
+  Future<void> saveCookieCloudPassword(String password) async {
+    final wrote = await _secureWrite(
+      key: StorageKeys.cookieCloudPassword,
+      value: password,
+    );
+    final prefs = await _prefs;
+    if (wrote) {
+      await prefs.remove(StorageKeys.cookieCloudPasswordFallback);
+    } else {
+      await prefs.setString(StorageKeys.cookieCloudPasswordFallback, password);
+    }
+  }
+
+  Future<String> loadCookieCloudPassword() async {
+    try {
+      final password = await _secureRead(StorageKeys.cookieCloudPassword);
+      if (password != null && password.isNotEmpty) return password;
+    } catch (_) {}
+    final prefs = await _prefs;
+    return prefs.getString(StorageKeys.cookieCloudPasswordFallback) ?? '';
+  }
+
+  Future<void> saveCookieCloudLastSync({
+    required DateTime syncedAt,
+    required String summary,
+  }) async {
+    final prefs = await _prefs;
+    await prefs.setString(
+      StorageKeys.cookieCloudLastSyncAt,
+      syncedAt.toIso8601String(),
+    );
+    await prefs.setString(StorageKeys.cookieCloudLastSyncSummary, summary);
   }
 
   // 默认下载设置相关

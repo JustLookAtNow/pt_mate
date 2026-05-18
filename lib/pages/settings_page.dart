@@ -15,6 +15,7 @@ import 'backup_restore_page.dart';
 import 'aggregate_search_settings_page.dart';
 import 'downloader_settings_page.dart';
 import 'network_settings_page.dart';
+import 'cookie_cloud_page.dart';
 import '../services/update_service.dart';
 import '../services/debug/web_debug_service.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
@@ -60,12 +61,8 @@ class _SettingsBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-
         // 主题设置
-        Text(
-          '主题设置',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('主题设置', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Card(
           child: Column(
@@ -77,7 +74,9 @@ class _SettingsBody extends StatelessWidget {
                       ListTile(
                         leading: const Icon(Icons.brightness_6),
                         title: const Text('主题模式'),
-                        subtitle: Text(_getThemeModeText(themeManager.themeMode)),
+                        subtitle: Text(
+                          _getThemeModeText(themeManager.themeMode),
+                        ),
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -140,12 +139,8 @@ class _SettingsBody extends StatelessWidget {
           ),
         ),
 
-
         // 下载器设置
-        Text(
-          '下载器设置',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('下载器设置', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Card(
           child: ListTile(
@@ -165,10 +160,7 @@ class _SettingsBody extends StatelessWidget {
         const SizedBox(height: 16),
 
         // 显示设置
-        Text(
-          '显示设置',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('显示设置', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Card(
           child: Column(
@@ -184,10 +176,7 @@ class _SettingsBody extends StatelessWidget {
         const SizedBox(height: 16),
 
         // 聚合搜索设置
-        Text(
-          '聚合搜索',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('聚合搜索', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Card(
           child: ListTile(
@@ -207,10 +196,7 @@ class _SettingsBody extends StatelessWidget {
         const SizedBox(height: 16),
 
         // 网络设置
-        Text(
-          '网络设置',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('网络设置', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Card(
           child: ListTile(
@@ -230,32 +216,71 @@ class _SettingsBody extends StatelessWidget {
         const SizedBox(height: 16),
 
         // 备份恢复
-        Text(
-          '数据管理',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('数据管理', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Card(
-          child: ListTile(
-            leading: const Icon(Icons.backup),
-            title: const Text('备份与恢复'),
-            subtitle: const Text('导出或导入应用数据'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const BackupRestorePage(),
-                ),
-              );
-            },
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.backup),
+                title: const Text('备份与恢复'),
+                subtitle: const Text('导出或导入应用数据'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const BackupRestorePage(),
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              FutureBuilder<CookieCloudConfig>(
+                future: StorageService.instance.loadCookieCloudConfig(),
+                builder: (context, snapshot) {
+                  final config = snapshot.data;
+                  final subtitle = config?.lastSyncAt == null
+                      ? '同步浏览器 Cookie，支持自动静默同步'
+                      : '上次同步 ${config!.lastSyncAt!.toLocal().toString().substring(0, 16)}';
+                  return ListTile(
+                    leading: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        const Icon(Icons.cloud_sync),
+                        if (config?.lastSyncAt == null)
+                          Positioned(
+                            right: -1,
+                            top: -1,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.error,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    title: const Text('Cookie Cloud 同步'),
+                    subtitle: Text(subtitle),
+                    trailing: const Icon(Icons.arrow_forward_ios),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const CookieCloudPage(),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 16),
         // 更新设置
-        Text(
-          '更新设置',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('更新设置', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         const _BetaUpdateTile(),
         const SizedBox(height: 16),
@@ -263,10 +288,7 @@ class _SettingsBody extends StatelessWidget {
         // 查询条件配置已移至站点配置中，可在站点配置页面管理
         // 日志与诊断（底部）
         const SizedBox(height: 8),
-        Text(
-          '调试与诊断',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('调试与诊断', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Card(
           child: Column(
@@ -386,7 +408,6 @@ class _WebDebugToggleTileState extends State<_WebDebugToggleTile> {
   }
 }
 
-
 class _BetaUpdateTile extends StatefulWidget {
   const _BetaUpdateTile();
 
@@ -474,9 +495,7 @@ class _ColorPickerTile extends StatelessWidget {
       onTap: () async {
         final color = await showDialog<Color>(
           context: context,
-          builder: (context) => _ColorPickerDialog(
-            initialColor: currentColor,
-          ),
+          builder: (context) => _ColorPickerDialog(initialColor: currentColor),
         );
         if (color != null) {
           onColorChanged(color);
@@ -489,9 +508,7 @@ class _ColorPickerTile extends StatelessWidget {
 class _ColorPickerDialog extends StatefulWidget {
   final Color initialColor;
 
-  const _ColorPickerDialog({
-    required this.initialColor,
-  });
+  const _ColorPickerDialog({required this.initialColor});
 
   @override
   State<_ColorPickerDialog> createState() => _ColorPickerDialogState();
@@ -509,7 +526,8 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
   void initState() {
     super.initState();
     _selectedColor = widget.initialColor;
-    _hexController.text = '#${_selectedColor.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2)}';
+    _hexController.text =
+        '#${_selectedColor.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase().substring(2)}';
     final hsv = HSVColor.fromColor(_selectedColor);
     _h = hsv.hue;
     _s = hsv.saturation;
@@ -540,43 +558,46 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             // 预设颜色
-            const Text(
-              '预设颜色',
-              style: TextStyle(fontWeight: FontWeight.w500),
-            ),
+            const Text('预设颜色', style: TextStyle(fontWeight: FontWeight.w500)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: [
-                Colors.red,
-                Colors.pink,
-                Colors.purple,
-                Colors.deepPurple,
-                Colors.indigo,
-                Colors.blue,
-                Colors.lightBlue,
-                Colors.cyan,
-                Colors.teal,
-                Colors.green,
-                Colors.lightGreen,
-                Colors.lime,
-                Colors.yellow,
-                Colors.amber,
-                Colors.orange,
-                Colors.deepOrange,
-                Colors.brown,
-                Colors.grey,
-                Colors.blueGrey,
-              ].map((color) => _ColorCircle(
-                color: color,
-                isSelected: _selectedColor.toARGB32() == color.toARGB32(),
+              children:
+                  [
+                        Colors.red,
+                        Colors.pink,
+                        Colors.purple,
+                        Colors.deepPurple,
+                        Colors.indigo,
+                        Colors.blue,
+                        Colors.lightBlue,
+                        Colors.cyan,
+                        Colors.teal,
+                        Colors.green,
+                        Colors.lightGreen,
+                        Colors.lime,
+                        Colors.yellow,
+                        Colors.amber,
+                        Colors.orange,
+                        Colors.deepOrange,
+                        Colors.brown,
+                        Colors.grey,
+                        Colors.blueGrey,
+                      ]
+                      .map(
+                        (color) => _ColorCircle(
+                          color: color,
+                          isSelected:
+                              _selectedColor.toARGB32() == color.toARGB32(),
                           onTap: () => setState(() {
                             _selectedColor = color;
                             _hexController.text = _toHexRGB(color);
                             _customMode = false;
                           }),
-              )).toList(),
+                        ),
+                      )
+                      .toList(),
             ),
             const SizedBox(height: 12),
             ListTile(
@@ -854,9 +875,7 @@ class _ColorCircle extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
-          border: isSelected
-              ? Border.all(color: Colors.white, width: 3)
-              : null,
+          border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
           boxShadow: isSelected
               ? [
                   BoxShadow(
@@ -868,11 +887,7 @@ class _ColorCircle extends StatelessWidget {
               : null,
         ),
         child: isSelected
-            ? const Icon(
-                Icons.check,
-                color: Colors.white,
-                size: 20,
-              )
+            ? const Icon(Icons.check, color: Colors.white, size: 20)
             : null,
       ),
     );
@@ -1297,7 +1312,10 @@ class _ExportLogsTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [

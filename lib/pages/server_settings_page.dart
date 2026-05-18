@@ -9,6 +9,7 @@ import '../services/api/api_service.dart';
 import '../utils/screen_utils.dart';
 import '../services/site_config_service.dart';
 import '../services/site_health_refresh_service.dart';
+import '../services/network/cookie_cloud_service.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/web_login_widget.dart';
 import '../widgets/responsive_layout.dart';
@@ -1772,6 +1773,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
   bool _showManualCookieInput = false; // 是否展示手动输入cookie框
   Color? _siteColor; // 站点颜色（编辑页）
   String? _newSiteId; // 新建站点时保持稳定的ID
+  bool _checkingCookieCloud = false;
 
   @override
   void initState() {
@@ -1805,6 +1807,9 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
       // 检查是否是预设站点，这会根据检测结果填充相应字段
       _checkIfPresetSite();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkCookieCloudUpdateOnOpen();
+      });
     } else {
       // 新建站点时，查询分类配置初始为空，字段保持空白
       _searchCategories = [];
@@ -1827,6 +1832,53 @@ class _SiteEditPageState extends State<SiteEditPage> {
         _presetTemplates = [];
         _filteredPresetTemplates = [];
       });
+    }
+  }
+
+  Future<void> _checkCookieCloudUpdateOnOpen() async {
+    if (_checkingCookieCloud || widget.site == null || !mounted) return;
+    _checkingCookieCloud = true;
+    try {
+      final cookie = await CookieCloudService().checkSiteCookieUpdate(
+        widget.site!,
+      );
+      if (!mounted || cookie == null || cookie == _cookieController.text) {
+        return;
+      }
+      final shouldUse = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('发现新的 Cookie'),
+          content: const Text('Cookie Cloud 中存在该站点的新版本 Cookie，是否填入当前配置？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              style: TextButton.styleFrom(
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.outline,
+                  width: 1.0,
+                ),
+              ),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('使用新版本'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || shouldUse != true) return;
+      setState(() {
+        _cookieController.text = cookie;
+        _savedCookie = cookie;
+        _cookieStatus = '已填入 Cookie Cloud 中的新版本，请保存配置';
+        _showManualCookieInput = true;
+      });
+    } catch (_) {
+      // 打开配置页时的检查不阻塞用户编辑。
+    } finally {
+      _checkingCookieCloud = false;
     }
   }
 
