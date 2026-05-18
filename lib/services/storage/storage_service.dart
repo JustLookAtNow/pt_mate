@@ -88,6 +88,16 @@ class StorageKeys {
       'app.lastSiteHealthRefreshCheck';
 
   // 查询条件配置已移至站点配置中，不再需要全局键
+
+  // 网络代理设置
+  static const String proxyEnabled = 'network.proxyEnabled'; // bool
+  static const String proxyHost = 'network.proxyHost'; // String
+  static const String proxyPort = 'network.proxyPort'; // int
+  static const String proxyUsername = 'network.proxyUsername'; // String
+  static const String proxyPassword = 'network.proxyPassword'; // String
+  static const String proxyPasswordFallback = 'network.proxyPassword.fallback'; // String
+  static const String proxyBypassLan = 'network.proxyBypassLan'; // bool
+  static const String proxyBypassRules = 'network.proxyBypassRules'; // List<String>
 }
 
 enum _SecureStorageAvailability { unknown, available, unavailable }
@@ -863,6 +873,90 @@ class StorageService {
   Future<bool> loadLogToFileEnabled() async {
     final prefs = await _prefs;
     return prefs.getBool(StorageKeys.logToFileEnabled) ?? false;
+  }
+
+  // 网络代理设置相关：保存与读取
+  Future<void> saveProxyEnabled(bool enabled) async {
+    final prefs = await _prefs;
+    await prefs.setBool(StorageKeys.proxyEnabled, enabled);
+  }
+
+  Future<bool> loadProxyEnabled() async {
+    final prefs = await _prefs;
+    return prefs.getBool(StorageKeys.proxyEnabled) ?? false;
+  }
+
+  Future<void> saveProxyHost(String host) async {
+    final prefs = await _prefs;
+    await prefs.setString(StorageKeys.proxyHost, host);
+  }
+
+  Future<String> loadProxyHost() async {
+    final prefs = await _prefs;
+    return prefs.getString(StorageKeys.proxyHost) ?? '';
+  }
+
+  Future<void> saveProxyPort(int port) async {
+    final prefs = await _prefs;
+    await prefs.setInt(StorageKeys.proxyPort, port);
+  }
+
+  Future<int> loadProxyPort() async {
+    final prefs = await _prefs;
+    return prefs.getInt(StorageKeys.proxyPort) ?? 7890;
+  }
+
+  Future<void> saveProxyUsername(String username) async {
+    final prefs = await _prefs;
+    await prefs.setString(StorageKeys.proxyUsername, username);
+  }
+
+  Future<String> loadProxyUsername() async {
+    final prefs = await _prefs;
+    return prefs.getString(StorageKeys.proxyUsername) ?? '';
+  }
+
+  Future<void> saveProxyPassword(String password) async {
+    final wrote = await _secureWrite(
+      key: StorageKeys.proxyPassword,
+      value: password,
+    );
+    if (wrote) {
+      final prefs = await _prefs;
+      await prefs.remove(StorageKeys.proxyPasswordFallback);
+    } else {
+      final prefs = await _prefs;
+      await prefs.setString(StorageKeys.proxyPasswordFallback, password);
+    }
+  }
+
+  Future<String> loadProxyPassword() async {
+    try {
+      final password = await _secureRead(StorageKeys.proxyPassword);
+      if (password != null && password.isNotEmpty) return password;
+    } catch (_) {}
+    final prefs = await _prefs;
+    return prefs.getString(StorageKeys.proxyPasswordFallback) ?? '';
+  }
+
+  Future<void> saveProxyBypassLan(bool bypass) async {
+    final prefs = await _prefs;
+    await prefs.setBool(StorageKeys.proxyBypassLan, bypass);
+  }
+
+  Future<bool> loadProxyBypassLan() async {
+    final prefs = await _prefs;
+    return prefs.getBool(StorageKeys.proxyBypassLan) ?? true;
+  }
+
+  Future<void> saveProxyBypassRules(List<String> rules) async {
+    final prefs = await _prefs;
+    await prefs.setStringList(StorageKeys.proxyBypassRules, rules);
+  }
+
+  Future<List<String>> loadProxyBypassRules() async {
+    final prefs = await _prefs;
+    return prefs.getStringList(StorageKeys.proxyBypassRules) ?? [];
   }
 
   // 默认下载设置相关

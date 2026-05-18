@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'app.dart';
 import 'services/storage/storage_service.dart';
 import 'services/logging/log_file_service.dart';
+import 'services/network/proxy_service.dart';
 
 void main() async {
   runZonedGuarded(
@@ -13,6 +14,9 @@ void main() async {
       final enabled = await StorageService.instance.loadLogToFileEnabled();
       await LogFileService.instance.init(enabled: enabled);
       await StorageService.instance.loadVisibleTags();
+
+      // 初始化并应用网络代理设置
+      await ProxyService.instance.init();
 
       runApp(const MTeamApp());
     },

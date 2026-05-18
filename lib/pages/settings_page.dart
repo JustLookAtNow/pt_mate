@@ -14,6 +14,7 @@ import '../services/logging/log_file_service.dart';
 import 'backup_restore_page.dart';
 import 'aggregate_search_settings_page.dart';
 import 'downloader_settings_page.dart';
+import 'network_settings_page.dart';
 import '../services/update_service.dart';
 import '../services/debug/web_debug_service.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
@@ -198,6 +199,29 @@ class _SettingsBody extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (context) => const AggregateSearchSettingsPage(),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // 网络设置
+        Text(
+          '网络设置',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.language),
+            title: const Text('网络代理设置'),
+            subtitle: const Text('自定义代理网络地址'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const NetworkSettingsPage(),
                 ),
               );
             },

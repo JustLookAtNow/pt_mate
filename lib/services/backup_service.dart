@@ -148,6 +148,15 @@ class BackupService {
         'tags': await _storageService.loadDefaultDownloadTags(),
         'savePath': await _storageService.loadDefaultDownloadSavePath(),
       },
+      'proxy': {
+        'enabled': await _storageService.loadProxyEnabled(),
+        'host': await _storageService.loadProxyHost(),
+        'port': await _storageService.loadProxyPort(),
+        'username': await _storageService.loadProxyUsername(),
+        'password': await _storageService.loadProxyPassword(),
+        'bypassLan': await _storageService.loadProxyBypassLan(),
+        'bypassRules': await _storageService.loadProxyBypassRules(),
+      },
     };
 
     // 收集下载器的分类和标签缓存
@@ -344,6 +353,33 @@ class BackupService {
           }
           if (downloadSettings['savePath'] != null) {
             await _storageService.saveDefaultDownloadSavePath(downloadSettings['savePath'] as String);
+          }
+        }
+
+        // 恢复网络代理设置
+        if (prefs['proxy'] != null) {
+          final proxy = prefs['proxy'] as Map<String, dynamic>;
+          if (proxy['enabled'] != null) {
+            await _storageService.saveProxyEnabled(proxy['enabled'] as bool);
+          }
+          if (proxy['host'] != null) {
+            await _storageService.saveProxyHost(proxy['host'] as String);
+          }
+          if (proxy['port'] != null) {
+            await _storageService.saveProxyPort(proxy['port'] as int);
+          }
+          if (proxy['username'] != null) {
+            await _storageService.saveProxyUsername(proxy['username'] as String);
+          }
+          if (proxy['password'] != null) {
+            await _storageService.saveProxyPassword(proxy['password'] as String);
+          }
+          if (proxy['bypassLan'] != null) {
+            await _storageService.saveProxyBypassLan(proxy['bypassLan'] as bool);
+          }
+          if (proxy['bypassRules'] != null) {
+            final rules = proxy['bypassRules'] as List<dynamic>;
+            await _storageService.saveProxyBypassRules(rules.cast<String>());
           }
         }
       }
