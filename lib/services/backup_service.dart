@@ -14,11 +14,11 @@ import 'webdav_service.dart';
 
 // 备份版本管理
 class BackupVersion {
-  static const String current = '1.2.0';
+  static const String current = '1.3.0';
 
   static bool isCompatible(String version) {
     // 支持的版本列表
-    const supportedVersions = ['1.0.0', '1.1.0', '1.2.0'];
+    const supportedVersions = ['1.0.0', '1.1.0', '1.2.0', '1.3.0'];
     return supportedVersions.contains(version);
   }
 
@@ -177,6 +177,10 @@ class BackupService {
     // 收集聚合搜索设置
     final aggregateSearchSettings = await _storageService.loadAggregateSearchSettings();
     data['aggregateSearchSettings'] = aggregateSearchSettings.toJson();
+
+    // 收集 Cookie Cloud 配置
+    final cookieCloudConfig = await _storageService.loadCookieCloudConfig();
+    data['cookieCloudConfig'] = cookieCloudConfig.toJson();
 
     return BackupData(
       version: BackupVersion.current,
@@ -410,6 +414,18 @@ class BackupService {
         } catch (e) {
           // 如果恢复聚合搜索设置失败，记录错误但不影响整体恢复过程
           // 这样可以确保其他数据的恢复不受影响
+        }
+      }
+
+      // 恢复 Cookie Cloud 配置
+      if (migratedData['cookieCloudConfig'] != null) {
+        try {
+          final cookieCloudConfig = CookieCloudConfig.fromJson(
+            migratedData['cookieCloudConfig'] as Map<String, dynamic>
+          );
+          await _storageService.saveCookieCloudConfig(cookieCloudConfig);
+        } catch (_) {
+          // 容错处理：恢复失败时不影响整体流程
         }
       }
 

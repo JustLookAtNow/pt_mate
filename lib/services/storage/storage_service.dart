@@ -156,6 +156,30 @@ class CookieCloudConfig {
     lastSyncAt: lastSyncAt ?? this.lastSyncAt,
     lastSyncSummary: lastSyncSummary ?? this.lastSyncSummary,
   );
+
+  Map<String, dynamic> toJson() => {
+        'url': url,
+        'uuid': uuid,
+        'password': password,
+        'autoSyncEnabled': autoSyncEnabled,
+        'syncIntervalMinutes': syncIntervalMinutes,
+        'lastSyncAt': lastSyncAt?.toIso8601String(),
+        'lastSyncSummary': lastSyncSummary,
+      };
+
+  factory CookieCloudConfig.fromJson(Map<String, dynamic> json) {
+    final lastSyncAtRaw = json['lastSyncAt'] as String?;
+    return CookieCloudConfig(
+      url: json['url'] as String? ?? '',
+      uuid: json['uuid'] as String? ?? '',
+      password: json['password'] as String? ?? '',
+      autoSyncEnabled: json['autoSyncEnabled'] as bool? ?? false,
+      syncIntervalMinutes: json['syncIntervalMinutes'] as int? ?? 360,
+      lastSyncAt:
+          lastSyncAtRaw == null ? null : DateTime.tryParse(lastSyncAtRaw),
+      lastSyncSummary: json['lastSyncSummary'] as String? ?? '',
+    );
+  }
 }
 
 enum _SecureStorageAvailability { unknown, available, unavailable }

@@ -136,11 +136,32 @@ class BackupMigratorV110To120 implements BackupMigrator {
   }
 }
 
+/// 1.2.0 迁移到 1.3.0 - 新增 Cookie Cloud 同步设置备份支持
+class BackupMigratorV120To130 implements BackupMigrator {
+  @override
+  String get fromVersion => '1.2.0';
+
+  @override
+  String get toVersion => '1.3.0';
+
+  @override
+  Map<String, dynamic> migrate(Map<String, dynamic> backupData) {
+    final migratedData = Map<String, dynamic>.from(backupData);
+
+    // 更新版本号
+    migratedData['version'] = toVersion;
+
+    // 1.2.0 中不含 cookieCloudConfig，迁移时无需任何额外调整（支持向前兼容）
+    return migratedData;
+  }
+}
+
 /// 备份迁移管理器
 class BackupMigrationManager {
   static final List<BackupMigrator> _migrators = [
     BackupMigratorV100To110(),
     BackupMigratorV110To120(),
+    BackupMigratorV120To130(),
   ];
 
   /// 注册迁移器

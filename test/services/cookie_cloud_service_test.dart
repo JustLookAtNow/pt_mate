@@ -3,10 +3,13 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pt_mate/models/app_models.dart';
+import 'package:pt_mate/services/backup_service.dart';
 import 'package:pt_mate/services/network/cookie_cloud_service.dart';
 import 'package:pt_mate/services/site_config_service.dart';
 import 'package:pt_mate/services/storage/storage_service.dart';
+import 'package:pt_mate/utils/backup_migrators.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -21,6 +24,13 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    PackageInfo.setMockInitialValues(
+      appName: 'PT Mate',
+      packageName: 'com.github.justlookatnow.ptmate',
+      version: '1.3.0',
+      buildNumber: '1',
+      buildSignature: '',
+    );
     secureStorage.clear();
     SiteConfigService.clearAllCache();
     StorageService.instance.resetForTest();
@@ -198,6 +208,77 @@ void main() {
       expect(loaded.syncIntervalMinutes, 120);
     },
   );
+
+  test('BackupService should export and restore CookieCloudConfig', () async {
+    final storage = StorageService.instance;
+    await storage.saveCookieCloudConfig(
+      const CookieCloudConfig(
+        url: 'https://backup-test.cloud',
+        uuid: 'uuid-backup',
+        password: 'pass-backup',
+        autoSyncEnabled: true,
+        syncIntervalMinutes: 180,
+        lastSyncSummary: 'Success-backup',
+      ),
+    );
+
+    final backupService = BackupService(storage);
+    final backupData = await backupService.createBackup();
+
+    expect(backupData.version, '1.3.0');
+    expect(backupData.data.containsKey('cookieCloudConfig'), isTrue);
+
+    final exportedJson =
+        backupData.data['cookieCloudConfig'] as Map<String, dynamic>;
+    expect(exportedJson['url'], 'https://backup-test.cloud');
+    expect(exportedJson['uuid'], 'uuid-backup');
+    expect(exportedJson['password'], 'pass-backup');
+    expect(exportedJson['autoSyncEnabled'], isTrue);
+    expect(exportedJson['syncIntervalMinutes'], 180);
+    expect(exportedJson['lastSyncSummary'], 'Success-backup');
+
+    // 清空当前存储，用于测试恢复
+    storage.resetForTest();
+
+    final restoreResult = await backupService.restoreBackup(backupData);
+    expect(restoreResult.success, isTrue);
+
+    final restored = await storage.loadCookieCloudConfig();
+    expect(restored.url, 'https://backup-test.cloud');
+    expect(restored.uuid, 'uuid-backup');
+    expect(restored.password, 'pass-backup');
+    expect(restored.autoSyncEnabled, isTrue);
+    expect(restored.syncIntervalMinutes, 180);
+    expect(restored.lastSyncSummary, 'Success-backup');
+  });
+
+  test('BackupMigrationManager should migrate v1.2.0 to v1.3.0 gracefully',
+      () async {
+    final legacyBackup = {
+      'version': '1.2.0',
+      'timestamp': DateTime.now().toIso8601String(),
+      'appVersion': '1.0.0',
+      'data': {
+        'siteConfigs': [],
+        'activeSiteId': null,
+        'downloaderConfigs': [],
+        'defaultDownloaderId': null,
+        'downloaderPasswords': {},
+        'userPreferences': {},
+        'downloaderCategoriesCache': {},
+        'downloaderTagsCache': {},
+        'aggregateSearchSettings': {
+          'shortcutType': 'none',
+          'searchTimeout': 15,
+          'aggregateSearchConfigs': [],
+        },
+      },
+    };
+
+    final migrated = BackupMigrationManager.migrate(legacyBackup, '1.3.0');
+    expect(migrated['version'], '1.3.0');
+    expect(migrated['data']['cookieCloudConfig'], isNull); // 1.2.0 备份中不包含此字段，完美兼容
+  });
 }
 
 Map<String, String> _cookieMap(String cookie) {
