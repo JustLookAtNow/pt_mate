@@ -105,10 +105,13 @@ class TorrentListItem extends StatelessWidget {
     final hasDouban = _hasRatingValue(torrent.doubanRating);
     final hasImdb = _hasRatingValue(torrent.imdbRating);
     final hasAnyRating = hasDouban || hasImdb;
-    final double rightMinHeight = showCover
+    final effectiveShowCover = showCover && (suspendImageLoading != true);
+    final double rightMinHeight = effectiveShowCover
         ? (isMobile && hasAnyRating ? 130.0 : 100.0)
         : 70.0;
-    final double desktopSideHeight = showCover ? _desktopCoverHeight : 92.0;
+    final double desktopSideHeight = effectiveShowCover
+        ? _desktopCoverHeight
+        : 100.0;
 
     // 构建主要内容
     Widget mainContent = Container(
@@ -156,7 +159,7 @@ class TorrentListItem extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // 封面截图和创建时间（在 showCover 为 true 时显示）
-                          if (showCover && (suspendImageLoading != true))
+                          if (effectiveShowCover)
                             TorrentCover(
                               torrent: torrent,
                               currentSite: currentSite,
@@ -172,7 +175,7 @@ class TorrentListItem extends StatelessWidget {
                               isAggregateMode: isAggregateMode,
                               siteName: siteName,
                               isMobile: isMobile,
-                              showCover: showCover,
+                              showCover: effectiveShowCover,
                               hasDouban: hasDouban,
                               hasImdb: hasImdb,
                               hasAnyRating: hasAnyRating,
@@ -608,11 +611,24 @@ class TorrentInfo extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Tags, Pin and Site
-                if (torrent.isTop || torrent.tags.isNotEmpty)
+                // Tags, pin and ratings without cover.
+                if (torrent.isTop ||
+                    torrent.tags.isNotEmpty ||
+                    (!showCover && hasAnyRating))
                   Padding(
                     padding: const EdgeInsets.only(bottom: 2),
-                    child: _TagsView(tags: torrent.tags, isTop: torrent.isTop),
+                    child: _TagsRatingRow(
+                      tags: torrent.tags,
+                      isTop: torrent.isTop,
+                      ratingBadges: !showCover && hasAnyRating
+                          ? _RatingBadges(
+                              torrent: torrent,
+                              hasDouban: hasDouban,
+                              hasImdb: hasImdb,
+                              compact: isMobile,
+                            )
+                          : null,
+                    ),
                   ),
 
                 Tooltip(
@@ -792,6 +808,70 @@ class TorrentInfo extends StatelessWidget {
   }
 }
 
+class _RatingBadges extends StatelessWidget {
+  final TorrentItem torrent;
+  final bool hasDouban;
+  final bool hasImdb;
+  final bool compact;
+
+  const _RatingBadges({
+    required this.torrent,
+    required this.hasDouban,
+    required this.hasImdb,
+    this.compact = false,
+  });
+
+  Widget _buildBadge({
+    required String text,
+    required Color backgroundColor,
+    required Color foregroundColor,
+    BorderRadius? borderRadius,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 5 : 6,
+        vertical: compact ? 1 : 2,
+      ),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: borderRadius ?? BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: compact ? 9 : 10,
+          color: foregroundColor,
+          fontWeight: FontWeight.bold,
+          height: 1.1,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 4,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (hasImdb)
+          _buildBadge(
+            text: 'IMDB ${torrent.imdbRating}',
+            backgroundColor: const Color(0xFFF5C518),
+            foregroundColor: Colors.black,
+          ),
+        if (hasDouban)
+          _buildBadge(
+            text: '豆 ${torrent.doubanRating}',
+            backgroundColor: const Color(0xFF007711),
+            foregroundColor: Colors.white,
+          ),
+      ],
+    );
+  }
+}
+
 class TorrentCover extends StatelessWidget {
   final TorrentItem torrent;
   final SiteConfig? currentSite;
@@ -923,60 +1003,109 @@ class TorrentCover extends StatelessWidget {
             Positioned(
               left: 0,
               bottom: 0,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (hasImdb)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5C518),
-                        borderRadius: BorderRadius.only(
-                          topRight: const Radius.circular(6),
-                          bottomLeft: hasDouban
-                              ? Radius.zero
-                              : const Radius.circular(6),
-                        ),
-                      ),
-                      child: Text(
-                        'IMDB ${torrent.imdbRating}',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  if (hasDouban)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF007711),
-                        borderRadius: BorderRadius.only(
-                          topRight: Radius.circular(6),
-                          bottomLeft: Radius.circular(6),
-                        ),
-                      ),
-                      child: Text(
-                        '豆 ${torrent.doubanRating}',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                ],
+              child: _CoverRatingBadges(
+                torrent: torrent,
+                hasDouban: hasDouban,
+                hasImdb: hasImdb,
               ),
             ),
         ],
       ),
+    );
+  }
+}
+
+class _CoverRatingBadges extends StatelessWidget {
+  final TorrentItem torrent;
+  final bool hasDouban;
+  final bool hasImdb;
+
+  const _CoverRatingBadges({
+    required this.torrent,
+    required this.hasDouban,
+    required this.hasImdb,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (hasImdb)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5C518),
+              borderRadius: BorderRadius.only(
+                topRight: const Radius.circular(6),
+                bottomLeft: hasDouban ? Radius.zero : const Radius.circular(6),
+              ),
+            ),
+            child: Text(
+              'IMDB ${torrent.imdbRating}',
+              style: const TextStyle(
+                fontSize: 10,
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        if (hasDouban)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: const BoxDecoration(
+              color: Color(0xFF007711),
+              borderRadius: BorderRadius.only(
+                topRight: Radius.circular(6),
+                bottomLeft: Radius.circular(6),
+              ),
+            ),
+            child: Text(
+              '豆 ${torrent.doubanRating}',
+              style: const TextStyle(
+                fontSize: 10,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _TagsRatingRow extends StatelessWidget {
+  final List<TagType> tags;
+  final bool isTop;
+  final Widget? ratingBadges;
+
+  const _TagsRatingRow({
+    required this.tags,
+    this.isTop = false,
+    this.ratingBadges,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasTags = isTop || tags.isNotEmpty;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (hasTags)
+          Expanded(
+            child: _TagsView(tags: tags, isTop: isTop),
+          )
+        else
+          const Spacer(),
+        if (ratingBadges != null) ...[
+          if (hasTags) const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 160),
+            child: ratingBadges,
+          ),
+        ],
+      ],
     );
   }
 }

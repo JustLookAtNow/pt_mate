@@ -17,18 +17,23 @@ class FakeStorageService implements StorageService {
 void main() {
   Widget createWidgetUnderTest({
     required TorrentItem torrent,
+    bool? showCoverSetting,
+    bool? suspendImageLoading,
   }) {
     return MaterialApp(
       home: Scaffold(
         body: Center(
           child: SizedBox(
-            width: 800, // Increased width to avoid overflow during tests with long text
+            width:
+                800, // Increased width to avoid overflow during tests with long text
             child: Provider<StorageService>(
               create: (_) => FakeStorageService(),
               child: TorrentListItem(
                 torrent: torrent,
                 isSelected: false,
                 isSelectionMode: false,
+                showCoverSetting: showCoverSetting,
+                suspendImageLoading: suspendImageLoading,
               ),
             ),
           ),
@@ -37,7 +42,9 @@ void main() {
     );
   }
 
-  testWidgets('TorrentListItem correctly identifies valid ratings', (WidgetTester tester) async {
+  testWidgets('TorrentListItem correctly identifies valid ratings', (
+    WidgetTester tester,
+  ) async {
     // Torrent with valid ratings
     final torrent = TorrentItem(
       id: '1',
@@ -68,7 +75,9 @@ void main() {
     expect(find.text('IMDB 7.2'), findsOneWidget);
   });
 
-  testWidgets('TorrentListItem handles invalid or empty ratings', (WidgetTester tester) async {
+  testWidgets('TorrentListItem handles invalid or empty ratings', (
+    WidgetTester tester,
+  ) async {
     // Torrent with invalid ratings
     final torrent = TorrentItem(
       id: '2',
@@ -87,7 +96,7 @@ void main() {
       collection: false,
       isTop: false,
       doubanRating: 'N/A', // Invalid
-      imdbRating: '',      // Empty
+      imdbRating: '', // Empty
       tags: [],
     );
 
@@ -99,34 +108,104 @@ void main() {
     expect(find.text('IMDB'), findsNothing);
   });
 
-  testWidgets('TorrentListItem handles ratings with text', (WidgetTester tester) async {
-      // Torrent with mixed text ratings
-      final torrent = TorrentItem(
-        id: '3',
-        name: 'Test Torrent Mixed',
-        smallDescr: 'Test Description',
-        sizeBytes: 1024,
-        seeders: 10,
-        leechers: 5,
-        createdDate: DateTime.parse('2023-10-27T10:00:00Z'),
-        discountEndTime: null,
-        downloadUrl: '',
-        imageList: [],
-        cover: '',
-        downloadStatus: DownloadStatus.none,
-        discount: DiscountType.normal,
-        collection: false,
-        isTop: false,
-        doubanRating: 'Rating: 9.0',
-        imdbRating: '7.5/10',
-        tags: [],
-      );
+  testWidgets('TorrentListItem handles ratings with text', (
+    WidgetTester tester,
+  ) async {
+    // Torrent with mixed text ratings
+    final torrent = TorrentItem(
+      id: '3',
+      name: 'Test Torrent Mixed',
+      smallDescr: 'Test Description',
+      sizeBytes: 1024,
+      seeders: 10,
+      leechers: 5,
+      createdDate: DateTime.parse('2023-10-27T10:00:00Z'),
+      discountEndTime: null,
+      downloadUrl: '',
+      imageList: [],
+      cover: '',
+      downloadStatus: DownloadStatus.none,
+      discount: DiscountType.normal,
+      collection: false,
+      isTop: false,
+      doubanRating: 'Rating: 9.0',
+      imdbRating: '7.5/10',
+      tags: [],
+    );
 
-      await tester.pumpWidget(createWidgetUnderTest(torrent: torrent));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(createWidgetUnderTest(torrent: torrent));
+    await tester.pumpAndSettle();
 
-      // Verify parsed values are displayed
-      expect(find.text('豆 Rating: 9.0'), findsOneWidget);
-      expect(find.text('IMDB 7.5/10'), findsOneWidget);
-    });
+    // Verify parsed values are displayed
+    expect(find.text('豆 Rating: 9.0'), findsOneWidget);
+    expect(find.text('IMDB 7.5/10'), findsOneWidget);
+  });
+
+  testWidgets('TorrentListItem shows ratings when cover is disabled', (
+    WidgetTester tester,
+  ) async {
+    final torrent = TorrentItem(
+      id: '4',
+      name: 'Test Torrent No Cover',
+      smallDescr: 'Test Description',
+      sizeBytes: 1024,
+      seeders: 10,
+      leechers: 5,
+      createdDate: DateTime.parse('2023-10-27T10:00:00Z'),
+      discountEndTime: null,
+      downloadUrl: '',
+      imageList: [],
+      cover: 'https://example.com/cover.jpg',
+      downloadStatus: DownloadStatus.none,
+      discount: DiscountType.normal,
+      collection: false,
+      isTop: false,
+      doubanRating: '8.5',
+      imdbRating: '7.2',
+      tags: [],
+    );
+
+    await tester.pumpWidget(
+      createWidgetUnderTest(torrent: torrent, showCoverSetting: false),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('豆 8.5'), findsOneWidget);
+    expect(find.text('IMDB 7.2'), findsOneWidget);
+    expect(find.text('暂无'), findsNothing);
+  });
+
+  testWidgets('TorrentListItem shows ratings when cover loading is suspended', (
+    WidgetTester tester,
+  ) async {
+    final torrent = TorrentItem(
+      id: '5',
+      name: 'Test Torrent Suspended Cover',
+      smallDescr: 'Test Description',
+      sizeBytes: 1024,
+      seeders: 10,
+      leechers: 5,
+      createdDate: DateTime.parse('2023-10-27T10:00:00Z'),
+      discountEndTime: null,
+      downloadUrl: '',
+      imageList: [],
+      cover: 'https://example.com/cover.jpg',
+      downloadStatus: DownloadStatus.none,
+      discount: DiscountType.normal,
+      collection: false,
+      isTop: false,
+      doubanRating: '8.6',
+      imdbRating: '7.3',
+      tags: [],
+    );
+
+    await tester.pumpWidget(
+      createWidgetUnderTest(torrent: torrent, suspendImageLoading: true),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('豆 8.6'), findsOneWidget);
+    expect(find.text('IMDB 7.3'), findsOneWidget);
+    expect(find.text('暂无'), findsNothing);
+  });
 }
