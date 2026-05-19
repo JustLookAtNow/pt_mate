@@ -1101,6 +1101,18 @@ class _MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
               Locale('en', 'US'), // 英文
             ],
             locale: const Locale('zh', 'CN'), // 默认使用中文简体
+            builder: (context, child) {
+              final mediaQueryData = MediaQuery.of(context);
+              return MediaQuery(
+                data: mediaQueryData.copyWith(
+                  textScaler: mediaQueryData.textScaler.clamp(
+                    minScaleFactor: 0.8,
+                    maxScaleFactor: 1.25,
+                  ),
+                ),
+                child: child!,
+              );
+            },
             home: !appState.isInitialized
                 ? const Scaffold(
                     body: Center(child: CircularProgressIndicator()),

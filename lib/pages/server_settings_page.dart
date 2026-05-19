@@ -1011,11 +1011,22 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
 
   Widget _buildStatArrow(IconData icon, Color color, String text) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
         Icon(icon, color: color, size: 14),
         const SizedBox(width: 4),
-        Text(text, style: const TextStyle(fontSize: 13)),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 13),
+              maxLines: 1,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -1305,12 +1316,16 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                         ),
                                         const SizedBox(width: 4),
                                         Flexible(
-                                          child: Text(
-                                            '${Formatters.bonus(profile.bonus)}${profile.bonusPerHour != null ? ' (${profile.bonusPerHour!.toInt()})' : ''}',
-                                            style: const TextStyle(
-                                              fontSize: 13,
+                                          child: FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            alignment: Alignment.centerLeft,
+                                            child: Text(
+                                              '${Formatters.bonus(profile.bonus)}${profile.bonusPerHour != null ? ' (${profile.bonusPerHour!.toInt()})' : ''}',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                              ),
+                                              maxLines: 1,
                                             ),
-                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
                                       ],
@@ -1333,14 +1348,21 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                             ).colorScheme.onSurfaceVariant,
                                           ),
                                           const SizedBox(width: 4),
-                                          Text(
-                                            profile.shareRate.toStringAsFixed(
-                                              2,
-                                            ),
-                                            style: const TextStyle(
-                                              color: Color(0xFF009688),
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
+                                          Flexible(
+                                            child: FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              alignment: Alignment.centerLeft,
+                                              child: Text(
+                                                profile.shareRate.toStringAsFixed(
+                                                  2,
+                                                ),
+                                                style: const TextStyle(
+                                                  color: Color(0xFF009688),
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14,
+                                                ),
+                                                maxLines: 1,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -1428,12 +1450,16 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                           ),
                                           const SizedBox(width: 4),
                                           Flexible(
-                                            child: Text(
-                                              '${Formatters.bonus(profile.bonus)}${profile.bonusPerHour != null ? ' (${profile.bonusPerHour!.toInt()})' : ''}',
-                                              style: const TextStyle(
-                                                fontSize: 13,
+                                            child: FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              alignment: Alignment.centerLeft,
+                                              child: Text(
+                                                '${Formatters.bonus(profile.bonus)}${profile.bonusPerHour != null ? ' (${profile.bonusPerHour!.toInt()})' : ''}',
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                ),
+                                                maxLines: 1,
                                               ),
-                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
                                         ],
@@ -1460,14 +1486,21 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                             ).colorScheme.onSurfaceVariant,
                                           ),
                                           const SizedBox(width: 4),
-                                          Text(
-                                            profile.shareRate.toStringAsFixed(
-                                              2,
-                                            ),
-                                            style: const TextStyle(
-                                              color: Color(0xFF009688),
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
+                                          Flexible(
+                                            child: FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              alignment: Alignment.centerLeft,
+                                              child: Text(
+                                                profile.shareRate.toStringAsFixed(
+                                                  2,
+                                                ),
+                                                style: const TextStyle(
+                                                  color: Color(0xFF009688),
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14,
+                                                ),
+                                                maxLines: 1,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -1490,19 +1523,30 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
       ),
     );
 
+    // 使用 MediaQuery 限制局部最大字体缩放因子为 1.15，防止在系统字体特别大时卡片挤压溢出
+    final clampedCard = MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        textScaler: MediaQuery.of(context).textScaler.clamp(
+          minScaleFactor: 0.8,
+          maxScaleFactor: 1.15,
+        ),
+      ),
+      child: card,
+    );
+
     // On mobile we already added the menu, so no need for SwipeableSiteItem anymore.
     // But we might want to keep it if we still want swipe actions.
     // Since the new design adds a 3-dots menu button inside the card, we probably don't need the swipe.
-    // However, I'll keep the Swipeable wrapping just in case they like both, but let's just return `card`.
+    // However, I'll keep the Swipeable wrapping just in case they like both, but let's just return `clampedCard`.
     if (!isLarge) {
       return _SwipeableSiteItem(
         actions: _buildSwipeActions(context, site, isActive),
         onTap: isActive ? null : () => _setActiveSite(site.id),
         onLongPress: null,
-        child: card,
+        child: clampedCard,
       );
     }
-    return card;
+    return clampedCard;
   }
 
   Widget _buildTopBar() {
