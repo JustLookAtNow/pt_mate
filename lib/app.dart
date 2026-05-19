@@ -12,6 +12,7 @@ import 'models/app_models.dart';
 import 'models/batch_operation_models.dart';
 import 'pages/torrent_detail_page.dart';
 import 'services/api/api_service.dart';
+import 'services/settings/display_settings_manager.dart';
 import 'services/storage/storage_service.dart';
 import 'services/theme/theme_manager.dart';
 import 'services/backup_service.dart';
@@ -1079,6 +1080,9 @@ class _MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
           create: (_) =>
               ThemeManager(StorageService.instance)..initializeDynamicColor(),
         ),
+        ChangeNotifierProvider(
+          create: (_) => DisplaySettingsManager(StorageService.instance),
+        ),
         ChangeNotifierProvider(create: (_) => AggregateSearchProvider()),
         Provider<StorageService>(create: (_) => StorageService.instance),
       ],
@@ -1229,9 +1233,6 @@ class _HomePageState extends State<HomePage> {
   double _headerProgress = 1.0; // 0.0=隐藏, 1.0=完全显示
   double _lastScrollOffset = 0.0; // 上次滚动位置
   static const double _maxHideDistance = 200.0; // 累计滚动200px完全隐藏/显示
-
-  // 封面图片显示设置（用户偏好）
-  bool _showCoverSetting = true; // 默认自动显示
 
   // 切换站点 FAB 按钮的显示状态（向上滑动隐藏，向下滑动显示）
   bool _fabVisible = true;
@@ -1446,11 +1447,6 @@ class _HomePageState extends State<HomePage> {
           .map((data) => DownloaderConfig.fromJson(data))
           .toList();
       if (mounted) setState(() => _downloaderConfigs = downloaderConfigs);
-
-      // 加载封面图片显示设置
-      final showCoverSetting = await StorageService.instance
-          .loadShowCoverImages();
-      if (mounted) setState(() => _showCoverSetting = showCoverSetting);
     } catch (e) {
       if (e.toString().contains('CookieExpiredException')) {
         _showCookieExpiredDialog();
@@ -2422,6 +2418,10 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final showCoverSetting = context.select<DisplaySettingsManager, bool>(
+      (settings) => settings.showCoverImages,
+    );
+
     return Consumer<AppState>(
       builder: (context, appState, child) {
         // 当AppState变化时，检查是否需要重新初始化
@@ -2778,7 +2778,7 @@ class _HomePageState extends State<HomePage> {
                                         isSelected: isSelected,
                                         isSelectionMode: _isSelectionMode,
                                         currentSite: _currentSite,
-                                        showCoverSetting: _showCoverSetting,
+                                        showCoverSetting: showCoverSetting,
                                         batchOperationType:
                                             _batchProgress?.actionType,
                                         batchItemState: _batchItemStateFor(

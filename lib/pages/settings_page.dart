@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import '../services/storage/storage_service.dart';
 import '../models/app_models.dart';
+import '../services/settings/display_settings_manager.dart';
 import '../services/theme/theme_manager.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/responsive_layout.dart';
@@ -1023,57 +1024,33 @@ class _AutoLoadImagesTileState extends State<_AutoLoadImagesTile> {
   }
 }
 
-class _ShowCoverImagesTile extends StatefulWidget {
-  @override
-  State<_ShowCoverImagesTile> createState() => _ShowCoverImagesTileState();
-}
-
-class _ShowCoverImagesTileState extends State<_ShowCoverImagesTile> {
-  bool _showCover = true;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSetting();
-  }
-
-  Future<void> _loadSetting() async {
-    try {
-      final storage = Provider.of<StorageService>(context, listen: false);
-      final showCover = await storage.loadShowCoverImages();
-      if (mounted) {
-        setState(() {
-          _showCover = showCover;
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
-    }
-  }
-
-  Future<void> _saveSetting(bool value) async {
-    try {
-      final storage = Provider.of<StorageService>(context, listen: false);
-      await storage.saveShowCoverImages(value);
-      if (mounted) {
-        setState(() => _showCover = value);
-      }
-    } catch (e) {
-      // 保存失败时恢复原值
-      if (mounted) {
-        setState(() => _showCover = !value);
-      }
-    }
-  }
-
+class _ShowCoverImagesTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const ListTile(
+    return Consumer<DisplaySettingsManager>(
+      builder: (context, displaySettings, child) {
+        if (displaySettings.isLoading) {
+          return child!;
+        }
+
+        final showCover = displaySettings.showCoverImages;
+        return SwitchListTile(
+          secondary: const Icon(Icons.photo_library),
+          title: const Text('封面图片'),
+          subtitle: Text(showCover ? '根据站点配置显示' : '不显示封面'),
+          value: showCover,
+          onChanged: (value) async {
+            try {
+              await displaySettings.setShowCoverImages(value);
+            } catch (e) {
+              if (context.mounted) {
+                NotificationHelper.showError(context, '保存封面图片设置失败: $e');
+              }
+            }
+          },
+        );
+      },
+      child: const ListTile(
         leading: Icon(Icons.photo_library),
         title: Text('封面图片'),
         trailing: SizedBox(
@@ -1081,15 +1058,7 @@ class _ShowCoverImagesTileState extends State<_ShowCoverImagesTile> {
           height: 20,
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
-      );
-    }
-
-    return SwitchListTile(
-      secondary: const Icon(Icons.photo_library),
-      title: const Text('封面图片'),
-      subtitle: Text(_showCover ? '根据站点配置显示' : '不显示封面'),
-      value: _showCover,
-      onChanged: _saveSetting,
+      ),
     );
   }
 }

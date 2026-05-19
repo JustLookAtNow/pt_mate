@@ -8,6 +8,7 @@ import '../models/app_models.dart';
 import '../models/batch_operation_models.dart';
 import '../services/storage/storage_service.dart';
 import '../services/api/api_service.dart';
+import '../services/settings/display_settings_manager.dart';
 import '../services/aggregate_search_service.dart';
 import '../services/downloader/downloader_config.dart';
 import '../services/downloader/downloader_service.dart';
@@ -59,9 +60,6 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   double _headerProgress = 1.0; // 1.0=完全显示, 0.0=完全隐藏
   double _lastScrollOffset = 0.0;
   final double _maxHideDistance = 200.0; // 滚动多少距离完全隐藏
-
-  // 封面图片显示设置（用户偏好）
-  bool _showCoverSetting = true; // 默认自动显示
 
   BatchProgressState<AggregateSearchResultItem>? _batchProgress;
   final Map<String, BatchItemState> _batchItemStates =
@@ -167,12 +165,6 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         );
         provider.setLoading(false);
         provider.initializeDefaultStrategy();
-
-        // 加载封面图片显示设置
-        final showCoverSetting = await storage.loadShowCoverImages();
-        if (mounted) {
-          setState(() => _showCoverSetting = showCoverSetting);
-        }
       }
     } catch (e) {
       if (mounted) {
@@ -184,6 +176,10 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    final showCoverSetting = context.select<DisplaySettingsManager, bool>(
+      (settings) => settings.showCoverImages,
+    );
+
     return Consumer<AggregateSearchProvider>(
       builder: (context, provider, child) {
         // 同步搜索框内容
@@ -872,7 +868,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                                   isAggregateMode: true,
                                                   siteName: item.siteName,
                                                   showCoverSetting:
-                                                      _showCoverSetting,
+                                                      showCoverSetting,
                                                   batchOperationType:
                                                       _batchProgress
                                                           ?.actionType,
