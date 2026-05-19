@@ -13,6 +13,7 @@ A Flutter-based private tracker client built with Material Design 3. PT Mate sup
 - Downloader integration (`qBittorrent` / `Transmission`)
 - Local relay download support
 - Backup and restore, including WebDAV
+- Cookie Cloud synchronization and batch configuration
 
 ## Supported Site Types
 
@@ -41,6 +42,37 @@ The following list is based on `assets/sites/*.json` (37 total):
   <img src="screenshots/2.jpg" width="300" alt="Screenshot 2">
   <img src="screenshots/3.jpg" width="300" alt="Screenshot 3">
 </p>
+
+## Cookie Cloud Sync & Critical Security Warning
+
+PT Mate now supports **Cookie Cloud** integration, allowing you to synchronize logged-in PT site cookies from your desktop browser to PT Mate on your mobile device. This avoids tedious manual cookie copying and supports batch site import/update based on site presets.
+
+> [!CAUTION]
+> ### ⚠️ CRITICAL SECURITY & ACCOUNT BAN WARNING (PLEASE READ CAREFULLY!)
+>
+> Cookies are your unique **identity credentials** on PT sites. Leaking them gives absolute control over your accounts to others. Before enabling this feature, you must fully understand and accept the following severe risks:
+>
+> 1. **NEVER Use Untrusted Public Cookie Cloud Servers**
+>    - Server operators or attackers can easily intercept your cookies through server logs or vault database vulnerabilities.
+>    - **Highly Recommended**: ONLY use a private, self-hosted Cookie Cloud server instance (e.g., deployed via Docker on your own NAS, VPS, or private network).
+> 2. **Severe Account Ban Risks (Multi-IP & Session Hijacking Detection)**
+>    - Many Private Tracker (PT) sites enforce extremely strict security rules against simultaneous access from multiple IPs or rapid geographical relocation (e.g., cellular data vs. home broadband).
+>    - If PT Mate makes requests using synced cookies over mobile networks (4G/5G/LTE) while your desktop browser is still active on home broadband, the site's security monitors might flag this as **"account sharing" or "session hijacking," resulting in an immediate and permanent account ban**.
+>    - **Recommendation**: Exercise extreme caution when using PT Mate on cellular/public networks. Disable auto-sync or refresh for highly sensitive sites when not connected to your home network, or configure appropriate proxies.
+> 3. **Encryption is Not Invulnerable**
+>    - Although Cookie Cloud uses client-side encryption (AES via key derivation from UUID and password), weak UUIDs or short passwords can still be brute-forced. Always use strong, complex sync credentials.
+> 4. **Exceeded Scope Risk (Not Limited to PT Sites)**
+>    - By default, browser Cookie Cloud extensions will **synchronize all website cookies in your browser** (including your emails, banking, shopping, and social media sites).
+>    - **Security Recommendation**: Configure domain whitelist/blacklist rules in your browser extension to restrict sync strictly to PT sites, avoiding leakage of non-PT high-value sessions.
+> 5. **Operating System Constraints & Plaintext Storage Risk**
+>    - While the application utilizes platform secure storage pipelines (Keychain/KeyStore), on certain Linux distributions or environments lacking a proper keyring service, the app may fall back to **storing Cookie Cloud credentials in plaintext** within configuration files.
+> 6. **Backup Exports & WebDAV Sync Exposures**
+>    - The exported backup files and the cloud-synced WebDAV backup payloads **contain the full, unencrypted Cookie Cloud configuration**.
+>    - **Security Recommendation**: Store exported backup JSON files securely. Ensure your WebDAV connection **strictly uses the HTTPS protocol** (never HTTP) to prevent man-in-the-middle sniffing of backup data.
+> 7. **Runtime Memory Snooping Risk**
+>    - At runtime, the application necessarily holds plaintext cookies and credentials in system memory. If your device is compromised by malware, spyware, or processes with root/jailbreak privileges, they could potentially read this sensitive information directly from process memory.
+>
+> **By enabling this feature, you acknowledge that you fully understand and assume all risks including, but not limited to, account bans, session termination, or data leaks resulting from cookie synchronization.**
 
 ## Quick Start
 
