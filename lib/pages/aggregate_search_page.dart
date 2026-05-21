@@ -24,6 +24,7 @@ import '../widgets/torrent_download_dialog.dart';
 import '../widgets/tag_filter_bar.dart';
 import 'torrent_detail_page.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
+import '../utils/url_launcher_helper.dart';
 
 class AggregateSearchPage extends StatefulWidget {
   const AggregateSearchPage({super.key});
@@ -1254,11 +1255,12 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   }
 
   Future<void> _showDownloadDialog(AggregateSearchResultItem item) async {
+    SiteConfig? siteConfig;
     try {
       // 1. 获取种子所属站点的配置
       final storage = Provider.of<StorageService>(context, listen: false);
       final allSites = await storage.loadSiteConfigs();
-      final siteConfig = allSites.firstWhere(
+      siteConfig = allSites.firstWhere(
         (site) => site.id == item.siteId,
         orElse: () => throw Exception('找不到站点配置: ${item.siteId}'),
       );
@@ -1277,7 +1279,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         builder: (_) => TorrentDownloadDialog(
           torrentName: item.torrent.name,
           downloadUrl: url,
-          isGazelleSite: siteConfig.siteType == SiteType.gazelle,
+          isGazelleSite: siteConfig!.siteType == SiteType.gazelle,
         ),
       );
 
@@ -1313,7 +1315,46 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       );
     } catch (e) {
       if (mounted) {
-        NotificationHelper.showError(context, '下载失败: $e');
+        if (e.toString().contains('NEED_PURCHASE')) {
+          showDialog(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('需要购买'),
+              content: const Text('该种子为付费种子且您尚未购买，请先前往网页端购买后再下载。'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  style: TextButton.styleFrom(
+                    side: BorderSide(
+                      color: Theme.of(dialogContext).colorScheme.outline,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: const Text('取消'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(dialogContext);
+                    String purchaseUrl = 'https://rousi.pro/torrent/${item.torrent.id}';
+                    if (siteConfig != null) {
+                      var base = siteConfig.baseUrl;
+                      if (!base.endsWith('/')) {
+                        base = '$base/';
+                      }
+                      purchaseUrl = '${base}torrent/${item.torrent.id}';
+                    }
+                    if (mounted) {
+                      await UrlLauncherHelper.launchBrowser(context, purchaseUrl);
+                    }
+                  },
+                  child: const Text('前往购买'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          NotificationHelper.showError(context, '下载失败: $e');
+        }
       }
     }
   }

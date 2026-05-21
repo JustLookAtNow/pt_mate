@@ -38,6 +38,7 @@ import 'services/update_service.dart';
 import 'widgets/update_notification_dialog.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
 import 'utils/screen_utils.dart';
+import 'utils/url_launcher_helper.dart';
 
 // 全局日志实例，供本文件内多个类使用
 final Logger _logger = Logger();
@@ -2152,7 +2153,46 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       if (mounted) {
-        NotificationHelper.showError(context, '下载失败：$e');
+        if (e.toString().contains('NEED_PURCHASE')) {
+          showDialog(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('需要购买'),
+              content: const Text('该种子为付费种子且您尚未购买，请先前往网页端购买后再下载。'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  style: TextButton.styleFrom(
+                    side: BorderSide(
+                      color: Theme.of(dialogContext).colorScheme.outline,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: const Text('取消'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(dialogContext);
+                    String purchaseUrl = 'https://rousi.pro/torrent/${item.id}';
+                    if (_currentSite != null) {
+                      var base = _currentSite!.baseUrl;
+                      if (!base.endsWith('/')) {
+                        base = '$base/';
+                      }
+                      purchaseUrl = '${base}torrent/${item.id}';
+                    }
+                    if (mounted) {
+                      await UrlLauncherHelper.launchBrowser(context, purchaseUrl);
+                    }
+                  },
+                  child: const Text('前往购买'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          NotificationHelper.showError(context, '下载失败：$e');
+        }
       }
     }
   }

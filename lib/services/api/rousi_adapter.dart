@@ -369,9 +369,36 @@ class RousiAdapter implements SiteAdapter {
         if (dUrl != null && dUrl is String && dUrl.isNotEmpty) {
           return dUrl;
         }
+
+        // 判断是否是付费种子且未购买 (极致强壮的兜底判定)
+        final rawIsPurchased = data['data']['is_purchased'];
+        final rawPrice = data['data']['price'];
+        
+        bool isPurchased = true;
+        if (rawIsPurchased is bool) {
+          isPurchased = rawIsPurchased;
+        } else if (rawIsPurchased is String) {
+          isPurchased = rawIsPurchased.toLowerCase() == 'true';
+        }
+        
+        double price = 0;
+        if (rawPrice is num) {
+          price = rawPrice.toDouble();
+        } else if (rawPrice is String) {
+          price = double.tryParse(rawPrice) ?? 0;
+        }
+
+        // 如果获取到的 download_url 确实为空，且价格大于0或者被明确标识为未购买
+        if ((dUrl == null || dUrl.toString().isEmpty) && 
+            (price > 0 || isPurchased == false || rawIsPurchased == 'false')) {
+          throw SiteApiException(message: 'NEED_PURCHASE', responseData: data);
+        }
       }
       throw SiteApiException(message: '无法获取下载链接', responseData: data);
     } catch (e) {
+      if (e is SiteApiException && e.message == 'NEED_PURCHASE') {
+        rethrow;
+      }
       throw ApiExceptionAdapter.wrapError(e, '生成下载链接');
     }
   }

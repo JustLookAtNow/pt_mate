@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:ui';
-import 'dart:io';
 import 'package:html/dom.dart' as dom;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -9,7 +8,7 @@ import 'package:flutter_bbcode/flutter_bbcode.dart';
 import 'package:bbob_dart/bbob_dart.dart' as bbob;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../utils/url_launcher_helper.dart';
 import '../services/api/api_service.dart';
 import '../services/storage/storage_service.dart';
 import '../models/app_models.dart';
@@ -770,7 +769,46 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         // 添加短暂延迟，确保对话框完全关闭后再显示SnackBar
         await Future.delayed(const Duration(milliseconds: 100));
         if (mounted) {
-          NotificationHelper.showError(context, '下载失败：$e');
+          if (e.toString().contains('NEED_PURCHASE')) {
+            showDialog(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                title: const Text('需要购买'),
+                content: const Text('该种子为付费种子且您尚未购买，请先前往网页端购买后再下载。'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    style: TextButton.styleFrom(
+                      side: BorderSide(
+                        color: Theme.of(dialogContext).colorScheme.outline,
+                        width: 1.0,
+                      ),
+                    ),
+                    child: const Text('取消'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      Navigator.pop(dialogContext);
+                      String purchaseUrl = 'https://rousi.pro/torrent/${widget.torrentItem.id}';
+                      if (widget.siteConfig != null) {
+                        var base = widget.siteConfig!.baseUrl;
+                        if (!base.endsWith('/')) {
+                          base = '$base/';
+                        }
+                        purchaseUrl = '${base}torrent/${widget.torrentItem.id}';
+                      }
+                    if (mounted) {
+                      await UrlLauncherHelper.launchBrowser(context, purchaseUrl);
+                    }
+                    },
+                    child: const Text('前往购买'),
+                  ),
+                ],
+              ),
+            );
+          } else {
+            NotificationHelper.showError(context, '下载失败：$e');
+          }
         }
       }
     }
@@ -1763,7 +1801,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       html,
       customWidgetBuilder: _buildHtmlImage,
       onTapUrl: (url) {
-        launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        UrlLauncherHelper.launchBrowser(context, url);
         return true;
       },
       customStylesBuilder: (element) {
@@ -1811,105 +1849,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
               const SizedBox(height: 24),
               FilledButton.icon(
                 onPressed: () async {
-                  try {
-                    final uri = Uri.parse(webviewUrl);
-                    // 在Linux和Windows平台上，canLaunchUrl可能返回false即使系统可以打开URL
-                    // 所以在这些平台上直接尝试启动，其他平台保持原有逻辑
-                    if (defaultTargetPlatform == TargetPlatform.linux ||
-                        defaultTargetPlatform == TargetPlatform.windows) {
-                      final platformName =
-                          defaultTargetPlatform == TargetPlatform.linux
-                          ? 'Linux'
-                          : 'Windows';
-                      debugPrint('$platformName平台：尝试启动URL: $webviewUrl');
-                      debugPrint('使用模式: LaunchMode.externalApplication');
-
-                      try {
-                        // 首先尝试使用 url_launcher
-                        await launchUrl(
-                          uri,
-                          mode: LaunchMode.externalApplication,
-                        );
-                        debugPrint('$platformName平台：url_launcher 启动命令已执行');
-
-                        // 对于 Linux，提供 xdg-open 备选方案
-                        if (defaultTargetPlatform == TargetPlatform.linux) {
-                          // 等待一小段时间，然后尝试备选方案
-                          await Future.delayed(
-                            const Duration(milliseconds: 500),
-                          );
-
-                          // 如果 url_launcher 没有效果，尝试直接调用 xdg-open
-                          debugPrint('Linux平台：尝试备选方案 - 直接调用 xdg-open');
-                          final result = await Process.run('xdg-open', [
-                            webviewUrl,
-                          ]);
-                          debugPrint(
-                            'Linux平台：xdg-open 退出码: ${result.exitCode}',
-                          );
-                          if (result.exitCode != 0) {
-                            debugPrint(
-                              'Linux平台：xdg-open 错误输出: ${result.stderr}',
-                            );
-                          } else {
-                            debugPrint('Linux平台：xdg-open 执行成功');
-                          }
-                        } else if (defaultTargetPlatform ==
-                            TargetPlatform.windows) {
-                          // Windows 平台通常 url_launcher 就足够了，但如果需要可以添加 start 命令备选方案
-                          debugPrint('Windows平台：url_launcher 应该已经处理了URL启动');
-                        }
-                      } catch (processError) {
-                        debugPrint(
-                          '$platformName平台：Process.run 失败: $processError',
-                        );
-                        // 如果 Process.run 也失败，抛出原始错误
-                        rethrow;
-                      }
-                    } else {
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(
-                          uri,
-                          mode: LaunchMode.externalApplication,
-                        );
-                      } else {
-                        if (mounted) {
-                          // 添加短暂延迟，确保UI稳定后再显示SnackBar
-                          await Future.delayed(
-                            const Duration(milliseconds: 50),
-                          );
-                          if (mounted) {
-                            NotificationHelper.showError(
-                              context,
-                              '无法打开链接: $webviewUrl',
-                            );
-                          }
-                        }
-                      }
-                    }
-                  } catch (e) {
-                    debugPrint('URL启动失败: $e');
-                    if (mounted) {
-                      String errorMessage = '打开链接失败: $e';
-                      if (defaultTargetPlatform == TargetPlatform.linux) {
-                        errorMessage +=
-                            '\n\n建议检查：\n1. 默认浏览器设置\n2. Desktop文件是否存在\n3. 运行: xdg-open $webviewUrl';
-                      } else if (defaultTargetPlatform ==
-                          TargetPlatform.windows) {
-                        errorMessage +=
-                            '\n\n建议检查：\n1. 默认浏览器设置\n2. 浏览器是否正确安装\n3. 运行: start $webviewUrl';
-                      }
-                      // 添加短暂延迟，确保UI稳定后再显示SnackBar
-                      await Future.delayed(const Duration(milliseconds: 50));
-                      if (mounted) {
-                        NotificationHelper.showError(
-                          context,
-                          errorMessage,
-                          duration: const Duration(seconds: 8),
-                        );
-                      }
-                    }
-                  }
+                  await UrlLauncherHelper.launchBrowser(context, webviewUrl);
                 },
                 icon: const Icon(Icons.launch),
                 label: const Text('在浏览器中打开'),
