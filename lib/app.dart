@@ -2543,7 +2543,20 @@ class _HomePageState extends State<HomePage> {
             currentRoute: '/',
             onSettingsChanged: _reloadCategories,
             appBar: AppBar(
-              title: GestureDetector(
+              titleSpacing: 0, // 调小网站图标跟汉堡菜单之间的间隙
+              leadingWidth: 40.0, // 缩减 leading 宽度
+              leading: Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu),
+                  padding: EdgeInsets.zero, // 消除默认 padding
+                  constraints: const BoxConstraints(), // 消除额外物理边界约束
+                  onPressed: () {
+                    Scaffold.of(context).openDrawer();
+                  },
+                ),
+              ),
+              title: InkWell(
+                borderRadius: BorderRadius.circular(8),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -2551,28 +2564,36 @@ class _HomePageState extends State<HomePage> {
                     ),
                   );
                 },
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_currentSite != null) ...[
-                      _buildAppBarLogo(_currentSite!),
-                      const SizedBox(width: 8),
-                    ],
-                    Flexible(
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(text: appState.site?.name ?? 'PT Mate'),
-                            TextSpan(
-                              text: ' - PT Mate',
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ],
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                    left: 4.0,
+                    right: 8.0,
+                    top: 4.0,
+                    bottom: 4.0,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_currentSite != null) ...[
+                        _buildAppBarLogo(_currentSite!),
+                        const SizedBox(width: 8),
+                      ],
+                      Flexible(
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: appState.site?.name ?? 'PT Mate'),
+                              TextSpan(
+                                text: ' - PT Mate',
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ],
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               actions: const [QbSpeedIndicator()],
