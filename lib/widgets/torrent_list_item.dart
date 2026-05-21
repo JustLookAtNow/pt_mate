@@ -14,8 +14,8 @@ final RegExp _ratingRegExp = RegExp(r'([0-9]+(?:\.[0-9]+)?)');
 
 const double _mobileCoverWidth = 80;
 const double _mobileCoverHeight = 115;
-const double _desktopCoverWidth = 67;
-const double _desktopCoverHeight = 96;
+const double _desktopCoverWidth = 56;
+const double _desktopCoverHeight = 80;
 
 bool _hasRatingValue(String? r) {
   if (r == null) return false;
@@ -649,7 +649,7 @@ class TorrentInfo extends StatelessWidget {
                 // Subtitle
                 Text(
                   torrent.smallDescr,
-                  maxLines: 3,
+                  maxLines: isMobile ? 3 : 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
@@ -676,9 +676,7 @@ class TorrentInfo extends StatelessWidget {
           SizedBox(width: isMobile ? 4 : 20),
           // 右侧数据列
           SizedBox(
-            width: isMobile
-                ? 55
-                : 100, // Fixed width for right column for alignment
+            width: isMobile ? 55 : 160,
             child: SizedBox(
               height: rightColumnHeight > 0 ? rightColumnHeight : null,
               child: Column(
@@ -710,7 +708,7 @@ class TorrentInfo extends StatelessWidget {
                             torrent.discount,
                             torrent.discountEndTime,
                           ),
-                          textAlign: TextAlign.right,
+                          textAlign: isMobile ? TextAlign.right : TextAlign.left,
                           style: TextStyle(
                             color: _discountColor(torrent.discount),
                             fontSize: 8,
@@ -719,84 +717,182 @@ class TorrentInfo extends StatelessWidget {
                         ),
                       ),
                     ),
-                  // seeders
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.arrow_upward,
-                        color: Colors.green,
-                        size: 12,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        '${torrent.seeders}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  if (!isMobile)
+                    // 大屏（桌面端）双列布局
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 左列：上传数和下载数
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // seeders
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.arrow_upward,
+                                  color: Colors.green,
+                                  size: 12,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${torrent.seeders}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            // leechers
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.arrow_downward,
+                                  color: Colors.red,
+                                  size: 12,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${torrent.leechers}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: smallGap),
-                  // leechers
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.arrow_downward,
-                        color: Colors.red,
-                        size: 12,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        '${torrent.leechers}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        const SizedBox(width: 16),
+                        // 右列：大小和评论数（含历史状态）
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // size
+                              Text(
+                                Formatters.dataFromBytes(torrent.sizeBytes),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              // comments & history status
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (currentSite?.siteType == SiteType.mteam ||
+                                      currentSite?.siteType == SiteType.nexusphp) ...[
+                                    Icon(
+                                      Icons.chat,
+                                      size: 10,
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      '${torrent.comments}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    if (currentSite?.features.supportHistory ?? true) const SizedBox(width: 6),
+                                  ],
+                                  if (currentSite?.features.supportHistory ?? true)
+                                    _buildDownloadStatusIcon(torrent.downloadStatus),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: compactGap),
-                  // size
-                  Text(
-                    Formatters.dataFromBytes(torrent.sizeBytes),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  SizedBox(height: compactGap),
-                  // comments
-                  if (currentSite?.siteType == SiteType.mteam ||
-                      currentSite?.siteType == SiteType.nexusphp)
+                      ],
+                    )
+                  else ...[
+                    // 移动端单列布局 (保持原样)
+                    // seeders
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.chat,
-                          size: 10,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        const Icon(
+                          Icons.arrow_upward,
+                          color: Colors.green,
+                          size: 12,
                         ),
                         const SizedBox(width: 2),
                         Text(
-                          '${torrent.comments}',
+                          '${torrent.seeders}',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
                     ),
-                  // history download status
-                  if (currentSite?.features.supportHistory ?? true)
-                    Padding(
-                      padding: EdgeInsets.only(top: smallGap),
-                      child: _buildDownloadStatusIcon(torrent.downloadStatus),
+                    SizedBox(height: smallGap),
+                    // leechers
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.arrow_downward,
+                          color: Colors.red,
+                          size: 12,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${torrent.leechers}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
+                    SizedBox(height: compactGap),
+                    // size
+                    Text(
+                      Formatters.dataFromBytes(torrent.sizeBytes),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    SizedBox(height: compactGap),
+                    // comments
+                    if (currentSite?.siteType == SiteType.mteam ||
+                        currentSite?.siteType == SiteType.nexusphp)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.chat,
+                            size: 10,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${torrent.comments}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    // history download status
+                    if (currentSite?.features.supportHistory ?? true)
+                      Padding(
+                        padding: EdgeInsets.only(top: smallGap),
+                        child: _buildDownloadStatusIcon(torrent.downloadStatus),
+                      ),
+                  ],
                 ],
               ),
             ),
