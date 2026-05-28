@@ -441,6 +441,7 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
   bool _isGridView = true;
   Map<String, HealthStatus> _healthStatuses = {};
   late ScrollController _scrollController;
+  final Map<String, GlobalKey> _siteItemKeys = {};
 
   final Map<String, String> _logoPathCache = {};
   final Map<String, Future<String>> _logoPathFutureCache = {};
@@ -492,13 +493,52 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
     _loadHealthStatuses();
 
     // 在首帧渲染后滚动到当前选中的站点
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToActiveSite();
-    });
+    _scheduleScrollToActiveSite();
+  }
+
+  void _scheduleScrollToActiveSite() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToActiveSite());
+  }
+
+  GlobalKey _itemKeyForSite(String siteId) {
+    return _siteItemKeys.putIfAbsent(
+      siteId,
+      () => GlobalKey(debugLabel: 'site-item-$siteId'),
+    );
+  }
+
+  double _alignmentForItem(BuildContext itemContext) {
+    final itemBox = itemContext.findRenderObject() as RenderBox?;
+    final itemHeight = itemBox?.size.height ?? 0.0;
+    final viewportHeight = _scrollController.hasClients
+        ? _scrollController.position.viewportDimension
+        : 0.0;
+
+    if (viewportHeight <= 0 || itemHeight <= 0 || itemHeight >= viewportHeight) {
+      return _isGridView ? 0.12 : 0.06;
+    }
+
+    final desiredTopInset = _isGridView
+        ? viewportHeight * 0.16
+        : viewportHeight * 0.08;
+    final travelRange = viewportHeight - itemHeight;
+    return (desiredTopInset / travelRange).clamp(0.0, 1.0);
+  }
+
+  void _ensureActiveSiteVisible(BuildContext itemContext) {
+    Scrollable.ensureVisible(
+      itemContext,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      alignment: _alignmentForItem(itemContext),
+      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+    );
   }
 
   void _scrollToActiveSite() {
-    if (!mounted || _selectedSiteId.isEmpty) return;
+    if (!mounted || _selectedSiteId.isEmpty || !_scrollController.hasClients) {
+      return;
+    }
 
     final index = _filteredSites.indexWhere((s) => s.id == _selectedSiteId);
     if (index == -1) return;
@@ -507,7 +547,8 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
     final size = MediaQuery.of(context).size;
     final dialogWidth = isLargeScreen ? 680.0 : size.width * 0.92;
 
-    double offset = 0;
+    // 先粗定位，再在下一帧用 ensureVisible 做精准定位。
+    double roughOffset = 0;
     if (_isGridView) {
       final crossAxisCount = isLargeScreen ? 5 : 3;
       final horizontalPadding = 24.0 * 2;
@@ -517,26 +558,39 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
           (availableWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
       final itemHeight = itemWidth; // childAspectRatio: 1.0
       final row = index ~/ crossAxisCount;
-      // 减去 16 像素的缓冲，确保顶部不会被遮挡且留出一定视觉间距
-      offset = (row * (itemHeight + spacing) - 16).clamp(0.0, double.infinity);
+      roughOffset = (row * (itemHeight + spacing)).clamp(0.0, double.infinity);
     } else {
-      // 估算列表项高度：Container padding(12*2) + Logo(30) + Padding bottom(8) = 62
-      // 考虑到文字可能有两行，这里取一个保守值 72
-      const itemHeight = 72.0;
-      // 列表模式用户反馈“刚刚好”，稍微减去 8 像素缓冲以防万一
-      offset = (index * itemHeight).clamp(0.0, double.infinity);
+      const itemHeight = 74.0;
+      roughOffset = (index * itemHeight).clamp(0.0, double.infinity);
     }
 
-    if (offset > 0) {
-      // 检查 controller 是否已附加到任何滚动视图
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          offset,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      }
+    final directContext = _siteItemKeys[_selectedSiteId]?.currentContext;
+    if (directContext != null) {
+      _ensureActiveSiteVisible(directContext);
+      return;
     }
+
+    final position = _scrollController.position;
+    final clampedOffset = roughOffset.clamp(0.0, position.maxScrollExtent);
+    _scrollController.jumpTo(clampedOffset);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final itemContext = _siteItemKeys[_selectedSiteId]?.currentContext;
+      if (itemContext == null) return;
+      _ensureActiveSiteVisible(itemContext);
+    });
+  }
+
+  void _refreshVisibleKeys() {
+    final visibleSiteIds = _filteredSites.map((s) => s.id).toSet();
+    _siteItemKeys.removeWhere((siteId, _) => !visibleSiteIds.contains(siteId));
+  }
+
+  void _handleViewModeChanged(bool nextGridView) {
+    if (_isGridView == nextGridView) return;
+    setState(() => _isGridView = nextGridView);
+    _scheduleScrollToActiveSite();
   }
 
   Future<void> _loadHealthStatuses() async {
@@ -568,7 +622,16 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
               s.baseUrl.toLowerCase().contains(lowerKeyword);
         }).toList();
       }
+      _refreshVisibleKeys();
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant _SiteSelectionDialog oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!listEquals(oldWidget.sites, widget.sites)) {
+      _refreshVisibleKeys();
+    }
   }
 
   Color _getStatusColor(HealthStatus? hs) {
@@ -697,26 +760,12 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                         _buildToggleButton(
                           Icons.grid_view_rounded,
                           _isGridView,
-                          () {
-                            if (!_isGridView) {
-                              setState(() => _isGridView = true);
-                              WidgetsBinding.instance.addPostFrameCallback(
-                                (_) => _scrollToActiveSite(),
-                              );
-                            }
-                          },
+                          () => _handleViewModeChanged(true),
                         ),
                         _buildToggleButton(
                           Icons.format_list_bulleted_rounded,
                           !_isGridView,
-                          () {
-                            if (_isGridView) {
-                              setState(() => _isGridView = false);
-                              WidgetsBinding.instance.addPostFrameCallback(
-                                (_) => _scrollToActiveSite(),
-                              );
-                            }
-                          },
+                          () => _handleViewModeChanged(false),
                         ),
                       ],
                     ),
@@ -761,15 +810,25 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
                                     crossAxisSpacing: 12,
                                     childAspectRatio: 1.0,
                                   ),
-                              itemBuilder: (context, index) =>
-                                  _buildGridItem(_filteredSites[index]),
+                              itemBuilder: (context, index) {
+                                final site = _filteredSites[index];
+                                return KeyedSubtree(
+                                  key: _itemKeyForSite(site.id),
+                                  child: _buildGridItem(site),
+                                );
+                              },
                             )
                           : ListView.builder(
                               controller: _scrollController,
                               padding: const EdgeInsets.only(bottom: 24),
                               itemCount: _filteredSites.length,
-                              itemBuilder: (context, index) =>
-                                  _buildListItem(_filteredSites[index]),
+                              itemBuilder: (context, index) {
+                                final site = _filteredSites[index];
+                                return KeyedSubtree(
+                                  key: _itemKeyForSite(site.id),
+                                  child: _buildListItem(site),
+                                );
+                              },
                             ),
                     ),
             ),
