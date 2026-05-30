@@ -123,7 +123,8 @@
             <option value="web">web</option>
           </select>
           <label>版本筛选</label>
-          <input v-model="filterVersion" @keyup.enter="applyFilters" placeholder="例如 2.13.0" />
+          <input v-model="filterVersion" @keyup.enter="applyVersionFilter" placeholder="例如 2.13.0" />
+          <span v-if="filterVersionBucket==='other'" class="badge bg-gray link" @click="clearVersionFilter">其它版本 ×</span>
           <label>搜索</label>
           <input v-model="q" @keyup.enter="applyFilters" placeholder="device id 或 IP" />
         </div>
@@ -305,7 +306,7 @@
           view: 'stats', // 'stats' or 'updates'
           window: '7d', from: '', to: '', kpi: { dauToday: 0, mau30d: 0, totalDevices: 0 }, windowDevices: 0,
           platformChart:null, versionChart:null, dauChart:null,
-          filterPlatform: '', filterVersion: '', q: '', devices: { total: 0, items: [] }, page: 1, pageSize: 20, loading: false,
+          versionStatsLimit: 8, filterPlatform: '', filterVersion: '', filterVersionBucket: '', q: '', devices: { total: 0, items: [] }, page: 1, pageSize: 20, loading: false,
           versions: [], updatesTotal: 0, updatesPage: 1, updatesPageSize: 30,
           showEditModal: false, editingVersion: {}
         };
@@ -332,34 +333,23 @@
         async fetchKPI() { const r = await request('/api/v1/admin/stats/overview'); const j = await r.json(); this.kpi = j; },
         async fetchPlatforms() { const r = await request('/api/v1/admin/stats/platforms'); const j = await r.json(); this.renderPie('platformChart', j.items.map(x => x.platform), j.items.map(x => x.count), 'platform'); },
         async fetchVersionsStats() {
-          const r = await request('/api/v1/admin/stats/versions');
+          const p = new URLSearchParams(); p.set('limit', this.versionStatsLimit);
+          const r = await request('/api/v1/admin/stats/versions?' + p.toString());
           const j = await r.json();
-          const total = (j.items || []).reduce((sum, x) => sum + (x.count || 0), 0);
-          let labels = [];
-          let data = [];
-          if(total > 0){
-            let others = 0;
-            // 将占比 <10% 的版本合并为“其它”
-            for(const it of j.items){
-              const pct = (it.count || 0) / total;
-              if (pct < 0.10) { others += it.count || 0; }
-              else { labels.push(it.version); data.push(it.count || 0); }
-            }
-            if (others > 0) { labels.push('其它'); data.push(others); }
-          } else {
-            labels = (j.items || []).map(x=>x.version);
-            data = (j.items || []).map(x=>x.count || 0);
-          }
-          this.renderPie('versionChart', labels, data, 'version');
+          const items = j.items || [];
+          this.renderPie('versionChart', items.map(x=>x.version), items.map(x=>x.count || 0), 'version', items);
         },
         async fetchDevices(){
           const p = new URLSearchParams(); p.set('page', this.page); p.set('pageSize', this.pageSize);
           if(this.filterPlatform) p.set('platform', this.filterPlatform);
           if(this.filterVersion) p.set('version', this.filterVersion);
+          else if(this.filterVersionBucket) { p.set('version_bucket', this.filterVersionBucket); p.set('version_limit', this.versionStatsLimit); }
           if(this.q) p.set('q', this.q);
           const r = await request('/api/v1/admin/stats/devices?' + p.toString());
           const j = await r.json(); this.devices = j; },
         applyFilters(){ this.page = 1; this.fetchDevices(); },
+        applyVersionFilter(){ this.filterVersionBucket = ''; this.page = 1; this.fetchDevices(); },
+        clearVersionFilter(){ this.filterVersion = ''; this.filterVersionBucket = ''; this.page = 1; this.fetchDevices(); },
         async fetchDauTrend() {
           const qs = buildRange(this.window, this.from, this.to);
           const r = await request('/api/v1/admin/stats/trend/dau?' + qs); const j = await r.json();
@@ -409,17 +399,21 @@
           if (r.ok) { this.fetchVersions(); }
         },
 
-        renderPie(id, labels, data, kind){
+        renderPie(id, labels, data, kind, meta){
           const ctx = document.getElementById(id);
           if (!ctx) return;
           if(this[id+'Instance']) { this[id+'Instance'].destroy(); }
-          const colors = ['#3b82f6','#f59e0b','#10b981','#ef4444','#6366f1','#22d3ee','#84cc16','#e11d48'];
+          const colors = ['#3b82f6','#f59e0b','#10b981','#ef4444','#6366f1','#22d3ee','#84cc16','#e11d48','#94a3b8'];
           const chart = new Chart(ctx, { type:'pie', data:{ labels, datasets:[{ data, backgroundColor: colors }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } }, onClick:(evt, elements)=>{
             if(elements.length>0){
               const idx = elements[0].index;
               const label = labels[idx];
               if (kind === 'platform') { this.filterPlatform = label; }
-              else if (kind === 'version') { if (label !== '其它') this.filterVersion = label; }
+              else if (kind === 'version') {
+                const item = (meta || [])[idx] || {};
+                if (item.is_other) { this.filterVersion = ''; this.filterVersionBucket = 'other'; }
+                else { this.filterVersion = label; this.filterVersionBucket = ''; }
+              }
               this.page = 1; this.fetchDevices();
             }
           } } });
