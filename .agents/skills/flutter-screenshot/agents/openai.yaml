@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flutter Screenshot"
+  short_description: "启动Linux目标并截取大屏和移动端预览图"
+  default_prompt: "使用 $flutter-screenshot 为当前 Flutter UI 截取大屏和移动端两张预览图并展示给我。"
