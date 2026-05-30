@@ -115,7 +115,7 @@ class TorrentListItem extends StatelessWidget {
 
     // 构建主要内容
     Widget mainContent = Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      margin: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 3),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -153,7 +153,10 @@ class TorrentListItem extends StatelessWidget {
                       ),
                     ),
                   Padding(
-                    padding: const EdgeInsets.all(4),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 3 : 4,
+                      vertical: 4,
+                    ),
                     child: IntrinsicHeight(
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -469,6 +472,31 @@ class TorrentInfo extends StatelessWidget {
     }
   }
 
+  Widget _buildSizeText(BuildContext context) {
+    final style = TextStyle(
+      fontSize: 11,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
+    final text = Text(
+      Formatters.dataFromBytes(torrent.sizeBytes),
+      maxLines: 1,
+      softWrap: false,
+      textAlign: isMobile ? TextAlign.right : TextAlign.left,
+      style: style,
+    );
+
+    if (!isMobile) return text;
+
+    return SizedBox(
+      width: double.infinity,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerRight,
+        child: text,
+      ),
+    );
+  }
+
   String _batchActionLabel() {
     switch (batchOperationType) {
       case BatchOperationType.favorite:
@@ -601,7 +629,7 @@ class TorrentInfo extends StatelessWidget {
     final double compactGap = isMobile ? 6 : 2;
     final double smallGap = isMobile ? 2 : 1;
     return Padding(
-      padding: const EdgeInsets.only(left: 8),
+      padding: EdgeInsets.only(left: isMobile ? 6 : 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -673,10 +701,10 @@ class TorrentInfo extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(width: isMobile ? 4 : 20),
+          SizedBox(width: isMobile ? 2 : 20),
           // 右侧数据列
           SizedBox(
-            width: isMobile ? 55 : 160,
+            width: isMobile ? 64 : 160,
             child: SizedBox(
               height: rightColumnHeight > 0 ? rightColumnHeight : null,
               child: Column(
@@ -708,7 +736,9 @@ class TorrentInfo extends StatelessWidget {
                             torrent.discount,
                             torrent.discountEndTime,
                           ),
-                          textAlign: isMobile ? TextAlign.right : TextAlign.left,
+                          textAlign: isMobile
+                              ? TextAlign.right
+                              : TextAlign.left,
                           style: TextStyle(
                             color: _discountColor(torrent.discount),
                             fontSize: 8,
@@ -740,7 +770,9 @@ class TorrentInfo extends StatelessWidget {
                                   '${torrent.seeders}',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ],
@@ -760,7 +792,9 @@ class TorrentInfo extends StatelessWidget {
                                   '${torrent.leechers}',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ],
@@ -774,37 +808,41 @@ class TorrentInfo extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // size
-                              Text(
-                                Formatters.dataFromBytes(torrent.sizeBytes),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
+                              _buildSizeText(context),
                               const SizedBox(height: 4),
                               // comments & history status
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   if (currentSite?.siteType == SiteType.mteam ||
-                                      currentSite?.siteType == SiteType.nexusphp) ...[
+                                      currentSite?.siteType ==
+                                          SiteType.nexusphp) ...[
                                     Icon(
                                       Icons.chat,
                                       size: 10,
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                     ),
                                     const SizedBox(width: 2),
                                     Text(
                                       '${torrent.comments}',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
                                       ),
                                     ),
-                                    if (currentSite?.features.supportHistory ?? true) const SizedBox(width: 6),
+                                    if (currentSite?.features.supportHistory ??
+                                        true)
+                                      const SizedBox(width: 6),
                                   ],
-                                  if (currentSite?.features.supportHistory ?? true)
-                                    _buildDownloadStatusIcon(torrent.downloadStatus),
+                                  if (currentSite?.features.supportHistory ??
+                                      true)
+                                    _buildDownloadStatusIcon(
+                                      torrent.downloadStatus,
+                                    ),
                                 ],
                               ),
                             ],
@@ -828,7 +866,9 @@ class TorrentInfo extends StatelessWidget {
                           '${torrent.seeders}',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -848,20 +888,16 @@ class TorrentInfo extends StatelessWidget {
                           '${torrent.leechers}',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
                     ),
                     SizedBox(height: compactGap),
                     // size
-                    Text(
-                      Formatters.dataFromBytes(torrent.sizeBytes),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
+                    _buildSizeText(context),
                     SizedBox(height: compactGap),
                     // comments
                     if (currentSite?.siteType == SiteType.mteam ||
@@ -872,7 +908,9 @@ class TorrentInfo extends StatelessWidget {
                           Icon(
                             Icons.chat,
                             size: 10,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: 2),
                           Text(
@@ -897,7 +935,7 @@ class TorrentInfo extends StatelessWidget {
               ),
             ),
           ),
-          if (isMobile) const SizedBox(width: 8),
+          if (isMobile) const SizedBox(width: 4),
         ],
       ),
     );
@@ -1220,6 +1258,14 @@ class TorrentActions extends StatelessWidget {
     this.onDownload,
   });
 
+  ButtonStyle get _compactIconButtonStyle => IconButton.styleFrom(
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    fixedSize: const Size.square(36),
+    minimumSize: const Size.square(36),
+    padding: EdgeInsets.zero,
+    visualDensity: VisualDensity.compact,
+  );
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -1235,8 +1281,8 @@ class TorrentActions extends StatelessWidget {
               color: torrent.collection ? Colors.red : null,
             ),
             tooltip: torrent.collection ? '取消收藏' : '收藏',
-            padding: EdgeInsets.all(6),
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            iconSize: 20,
+            style: _compactIconButtonStyle,
           ),
         // 下载按钮 - 仅在站点支持下载功能时显示
         if (currentSite?.features.supportDownload ?? true)
@@ -1244,8 +1290,8 @@ class TorrentActions extends StatelessWidget {
             onPressed: onDownload,
             icon: const Icon(Icons.download_outlined),
             tooltip: '下载',
-            padding: EdgeInsets.all(6),
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            iconSize: 20,
+            style: _compactIconButtonStyle,
           ),
       ],
     );
