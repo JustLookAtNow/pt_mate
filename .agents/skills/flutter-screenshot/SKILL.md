@@ -1,6 +1,6 @@
 ---
 name: flutter-screenshot
-description: Capture and show two Flutter UI screenshots for this project: one landscape/large-screen preview and one portrait/mobile preview, without using Flutter Web.
+description: "Capture and show two Flutter UI screenshots for this project: one landscape/large-screen preview and one portrait/mobile preview, without using Flutter Web."
 ---
 
 # Flutter Screenshot Skill
