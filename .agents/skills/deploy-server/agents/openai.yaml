@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deploy Server"
+  short_description: "构建并部署 server 到测试或正式服务器环境"
+  default_prompt: "使用 $deploy-server 将 server 新版本部署到指定环境。测试环境部署到 golakers:~/ptmate-beta 并直接运行；正式环境先 systemctl stop ptmate，再复制到 ~/ptmate，最后 systemctl start ptmate。"
