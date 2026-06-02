@@ -209,6 +209,7 @@ class BackupService {
           initialDirectory: initialDirectory,
           type: FileType.custom,
           allowedExtensions: ['json'],
+          bytes: Uint8List.fromList(utf8.encode(prepared.content)),
         );
 
         if (result != null) {
@@ -486,6 +487,7 @@ class BackupService {
             initialDirectory: initialDirectory,
             type: FileType.custom,
             allowedExtensions: ['json'],
+            bytes: Uint8List.fromList(utf8.encode(prepared.content)),
           );
 
           if (result != null) {

@@ -211,6 +211,7 @@ class StorageService {
   static const AndroidOptions _androidCompatSecureOptions = AndroidOptions(
     resetOnError: false,
     migrateOnAlgorithmChange: false,
+    // ignore: deprecated_member_use
     keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_PKCS1Padding,
     storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
   );
@@ -218,7 +219,9 @@ class StorageService {
   static const AndroidOptions _androidLegacySecureOptions = AndroidOptions(
     resetOnError: false,
     migrateOnAlgorithmChange: false,
+    // ignore: deprecated_member_use
     keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_PKCS1Padding,
+    // ignore: deprecated_member_use
     storageCipherAlgorithm: StorageCipherAlgorithm.AES_CBC_PKCS7Padding,
   );
 

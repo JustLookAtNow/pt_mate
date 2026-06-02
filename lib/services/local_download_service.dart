@@ -231,6 +231,7 @@ class LocalDownloadService with TorrentFileDownloaderMixin {
         initialDirectory: initialDirectory,
         type: FileType.custom,
         allowedExtensions: ['zip', 'torrent'],
+        bytes: Uint8List.fromList(data),
       );
 
       if (result != null) {
