@@ -680,6 +680,101 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     }
   }
 
+  bool get _hasInlineDetailContent {
+    final descrHtml = _detail?.descrHtml;
+    if (descrHtml != null && descrHtml.isNotEmpty) {
+      return true;
+    }
+
+    final descr = _detail?.descr?.toString();
+    return descr != null && descr.isNotEmpty;
+  }
+
+  bool get _shouldShowInlineCommentsSection =>
+      widget.siteFeatures.supportCommentDetail && _hasInlineDetailContent;
+
+  Future<void> _ensureCommentsLoaded() async {
+    if (!widget.siteFeatures.supportCommentDetail) {
+      return;
+    }
+
+    if (_comments == null && !_commentsLoading) {
+      await _loadComments();
+    }
+  }
+
+  void _scrollToCommentsSection() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      final ctx = _commentsKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  Future<void> _openComments() async {
+    await _ensureCommentsLoaded();
+
+    if (!mounted) {
+      return;
+    }
+
+    if (_hasInlineDetailContent) {
+      _scrollToCommentsSection();
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.75,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.comment, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Text(
+                      '用户评论 (${_comments?.total ?? widget.torrentItem.comments})',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(8),
+                  child: _buildCommentsSection(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _onDownload() async {
     try {
       // 1. 获取下载 URL
@@ -707,19 +802,17 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
       if (downloadToLocal) {
         // 本地下载模式
-        final savedPath = await LocalDownloadService.instance.downloadAndSaveTorrent(
-          downloadUrl: url,
-          torrentName: widget.torrentItem.name,
-          siteConfig: widget.siteConfig,
-        );
+        final savedPath = await LocalDownloadService.instance
+            .downloadAndSaveTorrent(
+              downloadUrl: url,
+              torrentName: widget.torrentItem.name,
+              siteConfig: widget.siteConfig,
+            );
 
         if (mounted && savedPath != null) {
           await Future.delayed(const Duration(milliseconds: 100));
           if (mounted) {
-            NotificationHelper.showInfo(
-              context,
-              '种子文件已保存到: $savedPath',
-            );
+            NotificationHelper.showInfo(context, '种子文件已保存到: $savedPath');
           }
         }
       } else {
@@ -789,7 +882,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                   ElevatedButton(
                     onPressed: () async {
                       Navigator.pop(dialogContext);
-                      String purchaseUrl = 'https://rousi.pro/torrent/${widget.torrentItem.id}';
+                      String purchaseUrl =
+                          'https://rousi.pro/torrent/${widget.torrentItem.id}';
                       if (widget.siteConfig != null) {
                         var base = widget.siteConfig!.baseUrl;
                         if (!base.endsWith('/')) {
@@ -797,9 +891,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                         }
                         purchaseUrl = '${base}torrent/${widget.torrentItem.id}';
                       }
-                    if (mounted) {
-                      await UrlLauncherHelper.launchBrowser(context, purchaseUrl);
-                    }
+                      if (mounted) {
+                        await UrlLauncherHelper.launchBrowser(
+                          context,
+                          purchaseUrl,
+                        );
+                      }
                     },
                     child: const Text('前往购买'),
                   ),
@@ -2144,6 +2241,35 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     );
   }
 
+  Widget _buildCommentsCard() {
+    return Card(
+      key: _commentsKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(4),
+            child: Row(
+              children: [
+                const Icon(Icons.comment, color: Colors.green),
+                const SizedBox(width: 8),
+                Text(
+                  '用户评论 (${_comments?.total ?? widget.torrentItem.comments})',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          _buildCommentsSection(),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -2259,6 +2385,10 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                         ),
                       ),
                     ),
+                    if (_shouldShowInlineCommentsSection) ...[
+                      const SizedBox(height: 16),
+                      _buildCommentsCard(),
+                    ],
                     // 底部留白，防止被FAB遮挡
                     const SizedBox(height: 80),
                   ],
@@ -2308,38 +2438,9 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                         ),
                       ),
                     ),
-                    // 用户评论 - 仅在支持评论详情时显示
-                    if (widget.siteFeatures.supportCommentDetail) ...[
+                    if (_shouldShowInlineCommentsSection) ...[
                       const SizedBox(height: 16),
-                      Card(
-                        key: _commentsKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(4),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.comment,
-                                    color: Colors.green,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '用户评论 (${_comments?.total ?? widget.torrentItem.comments})',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Divider(height: 1),
-                            _buildCommentsSection(),
-                          ],
-                        ),
-                      ),
+                      _buildCommentsCard(),
                     ],
                     // 底部留白，防止被FAB遮挡
                     const SizedBox(height: 160),
@@ -2420,66 +2521,54 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                   isDesktop
                       ? FloatingActionButton.extended(
                           heroTag: "comment",
-                          onPressed: () {
-                            final ctx = _commentsKey.currentContext;
-                            if (ctx != null) {
-                              Scrollable.ensureVisible(
-                                ctx,
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                              );
-                            }
-                          },
+                          onPressed: _openComments,
                           tooltip: '评论',
                           icon: const Icon(Icons.comment),
                           label: const Text('评论'),
                         )
                       : FloatingActionButton(
                           heroTag: "comment",
-                          onPressed: () {
-                            final ctx = _commentsKey.currentContext;
-                            if (ctx != null) {
-                              Scrollable.ensureVisible(
-                                ctx,
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                              );
-                            }
-                          },
+                          onPressed: _openComments,
                           tooltip: '评论',
                           child: const Icon(Icons.comment),
                         ),
                   const SizedBox(height: 16),
                 ],
                 // 收藏按钮
-                isDesktop
-                    ? FloatingActionButton.extended(
-                        heroTag: "favorite",
-                        onPressed: _onToggleCollection,
-                        backgroundColor: _isCollected ? Colors.red : null,
-                        tooltip: _isCollected ? '取消收藏' : '收藏',
-                        icon: Icon(
-                          _isCollected ? Icons.favorite : Icons.favorite_border,
-                          color: _isCollected ? Colors.white : null,
-                        ),
-                        label: Text(
-                          _isCollected ? '取消收藏' : '收藏',
-                          style: TextStyle(
+                if (widget.siteFeatures.supportCollection) ...[
+                  isDesktop
+                      ? FloatingActionButton.extended(
+                          heroTag: "favorite",
+                          onPressed: _onToggleCollection,
+                          backgroundColor: _isCollected ? Colors.red : null,
+                          tooltip: _isCollected ? '取消收藏' : '收藏',
+                          icon: Icon(
+                            _isCollected
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            color: _isCollected ? Colors.white : null,
+                          ),
+                          label: Text(
+                            _isCollected ? '取消收藏' : '收藏',
+                            style: TextStyle(
+                              color: _isCollected ? Colors.white : null,
+                            ),
+                          ),
+                        )
+                      : FloatingActionButton(
+                          heroTag: "favorite",
+                          onPressed: _onToggleCollection,
+                          backgroundColor: _isCollected ? Colors.red : null,
+                          tooltip: _isCollected ? '取消收藏' : '收藏',
+                          child: Icon(
+                            _isCollected
+                                ? Icons.favorite
+                                : Icons.favorite_border,
                             color: _isCollected ? Colors.white : null,
                           ),
                         ),
-                      )
-                    : FloatingActionButton(
-                        heroTag: "favorite",
-                        onPressed: _onToggleCollection,
-                        backgroundColor: _isCollected ? Colors.red : null,
-                        tooltip: _isCollected ? '取消收藏' : '收藏',
-                        child: Icon(
-                          _isCollected ? Icons.favorite : Icons.favorite_border,
-                          color: _isCollected ? Colors.white : null,
-                        ),
-                      ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                ],
                 // 下载按钮
                 isDesktop
                     ? FloatingActionButton.extended(
