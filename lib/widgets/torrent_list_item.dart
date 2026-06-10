@@ -1136,13 +1136,13 @@ class _TagsRatingRow extends StatelessWidget {
         if (hasLeadingBadges)
           Expanded(
             child: Wrap(
-              spacing: 6,
+              spacing: 4,
               runSpacing: 2,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 if (isTop) const _TopTagIcon(),
                 ?discountBadge,
-                if (tags.isNotEmpty) _TagsView(tags: tags),
+                ...tags.map((tag) => _TagChip(tag: tag)),
               ],
             ),
           )
@@ -1455,11 +1455,13 @@ class _SwipeableItemState extends State<_SwipeableItem>
   }
 }
 
-class _TagsView extends StatelessWidget {
-  final List<TagType> tags;
-  const _TagsView({required this.tags});
+class _TagChip extends StatelessWidget {
+  final TagType tag;
 
-  Widget _buildChip(TagType tag) {
+  const _TagChip({required this.tag});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
@@ -1475,16 +1477,6 @@ class _TagsView extends StatelessWidget {
           height: 1.1,
         ),
       ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 4,
-      runSpacing: 2,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: tags.map(_buildChip).toList(),
     );
   }
 }
