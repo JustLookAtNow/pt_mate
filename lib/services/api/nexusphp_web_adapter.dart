@@ -164,6 +164,7 @@ class NexusPHPWebAdapter extends SiteAdapter
     _dio.options.headers['User-Agent'] =
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36';
     _dio.options.responseType = ResponseType.plain; // 设置为plain避免JSON解析警告
+    _dio.transformer = _SafeContentTypeTransformer();
     swDio.stop();
     if (kDebugMode) {
       _logger.d(
@@ -1377,5 +1378,40 @@ class NexusPHPWebAdapter extends SiteAdapter
     }
 
     return categories;
+  }
+}
+
+/// 用于在 Dio 处理响应之前过滤并修正不规范的 Content-Type 响应头，
+/// 比如 text/html; charset=utf-8; Cache-control:private
+class _SafeContentTypeTransformer extends BackgroundTransformer {
+  @override
+  Future transformResponse(
+    RequestOptions options,
+    ResponseBody response,
+  ) async {
+    final contentTypeList = response.headers[Headers.contentTypeHeader];
+    if (contentTypeList != null && contentTypeList.isNotEmpty) {
+      final contentType = contentTypeList.first;
+      if (contentType.contains(';')) {
+        final parts = contentType.split(';');
+        final validParts = <String>[];
+        for (var i = 0; i < parts.length; i++) {
+          final part = parts[i].trim();
+          if (i == 0) {
+            // 第一部分是 MIME 类型本身，如 text/html
+            validParts.add(part);
+          } else {
+            // 后续是参数部分，标准的参数应该为 key=value 形式，且不应包含冒号
+            if (part.contains('=') && !part.contains(':')) {
+              validParts.add(part);
+            }
+          }
+        }
+        if (validParts.length < parts.length) {
+          response.headers[Headers.contentTypeHeader] = [validParts.join('; ')];
+        }
+      }
+    }
+    return super.transformResponse(options, response);
   }
 }
