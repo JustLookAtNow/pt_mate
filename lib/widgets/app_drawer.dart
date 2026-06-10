@@ -29,7 +29,7 @@ class AppDrawer extends StatelessWidget {
         ? (isDark ? colorScheme.onPrimaryContainer : colorScheme.onPrimary)
         : colorScheme.onSurface;
 
-    final drawerContent = Container(
+    final drawerContent = Material(
       color: colorScheme.surface,
       child: ListView(
         padding: EdgeInsets.zero, // 移除默认的 padding，让 DrawerHeader 能够延伸到状态栏
@@ -268,27 +268,28 @@ class _DrawerItem extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: isActive ? colorScheme.primaryContainer : null,
+      child: Material(
+        color: isActive ? colorScheme.primaryContainer : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
-      ),
-      child: ListTile(
-        selected: isActive,
-        selectedColor: colorScheme.onPrimaryContainer,
-        iconColor: colorScheme.onSurfaceVariant,
-        textColor: colorScheme.onSurface,
-        leading: Icon(
-          icon,
-          color: isActive ? colorScheme.onPrimaryContainer : null,
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          selected: isActive,
+          selectedColor: colorScheme.onPrimaryContainer,
+          iconColor: colorScheme.onSurfaceVariant,
+          textColor: colorScheme.onSurface,
+          leading: Icon(
+            icon,
             color: isActive ? colorScheme.onPrimaryContainer : null,
           ),
+          title: Text(
+            title,
+            style: TextStyle(
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+              color: isActive ? colorScheme.onPrimaryContainer : null,
+            ),
+          ),
+          onTap: onTap,
         ),
-        onTap: onTap,
       ),
     );
   }
