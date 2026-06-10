@@ -37,5 +37,7 @@ Use this skill when the user asks to screenshot the Flutter app or a changed UI 
 ## Notes
 
 - The script requires the Linux desktop Flutter target, X11, and ImageMagick `import`.
+- In WSLg or remote desktop sessions, `DISPLAY` may be unset even when X11 is available. If `xwininfo` works with `DISPLAY=:0`, prefix the screenshot command with `DISPLAY=:0`.
+- Use a longer `--settle-seconds` value when the first capture shows a loading screen; verify the captured images before copying or reporting them.
 - Run the script with escalated permissions when the sandbox blocks GUI launch or X11 capture.
 - Keep screenshots in `/tmp` long enough for the user to view them; clean up temporary preview Dart files when done.
