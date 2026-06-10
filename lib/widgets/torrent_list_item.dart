@@ -602,8 +602,7 @@ class TorrentInfo extends StatelessWidget {
     final batchStatus = _buildBatchStatus(context);
     final isCompactDesktopNoCover = !isMobile && !showCover;
     final showInlineRatings = !showCover && hasAnyRating;
-    final showInlineDiscount =
-        !showCover && torrent.discount != DiscountType.normal;
+    final showInlineDiscount = torrent.discount != DiscountType.normal;
     final hasHeaderRow =
         torrent.isTop ||
         torrent.tags.isNotEmpty ||
@@ -621,7 +620,7 @@ class TorrentInfo extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 标签 / 置顶 / 内联优惠与评分（无封面时）
+          // 标签 / 置顶 / 优惠与内联评分（评分仅无封面时内联）
           if (hasHeaderRow)
             Padding(
               padding: EdgeInsets.only(bottom: isCompactDesktopNoCover ? 1 : 2),
@@ -793,13 +792,11 @@ class _SizeText extends StatelessWidget {
   }
 }
 
-/// 优惠标签徽章。[solid] 为 true 时用于封面角标（不透明底、白字），
-/// 否则为标签行内的浅色填充样式。
+/// 优惠标签徽章，用于标签行内的浅色填充样式。
 class _DiscountBadge extends StatelessWidget {
   final TorrentItem torrent;
-  final bool solid;
 
-  const _DiscountBadge({required this.torrent, this.solid = false});
+  const _DiscountBadge({required this.torrent});
 
   Color _color(AppSemanticColors colors) {
     switch (torrent.discount.colorType) {
@@ -826,26 +823,17 @@ class _DiscountBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 封面角标叠在图片上，需要不透明底色保证可读，
-    // 固定使用饱和度较高的浅色版语义色 + 白字。
-    final color = solid
-        ? _color(AppSemanticColors.light)
-        : _color(context.semanticColors);
+    final color = _color(context.semanticColors);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
-        color: solid ? color : color.withValues(alpha: 0.15),
-        borderRadius: solid
-            ? const BorderRadius.only(
-                topLeft: Radius.circular(AppRadius.sm),
-                bottomRight: Radius.circular(AppRadius.sm),
-              )
-            : BorderRadius.circular(AppRadius.sm),
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Text(
         _text(),
         style: TextStyle(
-          color: solid ? Colors.white : color,
+          color: color,
           fontSize: AppFontSize.badge,
           fontWeight: FontWeight.w700,
           height: 1.1,
@@ -1047,12 +1035,6 @@ class TorrentCover extends StatelessWidget {
               ),
             ),
           ),
-          if (torrent.discount != DiscountType.normal)
-            Positioned(
-              left: 0,
-              top: 0,
-              child: _DiscountBadge(torrent: torrent, solid: true),
-            ),
           if (hasDouban || hasImdb)
             Positioned(
               left: 0,
@@ -1145,22 +1127,29 @@ class _TagsRatingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasTags = isTop || tags.isNotEmpty;
+    final discountBadge = this.discountBadge;
+    final hasLeadingBadges = hasTags || discountBadge != null;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (discountBadge != null) ...[
-          discountBadge!,
-          const SizedBox(width: 6),
-        ],
-        if (hasTags)
+        if (hasLeadingBadges)
           Expanded(
-            child: _TagsView(tags: tags, isTop: isTop),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (isTop) const _TopTagIcon(),
+                ?discountBadge,
+                if (tags.isNotEmpty) _TagsView(tags: tags),
+              ],
+            ),
           )
         else
           const Spacer(),
         if (ratingBadges != null) ...[
-          if (hasTags) const SizedBox(width: 6),
+          if (hasLeadingBadges) const SizedBox(width: 6),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 160),
             child: ratingBadges,
@@ -1468,8 +1457,7 @@ class _SwipeableItemState extends State<_SwipeableItem>
 
 class _TagsView extends StatelessWidget {
   final List<TagType> tags;
-  final bool isTop;
-  const _TagsView({required this.tags, this.isTop = false});
+  const _TagsView({required this.tags});
 
   Widget _buildChip(TagType tag) {
     return Container(
@@ -1496,18 +1484,23 @@ class _TagsView extends StatelessWidget {
       spacing: 4,
       runSpacing: 2,
       crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        if (isTop)
-          Transform.rotate(
-            angle: math.pi / 4,
-            child: Icon(
-              Icons.push_pin,
-              size: 14,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-        ...tags.map(_buildChip),
-      ],
+      children: tags.map(_buildChip).toList(),
+    );
+  }
+}
+
+class _TopTagIcon extends StatelessWidget {
+  const _TopTagIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.rotate(
+      angle: math.pi / 4,
+      child: Icon(
+        Icons.push_pin,
+        size: 14,
+        color: Theme.of(context).colorScheme.primary,
+      ),
     );
   }
 }
