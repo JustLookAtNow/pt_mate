@@ -206,21 +206,6 @@ class _DownloadTasksPageState extends State<DownloadTasksPage> {
       currentRoute: '/download_tasks',
       appBar: AppBar(
         title: const Text('下载管理'),
-        backgroundColor: Theme.of(context).brightness == Brightness.light
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.surface,
-        iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.light
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
-        ),
-        titleTextStyle: TextStyle(
-          color: Theme.of(context).brightness == Brightness.light
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
-          fontSize: 20,
-          fontWeight: FontWeight.w500,
-        ),
         actions: const [QbSpeedIndicator()],
       ),
       body: _isLoading

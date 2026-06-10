@@ -33,6 +33,7 @@ import 'widgets/batch_progress_card.dart';
 import 'widgets/responsive_layout.dart';
 import 'widgets/torrent_download_dialog.dart';
 import 'widgets/torrent_list_item.dart';
+import 'widgets/torrent_list_skeleton.dart';
 import 'widgets/tag_filter_bar.dart';
 import 'services/update_service.dart';
 import 'widgets/update_notification_dialog.dart';
@@ -1388,11 +1389,9 @@ class _HomePageState extends State<HomePage> {
         height: 28,
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
-          color: theme.brightness == Brightness.light
-              ? Colors.white.withValues(alpha: 0.9)
-              : theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.4,
-                ),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.4,
+          ),
           shape: BoxShape.circle,
           border: Border.all(
             color: siteColor ?? theme.colorScheme.outlineVariant,
@@ -1420,9 +1419,7 @@ class _HomePageState extends State<HomePage> {
       height: 28,
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: theme.brightness == Brightness.light
-            ? Colors.white.withValues(alpha: 0.9)
-            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
         shape: BoxShape.circle,
         border: Border.all(
           color: siteColor ?? theme.colorScheme.outlineVariant,
@@ -2696,21 +2693,6 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               actions: const [QbSpeedIndicator()],
-              backgroundColor: Theme.of(context).brightness == Brightness.light
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.surface,
-              iconTheme: IconThemeData(
-                color: Theme.of(context).brightness == Brightness.light
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onSurface,
-              ),
-              titleTextStyle: TextStyle(
-                color: Theme.of(context).brightness == Brightness.light
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onSurface,
-                fontSize: 20,
-                fontWeight: FontWeight.w500,
-              ),
             ),
             body: Column(
               children: [
@@ -2792,6 +2774,10 @@ class _HomePageState extends State<HomePage> {
                           builder: (context) {
                             final filteredItems = _filteredItems;
                             if (filteredItems.isEmpty) {
+                              // 首屏加载中显示骨架屏
+                              if (_loading) {
+                                return const TorrentListSkeleton();
+                              }
                               // 空状态也支持下拉刷新
                               return RefreshIndicator(
                                 onRefresh: () => _search(reset: true),
@@ -3641,5 +3627,3 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
-
-/// 用户信息骨架屏组件

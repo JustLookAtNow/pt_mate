@@ -54,21 +54,6 @@ class _AboutPageState extends State<AboutPage> {
       appBar: AppBar(
         title: const Text('关于'),
         actions: const [QbSpeedIndicator()],
-        backgroundColor: Theme.of(context).brightness == Brightness.light
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.surface,
-        iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.light
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
-        ),
-        titleTextStyle: TextStyle(
-          color: Theme.of(context).brightness == Brightness.light
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
-          fontSize: 20,
-          fontWeight: FontWeight.w500,
-        ),
       ),
       body: _AboutBody(
         version: _version.isEmpty ? '读取中...' : _version,

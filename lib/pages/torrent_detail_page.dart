@@ -2296,6 +2296,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         appBar: AppBar(
           title: Builder(
             builder: (context) {
+              final theme = Theme.of(context);
               final isLargeScreen = ScreenUtils.isLargeScreen(context);
               final maxLines = isLargeScreen ? 1 : 2;
               return Text(
@@ -2305,9 +2306,9 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                 style: TextStyle(
                   fontSize: 16,
                   height: 1.35,
-                  color: Theme.of(context).brightness == Brightness.light
-                      ? Theme.of(context).colorScheme.onPrimary
-                      : Theme.of(context).colorScheme.onSurface,
+                  color:
+                      theme.appBarTheme.titleTextStyle?.color ??
+                      theme.appBarTheme.foregroundColor,
                 ),
                 strutStyle: const StrutStyle(
                   forceStrutHeight: true,
@@ -2320,21 +2321,6 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
           toolbarHeight: ScreenUtils.isLargeScreen(context)
               ? kToolbarHeight
               : 72,
-          backgroundColor: Theme.of(context).brightness == Brightness.light
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.surface,
-          iconTheme: IconThemeData(
-            color: Theme.of(context).brightness == Brightness.light
-                ? Theme.of(context).colorScheme.onPrimary
-                : Theme.of(context).colorScheme.onSurface,
-          ),
-          titleTextStyle: TextStyle(
-            color: Theme.of(context).brightness == Brightness.light
-                ? Theme.of(context).colorScheme.onPrimary
-                : Theme.of(context).colorScheme.onSurface,
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
-          ),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())

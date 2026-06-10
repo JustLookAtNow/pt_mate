@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import '../storage/storage_service.dart';
+import 'app_tokens.dart';
 
 enum AppThemeMode { system, light, dark }
 
@@ -78,19 +79,7 @@ class ThemeManager extends ChangeNotifier {
       );
     }
 
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: colorScheme,
-      fontFamilyFallback: _getFontFallback(),
-      appBarTheme: AppBarTheme(
-        titleTextStyle: TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.w500,
-          color: colorScheme.onSurface,
-          fontFamilyFallback: _getFontFallback(),
-        ),
-      ),
-    );
+    return _buildTheme(colorScheme, AppSemanticColors.light);
   }
 
   // 获取当前的暗色主题
@@ -106,16 +95,78 @@ class ThemeManager extends ChangeNotifier {
       );
     }
 
+    return _buildTheme(colorScheme, AppSemanticColors.dark);
+  }
+
+  ThemeData _buildTheme(ColorScheme colorScheme, AppSemanticColors semantic) {
+    final fontFallback = _getFontFallback();
+    final isDark = colorScheme.brightness == Brightness.dark;
+    final appBarBackground = isDark
+        ? colorScheme.primaryContainer
+        : colorScheme.primary;
+    final appBarForeground = isDark
+        ? colorScheme.onPrimaryContainer
+        : colorScheme.onPrimary;
+
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      fontFamilyFallback: _getFontFallback(),
+      fontFamilyFallback: fontFallback,
+      extensions: [semantic],
       appBarTheme: AppBarTheme(
+        backgroundColor: appBarBackground,
+        foregroundColor: appBarForeground,
+        elevation: 0,
+        scrolledUnderElevation: 2,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: IconThemeData(color: appBarForeground),
+        actionsIconTheme: IconThemeData(color: appBarForeground),
         titleTextStyle: TextStyle(
-          fontSize: 22,
+          fontSize: 20,
           fontWeight: FontWeight.w500,
-          color: colorScheme.onSurface,
-          fontFamilyFallback: _getFontFallback(),
+          color: appBarForeground,
+          fontFamilyFallback: fontFallback,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        color: colorScheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.15)),
+        ),
+        margin: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        labelStyle: TextStyle(
+          fontSize: AppFontSize.caption,
+          color: colorScheme.onSurfaceVariant,
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: 2,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        isDense: true,
+      ),
+      dividerTheme: DividerThemeData(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        space: 1,
+        thickness: 1,
+      ),
+      listTileTheme: ListTileThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
       ),
     );

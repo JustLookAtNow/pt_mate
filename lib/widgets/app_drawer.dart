@@ -20,19 +20,24 @@ class AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = colorScheme.brightness == Brightness.dark;
+    final drawerHeaderBackground = !isFixedSidebar
+        ? (isDark ? colorScheme.primaryContainer : colorScheme.primary)
+        : colorScheme.surface;
+    final drawerHeaderForeground = !isFixedSidebar
+        ? (isDark ? colorScheme.onPrimaryContainer : colorScheme.onPrimary)
+        : colorScheme.onSurface;
+
     final drawerContent = Container(
-      color: Theme.of(context).colorScheme.surface,
+      color: colorScheme.surface,
       child: ListView(
         padding: EdgeInsets.zero, // 移除默认的 padding，让 DrawerHeader 能够延伸到状态栏
         children: [
           // 只在非固定菜单模式下显示 header
           if (!isFixedSidebar)
             DrawerHeader(
-              decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.light
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.surface,
-              ),
+              decoration: BoxDecoration(color: drawerHeaderBackground),
               child: Align(
                 alignment: Alignment.bottomLeft,
                 child: Text(
@@ -40,16 +45,13 @@ class AppDrawer extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(context).brightness == Brightness.light
-                        ? Theme.of(context).colorScheme.onPrimary
-                        : Theme.of(context).colorScheme.onSurface,
+                    color: drawerHeaderForeground,
                   ),
                 ),
               ),
             ),
           // 固定菜单模式下添加一些顶部间距
-          if (isFixedSidebar)
-            const SizedBox(height: 16),
+          if (isFixedSidebar) const SizedBox(height: 16),
           _DrawerItem(
             icon: Icons.home_outlined,
             title: '主页',
@@ -63,7 +65,8 @@ class AppDrawer extends StatelessWidget {
                 if (isFixedSidebar) {
                   Navigator.of(context).pushReplacement(
                     PageRouteBuilder(
-                      pageBuilder: (context, animation1, animation2) => const HomePage(),
+                      pageBuilder: (context, animation1, animation2) =>
+                          const HomePage(),
                       settings: const RouteSettings(name: '/'),
                       transitionDuration: Duration.zero,
                       reverseTransitionDuration: Duration.zero,
@@ -93,7 +96,8 @@ class AppDrawer extends StatelessWidget {
                 if (isFixedSidebar) {
                   Navigator.of(context).pushReplacement(
                     PageRouteBuilder(
-                      pageBuilder: (context, animation1, animation2) => const AggregateSearchPage(),
+                      pageBuilder: (context, animation1, animation2) =>
+                          const AggregateSearchPage(),
                       settings: const RouteSettings(name: '/aggregate_search'),
                       transitionDuration: Duration.zero,
                       reverseTransitionDuration: Duration.zero,
@@ -122,7 +126,8 @@ class AppDrawer extends StatelessWidget {
                 if (isFixedSidebar) {
                   Navigator.of(context).pushReplacement(
                     PageRouteBuilder(
-                      pageBuilder: (context, animation1, animation2) => const DownloadTasksPage(),
+                      pageBuilder: (context, animation1, animation2) =>
+                          const DownloadTasksPage(),
                       settings: const RouteSettings(name: '/download_tasks'),
                       transitionDuration: Duration.zero,
                       reverseTransitionDuration: Duration.zero,
@@ -151,7 +156,8 @@ class AppDrawer extends StatelessWidget {
                 if (isFixedSidebar) {
                   Navigator.of(context).pushReplacement(
                     PageRouteBuilder(
-                      pageBuilder: (context, animation1, animation2) => const ServerSettingsPage(),
+                      pageBuilder: (context, animation1, animation2) =>
+                          const ServerSettingsPage(),
                       settings: const RouteSettings(name: '/server_settings'),
                       transitionDuration: Duration.zero,
                       reverseTransitionDuration: Duration.zero,
@@ -180,7 +186,8 @@ class AppDrawer extends StatelessWidget {
                 if (isFixedSidebar) {
                   await Navigator.of(context).pushReplacement(
                     PageRouteBuilder(
-                      pageBuilder: (context, animation1, animation2) => const SettingsPage(),
+                      pageBuilder: (context, animation1, animation2) =>
+                          const SettingsPage(),
                       settings: const RouteSettings(name: '/settings'),
                       transitionDuration: Duration.zero,
                       reverseTransitionDuration: Duration.zero,
@@ -211,7 +218,8 @@ class AppDrawer extends StatelessWidget {
                 if (isFixedSidebar) {
                   Navigator.of(context).pushReplacement(
                     PageRouteBuilder(
-                      pageBuilder: (context, animation1, animation2) => const AboutPage(),
+                      pageBuilder: (context, animation1, animation2) =>
+                          const AboutPage(),
                       settings: const RouteSettings(name: '/about'),
                       transitionDuration: Duration.zero,
                       reverseTransitionDuration: Duration.zero,
@@ -256,28 +264,28 @@ class _DrawerItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: isActive
-            ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
-            : null,
+        color: isActive ? colorScheme.primaryContainer : null,
         borderRadius: BorderRadius.circular(8),
       ),
       child: ListTile(
+        selected: isActive,
+        selectedColor: colorScheme.onPrimaryContainer,
+        iconColor: colorScheme.onSurfaceVariant,
+        textColor: colorScheme.onSurface,
         leading: Icon(
           icon,
-          color: isActive
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.primary,
+          color: isActive ? colorScheme.onPrimaryContainer : null,
         ),
         title: Text(
           title,
           style: TextStyle(
             fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-            color: isActive
-                ? Theme.of(context).colorScheme.onPrimaryContainer
-                : null,
+            color: isActive ? colorScheme.onPrimaryContainer : null,
           ),
         ),
         onTap: onTap,

@@ -215,21 +215,6 @@ class _DownloaderSettingsPageState extends State<DownloaderSettingsPage> {
           ),
           const QbSpeedIndicator(),
         ],
-        backgroundColor: Theme.of(context).brightness == Brightness.light
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.surface,
-        iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.light
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
-        ),
-        titleTextStyle: TextStyle(
-          color: Theme.of(context).brightness == Brightness.light
-              ? Theme.of(context).colorScheme.onPrimary
-              : Theme.of(context).colorScheme.onSurface,
-          fontSize: 20,
-          fontWeight: FontWeight.w500,
-        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
+import '../services/theme/app_tokens.dart';
 import 'dart:math' as math;
 
 import '../utils/format.dart';
@@ -12,10 +13,11 @@ import 'cached_network_image.dart';
 // Using a static final RegExp to avoid recompiling the pattern on every call, improving performance.
 final RegExp _ratingRegExp = RegExp(r'([0-9]+(?:\.[0-9]+)?)');
 
-const double _mobileCoverWidth = 80;
-const double _mobileCoverHeight = 115;
+const double _mobileCoverWidth = 64;
+const double _mobileCoverHeight = 90;
 const double _desktopCoverWidth = 56;
 const double _desktopCoverHeight = 80;
+const double _desktopNoCoverSideHeight = 72;
 
 bool _hasRatingValue(String? r) {
   if (r == null) return false;
@@ -106,16 +108,17 @@ class TorrentListItem extends StatelessWidget {
     final hasImdb = _hasRatingValue(torrent.imdbRating);
     final hasAnyRating = hasDouban || hasImdb;
     final effectiveShowCover = showCover && (suspendImageLoading != true);
-    final double rightMinHeight = effectiveShowCover
-        ? (isMobile && hasAnyRating ? 130.0 : 100.0)
-        : 70.0;
+    final isCompactDesktopNoCover = !isMobile && !effectiveShowCover;
     final double desktopSideHeight = effectiveShowCover
         ? _desktopCoverHeight
-        : 100.0;
+        : _desktopNoCoverSideHeight;
 
     // 构建主要内容
     Widget mainContent = Container(
-      margin: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 3),
+      margin: EdgeInsets.symmetric(
+        horizontal: isMobile ? 4 : 8,
+        vertical: isCompactDesktopNoCover ? 2 : 3,
+      ),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -155,69 +158,25 @@ class TorrentListItem extends StatelessWidget {
                   Padding(
                     padding: EdgeInsets.symmetric(
                       horizontal: isMobile ? 3 : 4,
-                      vertical: 4,
+                      vertical: isCompactDesktopNoCover ? 2 : 4,
                     ),
-                    child: IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // 封面截图和创建时间（在 showCover 为 true 时显示）
-                          if (effectiveShowCover)
-                            TorrentCover(
-                              torrent: torrent,
-                              currentSite: currentSite,
-                              isMobile: isMobile,
-                              hasDouban: hasDouban,
-                              hasImdb: hasImdb,
-                            ),
-
-                          Expanded(
-                            child: TorrentInfo(
-                              torrent: torrent,
-                              currentSite: currentSite,
-                              isAggregateMode: isAggregateMode,
-                              siteName: siteName,
-                              isMobile: isMobile,
-                              showCover: effectiveShowCover,
-                              hasDouban: hasDouban,
-                              hasImdb: hasImdb,
-                              hasAnyRating: hasAnyRating,
-                              rightMinHeight: rightMinHeight,
-                              batchOperationType: batchOperationType,
-                              batchItemState: batchItemState,
-                              batchErrorMessage: batchErrorMessage,
-                              onRetryBatchAction: onRetryBatchAction,
-                            ),
-                          ),
-                          // 桌面端显示操作按钮
-                          if (!isMobile) ...[
-                            const SizedBox(width: 8),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 8.0,
-                              ),
-                              child: Container(
-                                width: 1,
-                                height: math.max(60, desktopSideHeight - 16),
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .outlineVariant
-                                    .withValues(alpha: 0.5),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            SizedBox(
-                              height: math.max(60, desktopSideHeight - 8),
-                              child: TorrentActions(
-                                torrent: torrent,
-                                currentSite: currentSite,
-                                onToggleCollection: onToggleCollection,
-                                onDownload: onDownload,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                    child: _TorrentListItemRow(
+                      torrent: torrent,
+                      currentSite: currentSite,
+                      isAggregateMode: isAggregateMode,
+                      siteName: siteName,
+                      isMobile: isMobile,
+                      effectiveShowCover: effectiveShowCover,
+                      hasDouban: hasDouban,
+                      hasImdb: hasImdb,
+                      hasAnyRating: hasAnyRating,
+                      desktopSideHeight: desktopSideHeight,
+                      batchOperationType: batchOperationType,
+                      batchItemState: batchItemState,
+                      batchErrorMessage: batchErrorMessage,
+                      onRetryBatchAction: onRetryBatchAction,
+                      onToggleCollection: onToggleCollection,
+                      onDownload: onDownload,
                     ),
                   ),
                 ],
@@ -381,6 +340,108 @@ class TorrentListItem extends StatelessWidget {
   }
 }
 
+class _TorrentListItemRow extends StatelessWidget {
+  final TorrentItem torrent;
+  final SiteConfig? currentSite;
+  final bool isAggregateMode;
+  final String? siteName;
+  final bool isMobile;
+  final bool effectiveShowCover;
+  final bool hasDouban;
+  final bool hasImdb;
+  final bool hasAnyRating;
+  final double desktopSideHeight;
+  final BatchOperationType? batchOperationType;
+  final BatchItemState batchItemState;
+  final String? batchErrorMessage;
+  final VoidCallback? onRetryBatchAction;
+  final VoidCallback? onToggleCollection;
+  final VoidCallback? onDownload;
+
+  const _TorrentListItemRow({
+    required this.torrent,
+    this.currentSite,
+    required this.isAggregateMode,
+    this.siteName,
+    required this.isMobile,
+    required this.effectiveShowCover,
+    required this.hasDouban,
+    required this.hasImdb,
+    required this.hasAnyRating,
+    required this.desktopSideHeight,
+    this.batchOperationType,
+    required this.batchItemState,
+    this.batchErrorMessage,
+    this.onRetryBatchAction,
+    this.onToggleCollection,
+    this.onDownload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final row = Row(
+      crossAxisAlignment: isMobile
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.stretch,
+      children: [
+        // 封面截图和创建时间（在 showCover 为 true 时显示）
+        if (effectiveShowCover)
+          TorrentCover(
+            torrent: torrent,
+            currentSite: currentSite,
+            isMobile: isMobile,
+            hasDouban: hasDouban,
+            hasImdb: hasImdb,
+          ),
+        Expanded(
+          child: TorrentInfo(
+            torrent: torrent,
+            currentSite: currentSite,
+            isAggregateMode: isAggregateMode,
+            siteName: siteName,
+            isMobile: isMobile,
+            showCover: effectiveShowCover,
+            hasDouban: hasDouban,
+            hasImdb: hasImdb,
+            hasAnyRating: hasAnyRating,
+            batchOperationType: batchOperationType,
+            batchItemState: batchItemState,
+            batchErrorMessage: batchErrorMessage,
+            onRetryBatchAction: onRetryBatchAction,
+          ),
+        ),
+        // 桌面端显示操作按钮
+        if (!isMobile) ...[
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Container(
+              width: 1,
+              height: math.max(60, desktopSideHeight - 16),
+              color: Theme.of(
+                context,
+              ).colorScheme.outlineVariant.withValues(alpha: 0.5),
+            ),
+          ),
+          const SizedBox(width: 4),
+          SizedBox(
+            height: math.max(60, desktopSideHeight - 8),
+            child: TorrentActions(
+              torrent: torrent,
+              currentSite: currentSite,
+              onToggleCollection: onToggleCollection,
+              onDownload: onDownload,
+              compact: !effectiveShowCover,
+            ),
+          ),
+        ],
+      ],
+    );
+
+    return isMobile ? row : IntrinsicHeight(child: row);
+  }
+}
+
 class TorrentInfo extends StatelessWidget {
   final TorrentItem torrent;
   final SiteConfig? currentSite;
@@ -391,7 +452,6 @@ class TorrentInfo extends StatelessWidget {
   final bool hasDouban;
   final bool hasImdb;
   final bool hasAnyRating;
-  final double rightMinHeight;
   final BatchOperationType? batchOperationType;
   final BatchItemState batchItemState;
   final String? batchErrorMessage;
@@ -408,94 +468,11 @@ class TorrentInfo extends StatelessWidget {
     required this.hasDouban,
     required this.hasImdb,
     required this.hasAnyRating,
-    required this.rightMinHeight,
     this.batchOperationType,
     this.batchItemState = BatchItemState.idle,
     this.batchErrorMessage,
     this.onRetryBatchAction,
   });
-
-  /// 获取优惠类型对应的颜色
-  Color _discountColor(DiscountType discount) {
-    switch (discount.colorType) {
-      case DiscountColorType.green:
-        return Colors.green;
-      case DiscountColorType.yellow:
-        return Colors.amber;
-      case DiscountColorType.blue:
-        return Colors.lightBlue;
-      case DiscountColorType.none:
-        return Colors.grey;
-    }
-  }
-
-  /// 获取优惠类型显示文本
-  String _discountText(DiscountType discount, DateTime? endTime) {
-    final baseText = discount.displayText;
-
-    if (discount != DiscountType.normal && endTime != null) {
-      final endDateTime = endTime;
-      final now = DateTime.now();
-      final difference = endDateTime.difference(now);
-      final hoursLeft = difference.inHours;
-
-      if (hoursLeft > 0) {
-        return '$baseText ${hoursLeft}h';
-      }
-    }
-
-    return baseText;
-  }
-
-  /// 构建下载状态图标
-  Widget _buildDownloadStatusIcon(DownloadStatus status) {
-    switch (status) {
-      case DownloadStatus.completed:
-        return const Tooltip(
-          message: '已完成',
-          child: Icon(Icons.download_done, color: Colors.green, size: 20),
-        );
-      case DownloadStatus.downloading:
-        return const Tooltip(
-          message: '下载中',
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-            ),
-          ),
-        );
-      case DownloadStatus.none:
-        return const SizedBox(width: 20); // 占位，保持布局一致
-    }
-  }
-
-  Widget _buildSizeText(BuildContext context) {
-    final style = TextStyle(
-      fontSize: 11,
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
-    );
-    final text = Text(
-      Formatters.dataFromBytes(torrent.sizeBytes),
-      maxLines: 1,
-      softWrap: false,
-      textAlign: isMobile ? TextAlign.right : TextAlign.left,
-      style: style,
-    );
-
-    if (!isMobile) return text;
-
-    return SizedBox(
-      width: double.infinity,
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerRight,
-        child: text,
-      ),
-    );
-  }
 
   String _batchActionLabel() {
     switch (batchOperationType) {
@@ -623,320 +600,256 @@ class TorrentInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final batchStatus = _buildBatchStatus(context);
-    final double rightColumnHeight = !isMobile && showCover
-        ? _desktopCoverHeight
-        : 0;
-    final double compactGap = isMobile ? 6 : 2;
-    final double smallGap = isMobile ? 2 : 1;
-    return Padding(
-      padding: EdgeInsets.only(left: isMobile ? 6 : 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // 中间内容列
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Tags, pin and ratings without cover.
-                if (torrent.isTop ||
-                    torrent.tags.isNotEmpty ||
-                    (!showCover && hasAnyRating))
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 2),
-                    child: _TagsRatingRow(
-                      tags: torrent.tags,
-                      isTop: torrent.isTop,
-                      ratingBadges: !showCover && hasAnyRating
-                          ? _RatingBadges(
-                              torrent: torrent,
-                              hasDouban: hasDouban,
-                              hasImdb: hasImdb,
-                              compact: isMobile,
-                            )
-                          : null,
-                    ),
-                  ),
+    final isCompactDesktopNoCover = !isMobile && !showCover;
+    final showInlineRatings = !showCover && hasAnyRating;
+    final showInlineDiscount =
+        !showCover && torrent.discount != DiscountType.normal;
+    final hasHeaderRow =
+        torrent.isTop ||
+        torrent.tags.isNotEmpty ||
+        showInlineRatings ||
+        showInlineDiscount;
 
-                Tooltip(
-                  message: torrent.name,
-                  child: Text(
-                    torrent.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Theme.of(context).textTheme.titleMedium?.color,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                // Subtitle
-                Text(
-                  torrent.smallDescr,
-                  maxLines: isMobile ? 3 : 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    height: 1.2,
-                  ),
-                ),
-                // Date
-                Text(
-                  '发布于 ${Formatters.formatTorrentCreatedDate(torrent.createdDate)}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                if (batchStatus != null) ...[
-                  const SizedBox(height: 4),
-                  batchStatus,
-                ],
-              ],
+    return Padding(
+      padding: EdgeInsets.only(
+        left: AppSpacing.sm,
+        right: isMobile ? AppSpacing.xs : 0,
+        top: isCompactDesktopNoCover ? 0 : 2,
+        bottom: isCompactDesktopNoCover ? 0 : 2,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 标签 / 置顶 / 内联优惠与评分（无封面时）
+          if (hasHeaderRow)
+            Padding(
+              padding: EdgeInsets.only(bottom: isCompactDesktopNoCover ? 1 : 2),
+              child: _TagsRatingRow(
+                tags: torrent.tags,
+                isTop: torrent.isTop,
+                discountBadge: showInlineDiscount
+                    ? _DiscountBadge(torrent: torrent)
+                    : null,
+                ratingBadges: showInlineRatings
+                    ? _RatingBadges(
+                        torrent: torrent,
+                        hasDouban: hasDouban,
+                        hasImdb: hasImdb,
+                        compact: isMobile,
+                      )
+                    : null,
+              ),
             ),
-          ),
-          SizedBox(width: isMobile ? 2 : 20),
-          // 右侧数据列
-          SizedBox(
-            width: isMobile ? 64 : 160,
-            child: SizedBox(
-              height: rightColumnHeight > 0 ? rightColumnHeight : null,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: isMobile
-                    ? CrossAxisAlignment.end
-                    : CrossAxisAlignment.start,
-                children: [
-                  // discount
-                  if (torrent.discount != DiscountType.normal)
-                    Align(
-                      alignment: isMobile
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 2,
-                        ),
-                        margin: EdgeInsets.only(bottom: smallGap + 2),
-                        decoration: BoxDecoration(
-                          color: _discountColor(
-                            torrent.discount,
-                          ).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          _discountText(
-                            torrent.discount,
-                            torrent.discountEndTime,
-                          ),
-                          textAlign: isMobile
-                              ? TextAlign.right
-                              : TextAlign.left,
-                          style: TextStyle(
-                            color: _discountColor(torrent.discount),
-                            fontSize: 8,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (!isMobile)
-                    // 大屏（桌面端）双列布局
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 左列：上传数和下载数
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // seeders
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.arrow_upward,
-                                  color: Colors.green,
-                                  size: 12,
-                                ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  '${torrent.seeders}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            // leechers
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.arrow_downward,
-                                  color: Colors.red,
-                                  size: 12,
-                                ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  '${torrent.leechers}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 16),
-                        // 右列：大小和评论数（含历史状态）
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // size
-                              _buildSizeText(context),
-                              const SizedBox(height: 4),
-                              // comments & history status
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (currentSite?.siteType == SiteType.mteam ||
-                                      currentSite?.siteType ==
-                                          SiteType.nexusphp) ...[
-                                    Icon(
-                                      Icons.chat,
-                                      size: 10,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                    ),
-                                    const SizedBox(width: 2),
-                                    Text(
-                                      '${torrent.comments}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                    if (currentSite?.features.supportHistory ??
-                                        true)
-                                      const SizedBox(width: 6),
-                                  ],
-                                  if (currentSite?.features.supportHistory ??
-                                      true)
-                                    _buildDownloadStatusIcon(
-                                      torrent.downloadStatus,
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    )
-                  else ...[
-                    // 移动端单列布局 (保持原样)
-                    // seeders
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.arrow_upward,
-                          color: Colors.green,
-                          size: 12,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${torrent.seeders}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: smallGap),
-                    // leechers
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.arrow_downward,
-                          color: Colors.red,
-                          size: 12,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${torrent.leechers}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: compactGap),
-                    // size
-                    _buildSizeText(context),
-                    SizedBox(height: compactGap),
-                    // comments
-                    if (currentSite?.siteType == SiteType.mteam ||
-                        currentSite?.siteType == SiteType.nexusphp)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.chat,
-                            size: 10,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${torrent.comments}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    // history download status
-                    if (currentSite?.features.supportHistory ?? true)
-                      Padding(
-                        padding: EdgeInsets.only(top: smallGap),
-                        child: _buildDownloadStatusIcon(torrent.downloadStatus),
-                      ),
-                  ],
-                ],
+          Tooltip(
+            message: torrent.name,
+            child: Text(
+              torrent.name,
+              maxLines: isMobile ? 2 : 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Theme.of(context).textTheme.titleMedium?.color,
+                fontWeight: FontWeight.bold,
+                fontSize: AppFontSize.title,
+                height: isCompactDesktopNoCover ? 1.15 : 1.2,
               ),
             ),
           ),
-          if (isMobile) const SizedBox(width: 4),
+          SizedBox(height: isCompactDesktopNoCover ? 1 : 2),
+          // Subtitle
+          Text(
+            torrent.smallDescr,
+            maxLines: isMobile ? 2 : 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: AppFontSize.caption,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              height: isCompactDesktopNoCover ? 1.15 : 1.2,
+            ),
+          ),
+          SizedBox(height: isCompactDesktopNoCover ? 2 : 4),
+          // 底部内联统计行
+          _StatsRow(
+            torrent: torrent,
+            currentSite: currentSite,
+            compact: isCompactDesktopNoCover,
+          ),
+          if (batchStatus != null) ...[const SizedBox(height: 4), batchStatus],
         ],
+      ),
+    );
+  }
+}
+
+/// 底部内联统计行：做种/下载/大小/发布时间 + 评论数与下载历史状态
+class _StatsRow extends StatelessWidget {
+  final TorrentItem torrent;
+  final SiteConfig? currentSite;
+  final bool compact;
+
+  const _StatsRow({
+    required this.torrent,
+    this.currentSite,
+    this.compact = false,
+  });
+
+  Widget _downloadStatusIcon(DownloadStatus status, AppSemanticColors colors) {
+    switch (status) {
+      case DownloadStatus.completed:
+        return Tooltip(
+          message: '已完成',
+          child: Icon(Icons.download_done, color: colors.seeders, size: 15),
+        );
+      case DownloadStatus.downloading:
+        return const Tooltip(
+          message: '下载中',
+          child: SizedBox(
+            width: 13,
+            height: 13,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        );
+      case DownloadStatus.none:
+        return const SizedBox.shrink();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.semanticColors;
+    final metaStyle = TextStyle(
+      fontSize: AppFontSize.meta,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+      height: compact ? 1.15 : 1.2,
+    );
+    final showComments =
+        currentSite?.siteType == SiteType.mteam ||
+        currentSite?.siteType == SiteType.nexusphp;
+    final showHistory =
+        (currentSite?.features.supportHistory ?? true) &&
+        torrent.downloadStatus != DownloadStatus.none;
+
+    return DefaultTextStyle.merge(
+      style: metaStyle,
+      child: Row(
+        children: [
+          Icon(Icons.arrow_upward, color: colors.seeders, size: 12),
+          const SizedBox(width: 2),
+          Text('${torrent.seeders}'),
+          const SizedBox(width: AppSpacing.sm),
+          Icon(Icons.arrow_downward, color: colors.leechers, size: 12),
+          const SizedBox(width: 2),
+          Text('${torrent.leechers}'),
+          const SizedBox(width: AppSpacing.sm),
+          _SizeText(sizeBytes: torrent.sizeBytes),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              Formatters.formatTorrentCreatedDate(torrent.createdDate),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: metaStyle.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          if (showComments) ...[
+            const SizedBox(width: AppSpacing.xs),
+            Icon(
+              Icons.chat_bubble_outline,
+              size: 11,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 2),
+            Text('${torrent.comments}'),
+          ],
+          if (showHistory) ...[
+            const SizedBox(width: AppSpacing.sm),
+            _downloadStatusIcon(torrent.downloadStatus, colors),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SizeText extends StatelessWidget {
+  final int sizeBytes;
+
+  const _SizeText({required this.sizeBytes});
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Text(
+        Formatters.dataFromBytes(sizeBytes),
+        maxLines: 1,
+        softWrap: false,
+      ),
+    );
+  }
+}
+
+/// 优惠标签徽章。[solid] 为 true 时用于封面角标（不透明底、白字），
+/// 否则为标签行内的浅色填充样式。
+class _DiscountBadge extends StatelessWidget {
+  final TorrentItem torrent;
+  final bool solid;
+
+  const _DiscountBadge({required this.torrent, this.solid = false});
+
+  Color _color(AppSemanticColors colors) {
+    switch (torrent.discount.colorType) {
+      case DiscountColorType.green:
+        return colors.discountFree;
+      case DiscountColorType.yellow:
+        return colors.discountPercent;
+      case DiscountColorType.blue:
+        return colors.discountOther;
+      case DiscountColorType.none:
+        return Colors.grey;
+    }
+  }
+
+  String _text() {
+    final baseText = torrent.discount.displayText;
+    final endTime = torrent.discountEndTime;
+    if (torrent.discount != DiscountType.normal && endTime != null) {
+      final hoursLeft = endTime.difference(DateTime.now()).inHours;
+      if (hoursLeft > 0) return '$baseText ${hoursLeft}h';
+    }
+    return baseText;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 封面角标叠在图片上，需要不透明底色保证可读，
+    // 固定使用饱和度较高的浅色版语义色 + 白字。
+    final color = solid
+        ? _color(AppSemanticColors.light)
+        : _color(context.semanticColors);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: solid ? color : color.withValues(alpha: 0.15),
+        borderRadius: solid
+            ? const BorderRadius.only(
+                topLeft: Radius.circular(AppRadius.sm),
+                bottomRight: Radius.circular(AppRadius.sm),
+              )
+            : BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Text(
+        _text(),
+        style: TextStyle(
+          color: solid ? Colors.white : color,
+          fontSize: AppFontSize.badge,
+          fontWeight: FontWeight.w700,
+          height: 1.1,
+        ),
       ),
     );
   }
@@ -984,6 +897,7 @@ class _RatingBadges extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.semanticColors;
     return Wrap(
       spacing: 4,
       runSpacing: 2,
@@ -992,14 +906,14 @@ class _RatingBadges extends StatelessWidget {
         if (hasImdb)
           _buildBadge(
             text: 'IMDB ${torrent.imdbRating}',
-            backgroundColor: const Color(0xFFF5C518),
-            foregroundColor: Colors.black,
+            backgroundColor: colors.imdbBadge,
+            foregroundColor: colors.onImdbBadge,
           ),
         if (hasDouban)
           _buildBadge(
             text: '豆 ${torrent.doubanRating}',
-            backgroundColor: const Color(0xFF007711),
-            foregroundColor: Colors.white,
+            backgroundColor: colors.doubanBadge,
+            foregroundColor: colors.onDoubanBadge,
           ),
       ],
     );
@@ -1133,6 +1047,12 @@ class TorrentCover extends StatelessWidget {
               ),
             ),
           ),
+          if (torrent.discount != DiscountType.normal)
+            Positioned(
+              left: 0,
+              top: 0,
+              child: _DiscountBadge(torrent: torrent, solid: true),
+            ),
           if (hasDouban || hasImdb)
             Positioned(
               left: 0,
@@ -1162,6 +1082,7 @@ class _CoverRatingBadges extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.semanticColors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1169,7 +1090,7 @@ class _CoverRatingBadges extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: const Color(0xFFF5C518),
+              color: colors.imdbBadge,
               borderRadius: BorderRadius.only(
                 topRight: const Radius.circular(6),
                 bottomLeft: hasDouban ? Radius.zero : const Radius.circular(6),
@@ -1177,9 +1098,9 @@ class _CoverRatingBadges extends StatelessWidget {
             ),
             child: Text(
               'IMDB ${torrent.imdbRating}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
-                color: Colors.black,
+                color: colors.onImdbBadge,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1187,18 +1108,18 @@ class _CoverRatingBadges extends StatelessWidget {
         if (hasDouban)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: const BoxDecoration(
-              color: Color(0xFF007711),
-              borderRadius: BorderRadius.only(
+            decoration: BoxDecoration(
+              color: colors.doubanBadge,
+              borderRadius: const BorderRadius.only(
                 topRight: Radius.circular(6),
                 bottomLeft: Radius.circular(6),
               ),
             ),
             child: Text(
               '豆 ${torrent.doubanRating}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
-                color: Colors.white,
+                color: colors.onDoubanBadge,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1212,11 +1133,13 @@ class _TagsRatingRow extends StatelessWidget {
   final List<TagType> tags;
   final bool isTop;
   final Widget? ratingBadges;
+  final Widget? discountBadge;
 
   const _TagsRatingRow({
     required this.tags,
     this.isTop = false,
     this.ratingBadges,
+    this.discountBadge,
   });
 
   @override
@@ -1226,6 +1149,10 @@ class _TagsRatingRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (discountBadge != null) ...[
+          discountBadge!,
+          const SizedBox(width: 6),
+        ],
         if (hasTags)
           Expanded(
             child: _TagsView(tags: tags, isTop: isTop),
@@ -1249,6 +1176,7 @@ class TorrentActions extends StatelessWidget {
   final SiteConfig? currentSite;
   final VoidCallback? onToggleCollection;
   final VoidCallback? onDownload;
+  final bool compact;
 
   const TorrentActions({
     super.key,
@@ -1256,15 +1184,19 @@ class TorrentActions extends StatelessWidget {
     this.currentSite,
     this.onToggleCollection,
     this.onDownload,
+    this.compact = false,
   });
 
-  ButtonStyle get _compactIconButtonStyle => IconButton.styleFrom(
-    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    fixedSize: const Size.square(36),
-    minimumSize: const Size.square(36),
-    padding: EdgeInsets.zero,
-    visualDensity: VisualDensity.compact,
-  );
+  ButtonStyle get _compactIconButtonStyle {
+    final size = compact ? 32.0 : 36.0;
+    return IconButton.styleFrom(
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      fixedSize: Size.square(size),
+      minimumSize: Size.square(size),
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1281,7 +1213,7 @@ class TorrentActions extends StatelessWidget {
               color: torrent.collection ? Colors.red : null,
             ),
             tooltip: torrent.collection ? '取消收藏' : '收藏',
-            iconSize: 20,
+            iconSize: compact ? 18 : 20,
             style: _compactIconButtonStyle,
           ),
         // 下载按钮 - 仅在站点支持下载功能时显示
@@ -1290,7 +1222,7 @@ class TorrentActions extends StatelessWidget {
             onPressed: onDownload,
             icon: const Icon(Icons.download_outlined),
             tooltip: '下载',
-            iconSize: 20,
+            iconSize: compact ? 18 : 20,
             style: _compactIconButtonStyle,
           ),
       ],

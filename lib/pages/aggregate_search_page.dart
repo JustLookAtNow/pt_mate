@@ -192,21 +192,6 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           currentRoute: '/aggregate_search',
           appBar: AppBar(
             title: const Text('聚合搜索'),
-            backgroundColor: Theme.of(context).brightness == Brightness.light
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.surface,
-            iconTheme: IconThemeData(
-              color: Theme.of(context).brightness == Brightness.light
-                  ? Theme.of(context).colorScheme.onPrimary
-                  : Theme.of(context).colorScheme.onSurface,
-            ),
-            titleTextStyle: TextStyle(
-              color: Theme.of(context).brightness == Brightness.light
-                  ? Theme.of(context).colorScheme.onPrimary
-                  : Theme.of(context).colorScheme.onSurface,
-              fontSize: 20,
-              fontWeight: FontWeight.w500,
-            ),
             actions: [const QbSpeedIndicator()],
           ),
           body: provider.loading
