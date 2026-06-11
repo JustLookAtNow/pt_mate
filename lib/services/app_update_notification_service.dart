@@ -83,14 +83,14 @@ class AppUpdateNotificationService {
   }
 
   Future<void> showCanceled() async {
-    await _show(
-      title: '更新下载已取消',
-      body: '可稍后重新检查更新',
-      progress: null,
-      indeterminate: false,
-      ongoing: false,
-      withCancelAction: false,
-    );
+    await initialize();
+    if (!_available) return;
+
+    try {
+      await _plugin.cancel(id: notificationId);
+    } catch (_) {
+      _available = false;
+    }
   }
 
   Future<void> showFailed(String message) async {
@@ -139,7 +139,7 @@ class AppUpdateNotificationService {
                 cancelActionId,
                 '取消',
                 showsUserInterface: true,
-                cancelNotification: false,
+                cancelNotification: true,
               ),
             ]
           : null,
