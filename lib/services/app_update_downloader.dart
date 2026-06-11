@@ -24,6 +24,49 @@ class AppUpdateProgress {
   });
 }
 
+class AppUpdateCanceledException implements Exception {
+  const AppUpdateCanceledException();
+
+  @override
+  String toString() => '更新下载已取消';
+}
+
+class AppUpdateCancelToken {
+  bool _isCanceled = false;
+  final List<VoidCallback> _listeners = [];
+
+  bool get isCanceled => _isCanceled;
+
+  void cancel() {
+    if (_isCanceled) return;
+    _isCanceled = true;
+
+    final listeners = List<VoidCallback>.from(_listeners);
+    _listeners.clear();
+    for (final listener in listeners) {
+      listener();
+    }
+  }
+
+  VoidCallback addCancelListener(VoidCallback listener) {
+    if (_isCanceled) {
+      listener();
+      return () {};
+    }
+
+    _listeners.add(listener);
+    return () {
+      _listeners.remove(listener);
+    };
+  }
+
+  void throwIfCanceled() {
+    if (_isCanceled) {
+      throw const AppUpdateCanceledException();
+    }
+  }
+}
+
 @immutable
 class MirrorProbeResult {
   final bool isAvailable;
@@ -100,10 +143,12 @@ class AppUpdateDownloader {
   Future<void> startAndroidUpdate({
     required UpdateCheckResult updateResult,
     required ValueChanged<AppUpdateProgress> onProgress,
+    AppUpdateCancelToken? cancelToken,
   }) async {
     if (!supportsInAppUpdate) {
       throw StateError('当前平台不支持应用内安装更新');
     }
+    cancelToken?.throwIfCanceled();
 
     final directApkUrl = _resolveAndroidApkUrl(updateResult);
     if (directApkUrl == null) {
@@ -112,7 +157,8 @@ class AppUpdateDownloader {
 
     final candidates = _buildCandidateUrls(directApkUrl);
     onProgress(const AppUpdateProgress(message: '正在测速下载源...'));
-    final ranked = await _rankCandidates(candidates);
+    final ranked = await _rankCandidates(candidates, cancelToken: cancelToken);
+    cancelToken?.throwIfCanceled();
     if (ranked.isEmpty) {
       throw StateError('未找到可用的下载源');
     }
@@ -126,6 +172,7 @@ class AppUpdateDownloader {
 
     Object? lastError;
     for (var i = 0; i < ranked.length; i++) {
+      cancelToken?.throwIfCanceled();
       final candidate = ranked[i];
       onProgress(
         AppUpdateProgress(
@@ -140,8 +187,11 @@ class AppUpdateDownloader {
           version: updateResult.latestVersion,
           totalBytes: candidate.contentLength,
           onProgress: onProgress,
+          cancelToken: cancelToken,
         );
         return;
+      } on AppUpdateCanceledException {
+        rethrow;
       } catch (e) {
         lastError = e;
       }
@@ -202,12 +252,13 @@ class AppUpdateDownloader {
   }
 
   Future<List<RankedMirrorSource>> _rankCandidates(
-    List<String> candidates,
-  ) async {
+    List<String> candidates, {
+    AppUpdateCancelToken? cancelToken,
+  }) async {
     final probeResults = <String, MirrorProbeResult>{};
     await Future.wait(
       candidates.map((url) async {
-        probeResults[url] = await _probeUrl(url);
+        probeResults[url] = await _probeUrl(url, appCancelToken: cancelToken);
       }),
     );
     return rankCandidatesForTesting(candidates, probeResults);
@@ -275,25 +326,34 @@ class AppUpdateDownloader {
     return ranked.map((item) => item.source).toList();
   }
 
-  Future<MirrorProbeResult> _probeUrl(String url) async {
+  Future<MirrorProbeResult> _probeUrl(
+    String url, {
+    AppUpdateCancelToken? appCancelToken,
+  }) async {
     final stopwatch = Stopwatch()..start();
-    final cancelToken = CancelToken();
+    final dioCancelToken = CancelToken();
     Timer? timer;
+    VoidCallback? removeCancelListener;
     ResponseBody? responseBody;
     var bytesReceived = 0;
     int? latencyMs;
     int? contentLength;
 
     try {
+      removeCancelListener = appCancelToken?.addCancelListener(() {
+        if (!dioCancelToken.isCancelled) {
+          dioCancelToken.cancel('app-update-canceled');
+        }
+      });
       timer = Timer(_speedTestDuration, () {
-        if (!cancelToken.isCancelled) {
-          cancelToken.cancel('speed-test-timeout');
+        if (!dioCancelToken.isCancelled) {
+          dioCancelToken.cancel('speed-test-timeout');
         }
       });
 
       final response = await _probeDio.get<ResponseBody>(
         url,
-        cancelToken: cancelToken,
+        cancelToken: dioCancelToken,
         options: Options(
           responseType: ResponseType.stream,
           headers: const {'Range': 'bytes=0-1048575'},
@@ -314,8 +374,9 @@ class AppUpdateDownloader {
 
       await for (final chunk in responseBody.stream) {
         bytesReceived += chunk.length;
-        if (bytesReceived >= _speedTestByteLimit && !cancelToken.isCancelled) {
-          cancelToken.cancel('speed-test-sample-complete');
+        if (bytesReceived >= _speedTestByteLimit &&
+            !dioCancelToken.isCancelled) {
+          dioCancelToken.cancel('speed-test-sample-complete');
         }
       }
     } on DioException catch (e) {
@@ -337,6 +398,7 @@ class AppUpdateDownloader {
         contentLength: contentLength,
       );
     } finally {
+      removeCancelListener?.call();
       timer?.cancel();
       stopwatch.stop();
     }
@@ -374,8 +436,11 @@ class AppUpdateDownloader {
     required String? version,
     required int? totalBytes,
     required ValueChanged<AppUpdateProgress> onProgress,
+    AppUpdateCancelToken? cancelToken,
   }) async {
     final completer = Completer<void>();
+    final otaUpdate = OtaUpdate();
+    VoidCallback? removeCancelListener;
 
     final filenameVersion = (version ?? 'latest').replaceAll(
       RegExp(r'[^0-9A-Za-z._-]'),
@@ -384,12 +449,33 @@ class AppUpdateDownloader {
     final destinationFilename = 'pt_mate-$filenameVersion-arm64-v8a.apk';
 
     late final StreamSubscription<OtaEvent> sub;
-    sub = OtaUpdate()
+    removeCancelListener = cancelToken?.addCancelListener(() {
+      otaUpdate.cancel();
+      if (!completer.isCompleted) {
+        completer.completeError(const AppUpdateCanceledException());
+      }
+    });
+
+    sub = otaUpdate
         .execute(url, destinationFilename: destinationFilename)
         .listen(
           (event) {
+            if (cancelToken?.isCanceled ?? false) {
+              if (!completer.isCompleted) {
+                completer.completeError(const AppUpdateCanceledException());
+              }
+              return;
+            }
+
             final status = event.status.toString().split('.').last;
             final value = event.value ?? '';
+
+            if (status == 'CANCELED') {
+              if (!completer.isCompleted) {
+                completer.completeError(const AppUpdateCanceledException());
+              }
+              return;
+            }
 
             if (status == 'DOWNLOADING') {
               final progressValue = double.tryParse(value);
@@ -456,6 +542,7 @@ class AppUpdateDownloader {
     try {
       await completer.future;
     } finally {
+      removeCancelListener?.call();
       await sub.cancel();
     }
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -5,13 +7,19 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/android_install_permission_service.dart';
 import '../services/app_update_downloader.dart';
+import '../services/app_update_flow_controller.dart';
 import '../services/update_service.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
 
 class UpdateNotificationDialog extends StatefulWidget {
   final UpdateCheckResult updateResult;
+  final AppUpdateFlowController? flowController;
 
-  const UpdateNotificationDialog({super.key, required this.updateResult});
+  const UpdateNotificationDialog({
+    super.key,
+    required this.updateResult,
+    this.flowController,
+  });
 
   @override
   State<UpdateNotificationDialog> createState() =>
@@ -34,19 +42,35 @@ class UpdateNotificationDialog extends StatefulWidget {
 
 class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
   final ScrollController _contentScrollController = ScrollController();
+  late final AppUpdateFlowController _flowController;
 
-  bool _isUpdating = false;
-  String? _progressMessage;
-  double? _downloadProgress;
+  bool _handledTerminalState = false;
+  bool _shownFailure = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _flowController = widget.flowController ?? AppUpdateFlowController.instance;
+    _flowController.resetIfFinished();
+    _flowController.addListener(_onFlowChanged);
+  }
 
   @override
   void dispose() {
+    _flowController.removeListener(_onFlowChanged);
     _contentScrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final flowState = _flowController.state;
+    final isUpdating =
+        flowState.isRunning ||
+        flowState.status == AppUpdateFlowStatus.installing;
+    final progressMessage = flowState.message;
+    final downloadProgress = flowState.progress;
+
     return AlertDialog(
       title: Row(
         children: [
@@ -104,16 +128,18 @@ class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
-            if (_progressMessage != null) ...[
+            if (progressMessage != null) ...[
               const SizedBox(height: 12),
-              if (_isUpdating) ...[
-                LinearProgressIndicator(value: _downloadProgress),
+              if (isUpdating) ...[
+                LinearProgressIndicator(value: downloadProgress),
                 const SizedBox(height: 8),
               ],
               Text(
-                _progressMessage!,
+                progressMessage,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
+                  color: flowState.status == AppUpdateFlowStatus.failed
+                      ? Theme.of(context).colorScheme.error
+                      : Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -121,37 +147,57 @@ class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
           ],
         ),
       ),
-      actionsAlignment: MainAxisAlignment.spaceBetween,
-      actions: [
-        TextButton(
-          onPressed: _isUpdating ? null : _onNeverRemindPressed,
-          style: TextButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.error,
-            foregroundColor: Theme.of(context).colorScheme.onError,
-          ),
-          child: const Text('永不提醒'),
-        ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextButton(
-              onPressed: _isUpdating ? null : () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                side: BorderSide(
-                  color: Theme.of(context).colorScheme.outline,
-                  width: 1.0,
-                ),
+      actionsAlignment: isUpdating
+          ? MainAxisAlignment.end
+          : MainAxisAlignment.spaceBetween,
+      actions: isUpdating
+          ? [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('后台'),
               ),
-              child: const Text('稍后提醒'),
-            ),
-            const SizedBox(width: 8),
-            FilledButton(
-              onPressed: _isUpdating ? null : _onPrimaryPressed,
-              child: Text(_isUpdating ? '下载中...' : '立即更新'),
-            ),
-          ],
-        ),
-      ],
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: flowState.canCancel ? _onCancelPressed : null,
+                style: TextButton.styleFrom(
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.outline,
+                    width: 1.0,
+                  ),
+                ),
+                child: const Text('取消'),
+              ),
+            ]
+          : [
+              TextButton(
+                onPressed: _onNeverRemindPressed,
+                style: TextButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                ),
+                child: const Text('永不提醒'),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: TextButton.styleFrom(
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.outline,
+                        width: 1.0,
+                      ),
+                    ),
+                    child: const Text('稍后提醒'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: _onPrimaryPressed,
+                    child: const Text('立即更新'),
+                  ),
+                ],
+              ),
+            ],
     );
   }
 
@@ -188,45 +234,44 @@ class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
       return;
     }
 
-    setState(() {
-      _isUpdating = true;
-      _progressMessage = '正在清理旧安装包...';
-      _downloadProgress = null;
-    });
+    _handledTerminalState = false;
+    _shownFailure = false;
+    unawaited(_flowController.start(widget.updateResult));
+  }
+
+  void _onCancelPressed() {
+    _handledTerminalState = true;
+    _flowController.cancel();
+    if (!mounted) return;
+    NotificationHelper.showInfo(context, '更新下载已取消');
+    Navigator.of(context).pop();
+  }
+
+  void _onFlowChanged() {
+    if (!mounted) return;
+    setState(() {});
     _scrollToBottom();
 
-    try {
-      await AndroidInstallPermissionService.instance.clearDownloadedApks();
-      if (!mounted) return;
+    final flowState = _flowController.state;
+    if (flowState.status == AppUpdateFlowStatus.failed && !_shownFailure) {
+      _shownFailure = true;
+      NotificationHelper.showError(context, flowState.message ?? '应用内更新失败');
+      return;
+    }
 
-      setState(() {
-        _progressMessage = '正在测速下载源...';
-      });
-      _scrollToBottom();
+    if (_handledTerminalState) return;
 
-      await AppUpdateDownloader.instance.startAndroidUpdate(
-        updateResult: widget.updateResult,
-        onProgress: (progress) {
-          if (!mounted) return;
-          setState(() {
-            _progressMessage = progress.message;
-            _downloadProgress = progress.progress;
-          });
-          _scrollToBottom();
-        },
-      );
-
-      if (!mounted) return;
+    if (flowState.status == AppUpdateFlowStatus.installing) {
+      _handledTerminalState = true;
       NotificationHelper.showSuccess(context, '安装界面已打开，请按系统提示完成更新');
       Navigator.of(context).pop();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isUpdating = false;
-        _downloadProgress = null;
-      });
-      _scrollToBottom();
-      NotificationHelper.showError(context, '应用内更新失败：$e');
+      return;
+    }
+
+    if (flowState.status == AppUpdateFlowStatus.canceled) {
+      _handledTerminalState = true;
+      NotificationHelper.showInfo(context, '更新下载已取消');
+      Navigator.of(context).pop();
     }
   }
 

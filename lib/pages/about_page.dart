@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
 
+import '../services/app_update_flow_controller.dart';
 import '../services/update_service.dart';
 import '../utils/url_launcher_helper.dart';
 import '../widgets/qb_speed_indicator.dart';
@@ -94,6 +95,13 @@ class _AboutPageState extends State<AboutPage> {
 
   Future<void> _onCheckUpdatePressed() async {
     try {
+      final updateFlow = AppUpdateFlowController.instance;
+      final activeUpdateResult = updateFlow.currentUpdateResult;
+      if (updateFlow.state.isRunning && activeUpdateResult != null) {
+        await UpdateNotificationDialog.show(context, activeUpdateResult);
+        return;
+      }
+
       final result = await UpdateService.instance.manualCheckForUpdates();
       if (!mounted) return;
       if (result == null) {
