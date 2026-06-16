@@ -185,13 +185,13 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
                 Icon(
                   Icons.cloud_download,
                   size: 16,
-                  color: Theme.of(context).colorScheme.onSurface,
+                  color: Theme.of(context).colorScheme.onPrimary,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   '↑${Formatters.speedFromBytesPerSec(info.upSpeed)}${ScreenUtils.isLargeScreen(context) ? " (${Formatters.dataFromBytes(info.upTotal)})" : ""} ↓${Formatters.speedFromBytesPerSec(info.dlSpeed)}${ScreenUtils.isLargeScreen(context) ? " (${Formatters.dataFromBytes(info.dlTotal)})" : ""}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: Theme.of(context).colorScheme.onPrimary,
                   ),
                 ),
               ],
@@ -202,7 +202,7 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(
                   context,
-                ).colorScheme.onSurface.withValues(alpha: 0.8),
+                ).colorScheme.onPrimary.withValues(alpha: 0.8),
               ),
             ),
           ],
