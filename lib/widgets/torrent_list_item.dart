@@ -1,4 +1,5 @@
 import '../utils/screen_utils.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/app_models.dart';
@@ -8,6 +9,7 @@ import 'dart:math' as math;
 
 import '../utils/format.dart';
 import 'cached_network_image.dart';
+import 'full_screen_image_viewer.dart';
 
 // Helper method to parse rating
 // Using a static final RegExp to avoid recompiling the pattern on every call, improving performance.
@@ -908,7 +910,7 @@ class _RatingBadges extends StatelessWidget {
   }
 }
 
-class TorrentCover extends StatelessWidget {
+class TorrentCover extends StatefulWidget {
   final TorrentItem torrent;
   final SiteConfig? currentSite;
   final bool isMobile;
@@ -924,10 +926,57 @@ class TorrentCover extends StatelessWidget {
     required this.hasImdb,
   });
 
-  double get _coverWidth => isMobile ? _mobileCoverWidth : _desktopCoverWidth;
+  @override
+  State<TorrentCover> createState() => _TorrentCoverState();
+}
+
+class _TorrentCoverState extends State<TorrentCover> {
+  Uint8List? _imageData;
+  int _reloadKey = 0;
+
+  double get _coverWidth =>
+      widget.isMobile ? _mobileCoverWidth : _desktopCoverWidth;
 
   double get _coverHeight =>
-      isMobile ? _mobileCoverHeight : _desktopCoverHeight;
+      widget.isMobile ? _mobileCoverHeight : _desktopCoverHeight;
+
+  @override
+  void didUpdateWidget(TorrentCover oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.torrent.cover != widget.torrent.cover) {
+      _imageData = null;
+    }
+  }
+
+  Future<void> _showCoverPreview(
+    BuildContext context,
+    Uint8List imageData,
+  ) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    await showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.7),
+      builder: (context) =>
+          FullScreenImageViewer.memory(imageData: imageData),
+    );
+  }
+
+  void _reload() {
+    setState(() {
+      _reloadKey++;
+      _imageData = null;
+    });
+  }
+
+  void _handleTap(BuildContext context) {
+    if (widget.torrent.cover.isEmpty) return;
+    final data = _imageData;
+    if (data != null) {
+      _showCoverPreview(context, data);
+    } else {
+      _reload();
+    }
+  }
 
   Widget _buildCoverPlaceholder(
     BuildContext context, {
@@ -957,10 +1006,10 @@ class TorrentCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final torrent = widget.torrent;
     return SizedBox(
       width: _coverWidth,
       height: _coverHeight,
-      // margin: const EdgeInsets.only(right: 12),
       child: Stack(
         children: [
           Container(
@@ -974,36 +1023,22 @@ class TorrentCover extends StatelessWidget {
                 width: 1,
               ),
             ),
-            child: GestureDetector(
-              onTap: () async {
-                if (torrent.cover.isNotEmpty) {
-                  FocusManager.instance.primaryFocus?.unfocus();
-                  await showDialog(
-                    context: context,
-                    builder: (ctx) => Dialog(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: torrent.cover.isNotEmpty
+                  ? GestureDetector(
+                      onTap: () => _handleTap(context),
                       child: CachedNetworkImage(
+                        key: ValueKey('${torrent.cover}::$_reloadKey'),
                         imageUrl: torrent.cover,
-                        siteConfig: currentSite,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  );
-                  if (context.mounted) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      FocusManager.instance.primaryFocus?.unfocus();
-                    });
-                  }
-                }
-              },
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: torrent.cover.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: torrent.cover,
-                        siteConfig: currentSite,
+                        siteConfig: widget.currentSite,
                         width: _coverWidth,
                         height: _coverHeight,
                         fit: BoxFit.cover,
+                        imageBuilder: (context, imageData, image) {
+                          _imageData = imageData;
+                          return image;
+                        },
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;
                           return _buildCoverPlaceholder(
@@ -1026,23 +1061,27 @@ class TorrentCover extends StatelessWidget {
                             text: '加载失败',
                           );
                         },
-                      )
-                    : _buildCoverPlaceholder(
-                        context,
-                        icon: const Icon(Icons.image_outlined, size: 24),
-                        text: '暂无',
                       ),
-              ),
+                    )
+                  : _buildCoverPlaceholder(
+                      context,
+                      icon: const Icon(Icons.image_outlined, size: 24),
+                      text: '暂无',
+                    ),
             ),
           ),
-          if (hasDouban || hasImdb)
+          if (widget.hasDouban || widget.hasImdb)
             Positioned(
               left: 0,
               bottom: 0,
-              child: _CoverRatingBadges(
-                torrent: torrent,
-                hasDouban: hasDouban,
-                hasImdb: hasImdb,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _handleTap(context),
+                child: _CoverRatingBadges(
+                  torrent: torrent,
+                  hasDouban: widget.hasDouban,
+                  hasImdb: widget.hasImdb,
+                ),
               ),
             ),
         ],
