@@ -9,6 +9,7 @@ class NotificationHelper {
   static const double _horizontalMargin = 16;
   static const double _topSpacing = 12;
   static const double _maxWidth = 520;
+  static const double _dismissVelocity = 260;
   static const int _maxMessageLines = 4;
   static final BorderRadius _borderRadius = BorderRadius.circular(18);
 
@@ -111,20 +112,47 @@ class NotificationHelper {
     _currentHandle = handle;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_notificationVersion != version || !overlay.mounted) return;
-      overlay.insert(entry);
-    });
-
-    _autoDismissTimer = Timer(duration, () {
       if (_notificationVersion != version) return;
-      _dismissCurrent();
+      if (!overlay.mounted) {
+        _clearIfCurrent(entry);
+        return;
+      }
+
+      try {
+        overlay.insert(entry);
+      } catch (_) {
+        _clearIfCurrent(entry);
+        return;
+      }
+
+      if (_notificationVersion != version) {
+        _removeEntry(entry);
+        return;
+      }
+
+      _autoDismissTimer?.cancel();
+      _autoDismissTimer = Timer(duration, () {
+        if (_notificationVersion != version) return;
+        _dismissCurrent();
+      });
     });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   static void _dismissCurrent() {
     _autoDismissTimer?.cancel();
     _autoDismissTimer = null;
-    _currentHandle?.dismiss();
+
+    final entry = _currentEntry;
+    final handle = _currentHandle;
+    if (entry != null && (handle == null || !handle.isAttached)) {
+      _currentEntry = null;
+      _currentHandle = null;
+      _removeEntry(entry);
+      return;
+    }
+
+    handle?.dismiss();
   }
 
   static void _removeCurrent({required bool immediately}) {
@@ -155,6 +183,14 @@ class NotificationHelper {
     }
   }
 
+  static void _clearIfCurrent(OverlayEntry entry) {
+    if (!identical(_currentEntry, entry)) return;
+    _autoDismissTimer?.cancel();
+    _autoDismissTimer = null;
+    _currentHandle = null;
+    _currentEntry = null;
+  }
+
   @visibleForTesting
   static void resetForTest() {
     _notificationVersion++;
@@ -172,6 +208,8 @@ class _NotificationHandle {
   void detach() {
     _dismiss = null;
   }
+
+  bool get isAttached => _dismiss != null;
 
   void dismiss() {
     _dismiss?.call();
@@ -247,10 +285,25 @@ class _NotificationOverlayState extends State<_NotificationOverlay>
     widget.handle.detach();
 
     if (_controller.status != AnimationStatus.dismissed) {
-      await _controller.reverse();
+      try {
+        await _controller.reverse();
+      } on TickerCanceled {
+        return;
+      }
     }
 
+    if (!mounted) return;
     widget.onHidden();
+  }
+
+  void _handleDragEnd(DragEndDetails details) {
+    final velocity = details.velocity.pixelsPerSecond;
+    if (velocity.dx.abs() < NotificationHelper._dismissVelocity &&
+        velocity.dy.abs() < NotificationHelper._dismissVelocity) {
+      return;
+    }
+
+    unawaited(_dismiss());
   }
 
   @override
@@ -262,36 +315,36 @@ class _NotificationOverlayState extends State<_NotificationOverlay>
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
-      ignoring: true,
-      child: SizedBox.expand(
-        child: SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              NotificationHelper._horizontalMargin,
-              NotificationHelper._topSpacing,
-              NotificationHelper._horizontalMargin,
-              0,
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final maxWidth = math.min(
-                  constraints.maxWidth,
-                  NotificationHelper._maxWidth,
-                );
+    return SizedBox.expand(
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            NotificationHelper._horizontalMargin,
+            NotificationHelper._topSpacing,
+            NotificationHelper._horizontalMargin,
+            0,
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final maxWidth = math.min(
+                constraints.maxWidth,
+                NotificationHelper._maxWidth,
+              );
 
-                return Align(
-                  alignment: Alignment.topCenter,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: maxWidth,
-                      minHeight: 28,
-                    ),
-                    child: FadeTransition(
-                      opacity: _opacity,
-                      child: SlideTransition(
-                        position: _slide,
+              return Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: maxWidth,
+                    minHeight: 28,
+                  ),
+                  child: FadeTransition(
+                    opacity: _opacity,
+                    child: SlideTransition(
+                      position: _slide,
+                      child: GestureDetector(
+                        onPanEnd: _handleDragEnd,
                         child: Material(
                           key: const Key('notification_helper_toast'),
                           color: widget.backgroundColor,
@@ -334,9 +387,9 @@ class _NotificationOverlayState extends State<_NotificationOverlay>
                       ),
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
         ),
       ),

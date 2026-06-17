@@ -63,6 +63,28 @@ void main() {
     await _cleanupNotification(tester);
   });
 
+  testWidgets('通知可以手动滑动关闭', (tester) async {
+    await tester.pumpWidget(const _NotificationTestApp());
+
+    await tester.tap(find.byKey(const Key('show_long')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.byKey(const Key('notification_helper_toast')), findsOneWidget);
+
+    await tester.fling(
+      find.byKey(const Key('notification_helper_toast')),
+      const Offset(0, -120),
+      800,
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.byKey(const Key('notification_helper_toast')), findsNothing);
+
+    await _cleanupNotification(tester);
+  });
+
   testWidgets('新通知会替换旧通知', (tester) async {
     await tester.pumpWidget(const _NotificationTestApp());
 
