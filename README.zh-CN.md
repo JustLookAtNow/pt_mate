@@ -81,6 +81,14 @@ flutter pub get
 flutter run
 ```
 
+## 开发 Hooks
+
+本仓库使用版本化的 Git hook：`.githooks/pre-commit`，用于在提交前自动执行 `dart format`。克隆仓库后需要执行一次：
+
+```bash
+git config core.hooksPath .githooks
+```
+
 ## iOS 侧载源
 
 SideStore：

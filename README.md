@@ -81,6 +81,14 @@ flutter pub get
 flutter run
 ```
 
+## Development Hooks
+
+This repository uses a versioned Git hook in `.githooks/pre-commit` to run `dart format` before commits. Enable it once after cloning:
+
+```bash
+git config core.hooksPath .githooks
+```
+
 ## iOS Sideloading Source
 
 SideStore:
