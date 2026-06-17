@@ -24,7 +24,7 @@ class _TorrentListSkeletonState extends State<TorrentListSkeleton>
     _controller = AnimationController(
       duration: const Duration(milliseconds: 900),
       vsync: this,
-      lowerBound: 0.45,
+      lowerBound: 0.65,
       upperBound: 1.0,
     )..repeat(reverse: true);
   }
@@ -55,7 +55,7 @@ class _SkeletonItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final boneColor = colorScheme.surfaceContainerHighest;
+    final boneColor = AppPlaceholderColors.bone(colorScheme);
 
     Widget bone(double width, double height, {double radius = 4}) {
       return Container(
@@ -77,9 +77,7 @@ class _SkeletonItem extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: colorScheme.outline.withValues(alpha: 0.15),
-        ),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.15)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

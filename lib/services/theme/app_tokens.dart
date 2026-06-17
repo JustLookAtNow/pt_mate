@@ -41,6 +41,20 @@ abstract final class AppFontSize {
   static const double title = 14;
 }
 
+/// 主题派生占位色。
+///
+/// Material 3 的 surface container 色阶在 Android 动态取色下可能非常接近，
+/// 这里用前景色叠加到卡片底色上，保证骨架屏/加载占位始终有可见对比。
+abstract final class AppPlaceholderColors {
+  static Color bone(ColorScheme colorScheme) {
+    final alpha = colorScheme.brightness == Brightness.dark ? 0.22 : 0.14;
+    return Color.alphaBlend(
+      colorScheme.onSurface.withValues(alpha: alpha),
+      colorScheme.surfaceContainerLow,
+    );
+  }
+}
+
 /// 语义色 ThemeExtension：优惠、做种/下载、评分源、收藏等
 /// 与品牌主题色无关的固定语义色，按明暗模式分别给出。
 @immutable

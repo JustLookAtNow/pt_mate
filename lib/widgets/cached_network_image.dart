@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
 import '../services/image_http_client.dart';
+import '../services/theme/app_tokens.dart';
 
 /// 带缓存和请求头的网络图片组件
 class CachedNetworkImage extends StatefulWidget {
@@ -144,11 +145,12 @@ class _CachedNetworkImageState extends State<CachedNetworkImage> {
   }
 
   Widget _buildDefaultLoading(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       width: widget.width,
       height: widget.height,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: AppPlaceholderColors.bone(colorScheme),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Column(
@@ -159,16 +161,13 @@ class _CachedNetworkImageState extends State<CachedNetworkImage> {
             height: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: Theme.of(context).colorScheme.primary,
+              color: colorScheme.primary,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             '加载中',
-            style: TextStyle(
-              fontSize: 8,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+            style: TextStyle(fontSize: 8, color: colorScheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -176,11 +175,12 @@ class _CachedNetworkImageState extends State<CachedNetworkImage> {
   }
 
   Widget _buildDefaultError(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       width: widget.width,
       height: widget.height,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: AppPlaceholderColors.bone(colorScheme),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Column(
@@ -189,15 +189,12 @@ class _CachedNetworkImageState extends State<CachedNetworkImage> {
           Icon(
             Icons.image_outlined,
             size: 24,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: 4),
           Text(
             '加载失败',
-            style: TextStyle(
-              fontSize: 10,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+            style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant),
           ),
         ],
       ),

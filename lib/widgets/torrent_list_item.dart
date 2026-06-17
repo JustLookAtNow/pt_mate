@@ -956,8 +956,7 @@ class _TorrentCoverState extends State<TorrentCover> {
     await showDialog(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.7),
-      builder: (context) =>
-          FullScreenImageViewer.memory(imageData: imageData),
+      builder: (context) => FullScreenImageViewer.memory(imageData: imageData),
     );
   }
 
@@ -1007,6 +1006,7 @@ class _TorrentCoverState extends State<TorrentCover> {
   @override
   Widget build(BuildContext context) {
     final torrent = widget.torrent;
+    final colorScheme = Theme.of(context).colorScheme;
     return SizedBox(
       width: _coverWidth,
       height: _coverHeight,
@@ -1014,12 +1014,10 @@ class _TorrentCoverState extends State<TorrentCover> {
         children: [
           Container(
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              color: AppPlaceholderColors.bone(colorScheme),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: Theme.of(
-                  context,
-                ).colorScheme.outline.withValues(alpha: 0.3),
+                color: colorScheme.outline.withValues(alpha: 0.3),
                 width: 1,
               ),
             ),
