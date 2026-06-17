@@ -1,35 +1,40 @@
 import 'dart:io';
+
 import 'package:archive/archive.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../models/app_models.dart';
 import 'downloader/torrent_file_downloader_mixin.dart';
+import 'storage/storage_service.dart';
 
 /// 本地下载服务
 ///
-/// 提供种子文件下载并保存到本地设备的功能
+/// 提供种子文件下载并保存到本地设备的功能。
 class LocalDownloadService with TorrentFileDownloaderMixin {
   static final LocalDownloadService instance = LocalDownloadService._();
 
   LocalDownloadService._();
 
+  static const String downloadsDisplayPath = 'Downloads/PT Mate';
+  static const MethodChannel _androidDownloadsChannel = MethodChannel(
+    'pt_mate/local_downloads',
+  );
+
   late final Dio _dio = Dio();
 
-  /// 请求存储权限（仅Android 9及以下需要）
-  ///
-  /// 返回true表示已获得权限，false表示权限被拒绝
+  /// 请求存储权限（仅 Android 9 及以下需要）。
   Future<bool> requestStoragePermission() async {
     if (Platform.isAndroid) {
-      // Android 10+ (API 29+) 使用SAF机制，无需额外权限
-      final androidInfo = await _getAndroidSdkVersion();
-      if (androidInfo >= 29) {
+      final androidSdk = await _getAndroidSdkVersion();
+      if (androidSdk >= 29) {
         return true;
       }
 
-      // Android 9及以下需要存储权限
       final status = await Permission.storage.status;
       if (status.isGranted) {
         return true;
@@ -39,60 +44,62 @@ class LocalDownloadService with TorrentFileDownloaderMixin {
       return result.isGranted;
     }
 
-    // iOS/macOS/Linux/Windows 无需额外权限
     return true;
   }
 
-  /// 获取Android SDK版本
   Future<int> _getAndroidSdkVersion() async {
     try {
-      // 使用device_info_plus获取Android版本
-      // 这里简化处理，假设大多数设备都是Android 10+
-      // 实际项目中应该使用device_info_plus包
-      return 29; // 默认返回29，避免不必要的权限请求
-    } catch (e) {
+      final info = await DeviceInfoPlugin().androidInfo;
+      return info.version.sdkInt;
+    } catch (_) {
       return 29;
     }
   }
 
-  /// 下载单个种子文件并保存到本地
-  ///
-  /// [downloadUrl] 种子下载链接
-  /// [torrentName] 种子名称（用作文件名）
-  /// [siteConfig] 站点配置（用于NexusPHPWeb适配器）
-  ///
-  /// 返回保存的文件路径，失败返回null
+  Future<String> getLocalDownloadDisplayPath() async {
+    if (!Platform.isAndroid) {
+      return '用户选择的位置';
+    }
+
+    try {
+      return await _androidDownloadsChannel.invokeMethod<String>(
+            'getDownloadsDisplayPath',
+          ) ??
+          downloadsDisplayPath;
+    } catch (_) {
+      return downloadsDisplayPath;
+    }
+  }
+
+  Future<String> getLocalDownloadHint() async {
+    if (Platform.isAndroid) {
+      return '每个种子会单独保存为 .torrent 文件。';
+    }
+
+    return '将使用系统保存面板选择保存位置。';
+  }
+
+  /// 下载单个种子文件并保存到本地。
   Future<String?> downloadAndSaveTorrent({
     required String downloadUrl,
     required String torrentName,
     SiteConfig? siteConfig,
   }) async {
     try {
-      // 检查权限
       final hasPermission = await requestStoragePermission();
       if (!hasPermission) {
         throw Exception('没有存储权限，无法保存文件');
       }
 
-      // 下载种子文件
       final torrentData = await _downloadTorrentData(
         downloadUrl,
         siteConfig: siteConfig,
       );
+      final fileName = _buildTorrentFileName(torrentName);
 
-      // 确保文件名以.torrent结尾
-      String fileName = torrentName;
-      if (!fileName.endsWith('.torrent')) {
-        fileName = '$fileName.torrent';
-      }
-
-      // 处理文件名中的特殊字符
-      fileName = _sanitizeFileName(fileName);
-
-      // 使用文件选择器保存文件
-      final savePath = await _saveWithPicker(fileName, torrentData);
-
-      return savePath;
+      return Platform.isAndroid
+          ? await _saveToAndroidDownloads(fileName, torrentData)
+          : await _saveWithPicker(fileName, torrentData);
     } catch (e) {
       if (kDebugMode) {
         print('下载种子文件失败: $e');
@@ -101,81 +108,38 @@ class LocalDownloadService with TorrentFileDownloaderMixin {
     }
   }
 
-  /// 批量下载种子文件并打包成zip保存
+  /// 批量下载种子文件并保存到本地。
   ///
-  /// [items] 下载项列表
-  /// [onProgress] 进度回调
-  ///
-  /// 返回保存的zip文件路径，失败返回null
-  Future<String?> batchDownloadAndSaveAsZip({
+  /// Android 直接保存多个 .torrent 文件到 Downloads/PT Mate。
+  /// 其他平台仍打包成 zip 并通过保存面板导出。
+  Future<BatchLocalDownloadResult> batchDownloadAndSave({
     required List<TorrentDownloadItem> items,
     void Function(int current, int total, String? currentName)? onProgress,
   }) async {
     try {
-      // 检查权限
       final hasPermission = await requestStoragePermission();
       if (!hasPermission) {
         throw Exception('没有存储权限，无法保存文件');
       }
 
-      final archive = Archive();
-
-      for (int i = 0; i < items.length; i++) {
-        final item = items[i];
-        onProgress?.call(i + 1, items.length, item.torrentName);
-
-        try {
-          final torrentData = await _downloadTorrentData(
-            item.downloadUrl,
-            siteConfig: item.siteConfig,
-          );
-
-          // 确保文件名以.torrent结尾
-          String fileName = item.torrentName;
-          if (!fileName.endsWith('.torrent')) {
-            fileName = '$fileName.torrent';
-          }
-          fileName = _sanitizeFileName(fileName);
-
-          // 处理文件名冲突：如果zip中已有同名文件，添加序号
-          String uniqueFileName = fileName;
-          int counter = 1;
-          while (archive.files.any((f) => f.name == uniqueFileName)) {
-            final nameWithoutExt = fileName.replaceAll('.torrent', '');
-            uniqueFileName = '$nameWithoutExt ($counter).torrent';
-            counter++;
-          }
-
-          // 添加到archive
-          final archiveFile = ArchiveFile(
-            uniqueFileName,
-            torrentData.length,
-            torrentData,
-          );
-          archive.addFile(archiveFile);
-        } catch (e) {
-          if (kDebugMode) {
-            print('批量下载失败 [${item.torrentName}]: $e');
-          }
-          // 继续下载其他文件，不中断批量操作
-        }
+      if (Platform.isAndroid) {
+        return await _batchDownloadAndSaveToAndroidDownloads(
+          items: items,
+          onProgress: onProgress,
+        );
       }
 
-      if (archive.files.isEmpty) {
-        throw Exception('没有成功下载任何种子文件');
-      }
+      final savePath = await _batchDownloadAndSaveAsZipWithPicker(
+        items: items,
+        onProgress: onProgress,
+      );
 
-      // 编码zip文件
-      final zipData = ZipEncoder().encode(archive);
-
-      // 生成zip文件名
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final zipFileName = 'torrents_$timestamp.zip';
-
-      // 使用文件选择器保存zip文件
-      final savePath = await _saveWithPicker(zipFileName, zipData);
-
-      return savePath;
+      return BatchLocalDownloadResult(
+        displayPath: savePath,
+        savedCount: savePath == null ? 0 : items.length,
+        failedItems: const [],
+        usedZipFallback: true,
+      );
     } catch (e) {
       if (kDebugMode) {
         print('批量下载种子文件失败: $e');
@@ -184,7 +148,123 @@ class LocalDownloadService with TorrentFileDownloaderMixin {
     }
   }
 
-  /// 下载种子文件并验证
+  Future<BatchLocalDownloadResult> _batchDownloadAndSaveToAndroidDownloads({
+    required List<TorrentDownloadItem> items,
+    void Function(int current, int total, String? currentName)? onProgress,
+  }) async {
+    final failedItems = <BatchLocalDownloadFailure>[];
+    var savedCount = 0;
+
+    for (int i = 0; i < items.length; i++) {
+      final item = items[i];
+      onProgress?.call(i + 1, items.length, item.torrentName);
+
+      try {
+        final torrentData = await _downloadTorrentData(
+          item.downloadUrl,
+          siteConfig: item.siteConfig,
+        );
+        final fileName = _buildTorrentFileName(item.torrentName);
+        await _saveToAndroidDownloads(fileName, torrentData);
+        savedCount++;
+      } catch (e) {
+        failedItems.add(
+          BatchLocalDownloadFailure(
+            itemId: item.id,
+            torrentName: item.torrentName,
+            error: e.toString(),
+          ),
+        );
+        if (kDebugMode) {
+          print('批量下载失败 [${item.torrentName}]: $e');
+        }
+      }
+    }
+
+    if (savedCount == 0) {
+      throw Exception('没有成功下载任何种子文件');
+    }
+
+    return BatchLocalDownloadResult(
+      displayPath: await getLocalDownloadDisplayPath(),
+      savedCount: savedCount,
+      failedItems: failedItems,
+      usedZipFallback: false,
+    );
+  }
+
+  Future<String?> _batchDownloadAndSaveAsZipWithPicker({
+    required List<TorrentDownloadItem> items,
+    void Function(int current, int total, String? currentName)? onProgress,
+  }) async {
+    final archive = Archive();
+
+    for (int i = 0; i < items.length; i++) {
+      final item = items[i];
+      onProgress?.call(i + 1, items.length, item.torrentName);
+
+      try {
+        final torrentData = await _downloadTorrentData(
+          item.downloadUrl,
+          siteConfig: item.siteConfig,
+        );
+        final fileName = _buildTorrentFileName(item.torrentName);
+
+        String uniqueFileName = fileName;
+        int counter = 1;
+        while (archive.files.any((f) => f.name == uniqueFileName)) {
+          final nameWithoutExt = fileName.replaceAll('.torrent', '');
+          uniqueFileName = '$nameWithoutExt ($counter).torrent';
+          counter++;
+        }
+
+        archive.addFile(
+          ArchiveFile(uniqueFileName, torrentData.length, torrentData),
+        );
+      } catch (e) {
+        if (kDebugMode) {
+          print('批量下载失败 [${item.torrentName}]: $e');
+        }
+      }
+    }
+
+    if (archive.files.isEmpty) {
+      throw Exception('没有成功下载任何种子文件');
+    }
+
+    final zipData = ZipEncoder().encode(archive);
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return _saveWithPicker('torrents_$timestamp.zip', zipData);
+  }
+
+  Future<String> _saveToAndroidDownloads(
+    String fileName,
+    List<int> data,
+  ) async {
+    try {
+      return await _androidDownloadsChannel
+              .invokeMethod<String>('saveToDownloads', {
+                'fileName': fileName,
+                'bytes': Uint8List.fromList(data),
+                'mimeType': fileName.toLowerCase().endsWith('.zip')
+                    ? 'application/zip'
+                    : 'application/x-bittorrent',
+              }) ??
+          '$downloadsDisplayPath/$fileName';
+    } on MissingPluginException catch (e) {
+      if (kDebugMode) {
+        print('Android Downloads 保存通道不可用，回退到保存面板: $e');
+      }
+      final savePath = await _saveWithPicker(fileName, data);
+      if (savePath == null) {
+        throw Exception('用户取消保存');
+      }
+      return savePath;
+    } on PlatformException catch (e) {
+      throw Exception(e.message ?? '保存到 Downloads 失败');
+    }
+  }
+
   Future<List<int>> _downloadTorrentData(
     String downloadUrl, {
     SiteConfig? siteConfig,
@@ -199,7 +279,6 @@ class LocalDownloadService with TorrentFileDownloaderMixin {
       throw Exception('下载的种子文件为空');
     }
 
-    // 验证是否为有效的种子文件（bencode格式以'd'开头）
     if (!_isValidTorrentData(torrentData)) {
       throw Exception('下载的文件不是有效的种子文件（可能是HTML登录页面）');
     }
@@ -207,54 +286,68 @@ class LocalDownloadService with TorrentFileDownloaderMixin {
     return torrentData;
   }
 
-  /// 验证种子文件数据是否有效
-  ///
-  /// 有效的种子文件是bencode编码的字典，以字符'd'（ASCII 100）开头
-  /// 这个简单的启发式检查可以快速拒绝HTML文件（通常以'<'开头）
   bool _isValidTorrentData(List<int> data) {
     if (data.isEmpty) return false;
-    // bencode字典以'd'开头
     return data.first == 100; // ASCII 'd'
   }
 
-  /// 使用文件选择器保存文件
+  String _buildTorrentFileName(String torrentName) {
+    String fileName = torrentName;
+    if (!fileName.toLowerCase().endsWith('.torrent')) {
+      fileName = '$fileName.torrent';
+    }
+    return _sanitizeFileName(fileName);
+  }
+
   Future<String?> _saveWithPicker(String fileName, List<int> data) async {
-    String? result;
+    final initialDirectory = await _resolveInitialDirectory();
+    final result = await FilePicker.saveFile(
+      dialogTitle: '保存种子文件',
+      fileName: fileName,
+      initialDirectory: initialDirectory,
+      type: FileType.custom,
+      allowedExtensions: ['zip', 'torrent'],
+      bytes: Uint8List.fromList(data),
+    );
+
+    if (result == null) {
+      return null;
+    }
+
+    await _rememberSaveDirectory(result);
 
     if (Platform.isLinux) {
-      // Linux需要指定初始目录
-      final initialDirectory =
-          Platform.environment['HOME'] ?? Directory.current.path;
-      result = await FilePicker.saveFile(
-        dialogTitle: '保存种子文件',
-        fileName: fileName,
-        initialDirectory: initialDirectory,
-        type: FileType.custom,
-        allowedExtensions: ['zip', 'torrent'],
-        bytes: Uint8List.fromList(data),
-      );
-
-      if (result != null) {
-        final file = File(result);
-        await file.writeAsBytes(data);
-      }
-    } else {
-      // 其他平台使用FilePicker的bytes参数
-      result = await FilePicker.saveFile(
-        dialogTitle: '保存种子文件',
-        fileName: fileName,
-        type: FileType.custom,
-        allowedExtensions: ['zip', 'torrent'],
-        bytes: Uint8List.fromList(data),
-      );
+      final file = File(result);
+      await file.writeAsBytes(data);
     }
 
     return result;
   }
 
-  /// 清理文件名中的特殊字符
+  Future<String?> _resolveInitialDirectory() async {
+    final lastDirectory = await StorageService.instance
+        .loadLocalDownloadLastDirectory();
+    if (lastDirectory != null && Directory(lastDirectory).existsSync()) {
+      return lastDirectory;
+    }
+
+    if (Platform.isLinux) {
+      return Platform.environment['HOME'] ?? Directory.current.path;
+    }
+
+    return null;
+  }
+
+  Future<void> _rememberSaveDirectory(String filePath) async {
+    if (Platform.isAndroid) {
+      return;
+    }
+
+    final directory = File(filePath).parent.path;
+    await StorageService.instance.saveLocalDownloadLastDirectory(directory);
+  }
+
   String _sanitizeFileName(String fileName) {
-    // 移除或替换文件系统不允许的字符
     return fileName
         .replaceAll('/', '_')
         .replaceAll('\\', '_')
@@ -268,13 +361,43 @@ class LocalDownloadService with TorrentFileDownloaderMixin {
   }
 }
 
-/// 种子下载项数据类
+class BatchLocalDownloadResult {
+  final String? displayPath;
+  final int savedCount;
+  final List<BatchLocalDownloadFailure> failedItems;
+  final bool usedZipFallback;
+
+  const BatchLocalDownloadResult({
+    required this.displayPath,
+    required this.savedCount,
+    required this.failedItems,
+    required this.usedZipFallback,
+  });
+
+  int get failedCount => failedItems.length;
+}
+
+class BatchLocalDownloadFailure {
+  final String? itemId;
+  final String torrentName;
+  final String error;
+
+  const BatchLocalDownloadFailure({
+    required this.itemId,
+    required this.torrentName,
+    required this.error,
+  });
+}
+
+/// 种子下载项数据类。
 class TorrentDownloadItem {
+  final String? id;
   final String downloadUrl;
   final String torrentName;
   final SiteConfig? siteConfig;
 
   const TorrentDownloadItem({
+    this.id,
     required this.downloadUrl,
     required this.torrentName,
     this.siteConfig,

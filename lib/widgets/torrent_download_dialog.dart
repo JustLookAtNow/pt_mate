@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/storage/storage_service.dart';
 import '../services/downloader/downloader_config.dart';
 import '../services/downloader/downloader_service.dart';
+import '../services/local_download_service.dart';
 import '../pages/downloader_settings_page.dart';
 
 class TorrentDownloadDialog extends StatefulWidget {
@@ -37,11 +38,14 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
   bool _startPaused = false; // 不立即开始（添加后暂停）
   bool _useToken = false; // Gazelle类型站点使用FL Token选项
   bool _downloadToLocal = false; // 是否下载到本地
+  String _localDownloadPath = LocalDownloadService.downloadsDisplayPath;
+  String _localDownloadHint = '将使用系统保存面板选择保存位置。';
 
   @override
   void initState() {
     super.initState();
     _loadClients();
+    _loadLocalDownloadPath();
   }
 
   @override
@@ -54,9 +58,12 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
     try {
       final clientsData = await StorageService.instance.loadDownloaderConfigs();
       final defaultId = await StorageService.instance.loadDefaultDownloaderId();
-      final startPaused = await StorageService.instance.loadDefaultDownloadStartPaused();
+      final startPaused = await StorageService.instance
+          .loadDefaultDownloadStartPaused();
 
-      final clients = clientsData.map((data) => DownloaderConfig.fromJson(data)).toList();
+      final clients = clientsData
+          .map((data) => DownloaderConfig.fromJson(data))
+          .toList();
 
       if (mounted) {
         setState(() {
@@ -67,6 +74,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                   orElse: () => clients.first,
                 )
               : null;
+          _downloadToLocal = clients.isEmpty;
           _startPaused = startPaused;
         });
 
@@ -79,15 +87,26 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
     }
   }
 
+  Future<void> _loadLocalDownloadPath() async {
+    final service = LocalDownloadService.instance;
+    final path = await service.getLocalDownloadDisplayPath();
+    final hint = await service.getLocalDownloadHint();
+    if (mounted) {
+      setState(() {
+        _localDownloadPath = path;
+        _localDownloadHint = hint;
+      });
+    }
+  }
+
   Future<void> _loadCategoriesTagsAndPaths() async {
     if (_selectedClient == null) return;
 
     setState(() => _loading = true);
     try {
       // 优先读取缓存
-      final cachedCategories = await StorageService.instance.loadDownloaderCategories(
-        _selectedClient!.id,
-      );
+      final cachedCategories = await StorageService.instance
+          .loadDownloaderCategories(_selectedClient!.id);
       final cachedTags = await StorageService.instance.loadDownloaderTags(
         _selectedClient!.id,
       );
@@ -148,7 +167,10 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
         _selectedClient!.id,
         categories,
       );
-      await StorageService.instance.saveDownloaderTags(_selectedClient!.id, tags);
+      await StorageService.instance.saveDownloaderTags(
+        _selectedClient!.id,
+        tags,
+      );
       await StorageService.instance.saveDownloaderPaths(
         _selectedClient!.id,
         paths,
@@ -229,9 +251,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
   @override
   Widget build(BuildContext context) {
     final isBatchMode = widget.itemCount != null;
-    final title = isBatchMode
-        ? '批量下载设置 (${widget.itemCount}个项目)'
-        : '下载种子';
+    final title = isBatchMode ? '批量下载设置 (${widget.itemCount}个项目)' : '下载种子';
 
     return AlertDialog(
       title: Text(title),
@@ -249,7 +269,10 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (!isBatchMode && widget.torrentName != null) ...[
-                  Text('种子：${widget.torrentName}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    '种子：${widget.torrentName}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 16),
                 ],
                 const SizedBox(height: 8),
@@ -260,10 +283,11 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                       color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   )
-                else if (_clients.isEmpty)
-                  const Text('未配置下载器，请先添加下载器配置')
                 else
                   _buildForm(),
               ],
@@ -285,7 +309,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
         if (_downloadToLocal)
           FilledButton(
             onPressed: _onSubmit,
-            child: Text(isBatchMode ? '批量下载到本地' : '下载到本地'),
+            child: Text(isBatchMode ? '批量保存到本地' : '下载到本地'),
           )
         else if (_clients.isNotEmpty && _selectedClient != null)
           FilledButton(
@@ -343,7 +367,9 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                           '发送到下载器',
                           style: TextStyle(
                             color: !_downloadToLocal
-                                ? Theme.of(context).colorScheme.onPrimaryContainer
+                                ? Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimaryContainer
                                 : Theme.of(context).colorScheme.onSurface,
                             fontWeight: !_downloadToLocal
                                 ? FontWeight.bold
@@ -391,7 +417,9 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                           '下载到本地',
                           style: TextStyle(
                             color: _downloadToLocal
-                                ? Theme.of(context).colorScheme.onPrimaryContainer
+                                ? Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimaryContainer
                                 : Theme.of(context).colorScheme.onSurface,
                             fontWeight: _downloadToLocal
                                 ? FontWeight.bold
@@ -414,7 +442,9 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              color: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -440,24 +470,24 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                 const SizedBox(height: 8),
                 if (isBatchMode) ...[
                   Text(
-                    '将下载 ${widget.itemCount} 个种子文件到本地设备。',
+                    '将保存 ${widget.itemCount} 个种子文件到 $_localDownloadPath。',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '点击"批量下载到本地"后，需要选择一个文件夹来保存所有种子文件。',
+                    _localDownloadHint,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ] else ...[
                   Text(
-                    '将下载种子文件到本地设备。',
+                    '将保存种子文件到 $_localDownloadPath。',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '点击"下载到本地"后，可以选择保存位置。',
+                    _localDownloadHint,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -482,8 +512,9 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                 final screenWidth = MediaQuery.of(context).size.width;
                 // 响应式宽度：手机上限制最大宽度，大屏上基于对话框容器宽度计算
                 final maxWidth = screenWidth > 600
-                    ? 400.0 * 0.6  // 大屏上使用对话框容器宽度的60%
-                    : 240.0;  // 小屏上限制240px
+                    ? 400.0 *
+                          0.6 // 大屏上使用对话框容器宽度的60%
+                    : 240.0; // 小屏上限制240px
 
                 return SizedBox(
                   width: maxWidth,
@@ -505,8 +536,9 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                     final screenWidth = MediaQuery.of(context).size.width;
                     // 响应式宽度：手机上限制最大宽度，大屏上允许更宽
                     final maxWidth = screenWidth > 600
-                        ? screenWidth * 0.6  // 大屏上使用60%宽度
-                        : 240.0;  // 小屏上限制200px
+                        ? screenWidth *
+                              0.6 // 大屏上使用60%宽度
+                        : 240.0; // 小屏上限制200px
 
                     return SizedBox(
                       width: maxWidth,
@@ -653,15 +685,19 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
           Row(
             children: [
               Expanded(
-                child: Text('不立即开始（添加后暂停）',
-                    style: Theme.of(context).textTheme.titleSmall),
+                child: Text(
+                  '不立即开始（添加后暂停）',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
               ),
               Switch(
                 value: _startPaused,
                 onChanged: (val) async {
                   setState(() => _startPaused = val);
                   // 保存用户偏好以便下次打开默认状态
-                  await StorageService.instance.saveDefaultDownloadStartPaused(val);
+                  await StorageService.instance.saveDefaultDownloadStartPaused(
+                    val,
+                  );
                 },
               ),
             ],
@@ -673,8 +709,10 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
             Row(
               children: [
                 Expanded(
-                  child: Text('使用 FL Token',
-                      style: Theme.of(context).textTheme.titleSmall),
+                  child: Text(
+                    '使用 FL Token',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                 ),
                 Switch(
                   value: _useToken,

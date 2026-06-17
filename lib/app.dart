@@ -515,7 +515,9 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
         ? _scrollController.position.viewportDimension
         : 0.0;
 
-    if (viewportHeight <= 0 || itemHeight <= 0 || itemHeight >= viewportHeight) {
+    if (viewportHeight <= 0 ||
+        itemHeight <= 0 ||
+        itemHeight >= viewportHeight) {
       return _isGridView ? 0.12 : 0.06;
     }
 
@@ -2238,7 +2240,10 @@ class _HomePageState extends State<HomePage> {
                       purchaseUrl = '${base}torrent/${item.id}';
                     }
                     if (mounted) {
-                      await UrlLauncherHelper.launchBrowser(context, purchaseUrl);
+                      await UrlLauncherHelper.launchBrowser(
+                        context,
+                        purchaseUrl,
+                      );
                     }
                   },
                   child: const Text('前往购买'),
@@ -3260,7 +3265,7 @@ class _HomePageState extends State<HomePage> {
     final downloadToLocal = result['downloadToLocal'] as bool? ?? false;
 
     if (downloadToLocal) {
-      // 本地下载模式：打包成zip保存
+      // 本地下载模式
       unawaited(_performBatchLocalDownload(selectedItems));
     } else {
       // 远程下载器模式
@@ -3325,6 +3330,7 @@ class _HomePageState extends State<HomePage> {
         );
         downloadItems.add(
           TorrentDownloadItem(
+            id: item.id,
             downloadUrl: url,
             torrentName: item.name,
             siteConfig: _currentSite,
@@ -3340,28 +3346,34 @@ class _HomePageState extends State<HomePage> {
       }
     }
 
-    // 批量下载并打包成zip
+    // 批量下载到本地
     try {
-      final savedPath = await LocalDownloadService.instance
-          .batchDownloadAndSaveAsZip(
-            items: downloadItems,
-            onProgress: (current, total, currentName) {
-              if (mounted) {
-                setState(() {
-                  _batchProgress = _buildBatchProgressState(
-                    actionType: BatchOperationType.download,
-                    isRunning: true,
-                    runTotalCount: items.length,
-                    runCompletedCount: current,
-                    currentItemName: currentName,
-                  );
-                });
-              }
-            },
-          );
+      final result = await LocalDownloadService.instance.batchDownloadAndSave(
+        items: downloadItems,
+        onProgress: (current, total, currentName) {
+          if (mounted) {
+            setState(() {
+              _batchProgress = _buildBatchProgressState(
+                actionType: BatchOperationType.download,
+                isRunning: true,
+                runTotalCount: items.length,
+                runCompletedCount: current,
+                currentItemName: currentName,
+              );
+            });
+          }
+        },
+      );
 
       if (mounted) {
         setState(() {
+          for (final failure in result.failedItems) {
+            final itemId = failure.itemId;
+            if (itemId != null) {
+              _batchItemStates[itemId] = BatchItemState.failed;
+              _batchItemErrors[itemId] = failure.error;
+            }
+          }
           _batchProgress = _buildBatchProgressState(
             actionType: BatchOperationType.download,
             isRunning: false,
@@ -3370,10 +3382,12 @@ class _HomePageState extends State<HomePage> {
           );
         });
 
-        if (savedPath != null) {
+        if (result.displayPath != null) {
           NotificationHelper.showInfo(
             context,
-            '批量下载完成，已保存到: $savedPath',
+            result.usedZipFallback
+                ? '批量下载完成，已保存到: ${result.displayPath}'
+                : '已保存 ${result.savedCount} 个种子文件到 ${result.displayPath}',
             duration: const Duration(seconds: 3),
           );
         }

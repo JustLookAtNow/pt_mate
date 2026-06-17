@@ -225,9 +225,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                             vertical: 0,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .surfaceContainer,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.surfaceContainer,
                                             borderRadius: BorderRadius.circular(
                                               25,
                                             ),
@@ -312,9 +312,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                                   borderSide: BorderSide.none,
                                                 ),
                                             filled: true,
-                                            fillColor: Theme.of(context)
-                                                .colorScheme
-                                                .surfaceContainer,
+                                            fillColor: Theme.of(
+                                              context,
+                                            ).colorScheme.surfaceContainer,
                                             contentPadding:
                                                 const EdgeInsets.symmetric(
                                                   horizontal: 12,
@@ -416,9 +416,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                               ),
                                               padding:
                                                   const EdgeInsets.symmetric(
-                                                horizontal: 8,
-                                                vertical: 4,
-                                              ),
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
                                               child: Row(
                                                 children: [
                                                   Icon(
@@ -459,9 +459,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                               ),
                                               padding:
                                                   const EdgeInsets.symmetric(
-                                                horizontal: 8,
-                                                vertical: 4,
-                                              ),
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
                                               child: Row(
                                                 children: [
                                                   Icon(
@@ -1043,7 +1043,8 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: !_isBatchRunning &&
+                                  onPressed:
+                                      !_isBatchRunning &&
                                           _selectedItems.isNotEmpty
                                       ? _onBatchDownload
                                       : null,
@@ -1059,9 +1060,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       context,
                                     ).colorScheme.onPrimary,
                                   ),
-                                  child: Text(
-                                    '下载 (${_selectedItems.length})',
-                                  ),
+                                  child: Text('下载 (${_selectedItems.length})'),
                                 ),
                               ),
                             ],
@@ -1090,7 +1089,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     switch (sortBy) {
       case 'time':
         sortedItems.sort((a, b) {
-          final comparison = a.torrent.createdDate.compareTo(b.torrent.createdDate);
+          final comparison = a.torrent.createdDate.compareTo(
+            b.torrent.createdDate,
+          );
           return sortAscending ? comparison : -comparison;
         });
         break;
@@ -1227,7 +1228,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           ),
         ),
       );
-      
+
       // 从详情页返回后，刷新列表页状态以确保收藏状态同步
       if (mounted) {
         setState(() {});
@@ -1320,7 +1321,8 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                 ElevatedButton(
                   onPressed: () async {
                     Navigator.pop(dialogContext);
-                    String purchaseUrl = 'https://rousi.pro/torrent/${item.torrent.id}';
+                    String purchaseUrl =
+                        'https://rousi.pro/torrent/${item.torrent.id}';
                     if (siteConfig != null) {
                       var base = siteConfig.baseUrl;
                       if (!base.endsWith('/')) {
@@ -1329,7 +1331,10 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                       purchaseUrl = '${base}torrent/${item.torrent.id}';
                     }
                     if (mounted) {
-                      await UrlLauncherHelper.launchBrowser(context, purchaseUrl);
+                      await UrlLauncherHelper.launchBrowser(
+                        context,
+                        purchaseUrl,
+                      );
                     }
                   },
                   child: const Text('前往购买'),
@@ -1642,7 +1647,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     final downloadToLocal = result['downloadToLocal'] as bool? ?? false;
 
     if (downloadToLocal) {
-      // 本地下载模式：打包成zip保存
+      // 本地下载模式
       unawaited(_performBatchLocalDownload(selectedItems, sitesById));
     } else {
       // 远程下载器模式
@@ -1719,11 +1724,14 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           url: item.torrent.downloadUrl,
           siteConfig: siteConfig,
         );
-        downloadItems.add(TorrentDownloadItem(
-          downloadUrl: url,
-          torrentName: item.torrent.name,
-          siteConfig: siteConfig,
-        ));
+        downloadItems.add(
+          TorrentDownloadItem(
+            id: item.torrent.id,
+            downloadUrl: url,
+            torrentName: item.torrent.name,
+            siteConfig: siteConfig,
+          ),
+        );
       } catch (e) {
         if (mounted) {
           setState(() {
@@ -1734,9 +1742,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       }
     }
 
-    // 批量下载并打包成zip
+    // 批量下载到本地
     try {
-      final savedPath = await LocalDownloadService.instance.batchDownloadAndSaveAsZip(
+      final result = await LocalDownloadService.instance.batchDownloadAndSave(
         items: downloadItems,
         onProgress: (current, total, currentName) {
           if (mounted) {
@@ -1755,6 +1763,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
       if (mounted) {
         setState(() {
+          for (final failure in result.failedItems) {
+            final itemId = failure.itemId;
+            if (itemId != null) {
+              _batchItemStates[itemId] = BatchItemState.failed;
+              _batchItemErrors[itemId] = failure.error;
+            }
+          }
           _batchProgress = _buildBatchProgressState(
             actionType: BatchOperationType.download,
             isRunning: false,
@@ -1763,10 +1778,12 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           );
         });
 
-        if (savedPath != null) {
+        if (result.displayPath != null) {
           NotificationHelper.showInfo(
             context,
-            '批量下载完成，已保存到: $savedPath',
+            result.usedZipFallback
+                ? '批量下载完成，已保存到: ${result.displayPath}'
+                : '已保存 ${result.savedCount} 个种子文件到 ${result.displayPath}',
             duration: const Duration(seconds: 3),
           );
         }

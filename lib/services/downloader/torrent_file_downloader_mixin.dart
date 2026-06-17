@@ -68,12 +68,14 @@ mixin TorrentFileDownloaderMixin {
     // DEBUG: 保存文件以供检查
     if (kDebugMode) {
       try {
-        final debugFile = File('/tmp/debug_ptmate.torrent');
-        await debugFile.writeAsBytes(result);
-        // ignore: avoid_print
-        print(
-          'DEBUG: Torrent file saved to ${debugFile.path}, size: ${result.length} bytes',
-        );
+        if (Platform.isLinux) {
+          final debugFile = File('/tmp/debug_ptmate.torrent');
+          await debugFile.writeAsBytes(result);
+          // ignore: avoid_print
+          print(
+            'DEBUG: Torrent file saved to ${debugFile.path}, size: ${result.length} bytes',
+          );
+        }
 
         if (result.isNotEmpty) {
           // 打印前100个字符，检查是否为HTML

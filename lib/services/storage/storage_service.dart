@@ -44,6 +44,8 @@ class StorageKeys {
   static const String defaultDownloadCategory = 'download.defaultCategory';
   static const String defaultDownloadTags = 'download.defaultTags';
   static const String defaultDownloadSavePath = 'download.defaultSavePath';
+  static const String localDownloadLastDirectory =
+      'download.localLastDirectory';
   static const String defaultDownloadStartPaused =
       'download.defaultStartPaused';
 
@@ -166,14 +168,14 @@ class CookieCloudConfig {
   );
 
   Map<String, dynamic> toJson() => {
-        'url': url,
-        'uuid': uuid,
-        'password': password,
-        'autoSyncEnabled': autoSyncEnabled,
-        'syncIntervalMinutes': syncIntervalMinutes,
-        'lastSyncAt': lastSyncAt?.toIso8601String(),
-        'lastSyncSummary': lastSyncSummary,
-      };
+    'url': url,
+    'uuid': uuid,
+    'password': password,
+    'autoSyncEnabled': autoSyncEnabled,
+    'syncIntervalMinutes': syncIntervalMinutes,
+    'lastSyncAt': lastSyncAt?.toIso8601String(),
+    'lastSyncSummary': lastSyncSummary,
+  };
 
   factory CookieCloudConfig.fromJson(Map<String, dynamic> json) {
     final lastSyncAtRaw = json['lastSyncAt'] as String?;
@@ -183,8 +185,9 @@ class CookieCloudConfig {
       password: json['password'] as String? ?? '',
       autoSyncEnabled: json['autoSyncEnabled'] as bool? ?? false,
       syncIntervalMinutes: json['syncIntervalMinutes'] as int? ?? 360,
-      lastSyncAt:
-          lastSyncAtRaw == null ? null : DateTime.tryParse(lastSyncAtRaw),
+      lastSyncAt: lastSyncAtRaw == null
+          ? null
+          : DateTime.tryParse(lastSyncAtRaw),
       lastSyncSummary: json['lastSyncSummary'] as String? ?? '',
     );
   }
@@ -601,13 +604,9 @@ class StorageService {
     final prefs = await _prefs;
     await prefs.setString(
       StorageKeys.siteConfig,
-      jsonEncode({
-        ...config.toJson(),
-        'apiKey': null,
-        'cookie': null,
-      }),
+      jsonEncode({...config.toJson(), 'apiKey': null, 'cookie': null}),
     );
-    
+
     // secure api key
     if ((config.apiKey ?? '').isNotEmpty) {
       final wrote = await _secureWrite(
@@ -719,7 +718,9 @@ class StorageService {
     }
 
     // 更新基础配置缓存（不含 apiKey 与 cookie），避免下一次再次解析 JSON
-    _siteConfigsCache = configs.map((c) => c.copyWith(clearApiKey: true, clearCookie: true)).toList();
+    _siteConfigsCache = configs
+        .map((c) => c.copyWith(clearApiKey: true, clearCookie: true))
+        .toList();
     _siteConfigsCacheDirty = false;
     _siteConfigsCacheNeedsUpdate = false;
   }
@@ -800,7 +801,7 @@ class StorageService {
       int idx = 0;
       for (final cfg in baseConfigs) {
         final swKey = Stopwatch()..start();
-        
+
         String? cookie;
         if (_siteCookiesCache.containsKey(cfg.id)) {
           cookie = _siteCookiesCache[cfg.id];
@@ -825,7 +826,7 @@ class StorageService {
             'StorageService.loadSiteConfigs: 第${idx + 1}个站点 加载敏感数据耗时=${swKey.elapsedMilliseconds}ms',
           );
         }
-        
+
         // 如果值完全一致，则直接返回基础配置实例，维持引用等价性优化
         if (cfg.apiKey == apiKey && cfg.cookie == cookie) {
           configs.add(cfg);
@@ -914,7 +915,9 @@ class StorageService {
     // 删除站点后保存其余站点配置，但不传递 apiKey 和 cookie（保持为 null），
     // 以避免在未加载密钥的场景下误删其他站点的密钥。
     await saveSiteConfigs(
-      configs.map((c) => c.copyWith(clearApiKey: true, clearCookie: true)).toList(),
+      configs
+          .map((c) => c.copyWith(clearApiKey: true, clearCookie: true))
+          .toList(),
     );
     await _deleteSiteApiKey(siteId);
     await _deleteSiteCookie(siteId);
@@ -1219,7 +1222,10 @@ class StorageService {
     final prefs = await _prefs;
     final legacyUrl = prefs.getString(StorageKeys.cookieCloudUrl);
     if (legacyUrl != null && legacyUrl.isNotEmpty) {
-      final wrote = await _secureWrite(key: StorageKeys.cookieCloudUrl, value: legacyUrl);
+      final wrote = await _secureWrite(
+        key: StorageKeys.cookieCloudUrl,
+        value: legacyUrl,
+      );
       if (wrote) {
         await prefs.remove(StorageKeys.cookieCloudUrl);
       }
@@ -1259,7 +1265,10 @@ class StorageService {
     final prefs = await _prefs;
     final legacyUuid = prefs.getString(StorageKeys.cookieCloudUuid);
     if (legacyUuid != null && legacyUuid.isNotEmpty) {
-      final wrote = await _secureWrite(key: StorageKeys.cookieCloudUuid, value: legacyUuid);
+      final wrote = await _secureWrite(
+        key: StorageKeys.cookieCloudUuid,
+        value: legacyUuid,
+      );
       if (wrote) {
         await prefs.remove(StorageKeys.cookieCloudUuid);
       }
@@ -1391,6 +1400,20 @@ class StorageService {
   Future<String?> loadDefaultDownloadSavePath() async {
     final prefs = await _prefs;
     return prefs.getString(StorageKeys.defaultDownloadSavePath);
+  }
+
+  Future<void> saveLocalDownloadLastDirectory(String? directory) async {
+    final prefs = await _prefs;
+    if (directory != null && directory.isNotEmpty) {
+      await prefs.setString(StorageKeys.localDownloadLastDirectory, directory);
+    } else {
+      await prefs.remove(StorageKeys.localDownloadLastDirectory);
+    }
+  }
+
+  Future<String?> loadLocalDownloadLastDirectory() async {
+    final prefs = await _prefs;
+    return prefs.getString(StorageKeys.localDownloadLastDirectory);
   }
 
   /// 保存“添加后暂停”默认设置
