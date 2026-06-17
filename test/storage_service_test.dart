@@ -186,4 +186,17 @@ void main() {
     expect(statuses['site-a']!['message'], 'new');
     expect(statuses['site-a']!['ok'], true);
   });
+
+  test(
+    'download mode preference defaults to downloader and persists',
+    () async {
+      expect(await service.loadDefaultDownloadToLocal(), isFalse);
+
+      await service.saveDefaultDownloadToLocal(true);
+      expect(await service.loadDefaultDownloadToLocal(), isTrue);
+
+      await service.saveDefaultDownloadToLocal(false);
+      expect(await service.loadDefaultDownloadToLocal(), isFalse);
+    },
+  );
 }

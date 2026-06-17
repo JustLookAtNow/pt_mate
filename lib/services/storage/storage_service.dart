@@ -46,6 +46,7 @@ class StorageKeys {
   static const String defaultDownloadSavePath = 'download.defaultSavePath';
   static const String localDownloadLastDirectory =
       'download.localLastDirectory';
+  static const String defaultDownloadToLocal = 'download.defaultToLocal';
   static const String defaultDownloadStartPaused =
       'download.defaultStartPaused';
 
@@ -1414,6 +1415,18 @@ class StorageService {
   Future<String?> loadLocalDownloadLastDirectory() async {
     final prefs = await _prefs;
     return prefs.getString(StorageKeys.localDownloadLastDirectory);
+  }
+
+  /// 保存上次选择的下载方式（true 表示下载到本地，false 表示发送到下载器）
+  Future<void> saveDefaultDownloadToLocal(bool downloadToLocal) async {
+    final prefs = await _prefs;
+    await prefs.setBool(StorageKeys.defaultDownloadToLocal, downloadToLocal);
+  }
+
+  /// 读取上次选择的下载方式（默认发送到下载器）
+  Future<bool> loadDefaultDownloadToLocal() async {
+    final prefs = await _prefs;
+    return prefs.getBool(StorageKeys.defaultDownloadToLocal) ?? false;
   }
 
   /// 保存“添加后暂停”默认设置

@@ -60,6 +60,8 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
       final defaultId = await StorageService.instance.loadDefaultDownloaderId();
       final startPaused = await StorageService.instance
           .loadDefaultDownloadStartPaused();
+      final defaultDownloadToLocal = await StorageService.instance
+          .loadDefaultDownloadToLocal();
 
       final clients = clientsData
           .map((data) => DownloaderConfig.fromJson(data))
@@ -74,7 +76,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                   orElse: () => clients.first,
                 )
               : null;
-          _downloadToLocal = clients.isEmpty;
+          _downloadToLocal = clients.isEmpty || defaultDownloadToLocal;
           _startPaused = startPaused;
         });
 
@@ -191,6 +193,11 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
 
   Future<String?> _promptPassword(String clientName) async {
     return await PasswordPromptDialog.show(context, clientName);
+  }
+
+  Future<void> _setDownloadToLocal(bool value) async {
+    setState(() => _downloadToLocal = value);
+    await StorageService.instance.saveDefaultDownloadToLocal(value);
   }
 
   Future<void> _onSubmit() async {
@@ -338,7 +345,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
             children: [
               Expanded(
                 child: InkWell(
-                  onTap: () => setState(() => _downloadToLocal = false),
+                  onTap: () => _setDownloadToLocal(false),
                   borderRadius: const BorderRadius.horizontal(
                     left: Radius.circular(8),
                   ),
@@ -388,7 +395,7 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
               ),
               Expanded(
                 child: InkWell(
-                  onTap: () => setState(() => _downloadToLocal = true),
+                  onTap: () => _setDownloadToLocal(true),
                   borderRadius: const BorderRadius.horizontal(
                     right: Radius.circular(8),
                   ),
