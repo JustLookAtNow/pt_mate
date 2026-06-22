@@ -76,6 +76,57 @@ class _CookieCloudPageState extends State<CookieCloudPage> {
     NotificationHelper.showInfo(context, 'Cookie Cloud 配置已保存');
   }
 
+  Future<void> _clearConfig() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('清空 Cookie Cloud 配置'),
+        content: const Text('将清空服务器地址、UUID、密码和同步状态，已同步到站点里的 Cookie 不会被删除。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            style: TextButton.styleFrom(
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outline,
+                width: 1.0,
+              ),
+            ),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            child: const Text('清空'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+
+    const clearedConfig = CookieCloudConfig(
+      autoSyncEnabled: false,
+      lastSyncSummary: '',
+    );
+    await StorageService.instance.saveCookieCloudConfig(clearedConfig);
+    if (!mounted) return;
+
+    setState(() {
+      _urlController.clear();
+      _uuidController.clear();
+      _passwordController.clear();
+      _autoSyncEnabled = false;
+      _lastSyncAt = null;
+      _lastSyncSummary = '';
+      _plan = null;
+      _selectedUpdates.clear();
+      _selectedAdditions.clear();
+    });
+    NotificationHelper.showInfo(context, 'Cookie Cloud 配置已清空');
+  }
+
   Future<void> _fetchPlan() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -182,30 +233,47 @@ class _CookieCloudPageState extends State<CookieCloudPage> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
+              SizedBox(
+                width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: _busy ? null : _saveConfig,
-                  icon: const Icon(Icons.save_outlined),
-                  label: const Text('保存配置'),
+                  onPressed: _busy ? null : _clearConfig,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('清空配置'),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _busy
-                      ? null
-                      : (_plan == null ? _fetchPlan : _applyPlan),
-                  icon: _busy
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(_plan == null ? Icons.cloud_sync : Icons.done),
-                  label: Text(_plan == null ? '拉取预览' : '确认同步'),
-                ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _busy ? null : _saveConfig,
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('保存配置'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : (_plan == null ? _fetchPlan : _applyPlan),
+                      icon: _busy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(_plan == null ? Icons.cloud_sync : Icons.done),
+                      label: Text(_plan == null ? '拉取预览' : '确认同步'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
