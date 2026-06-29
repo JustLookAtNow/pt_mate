@@ -147,23 +147,32 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final foregroundColor =
+        IconTheme.of(context).color ??
+        theme.appBarTheme.foregroundColor ??
+        (colorScheme.brightness == Brightness.dark
+            ? colorScheme.onPrimaryContainer
+            : colorScheme.onPrimary);
+
     if (_err != null) {
       return IconButton(
         onPressed: _openDownloader,
-        icon: Icon(
-          Icons.error_outline,
-          color: Theme.of(context).colorScheme.error,
-        ),
+        icon: Icon(Icons.error_outline, color: colorScheme.error),
         tooltip: _err,
       );
     }
     if (_info == null || _serverState == null) {
       return IconButton(
         onPressed: _openDownloader,
-        icon: const SizedBox(
+        icon: SizedBox(
           width: 16,
           height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: foregroundColor,
+          ),
         ),
         tooltip: '加载中...',
       );
@@ -182,16 +191,12 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.cloud_download,
-                  size: 16,
-                  color: Theme.of(context).colorScheme.onPrimary,
-                ),
+                Icon(Icons.cloud_download, size: 16, color: foregroundColor),
                 const SizedBox(width: 4),
                 Text(
                   '↑${Formatters.speedFromBytesPerSec(info.upSpeed)}${ScreenUtils.isLargeScreen(context) ? " (${Formatters.dataFromBytes(info.upTotal)})" : ""} ↓${Formatters.speedFromBytesPerSec(info.dlSpeed)}${ScreenUtils.isLargeScreen(context) ? " (${Formatters.dataFromBytes(info.dlTotal)})" : ""}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onPrimary,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: foregroundColor,
                   ),
                 ),
               ],
@@ -199,10 +204,8 @@ class _QbSpeedIndicatorState extends State<QbSpeedIndicator> {
             const SizedBox(height: 2),
             Text(
               '剩余空间: ${Formatters.dataFromBytes(serverState.freeSpaceOnDisk)}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onPrimary.withValues(alpha: 0.8),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: foregroundColor.withValues(alpha: 0.8),
               ),
             ),
           ],
