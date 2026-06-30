@@ -60,9 +60,14 @@ class AggregateSearchProvider extends ChangeNotifier {
   }
 
   // Setters
-  void setSearchKeyword(String keyword) {
+  void setSearchKeyword(String keyword, {bool notify = true}) {
+    if (_searchKeyword == keyword) {
+      return;
+    }
     _searchKeyword = keyword;
-    notifyListeners();
+    if (notify) {
+      notifyListeners();
+    }
   }
 
   void setSelectedStrategy(String strategy) {
@@ -174,7 +179,8 @@ class AggregateSearchProvider extends ChangeNotifier {
   void initializeDefaultStrategy() {
     if (_searchConfigs.isNotEmpty) {
       // 如果当前选中的策略不在激活列表中，或者没有选中策略，重新选择
-      if (_selectedStrategy.isEmpty || !_searchConfigs.any((config) => config.id == _selectedStrategy)) {
+      if (_selectedStrategy.isEmpty ||
+          !_searchConfigs.any((config) => config.id == _selectedStrategy)) {
         // 优先选择"所有站点"配置
         final allSitesConfig = _searchConfigs.firstWhere(
           (config) => config.isAllSitesType,

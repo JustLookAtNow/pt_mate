@@ -330,7 +330,10 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           ),
                                           onSubmitted: _performSearch,
                                           onChanged: (value) {
-                                            provider.setSearchKeyword(value);
+                                            provider.setSearchKeyword(
+                                              value,
+                                              notify: false,
+                                            );
                                           },
                                         ),
                                       ),
@@ -1145,6 +1148,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       context,
       listen: false,
     );
+    provider.setSearchKeyword(query);
 
     if (provider.selectedStrategy.isEmpty) {
       NotificationHelper.showError(context, '请选择搜索策略');
