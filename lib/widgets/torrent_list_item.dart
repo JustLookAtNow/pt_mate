@@ -31,6 +31,24 @@ bool _hasRatingValue(String? r) {
   return v != null && v > 0;
 }
 
+Color _resolveAggregateSiteColor(BuildContext context, String siteName) {
+  try {
+    final storage = Provider.of<StorageService>(context, listen: false);
+    final sites = storage.siteConfigsCache ?? [];
+    final found = sites.firstWhere(
+      (s) => s.name == siteName,
+      orElse: () => const SiteConfig(id: '', name: '', baseUrl: ''),
+    );
+    if (found.siteColor != null) return Color(found.siteColor!);
+  } catch (_) {}
+  final primaries = Colors.primaries;
+  return primaries[(siteName.hashCode.abs()) % primaries.length];
+}
+
+Color _onAggregateSiteColor(Color color) {
+  return color.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+}
+
 /// 种子列表项组件
 ///
 /// 可复用的种子列表项组件，支持：
@@ -114,6 +132,18 @@ class TorrentListItem extends StatelessWidget {
     final double desktopSideHeight = effectiveShowCover
         ? _desktopCoverHeight
         : _desktopNoCoverSideHeight;
+    final aggregateSiteColor = isAggregateMode && siteName != null
+        ? _resolveAggregateSiteColor(context, siteName!)
+        : null;
+    final colorScheme = Theme.of(context).colorScheme;
+    final cardBorderColor = aggregateSiteColor != null
+        ? aggregateSiteColor.withValues(alpha: isSelected ? 0.85 : 0.65)
+        : isSelected
+        ? colorScheme.primary.withValues(alpha: 0.6)
+        : colorScheme.outline.withValues(alpha: 0.15);
+    final cardBorderWidth = aggregateSiteColor != null && isSelected
+        ? 1.5
+        : 1.0;
 
     // 构建主要内容
     Widget mainContent = Container(
@@ -128,18 +158,12 @@ class TorrentListItem extends StatelessWidget {
           Container(
             decoration: BoxDecoration(
               color: isSelected
-                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-                  : Theme.of(context).colorScheme.surfaceContainerLow,
+                  ? colorScheme.primary.withValues(alpha: 0.1)
+                  : colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isSelected
-                    ? Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.6)
-                    : Theme.of(
-                        context,
-                      ).colorScheme.outline.withValues(alpha: 0.15),
-                width: 1,
+                color: cardBorderColor,
+                width: cardBorderWidth,
               ),
             ),
             child: ClipRRect(
@@ -179,18 +203,13 @@ class TorrentListItem extends StatelessWidget {
                       onRetryBatchAction: onRetryBatchAction,
                       onToggleCollection: onToggleCollection,
                       onDownload: onDownload,
+                      aggregateSiteColor: aggregateSiteColor,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          if (isAggregateMode && siteName != null)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: _AggregateSiteChip(siteName: siteName!),
-            ),
         ],
       ),
     );
@@ -359,6 +378,7 @@ class _TorrentListItemRow extends StatelessWidget {
   final VoidCallback? onRetryBatchAction;
   final VoidCallback? onToggleCollection;
   final VoidCallback? onDownload;
+  final Color? aggregateSiteColor;
 
   const _TorrentListItemRow({
     required this.torrent,
@@ -377,6 +397,7 @@ class _TorrentListItemRow extends StatelessWidget {
     this.onRetryBatchAction,
     this.onToggleCollection,
     this.onDownload,
+    this.aggregateSiteColor,
   });
 
   @override
@@ -410,6 +431,7 @@ class _TorrentListItemRow extends StatelessWidget {
             batchItemState: batchItemState,
             batchErrorMessage: batchErrorMessage,
             onRetryBatchAction: onRetryBatchAction,
+            aggregateSiteColor: aggregateSiteColor,
           ),
         ),
         // 桌面端显示操作按钮
@@ -458,6 +480,7 @@ class TorrentInfo extends StatelessWidget {
   final BatchItemState batchItemState;
   final String? batchErrorMessage;
   final VoidCallback? onRetryBatchAction;
+  final Color? aggregateSiteColor;
 
   const TorrentInfo({
     super.key,
@@ -474,6 +497,7 @@ class TorrentInfo extends StatelessWidget {
     this.batchItemState = BatchItemState.idle,
     this.batchErrorMessage,
     this.onRetryBatchAction,
+    this.aggregateSiteColor,
   });
 
   String _batchActionLabel() {
@@ -674,6 +698,15 @@ class TorrentInfo extends StatelessWidget {
             torrent: torrent,
             currentSite: currentSite,
             compact: isCompactDesktopNoCover,
+            trailing:
+                isAggregateMode &&
+                    siteName != null &&
+                    aggregateSiteColor != null
+                ? _AggregateSiteChip(
+                    siteName: siteName!,
+                    color: aggregateSiteColor!,
+                  )
+                : null,
           ),
           if (batchStatus != null) ...[const SizedBox(height: 4), batchStatus],
         ],
@@ -687,11 +720,13 @@ class _StatsRow extends StatelessWidget {
   final TorrentItem torrent;
   final SiteConfig? currentSite;
   final bool compact;
+  final Widget? trailing;
 
   const _StatsRow({
     required this.torrent,
     this.currentSite,
     this.compact = false,
+    this.trailing,
   });
 
   Widget _downloadStatusIcon(DownloadStatus status, AppSemanticColors colors) {
@@ -768,6 +803,10 @@ class _StatsRow extends StatelessWidget {
           if (showHistory) ...[
             const SizedBox(width: AppSpacing.sm),
             _downloadStatusIcon(torrent.downloadStatus, colors),
+          ],
+          if (trailing != null) ...[
+            const SizedBox(width: AppSpacing.sm),
+            trailing!,
           ],
         ],
       ),
@@ -1258,38 +1297,25 @@ class TorrentActions extends StatelessWidget {
 
 class _AggregateSiteChip extends StatelessWidget {
   final String siteName;
-  const _AggregateSiteChip({required this.siteName});
+  final Color color;
 
-  Color _resolveSiteColor(BuildContext context, String siteName) {
-    try {
-      final storage = Provider.of<StorageService>(context, listen: false);
-      final sites = storage.siteConfigsCache ?? [];
-      final found = sites.firstWhere(
-        (s) => s.name == siteName,
-        orElse: () => const SiteConfig(id: '', name: '', baseUrl: ''),
-      );
-      if (found.siteColor != null) return Color(found.siteColor!);
-    } catch (_) {}
-    final primaries = Colors.primaries;
-    final color = primaries[(siteName.hashCode.abs()) % primaries.length];
-    return color;
-  }
+  const _AggregateSiteChip({required this.siteName, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        color: _resolveSiteColor(context, siteName),
+        color: color,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         siteName,
         style: TextStyle(
-          color: const Color.fromARGB(255, 255, 255, 255),
+          color: _onAggregateSiteColor(color),
           fontWeight: FontWeight.w600,
           fontSize: 10,
-          height: 1.2,
+          height: 1.1,
         ),
       ),
     );

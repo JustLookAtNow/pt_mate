@@ -6,8 +6,12 @@ import 'package:pt_mate/services/storage/storage_service.dart';
 import 'package:pt_mate/widgets/torrent_list_item.dart';
 
 class FakeStorageService implements StorageService {
+  final List<SiteConfig> sites;
+
+  FakeStorageService({this.sites = const []});
+
   @override
-  List<SiteConfig>? get siteConfigsCache => [];
+  List<SiteConfig>? get siteConfigsCache => sites;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -17,6 +21,9 @@ void main() {
   Widget createWidgetUnderTest({
     required double width,
     required TorrentItem torrent,
+    bool isAggregateMode = false,
+    String? siteName,
+    List<SiteConfig> siteConfigs = const [],
   }) {
     return MaterialApp(
       home: Scaffold(
@@ -24,12 +31,14 @@ void main() {
           child: SizedBox(
             width: width,
             child: Provider<StorageService>(
-              create: (_) => FakeStorageService(),
+              create: (_) => FakeStorageService(sites: siteConfigs),
               child: TorrentListItem(
                 torrent: torrent,
                 isSelected: false,
                 isSelectionMode: false,
                 showCoverSetting: false,
+                isAggregateMode: isAggregateMode,
+                siteName: siteName,
               ),
             ),
           ),
@@ -84,5 +93,166 @@ void main() {
     final sizeText = tester.widget<Text>(sizeFinder);
     expect(sizeText.maxLines, 1);
     expect(sizeText.softWrap, isFalse);
+  });
+
+  testWidgets('aggregate site chip sits below inline ratings without cover', (
+    WidgetTester tester,
+  ) async {
+    final torrent = TorrentItem(
+      id: '2',
+      name: 'Test Torrent',
+      smallDescr: 'Test Description',
+      sizeBytes: 1024,
+      seeders: 10,
+      leechers: 5,
+      createdDate: DateTime.parse('2023-10-27T10:00:00Z'),
+      discountEndTime: null,
+      downloadUrl: '',
+      imageList: [],
+      cover: 'https://example.com/cover.jpg',
+      downloadStatus: DownloadStatus.none,
+      discount: DiscountType.normal,
+      collection: false,
+      isTop: false,
+      doubanRating: '8.5',
+      imdbRating: '7.2',
+      tags: const [],
+    );
+
+    await tester.pumpWidget(
+      createWidgetUnderTest(
+        width: 360,
+        torrent: torrent,
+        isAggregateMode: true,
+        siteName: 'LightSite',
+        siteConfigs: const [
+          SiteConfig(
+            id: 'light',
+            name: 'LightSite',
+            baseUrl: 'https://example.com',
+            siteColor: 0xFFFFF59D,
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('豆 8.5'), findsOneWidget);
+    expect(find.text('IMDB 7.2'), findsOneWidget);
+    expect(find.text('LightSite'), findsOneWidget);
+
+    final ratingBottom = tester.getBottomLeft(find.text('豆 8.5')).dy;
+    final siteTop = tester.getTopLeft(find.text('LightSite')).dy;
+    expect(siteTop, greaterThan(ratingBottom));
+  });
+
+  testWidgets('aggregate site chip uses readable text and site border color', (
+    WidgetTester tester,
+  ) async {
+    const siteColor = Color(0xFFFFF59D);
+    final torrent = TorrentItem(
+      id: '3',
+      name: 'Test Torrent',
+      smallDescr: 'Test Description',
+      sizeBytes: 1024,
+      seeders: 10,
+      leechers: 5,
+      createdDate: DateTime.parse('2023-10-27T10:00:00Z'),
+      discountEndTime: null,
+      downloadUrl: '',
+      imageList: [],
+      cover: '',
+      downloadStatus: DownloadStatus.none,
+      discount: DiscountType.normal,
+      collection: false,
+      isTop: false,
+      doubanRating: '0',
+      imdbRating: '0',
+      tags: const [],
+    );
+
+    await tester.pumpWidget(
+      createWidgetUnderTest(
+        width: 360,
+        torrent: torrent,
+        isAggregateMode: true,
+        siteName: 'LightSite',
+        siteConfigs: const [
+          SiteConfig(
+            id: 'light',
+            name: 'LightSite',
+            baseUrl: 'https://example.com',
+            siteColor: 0xFFFFF59D,
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final siteNameText = tester.widget<Text>(find.text('LightSite'));
+    expect(siteNameText.style?.color, Colors.black);
+
+    final siteBorderFinder = find.byWidgetPredicate((widget) {
+      if (widget is! Container) return false;
+      final decoration = widget.decoration;
+      if (decoration is! BoxDecoration) return false;
+      final border = decoration.border;
+      if (border is! Border) return false;
+      return border.top.color == siteColor.withValues(alpha: 0.65);
+    });
+    expect(siteBorderFinder, findsOneWidget);
+  });
+
+  testWidgets('aggregate site chip does not increase item height', (
+    WidgetTester tester,
+  ) async {
+    final torrent = TorrentItem(
+      id: '4',
+      name: 'Test Torrent',
+      smallDescr: 'Test Description',
+      sizeBytes: 1024,
+      seeders: 10,
+      leechers: 5,
+      createdDate: DateTime.parse('2023-10-27T10:00:00Z'),
+      discountEndTime: null,
+      downloadUrl: '',
+      imageList: [],
+      cover: '',
+      downloadStatus: DownloadStatus.none,
+      discount: DiscountType.normal,
+      collection: false,
+      isTop: false,
+      doubanRating: '0',
+      imdbRating: '0',
+      tags: const [],
+    );
+
+    await tester.pumpWidget(
+      createWidgetUnderTest(width: 360, torrent: torrent),
+    );
+    await tester.pumpAndSettle();
+    final normalHeight = tester.getSize(find.byType(TorrentListItem)).height;
+
+    await tester.pumpWidget(
+      createWidgetUnderTest(
+        width: 360,
+        torrent: torrent,
+        isAggregateMode: true,
+        siteName: 'LightSite',
+        siteConfigs: const [
+          SiteConfig(
+            id: 'light',
+            name: 'LightSite',
+            baseUrl: 'https://example.com',
+            siteColor: 0xFFFFF59D,
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    final aggregateHeight = tester.getSize(find.byType(TorrentListItem)).height;
+
+    expect(aggregateHeight, normalHeight);
   });
 }
