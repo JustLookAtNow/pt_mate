@@ -1,0 +1,57 @@
+{
+  "name": "海棠PT",
+  "searchCategories": [
+    {
+      "id": "all",
+      "displayName": "综合",
+      "parameters": "{}"
+    },
+    {
+      "id": "yue_ju",
+      "displayName": "越剧",
+      "parameters": "{\"search\":\"越剧\"}"
+    },
+    {
+      "id": "yu_ju",
+      "displayName": "粤剧",
+      "parameters": "{\"search\":\"粤剧\"}"
+    },
+    {
+      "id": "jing_ju",
+      "displayName": "京剧",
+      "parameters": "{\"search\":\"京剧\"}"
+    },
+    {
+      "id": "xiang_sheng",
+      "displayName": "相声",
+      "parameters": "{\"search\":\"相声\"}"
+    }
+  ],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": true,
+    "downloadHistory": false,
+    "categorySearch": true,
+    "advancedSearch": true,
+    "showCover": true,
+    "commentDetail": false
+  },
+  "discountMapping": {
+    "Free": "FREE",
+    "Free*2": "2xFREE",
+    "Normal": "NORMAL"
+  },
+  "tagMapping": {
+    "官方": "official"
+  },
+  "id": "htpt",
+  "primaryUrl": "https://www.htpt.cc/",
+  "baseUrls": [
+    "https://www.htpt.cc/"
+  ],
+  "siteType": "NexusPHP",
+  "logo": "assets/sites_icon/htpt.png"
+}
