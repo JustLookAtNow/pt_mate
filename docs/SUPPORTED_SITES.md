@@ -1,6 +1,6 @@
 # 当前支持的网站
 
-以下清单基于 `assets/sites/*.json`（共 35 个）。
+以下清单基于 `assets/sites/*.json`（共 36 个）。
 
 ## M-Team（1）
 - M-Team
@@ -20,7 +20,7 @@
 - 肉丝
 - 织梦
 
-## NexusPHPWeb（19）
+## NexusPHPWeb（20）
 - AFUN
 - 末日
 - Audiences
@@ -40,6 +40,7 @@
 - U2Share
 - UBits
 - 星陨阁
+- 海棠PT
 
 ## RousiPro（1）
 - 肉丝Pro(beta)

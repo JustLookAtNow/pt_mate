@@ -25,6 +25,41 @@
       "id": "xiang_sheng",
       "displayName": "相声",
       "parameters": "{\"search\":\"相声\"}"
+    },
+    {
+      "id": "ping_shu",
+      "displayName": "评书",
+      "parameters": "{\"category\":\"normal#4091\"}"
+    },
+    {
+      "id": "xi_qu",
+      "displayName": "戏曲",
+      "parameters": "{\"category\":\"normal#4097\"}"
+    },
+    {
+      "id": "gu_qin",
+      "displayName": "鼓/琴",
+      "parameters": "{\"category\":\"normal#4098\"}"
+    },
+    {
+      "id": "xiao_qu",
+      "displayName": "小曲",
+      "parameters": "{\"category\":\"normal#4099\"}"
+    },
+    {
+      "id": "xiao_pin",
+      "displayName": "小品",
+      "parameters": "{\"category\":\"normal#4101\"}"
+    },
+    {
+      "id": "er_ren_zhuan",
+      "displayName": "二人转",
+      "parameters": "{\"category\":\"normal#4104\"}"
+    },
+    {
+      "id": "xiao_ju_zhong",
+      "displayName": "小剧种",
+      "parameters": "{\"category\":\"normal#4105\"}"
     }
   ],
   "features": {
@@ -45,7 +80,11 @@
     "Normal": "NORMAL"
   },
   "tagMapping": {
-    "官方": "official"
+    "官方": "gf",
+    "高清音质": "gq",
+    "MP3格式": "mp3",
+    "MP4格式": "mp4",
+    "国粹之声": "gc"
   },
   "id": "htpt",
   "primaryUrl": "https://www.htpt.cc/",
