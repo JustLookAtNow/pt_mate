@@ -91,6 +91,6 @@
   "baseUrls": [
     "https://www.htpt.cc/"
   ],
-  "siteType": "NexusPHP",
+  "siteType": "NexusPHPWeb",
   "logo": "assets/sites_icon/htpt.png"
 }
