@@ -40,7 +40,6 @@
 - U2Share
 - UBits
 - 星陨阁
-- 海棠PT
 
 ## RousiPro（1）
 - 肉丝Pro(beta)
