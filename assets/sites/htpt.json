@@ -74,6 +74,11 @@
     "showCover": true,
     "commentDetail": false
   },
+  "search": {
+    "downloadUrl": {
+      "value": "{baseUrl}/download.php?id={torrentId}&passkey={passKey}&https=1"
+    }
+  },
   "discountMapping": {
     "Free": "FREE",
     "Free*2": "2xFREE",
