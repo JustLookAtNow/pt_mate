@@ -73,17 +73,12 @@
     "passKey": {
       "path": "usercp.php",
       "rows": {
-        "selector": "#outer > td.rowfollow > span#passkey"
+        "selector": "#outer > td.rowfollow > span#passkey > a"
       },
       "fields": {
         "passKey": {
           "selector": "",
-          "attribute": "text",
-          "filter": {
-            "name": "regexp",
-            "args": "([^\\s]+)\\s*（妥善保管，请勿泄露）",
-            "value": "$1"
-          }
+          "attribute": "data-copy"
         }
       }
     },
