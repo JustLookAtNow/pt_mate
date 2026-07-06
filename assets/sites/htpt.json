@@ -1,0 +1,200 @@
+{
+  "name": "海棠PT",
+  "searchCategories": [
+    {
+      "id": "all",
+      "displayName": "综合",
+      "parameters": "{}"
+    },
+    {
+      "id": "yue_ju",
+      "displayName": "越剧",
+      "parameters": "{\"search\":\"越剧\"}"
+    },
+    {
+      "id": "yue_ju_cantonese",
+      "displayName": "粤剧",
+      "parameters": "{\"search\":\"粤剧\"}"
+    },
+    {
+      "id": "jing_ju",
+      "displayName": "京剧",
+      "parameters": "{\"search\":\"京剧\"}"
+    },
+    {
+      "id": "xiang_sheng",
+      "displayName": "相声",
+      "parameters": "{\"search\":\"相声\"}"
+    },
+    {
+      "id": "ping_shu",
+      "displayName": "评书",
+      "parameters": "{\"category\":\"normal#4091\"}"
+    },
+    {
+      "id": "xi_qu",
+      "displayName": "戏曲",
+      "parameters": "{\"category\":\"normal#4097\"}"
+    },
+    {
+      "id": "gu_qin",
+      "displayName": "鼓/琴",
+      "parameters": "{\"category\":\"normal#4098\"}"
+    },
+    {
+      "id": "xiao_qu",
+      "displayName": "小曲",
+      "parameters": "{\"category\":\"normal#4099\"}"
+    },
+    {
+      "id": "xiao_pin",
+      "displayName": "小品",
+      "parameters": "{\"category\":\"normal#4101\"}"
+    },
+    {
+      "id": "er_ren_zhuan",
+      "displayName": "二人转",
+      "parameters": "{\"category\":\"normal#4104\"}"
+    },
+    {
+      "id": "xiao_ju_zhong",
+      "displayName": "小剧种",
+      "parameters": "{\"category\":\"normal#4105\"}"
+    }
+  ],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": true,
+    "downloadHistory": true,
+    "categorySearch": true,
+    "advancedSearch": true,
+    "showCover": false,
+    "commentDetail": false
+  },
+  "infoFinder": {
+    "bonusPerHour": {
+      "path": "mybonus_new.php",
+      "rows": {
+        "selector": "#outer > table:nth-child(3) > tbody > tr:nth-child(2) > td:nth-child(1) > div:nth-child(3)"
+      },
+      "fields": {
+        "bonusPerHour": {
+          "selector": "",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(?:你当前每小时能获取|You are currently getting|你當前每小時能獲取)\\s*([\\d.]+)",
+            "value": "$1"
+          }
+        }
+      }
+    },
+    "search": {
+      "rows": {
+        "selector": "table.torrents > tbody:nth-child > tr:nth-child"
+      },
+      "fields": {
+        "torrentId": {
+          "selector": "a[href^=\"details.php?id=\"]",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "id=(\\d+)",
+            "value": "$1"
+          }
+        },
+        "torrentName": {
+          "selector": "a[href^=\"details.php?id=\"] > b",
+          "attribute": "text"
+        },
+        "tag": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > span.torrent_tag",
+          "attribute": "text"
+        },
+        "description": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > *:last-node",
+          "attribute": "text"
+        },
+        "discount": {
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
+          "attribute": "alt"
+        },
+        "discountEndTime": {
+          "selector": "table.torrentname > img[class^=\"pro_\"]",
+          "attribute": "onmouseover",
+          "filter": {
+            "name": "regexp",
+            "args": "<span title=\\\"(.*?)\\\"",
+            "value": "$1"
+          },
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
+        },
+        "downloadUrl": {
+          "value": "{baseUrl}/download.php?id={torrentId}&passkey={passKey}"
+        },
+        "seedersText": {
+          "selector": "td:nth-child(6)",
+          "attribute": "text"
+        },
+        "leechersText": {
+          "selector": "td:nth-child(7)",
+          "attribute": "text"
+        },
+        "sizeText": {
+          "selector": "td:nth-child(5)",
+          "attribute": "text"
+        },
+        "downloadStatus": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > div[title]",
+          "attribute": "title",
+          "filter": {
+            "name": "regexp",
+            "args": "(\\d+)%",
+            "value": "$1"
+          }
+        },
+        "collection": {
+          "selector": "table.torrentname > img.bookmark",
+          "attribute": "src"
+        },
+        "isTop": {
+          "selector": "table.torrentname > img[title~=\"置顶|置頂\"]",
+          "attribute": "src"
+        },
+        "cover": {
+          "selector": "table.torrentname > tbody > tr > td:nth-child(1) > img[data-src]",
+          "attribute": "data-src"
+        },
+        "createDate": {
+          "selector": "td:nth-child(4) > span[title]",
+          "attribute": "title",
+          "time": {
+            "format": "yyyy-MM-dd HH:mm:ss",
+            "zone": "+08:00"
+          }
+        },
+        "doubanRating": {
+          "selector": "table.torrentname > img[title==\"douban\"] > next",
+          "attribute": "text"
+        },
+        "imdbRating": {
+          "selector": "table.torrentname > img[title==\"imdb\"] > next",
+          "attribute": "text"
+        }
+      }
+    }
+  },
+  "id": "htpt",
+  "primaryUrl": "https://www.htpt.cc/",
+  "baseUrls": [
+    "https://www.htpt.cc/"
+  ],
+  "siteType": "NexusPHPWeb",
+  "logo": "assets/sites_icon/htpt.png"
+}
