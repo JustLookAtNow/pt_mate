@@ -183,11 +183,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Select Xcode 26.1.1
-        run: |
-          sudo xcode-select -s /Applications/Xcode_26.1.1.app
-          xcodebuild -version
-
       - name: Setup Flutter (cached)
         id: cache_flutter_macos
         uses: subosito/flutter-action@v2

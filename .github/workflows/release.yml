@@ -313,11 +313,6 @@ jobs:
       with:
         ref: ${{ github.ref }}
 
-    - name: Select Xcode 26.1.1
-      run: |
-        sudo xcode-select -s /Applications/Xcode_26.1.1.app
-        xcodebuild -version
-        
     - name: Extract version from tag
       id: version
       run: |
