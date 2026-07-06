@@ -66,7 +66,7 @@ jobs:
       uses: subosito/flutter-action@v2
       with:
         flutter-version-file: .flutter-version
-        channel: 'main'
+        channel: 'stable'
         cache: true  # 启用 Flutter SDK 缓存
         cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
         cache-path: '${{ runner.tool_cache }}/flutter'
@@ -242,7 +242,7 @@ jobs:
       uses: subosito/flutter-action@v2
       with:
         flutter-version-file: .flutter-version
-        channel: 'main'
+        channel: 'stable'
         cache: true  # 启用 Flutter SDK 缓存
         cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
         cache-path: '${{ runner.tool_cache }}/flutter'
@@ -290,7 +290,7 @@ jobs:
       run: |
         $languagesDir = "C:\Program Files (x86)\Inno Setup 6\Languages"
         if (-not (Test-Path "$languagesDir\ChineseSimplified.isl")) {
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseSimplified.isl" -OutFile "$languagesDir\ChineseSimplified.isl"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/jrsoftware/issrc/refs/heads/main/Files/Languages/ChineseSimplified.isl" -OutFile "$languagesDir\ChineseSimplified.isl"
         }
         
     - name: Compile Inno Setup installer
@@ -335,7 +335,7 @@ jobs:
       uses: subosito/flutter-action@v2
       with:
         flutter-version-file: .flutter-version
-        channel: 'main'
+        channel: 'stable'
         cache: true  # 启用 Flutter SDK 缓存
         cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
         cache-path: '${{ runner.tool_cache }}/flutter'
