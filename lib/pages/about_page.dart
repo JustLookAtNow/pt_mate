@@ -159,10 +159,6 @@ class _AboutBody extends StatelessWidget {
             const SizedBox(height: 8),
             _LinkGrid(onOpenUrl: onOpenUrl),
             const SizedBox(height: 16),
-            _SectionTitle(icon: Icons.widgets_outlined, title: '项目能力'),
-            const SizedBox(height: 8),
-            const _CapabilityGrid(),
-            const SizedBox(height: 16),
             _SectionTitle(icon: Icons.info_outline, title: '开源信息'),
             const SizedBox(height: 8),
             _OpenSourceCard(onOpenUrl: onOpenUrl, onCopyVersion: onCopyVersion),
@@ -396,68 +392,6 @@ class _LinkGrid extends StatelessWidget {
   }
 }
 
-class _CapabilityGrid extends StatelessWidget {
-  const _CapabilityGrid();
-
-  @override
-  Widget build(BuildContext context) {
-    const items = [
-      _CapabilityItem(
-        icon: Icons.travel_explore,
-        title: '多站点浏览',
-        subtitle: '支持多种 PT 架构',
-      ),
-      _CapabilityItem(
-        icon: Icons.manage_search,
-        title: '聚合搜索',
-        subtitle: '跨站点快速检索',
-      ),
-      _CapabilityItem(
-        icon: Icons.download_for_offline_outlined,
-        title: '下载器集成',
-        subtitle: 'qBittorrent / Transmission',
-      ),
-      _CapabilityItem(
-        icon: Icons.cloud_sync_outlined,
-        title: 'Cookie Cloud',
-        subtitle: '批量同步登录状态',
-      ),
-      _CapabilityItem(
-        icon: Icons.backup_outlined,
-        title: '备份恢复',
-        subtitle: '支持本地与 WebDAV',
-      ),
-      _CapabilityItem(
-        icon: Icons.public_outlined,
-        title: '内置站点配置',
-        subtitle: '随应用持续维护',
-      ),
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 760
-            ? 3
-            : constraints.maxWidth >= 520
-            ? 2
-            : 1;
-        final itemWidth = (constraints.maxWidth - (columns - 1) * 12) / columns;
-        return Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            for (final item in items)
-              SizedBox(
-                width: itemWidth,
-                child: _CapabilityTile(item: item),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
 class _OpenSourceCard extends StatelessWidget {
   const _OpenSourceCard({required this.onOpenUrl, required this.onCopyVersion});
 
@@ -548,53 +482,6 @@ class _ActionTile extends StatelessWidget {
   }
 }
 
-class _CapabilityTile extends StatelessWidget {
-  const _CapabilityTile({required this.item});
-
-  final _CapabilityItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(item.icon, color: colorScheme.onPrimaryContainer),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item.subtitle,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _LinkAction {
   const _LinkAction({
     required this.icon,
@@ -607,16 +494,4 @@ class _LinkAction {
   final String title;
   final String subtitle;
   final String url;
-}
-
-class _CapabilityItem {
-  const _CapabilityItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
 }
