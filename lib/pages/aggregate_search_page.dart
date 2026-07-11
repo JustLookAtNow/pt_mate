@@ -24,6 +24,7 @@ import '../widgets/torrent_download_dialog.dart';
 import '../widgets/tag_filter_bar.dart';
 import 'torrent_detail_page.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
+import '../utils/screen_utils.dart';
 import '../utils/url_launcher_helper.dart';
 
 class AggregateSearchPage extends StatefulWidget {
@@ -320,13 +321,6 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                                   horizontal: 12,
                                                   vertical: 8,
                                                 ),
-                                            suffixIcon: IconButton(
-                                              icon: const Icon(Icons.search),
-                                              tooltip: '搜索',
-                                              onPressed: () => _performSearch(
-                                                _searchController.text,
-                                              ),
-                                            ),
                                           ),
                                           onSubmitted: _performSearch,
                                           onChanged: (value) {
@@ -832,6 +826,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       child: ListView.builder(
                                         key: _listKey,
                                         controller: _listController,
+                                        padding: const EdgeInsets.only(
+                                          bottom: 88,
+                                        ),
                                         itemCount:
                                             provider.filteredResults.length,
                                         itemBuilder: (context, index) {
@@ -1072,6 +1069,31 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                     ],
                   ),
                 ),
+          floatingActionButton: _isSelectionMode
+              ? null
+              : Builder(
+                  builder: (context) {
+                    final isDesktop = ScreenUtils.isLargeScreen(context);
+                    return isDesktop
+                        ? FloatingActionButton.extended(
+                            key: const ValueKey('aggregate-search-fab'),
+                            heroTag: 'aggregate-search-fab',
+                            onPressed: () =>
+                                _performSearch(_searchController.text),
+                            icon: const Icon(Icons.search),
+                            label: const Text('搜索'),
+                          )
+                        : FloatingActionButton(
+                            key: const ValueKey('aggregate-search-fab'),
+                            heroTag: 'aggregate-search-fab',
+                            onPressed: () =>
+                                _performSearch(_searchController.text),
+                            tooltip: '搜索',
+                            child: const Icon(Icons.search),
+                          );
+                  },
+                ),
+          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         );
       },
     );

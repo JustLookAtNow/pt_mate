@@ -1278,6 +1278,14 @@ class _HomePageState extends State<HomePage> {
   // 当前站点配置
   SiteConfig? _currentSite;
 
+  String get _selectedCategoryDisplayName {
+    if (_selectedCategoryIndex >= 0 &&
+        _selectedCategoryIndex < _categories.length) {
+      return _categories[_selectedCategoryIndex].displayName;
+    }
+    return '分类筛选';
+  }
+
   // 站点图标路径缓存：siteId -> asset path
   final Map<String, String> _logoPathCache = {};
   final Map<String, Future<String>> _logoPathFutureCache = {};
@@ -1685,6 +1693,9 @@ class _HomePageState extends State<HomePage> {
 
   /// 统一头部组件（搜索栏 + 标签筛选）
   Widget _buildHeaderPanel(BuildContext context, AppState appState) {
+    final isLargeScreen = ScreenUtils.isLargeScreen(context);
+    final supportsCategories = _currentSite?.features.supportCategories ?? true;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1696,106 +1707,131 @@ class _HomePageState extends State<HomePage> {
               Row(
                 children: [
                   // 分类按钮 - 仅在站点支持分类搜索功能时显示
-                  if (_currentSite?.features.supportCategories ?? true)
-                    IconButton(
-                      onPressed: () {
-                        _showCategoryFilterDialog();
-                      },
-                      icon: const Icon(Icons.category, size: 20),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.primaryContainer,
-                        foregroundColor: Theme.of(
-                          context,
-                        ).colorScheme.onPrimaryContainer,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                  if (supportsCategories && isLargeScreen)
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 128),
+                      child: TextButton.icon(
+                        onPressed: _showCategoryFilterDialog,
+                        icon: const Icon(Icons.category, size: 18),
+                        label: Text(
+                          _selectedCategoryDisplayName,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        padding: const EdgeInsets.all(10),
+                        style: TextButton.styleFrom(
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primaryContainer,
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onPrimaryContainer,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 10,
+                          ),
+                        ),
                       ),
-                      tooltip:
-                          _categories.isNotEmpty &&
-                              _selectedCategoryIndex >= 0 &&
-                              _selectedCategoryIndex < _categories.length
-                          ? _categories[_selectedCategoryIndex].displayName
-                          : '分类筛选',
                     ),
-                  if (_currentSite?.features.supportCategories ?? true)
+                  if (supportsCategories && !isLargeScreen)
+                    Expanded(
+                      child: TextButton.icon(
+                        onPressed: _showCategoryFilterDialog,
+                        icon: const Icon(Icons.category, size: 18),
+                        label: Text(
+                          _selectedCategoryDisplayName,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        style: TextButton.styleFrom(
+                          alignment: Alignment.centerLeft,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primaryContainer,
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onPrimaryContainer,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (supportsCategories && isLargeScreen)
                     const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _keywordCtrl,
-                      focusNode: _searchFocusNode,
-                      onTapOutside: (event) => FocusScope.of(context).unfocus(),
-                      textInputAction: TextInputAction.search,
-                      enabled:
-                          _currentSite?.features.supportTorrentSearch ?? true,
-                      decoration: InputDecoration(
-                        hintText:
-                            (_currentSite?.features.supportTorrentSearch ??
-                                true)
-                            ? ((_currentSite?.features.supportTorrentBrowse ??
-                                      true)
-                                  ? '输入关键词（可选）'
-                                  : '输入关键词（必填）')
-                            : '当前站点不支持搜索功能',
-                        border: const OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(25)),
-                          borderSide: BorderSide.none,
+                  if (isLargeScreen)
+                    Expanded(
+                      child: TextField(
+                        controller: _keywordCtrl,
+                        focusNode: _searchFocusNode,
+                        onTapOutside: (event) =>
+                            FocusScope.of(context).unfocus(),
+                        textInputAction: TextInputAction.search,
+                        enabled:
+                            _currentSite?.features.supportTorrentSearch ?? true,
+                        decoration: InputDecoration(
+                          hintText:
+                              (_currentSite?.features.supportTorrentSearch ??
+                                  true)
+                              ? ((_currentSite?.features.supportTorrentBrowse ??
+                                        true)
+                                    ? '输入关键词（可选）'
+                                    : '输入关键词（必填）')
+                              : '当前站点不支持搜索功能',
+                          border: const OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(25)),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: const OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(25)),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: const OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(25)),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainer,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
-                        enabledBorder: const OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(25)),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: const OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(25)),
-                          borderSide: BorderSide.none,
-                        ),
-                        filled: true,
-                        fillColor: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainer,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
+                        onSubmitted: (_) => _submitSearch(),
                       ),
-                      onSubmitted: (_) {
-                        if (_currentSite?.features.supportTorrentSearch ??
-                            true) {
-                          _search(reset: true);
-                        } else {
-                          NotificationHelper.showError(context, '当前站点不支持搜索功能');
-                        }
-                      },
                     ),
-                  ),
-                  const SizedBox(width: 8),
+                  if (isLargeScreen) const SizedBox(width: 8),
                   if (_currentSite?.features.supportCollection == true)
-                    IconButton(
-                      onPressed: () {
-                        if (mounted) {
-                          setState(() {
-                            _onlyFavorites = !_onlyFavorites;
-                          });
-                        }
-                        if (_currentSite?.features.supportTorrentSearch ??
-                            true) {
-                          _search(reset: true);
-                        } else {
-                          NotificationHelper.showError(context, '当前站点不支持搜索功能');
-                        }
-                      },
-                      icon: Icon(
-                        _onlyFavorites ? Icons.favorite : Icons.favorite_border,
-                        color: _onlyFavorites
-                            ? Theme.of(context).colorScheme.secondary
-                            : null,
+                    Tooltip(
+                      message: _onlyFavorites ? '显示全部' : '仅显示收藏',
+                      child: TextButton.icon(
+                        onPressed: () {
+                          if (mounted) {
+                            setState(() {
+                              _onlyFavorites = !_onlyFavorites;
+                            });
+                          }
+                          _submitSearch();
+                        },
+                        icon: Icon(
+                          _onlyFavorites
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: _onlyFavorites
+                              ? Theme.of(context).colorScheme.secondary
+                              : null,
+                        ),
+                        label: const Text('收藏'),
                       ),
-                      tooltip: _onlyFavorites ? '显示全部' : '仅显示收藏',
                     ),
                   const SizedBox(width: 8),
                   PopupMenuButton<String>(
@@ -1961,6 +1997,14 @@ class _HomePageState extends State<HomePage> {
     if (_loading || !_hasMore) return;
     _pageNumber += 1;
     await _search();
+  }
+
+  void _submitSearch() {
+    if (_currentSite?.features.supportTorrentSearch ?? true) {
+      _search(reset: true);
+    } else {
+      NotificationHelper.showError(context, '当前站点不支持搜索功能');
+    }
   }
 
   Future<void> _search({bool reset = false}) async {
@@ -3047,34 +3091,70 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             floatingActionButton: !_isSelectionMode
-                ? AnimatedSlide(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                    offset: _fabVisible ? Offset.zero : const Offset(0, 2),
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                      opacity: _fabVisible ? 1.0 : 0.0,
-                      child: Builder(
-                        builder: (context) {
-                          final isDesktop = ScreenUtils.isLargeScreen(context);
-                          return isDesktop
-                              ? FloatingActionButton.extended(
-                                  onPressed: _fabVisible
-                                      ? _showSiteSelectionDialog
-                                      : null,
-                                  icon: const Icon(Icons.swap_horiz),
-                                  label: const Text('切换站点'),
-                                )
-                              : FloatingActionButton(
-                                  onPressed: _fabVisible
-                                      ? _showSiteSelectionDialog
-                                      : null,
-                                  child: const Icon(Icons.swap_horiz),
-                                );
-                        },
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      AnimatedSlide(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                          opacity: _fabVisible ? 1.0 : 0.0,
+                          child: Builder(
+                            builder: (context) {
+                              final isDesktop = ScreenUtils.isLargeScreen(
+                                context,
+                              );
+                              return isDesktop
+                                  ? FloatingActionButton.extended(
+                                      heroTag: 'home-site-switch-fab',
+                                      onPressed: _fabVisible
+                                          ? _showSiteSelectionDialog
+                                          : null,
+                                      icon: const Icon(Icons.swap_horiz),
+                                      label: const Text('切换站点'),
+                                    )
+                                  : FloatingActionButton(
+                                      heroTag: 'home-site-switch-fab',
+                                      onPressed: _fabVisible
+                                          ? _showSiteSelectionDialog
+                                          : null,
+                                      child: const Icon(Icons.swap_horiz),
+                                    );
+                            },
+                          ),
+                        ),
                       ),
-                    ),
+                      if (_currentSite?.features.supportTorrentSearch ??
+                          true) ...[
+                        const SizedBox(height: 12),
+                        Builder(
+                          builder: (context) {
+                            final isDesktop = ScreenUtils.isLargeScreen(
+                              context,
+                            );
+                            return isDesktop
+                                ? FloatingActionButton.extended(
+                                    key: const ValueKey('home-search-fab'),
+                                    heroTag: 'home-search-fab',
+                                    onPressed: _submitSearch,
+                                    icon: const Icon(Icons.search),
+                                    label: const Text('搜索'),
+                                  )
+                                : FloatingActionButton(
+                                    key: const ValueKey('home-search-fab'),
+                                    heroTag: 'home-search-fab',
+                                    onPressed: _submitSearch,
+                                    tooltip: '搜索',
+                                    child: const Icon(Icons.search),
+                                  );
+                          },
+                        ),
+                      ],
+                    ],
                   )
                 : null,
             floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
