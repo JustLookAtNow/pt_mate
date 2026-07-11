@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'dart:math';
@@ -15,6 +14,7 @@ import '../widgets/web_login_widget.dart';
 import '../widgets/responsive_layout.dart';
 
 import '../utils/format.dart';
+import '../utils/reorder_haptic_feedback.dart';
 import '../app.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
 
@@ -40,6 +40,11 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   // 排序状态已移除
   bool _reorderMode = false;
   List<SiteConfig> _sitesBackup = [];
+  final ReorderHapticFeedbackController _reorderHapticFeedback =
+      ReorderHapticFeedbackController();
+  final Map<String, GlobalKey> _reorderSiteItemKeys = {};
+  Offset? _reorderDragStartPosition;
+  String? _draggingReorderSiteId;
 
   // 站点图标路径缓存：siteId -> asset path
   final Map<String, String> _logoPathCache = {};
@@ -58,6 +63,14 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   void _pruneSiteItemKeys() {
     final validIds = _sites.map((s) => s.id).toSet();
     _siteItemKeys.removeWhere((siteId, _) => !validIds.contains(siteId));
+    _reorderSiteItemKeys.removeWhere((siteId, _) => !validIds.contains(siteId));
+  }
+
+  GlobalKey _reorderSiteItemKeyFor(String siteId) {
+    return _reorderSiteItemKeys.putIfAbsent(
+      siteId,
+      () => GlobalKey(debugLabel: 'reorder_site_item_$siteId'),
+    );
   }
 
   void _scrollToActiveSite() {
@@ -723,6 +736,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                   sliver: SliverReorderableList(
                     itemBuilder: (context, index) => _buildSiteItem(index),
                     itemCount: _sites.length,
+                    onReorderStart: _onReorderStart,
+                    onReorderEnd: (_) => _endReorderDrag(),
                     onReorderItem: (oldIndex, newIndex) {
                       setState(() {
                         final item = _sites.removeAt(oldIndex);
@@ -766,7 +781,7 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         ? Color(site.siteColor!)
         : null;
     return Container(
-      key: ValueKey('site_${site.id}'),
+      key: _reorderSiteItemKeyFor(site.id),
       margin: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: isActive
@@ -842,25 +857,79 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                       },
                 tooltip: '置底',
               ),
-              Listener(
-                onPointerDown: (_) {
-                  if (!ScreenUtils.isLargeScreen(context)) {
-                    HapticFeedback.lightImpact();
-                  }
-                },
-                child: ReorderableDragStartListener(
-                  index: index,
-                  child: const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Icon(Icons.drag_handle),
-                  ),
-                ),
-              ),
+              _buildReorderDragHandle(index),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildReorderDragHandle(int index) {
+    const handle = Padding(
+      padding: EdgeInsets.all(8.0),
+      child: Icon(Icons.drag_handle),
+    );
+
+    if (ScreenUtils.isLargeScreen(context)) {
+      return ReorderableDragStartListener(index: index, child: handle);
+    }
+
+    return Listener(
+      onPointerDown: (event) => _reorderDragStartPosition = event.position,
+      onPointerMove: _onReorderDragPointerMove,
+      onPointerCancel: (_) => _endReorderDrag(),
+      child: ReorderableDelayedDragStartListener(index: index, child: handle),
+    );
+  }
+
+  void _onReorderStart(int index) {
+    if (ScreenUtils.isLargeScreen(context) || index >= _sites.length) return;
+
+    _draggingReorderSiteId = _sites[index].id;
+    final initialIndex = _reorderDragStartPosition == null
+        ? index
+        : (_insertionIndexAt(_reorderDragStartPosition!) ?? index);
+    _reorderHapticFeedback.startDrag(initialIndex);
+  }
+
+  void _onReorderDragPointerMove(PointerMoveEvent event) {
+    if (_draggingReorderSiteId == null) return;
+
+    final insertionIndex = _insertionIndexAt(event.position);
+    if (insertionIndex != null) {
+      _reorderHapticFeedback.updateInsertionIndex(insertionIndex);
+    }
+  }
+
+  int? _insertionIndexAt(Offset globalPosition) {
+    final itemPositions = <({int index, double centerY})>[];
+
+    for (var index = 0; index < _sites.length; index++) {
+      final renderObject = _reorderSiteItemKeys[_sites[index].id]
+          ?.currentContext
+          ?.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.hasSize) continue;
+
+      final top = renderObject.localToGlobal(Offset.zero).dy;
+      itemPositions.add((
+        index: index,
+        centerY: top + renderObject.size.height / 2,
+      ));
+    }
+
+    if (itemPositions.isEmpty) return null;
+
+    for (final item in itemPositions) {
+      if (globalPosition.dy <= item.centerY) return item.index;
+    }
+    return itemPositions.last.index + 1;
+  }
+
+  void _endReorderDrag() {
+    _reorderHapticFeedback.endDrag();
+    _draggingReorderSiteId = null;
+    _reorderDragStartPosition = null;
   }
 
   Color _getStatusColor(HealthStatus? hs) {
@@ -1353,9 +1422,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                               fit: BoxFit.scaleDown,
                                               alignment: Alignment.centerLeft,
                                               child: Text(
-                                                profile.shareRate.toStringAsFixed(
-                                                  2,
-                                                ),
+                                                profile.shareRate
+                                                    .toStringAsFixed(2),
                                                 style: const TextStyle(
                                                   color: Color(0xFF009688),
                                                   fontWeight: FontWeight.bold,
@@ -1491,9 +1559,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                                               fit: BoxFit.scaleDown,
                                               alignment: Alignment.centerLeft,
                                               child: Text(
-                                                profile.shareRate.toStringAsFixed(
-                                                  2,
-                                                ),
+                                                profile.shareRate
+                                                    .toStringAsFixed(2),
                                                 style: const TextStyle(
                                                   color: Color(0xFF009688),
                                                   fontWeight: FontWeight.bold,
@@ -1526,10 +1593,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     // 使用 MediaQuery 限制局部最大字体缩放因子为 1.15，防止在系统字体特别大时卡片挤压溢出
     final clampedCard = MediaQuery(
       data: MediaQuery.of(context).copyWith(
-        textScaler: MediaQuery.of(context).textScaler.clamp(
-          minScaleFactor: 0.8,
-          maxScaleFactor: 1.15,
-        ),
+        textScaler: MediaQuery.of(
+          context,
+        ).textScaler.clamp(minScaleFactor: 0.8, maxScaleFactor: 1.15),
       ),
       child: card,
     );
@@ -1656,42 +1722,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                 ),
               ],
             )
-          else if (ScreenUtils.isLargeScreen(context) ||
-              !_searchFocusNode.hasFocus) ...[
-            FilledButton.icon(
-              onPressed: _addSite,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('新增', style: TextStyle(fontSize: 13)),
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                minimumSize: const Size(0, 36),
-              ),
-            ),
-            const SizedBox(width: 6),
+          else ...[
             OutlinedButton.icon(
-              onPressed: _healthChecking ? null : _runHealthCheck,
-              icon: const Icon(Icons.refresh, size: 18),
-              label: Text(
-                _healthChecking ? '刷新中…' : '刷新',
-                style: const TextStyle(fontSize: 13),
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.primary,
-                side: BorderSide(color: Theme.of(context).colorScheme.primary),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                minimumSize: const Size(0, 36),
-              ),
-            ),
-            const SizedBox(width: 6),
-            OutlinedButton(
               onPressed: () {
                 setState(() {
                   _sitesBackup = List<SiteConfig>.from(_sites);
@@ -1705,16 +1737,73 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(18),
-                ), // Almost a circle like in the image
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(36, 36),
-                maximumSize: const Size(36, 36),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                minimumSize: const Size(0, 36),
               ),
-              child: const Icon(Icons.sort, size: 20),
+              icon: const Icon(Icons.sort, size: 20),
+              label: const Text('排序', style: TextStyle(fontSize: 13)),
             ),
           ],
         ],
       ),
+    );
+  }
+
+  Widget? _buildFloatingActionButtons() {
+    if (_loading || _reorderMode) return null;
+
+    return Builder(
+      builder: (context) {
+        final isLargeScreen = ScreenUtils.isLargeScreen(context);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            isLargeScreen
+                ? FloatingActionButton.extended(
+                    heroTag: 'add_site',
+                    onPressed: _addSite,
+                    tooltip: '新增站点',
+                    icon: const Icon(Icons.add),
+                    label: const Text('新增'),
+                  )
+                : FloatingActionButton(
+                    heroTag: 'add_site',
+                    onPressed: _addSite,
+                    tooltip: '新增站点',
+                    child: const Icon(Icons.add),
+                  ),
+            const SizedBox(height: 16),
+            isLargeScreen
+                ? FloatingActionButton.extended(
+                    heroTag: 'refresh_sites',
+                    onPressed: _healthChecking ? null : _runHealthCheck,
+                    tooltip: _healthChecking ? '正在刷新站点' : '刷新站点',
+                    icon: _healthChecking
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                    label: Text(_healthChecking ? '刷新中…' : '刷新'),
+                  )
+                : FloatingActionButton(
+                    heroTag: 'refresh_sites',
+                    onPressed: _healthChecking ? null : _runHealthCheck,
+                    tooltip: _healthChecking ? '正在刷新站点' : '刷新站点',
+                    child: _healthChecking
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                  ),
+          ],
+        );
+      },
     );
   }
 
@@ -1730,6 +1819,8 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
     return ResponsiveLayout(
       currentRoute: '/server_settings',
       appBar: _buildAppBar(context),
+      floatingActionButton: _buildFloatingActionButtons(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : PopScope(
