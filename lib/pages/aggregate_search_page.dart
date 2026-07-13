@@ -282,55 +282,6 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 4),
-                                      // 搜索输入框
-                                      Expanded(
-                                        flex: 3,
-                                        child: TextField(
-                                          controller: _searchController,
-                                          decoration: InputDecoration(
-                                            hintText: '输入搜索关键词',
-                                            border: const OutlineInputBorder(
-                                              borderRadius: BorderRadius.all(
-                                                Radius.circular(25),
-                                              ),
-                                              borderSide: BorderSide.none,
-                                            ),
-                                            enabledBorder:
-                                                const OutlineInputBorder(
-                                                  borderRadius:
-                                                      BorderRadius.all(
-                                                        Radius.circular(25),
-                                                      ),
-                                                  borderSide: BorderSide.none,
-                                                ),
-                                            focusedBorder:
-                                                const OutlineInputBorder(
-                                                  borderRadius:
-                                                      BorderRadius.all(
-                                                        Radius.circular(25),
-                                                      ),
-                                                  borderSide: BorderSide.none,
-                                                ),
-                                            filled: true,
-                                            fillColor: Theme.of(
-                                              context,
-                                            ).colorScheme.surfaceContainer,
-                                            contentPadding:
-                                                const EdgeInsets.symmetric(
-                                                  horizontal: 12,
-                                                  vertical: 8,
-                                                ),
-                                          ),
-                                          onSubmitted: _performSearch,
-                                          onChanged: (value) {
-                                            provider.setSearchKeyword(
-                                              value,
-                                              notify: false,
-                                            );
-                                          },
-                                        ),
-                                      ),
                                       const SizedBox(width: 8),
                                       // 排序选择
                                       PopupMenuButton<String>(
@@ -1078,16 +1029,14 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                         ? FloatingActionButton.extended(
                             key: const ValueKey('aggregate-search-fab'),
                             heroTag: 'aggregate-search-fab',
-                            onPressed: () =>
-                                _performSearch(_searchController.text),
+                            onPressed: _showSearchDialog,
                             icon: const Icon(Icons.search),
                             label: const Text('搜索'),
                           )
                         : FloatingActionButton(
                             key: const ValueKey('aggregate-search-fab'),
                             heroTag: 'aggregate-search-fab',
-                            onPressed: () =>
-                                _performSearch(_searchController.text),
+                            onPressed: _showSearchDialog,
                             tooltip: '搜索',
                             child: const Icon(Icons.search),
                           );
@@ -1161,6 +1110,26 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       );
       provider.setSearchResults(sortedResults);
     }
+  }
+
+  Future<void> _showSearchDialog() async {
+    final provider = Provider.of<AggregateSearchProvider>(
+      context,
+      listen: false,
+    );
+    final result = await showDialog<_AggregateSearchDialogResult>(
+      context: context,
+      builder: (context) => _AggregateSearchDialog(
+        configs: provider.searchConfigs,
+        selectedStrategy: provider.selectedStrategy,
+        keyword: _searchController.text,
+      ),
+    );
+    if (!mounted || result == null) return;
+
+    provider.setSelectedStrategy(result.strategy);
+    _searchController.text = result.keyword;
+    _performSearch(result.keyword);
   }
 
   void _performSearch(String query) async {
@@ -2084,6 +2053,127 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     setState(() {
       _isFastScrolling = v;
     });
+  }
+}
+
+class _AggregateSearchDialogResult {
+  const _AggregateSearchDialogResult({
+    required this.strategy,
+    required this.keyword,
+  });
+
+  final String strategy;
+  final String keyword;
+}
+
+class _AggregateSearchDialog extends StatefulWidget {
+  const _AggregateSearchDialog({
+    required this.configs,
+    required this.selectedStrategy,
+    required this.keyword,
+  });
+
+  final List<AggregateSearchConfig> configs;
+  final String selectedStrategy;
+  final String keyword;
+
+  @override
+  State<_AggregateSearchDialog> createState() => _AggregateSearchDialogState();
+}
+
+class _AggregateSearchDialogState extends State<_AggregateSearchDialog> {
+  late final TextEditingController _keywordController;
+  String? _selectedStrategy;
+
+  @override
+  void initState() {
+    super.initState();
+    _keywordController = TextEditingController(text: widget.keyword);
+    _selectedStrategy =
+        widget.configs.any((config) => config.id == widget.selectedStrategy)
+        ? widget.selectedStrategy
+        : widget.configs.firstOrNull?.id;
+  }
+
+  @override
+  void dispose() {
+    _keywordController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final strategy = _selectedStrategy;
+    if (strategy == null) return;
+    Navigator.of(context).pop(
+      _AggregateSearchDialogResult(
+        strategy: strategy,
+        keyword: _keywordController.text,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      scrollable: true,
+      title: const Text('聚合搜索'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('搜索策略', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              key: const ValueKey('aggregate-search-strategy-field'),
+              initialValue: _selectedStrategy,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              items: widget.configs
+                  .map(
+                    (config) => DropdownMenuItem<String>(
+                      value: config.id,
+                      child: Text(config.name, overflow: TextOverflow.ellipsis),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() {
+                _selectedStrategy = value;
+              }),
+            ),
+            const SizedBox(height: 16),
+            Text('搜索关键词', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            TextField(
+              key: const ValueKey('search-keyword-field'),
+              controller: _keywordController,
+              autofocus: true,
+              textInputAction: TextInputAction.search,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: '输入关键词（可选）',
+                isDense: true,
+              ),
+              onSubmitted: (_) => _submit(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: _selectedStrategy == null ? null : _submit,
+          child: const Text('搜索'),
+        ),
+      ],
+    );
   }
 }
 

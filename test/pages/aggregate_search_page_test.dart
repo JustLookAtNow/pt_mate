@@ -25,7 +25,7 @@ void main() {
     StorageService.instance.resetForTest();
   });
 
-  testWidgets('shows selected strategy and uses a floating search button', (
+  testWidgets('search FAB opens the strategy and keyword dialog', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(360, 800);
@@ -49,8 +49,16 @@ void main() {
 
     expect(find.text('测试策略'), findsOneWidget);
     expect(find.byKey(const ValueKey('aggregate-search-fab')), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
 
-    final searchField = tester.widget<TextField>(find.byType(TextField));
-    expect(searchField.decoration?.suffixIcon, isNull);
+    await tester.tap(find.byKey(const ValueKey('aggregate-search-fab')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('aggregate-search-strategy-field')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('search-keyword-field')), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '搜索'), findsOneWidget);
   });
 }

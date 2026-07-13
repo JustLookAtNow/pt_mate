@@ -336,7 +336,13 @@ class _CategoryFilterDialogState extends State<_CategoryFilterDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final availableHeight =
+        MediaQuery.sizeOf(context).height -
+        MediaQuery.viewInsetsOf(context).bottom;
+    final categoryListHeight = (availableHeight * 0.32).clamp(96.0, 200.0);
+
     return AlertDialog(
+      scrollable: true,
       title: const Text('分类筛选'),
       content: SizedBox(
         width: double.maxFinite,
@@ -348,7 +354,9 @@ class _CategoryFilterDialogState extends State<_CategoryFilterDialog> {
             Text('搜索关键词', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             TextField(
+              key: const ValueKey('search-keyword-field'),
               controller: _keywordController,
+              autofocus: true,
               onTapOutside: (event) => FocusScope.of(context).unfocus(),
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
@@ -365,7 +373,7 @@ class _CategoryFilterDialogState extends State<_CategoryFilterDialog> {
               const Text('暂无可用分类', style: TextStyle(color: Colors.grey))
             else
               SizedBox(
-                height: 200,
+                height: categoryListHeight,
                 child: RadioGroup<int>(
                   groupValue: _selectedCategoryIndex,
                   onChanged: (value) {
@@ -1204,7 +1212,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final _keywordCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
-  final FocusNode _searchFocusNode = FocusNode();
 
   int _selectedCategoryIndex = 0;
   List<SearchCategoryConfig> _categories = [];
@@ -1469,7 +1476,6 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _scrollCtrl.dispose();
     _keywordCtrl.dispose();
-    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -1630,11 +1636,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onScroll() {
-    // 滑动时收起键盘（滑动不触发 onTapOutside）
-    if (_searchFocusNode.hasFocus) {
-      _searchFocusNode.unfocus();
-    }
-
     if (!mounted) return;
 
     final currentOffset = _scrollCtrl.position.pixels;
@@ -1693,7 +1694,6 @@ class _HomePageState extends State<HomePage> {
 
   /// 统一头部组件（搜索栏 + 标签筛选）
   Widget _buildHeaderPanel(BuildContext context, AppState appState) {
-    final isLargeScreen = ScreenUtils.isLargeScreen(context);
     final supportsCategories = _currentSite?.features.supportCategories ?? true;
 
     return Column(
@@ -1707,35 +1707,7 @@ class _HomePageState extends State<HomePage> {
               Row(
                 children: [
                   // 分类按钮 - 仅在站点支持分类搜索功能时显示
-                  if (supportsCategories && isLargeScreen)
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 128),
-                      child: TextButton.icon(
-                        onPressed: _showCategoryFilterDialog,
-                        icon: const Icon(Icons.category, size: 18),
-                        label: Text(
-                          _selectedCategoryDisplayName,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        style: TextButton.styleFrom(
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primaryContainer,
-                          foregroundColor: Theme.of(
-                            context,
-                          ).colorScheme.onPrimaryContainer,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 10,
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (supportsCategories && !isLargeScreen)
+                  if (supportsCategories)
                     Expanded(
                       child: TextButton.icon(
                         onPressed: _showCategoryFilterDialog,
@@ -1763,53 +1735,8 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                     ),
-                  if (supportsCategories && isLargeScreen)
-                    const SizedBox(width: 8),
-                  if (isLargeScreen)
-                    Expanded(
-                      child: TextField(
-                        controller: _keywordCtrl,
-                        focusNode: _searchFocusNode,
-                        onTapOutside: (event) =>
-                            FocusScope.of(context).unfocus(),
-                        textInputAction: TextInputAction.search,
-                        enabled:
-                            _currentSite?.features.supportTorrentSearch ?? true,
-                        decoration: InputDecoration(
-                          hintText:
-                              (_currentSite?.features.supportTorrentSearch ??
-                                  true)
-                              ? ((_currentSite?.features.supportTorrentBrowse ??
-                                        true)
-                                    ? '输入关键词（可选）'
-                                    : '输入关键词（必填）')
-                              : '当前站点不支持搜索功能',
-                          border: const OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(25)),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: const OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(25)),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: const OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(25)),
-                            borderSide: BorderSide.none,
-                          ),
-                          filled: true,
-                          fillColor: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainer,
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                        ),
-                        onSubmitted: (_) => _submitSearch(),
-                      ),
-                    ),
-                  if (isLargeScreen) const SizedBox(width: 8),
+                  if (!supportsCategories) const Spacer(),
+                  const SizedBox(width: 8),
                   if (_currentSite?.features.supportCollection == true)
                     Tooltip(
                       message: _onlyFavorites ? '显示全部' : '仅显示收藏',
@@ -2181,11 +2108,6 @@ class _HomePageState extends State<HomePage> {
     // 从详情页返回后，刷新列表页状态以确保收藏状态同步
     if (mounted) {
       setState(() {});
-      // 路由 pop 后 Flutter 焦点恢复机制会在下一帧重新聚焦 TextField，
-      // 必须在 postFrameCallback 中再次取消焦点才能真正阻止键盘弹出
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _searchFocusNode.unfocus();
-      });
     }
   }
 
@@ -3140,14 +3062,14 @@ class _HomePageState extends State<HomePage> {
                                 ? FloatingActionButton.extended(
                                     key: const ValueKey('home-search-fab'),
                                     heroTag: 'home-search-fab',
-                                    onPressed: _submitSearch,
+                                    onPressed: _showCategoryFilterDialog,
                                     icon: const Icon(Icons.search),
                                     label: const Text('搜索'),
                                   )
                                 : FloatingActionButton(
                                     key: const ValueKey('home-search-fab'),
                                     heroTag: 'home-search-fab',
-                                    onPressed: _submitSearch,
+                                    onPressed: _showCategoryFilterDialog,
                                     tooltip: '搜索',
                                     child: const Icon(Icons.search),
                                   );
