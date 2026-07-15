@@ -215,8 +215,10 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
       //
       for (var add in additionalParams.entries) {
         if (add.key == 'category') {
-          var category = add.value.toString().split('#');
-          if (category.length == 2) {
+          final category = add.value.toString().split('#');
+          if (category.length == 1 && category[0].isNotEmpty) {
+            url += '/${category[0]}';
+          } else if (category.length == 2 && category[0].isNotEmpty) {
             url += '/${category[0]}';
             params['filter[category]'] = category[1];
           }
