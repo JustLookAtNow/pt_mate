@@ -7,7 +7,23 @@
   ],
   "primaryUrl": "https://xingtan.one/",
   "siteType": "NexusPHPWeb",
-  "searchCategories": [],
+  "searchCategories": [
+    {
+      "id": "all",
+      "displayName": "综合",
+      "parameters": "{}"
+    },
+    {
+      "id": "zhuan_ye",
+      "displayName": "专业",
+      "parameters": "{\"category\":\"normal\",\"boxId\":\"123\"}"
+    },
+    {
+      "id": "xue_shu",
+      "displayName": "学术（论文、期刊、会议等）",
+      "parameters": "{\"category\":\"normal\",\"boxId\":\"124\"}"
+    }
+  ],
   "features": {
     "userProfile": true,
     "torrentSearch": true,
