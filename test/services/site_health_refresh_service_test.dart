@@ -10,14 +10,37 @@ void main() {
   const MethodChannel channel = MethodChannel(
     'plugins.it_nomads.com/flutter_secure_storage',
   );
+  late Map<String, String> secureValues;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     StorageService.instance.resetForTest();
+    secureValues = <String, String>{};
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-          return null;
+        .setMockMethodCallHandler(channel, (MethodCall call) async {
+          final arguments = call.arguments as Map<dynamic, dynamic>?;
+          final key = arguments?['key'] as String?;
+          switch (call.method) {
+            case 'write':
+              secureValues[key!] = arguments!['value'] as String;
+              return null;
+            case 'read':
+              return secureValues[key];
+            case 'delete':
+              secureValues.remove(key);
+              return null;
+            case 'readAll':
+              return Map<String, String>.from(secureValues);
+            default:
+              return null;
+          }
         });
+  });
+
+  tearDown(() async {
+    await StorageService.instance.waitForPendingSecureStorageCleanup();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null);
   });
 
   test('未达到刷新间隔时跳过自动刷新', () async {

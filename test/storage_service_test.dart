@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pt_mate/services/storage/storage_service.dart';
 import 'package:pt_mate/models/app_models.dart';
@@ -11,17 +13,40 @@ void main() {
     'plugins.it_nomads.com/flutter_secure_storage',
   );
   late StorageService service;
+  late Map<String, String> secureValues;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     service = StorageService.instance;
     service.resetForTest();
+    secureValues = <String, String>{};
 
     // Mock FlutterSecureStorage
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-          return null;
+          final arguments = methodCall.arguments as Map<dynamic, dynamic>?;
+          final key = arguments?['key'] as String?;
+          switch (methodCall.method) {
+            case 'write':
+              secureValues[key!] = arguments!['value'] as String;
+              return null;
+            case 'read':
+              return secureValues[key];
+            case 'delete':
+              secureValues.remove(key);
+              return null;
+            case 'readAll':
+              return Map<String, String>.from(secureValues);
+            default:
+              return null;
+          }
         });
+  });
+
+  tearDown(() async {
+    await service.waitForPendingSecureStorageCleanup();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null);
   });
 
   test('StorageService caching optimization test (Add, Update, Delete)', () async {
@@ -79,6 +104,29 @@ void main() {
     // or the underlying mechanism didn't trigger a reload.
     // Ideally we'd check logs or mock verify, but given the previous tests passed,
     // ensuring correctness (empty list) is sufficient here.
+  });
+
+  test('模板升级的 includeApiKeys 读取不会在站点队列内自锁', () async {
+    const legacy = SiteConfig(
+      id: 'legacy-mteam',
+      name: 'Legacy M-Team',
+      baseUrl: 'https://kp.m-team.cc/',
+      apiKey: null,
+      templateId: 'mteam-api',
+    );
+    SharedPreferences.setMockInitialValues({
+      StorageKeys.siteConfigs: jsonEncode([legacy.toJson()]),
+    });
+    service.resetForTest();
+    secureValues[StorageKeys.siteApiKey(legacy.id)] = 'api-value';
+
+    final loaded = await service
+        .loadSiteConfigs(includeApiKeys: true)
+        .timeout(const Duration(seconds: 3));
+
+    expect(loaded, hasLength(1));
+    expect(loaded.single.templateId, 'mteam');
+    expect(loaded.single.apiKey, 'api-value');
   });
 
   test(

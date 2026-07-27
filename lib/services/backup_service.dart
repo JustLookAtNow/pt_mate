@@ -86,8 +86,11 @@ class BackupService {
 
   BackupService(this._storageService) : _webdavService = WebDAVService.instance;
 
-  Future<_PreparedBackupFile> _prepareBackupFile() async {
-    final backup = await createBackup();
+  Future<_PreparedBackupFile>
+  _prepareBackupFile() => _storageService.runWithCurrentSecureStorageOperation((
+    epoch,
+  ) async {
+    final backup = await _createBackupInCurrentEpoch();
     final timestamp = backup.timestamp.toIso8601String().replaceAll(':', '-');
     final fileName =
         '$_backupFilePrefix${backup.version}_$timestamp$_backupFileExtension';
@@ -96,11 +99,17 @@ class BackupService {
     return _PreparedBackupFile(
       fileName: fileName,
       content: backupContent,
+      secureStorageEpoch: epoch,
     );
-  }
+  });
 
   // 创建备份
-  Future<BackupData> createBackup() async {
+  Future<BackupData> createBackup() =>
+      _storageService.runWithCurrentSecureStorageOperation(
+        (_) => _createBackupInCurrentEpoch(),
+      );
+
+  Future<BackupData> _createBackupInCurrentEpoch() async {
     final data = <String, dynamic>{};
 
     // 获取应用版本信息
@@ -175,7 +184,8 @@ class BackupService {
     data['downloaderTagsCache'] = downloaderTagsCache;
 
     // 收集聚合搜索设置
-    final aggregateSearchSettings = await _storageService.loadAggregateSearchSettings();
+    final aggregateSearchSettings = await _storageService
+        .loadAggregateSearchSettings();
     data['aggregateSearchSettings'] = aggregateSearchSettings.toJson();
 
     // 收集 Cookie Cloud 配置
@@ -191,10 +201,15 @@ class BackupService {
   }
 
   // 导出备份到文件
-  Future<String?> exportBackup({void Function(String message)? onProgress}) async {
+  Future<String?> exportBackup({
+    void Function(String message)? onProgress,
+  }) async {
     try {
       onProgress?.call('正在创建备份...');
       final prepared = await _prepareBackupFile();
+      _storageService.requireSecureStorageOperationEpoch(
+        prepared.secureStorageEpoch,
+      );
 
       String? result;
       if (defaultTargetPlatform == TargetPlatform.linux) {
@@ -213,6 +228,9 @@ class BackupService {
         );
 
         if (result != null) {
+          _storageService.requireSecureStorageOperationEpoch(
+            prepared.secureStorageEpoch,
+          );
           final file = File(result);
           await file.writeAsString(prepared.content);
         }
@@ -228,6 +246,8 @@ class BackupService {
       }
 
       return result;
+    } on SecureStorageUnavailableException {
+      rethrow;
     } catch (e) {
       throw BackupException('导出备份失败: $e');
     }
@@ -248,10 +268,10 @@ class BackupService {
         var json = jsonDecode(content) as Map<String, dynamic>;
 
         // 检查是否需要数据迁移
-         final backupVersion = json['version'] as String? ?? '1.0.0';
-         if (backupVersion != BackupVersion.current) {
-           json = BackupMigrationManager.migrate(json, BackupVersion.current);
-         }
+        final backupVersion = json['version'] as String? ?? '1.0.0';
+        if (backupVersion != BackupVersion.current) {
+          json = BackupMigrationManager.migrate(json, BackupVersion.current);
+        }
 
         return BackupData.fromJson(json);
       }
@@ -262,8 +282,15 @@ class BackupService {
   }
 
   // 恢复备份
-  Future<BackupRestoreResult> restoreBackup(BackupData backup) async {
+  Future<BackupRestoreResult> restoreBackup(
+    BackupData backup, {
+    int? expectedSecureStorageEpoch,
+  }) async {
     try {
+      final expected = expectedSecureStorageEpoch;
+      if (expected != null) {
+        _storageService.requireSecureStorageOperationEpoch(expected);
+      }
       // 检查版本兼容性
       if (!BackupVersion.isCompatible(backup.version)) {
         throw BackupException('备份版本 ${backup.version} 不兼容当前应用版本');
@@ -273,173 +300,193 @@ class BackupService {
       var migratedData = backup.data;
       if (backup.version != BackupVersion.current) {
         try {
-          final backupDataJson = {
-            'version': backup.version,
-            ...backup.data,
-          };
-          final migratedJson = BackupMigrationManager.migrate(backupDataJson, BackupVersion.current);
-          migratedData = Map<String, dynamic>.from(migratedJson)..remove('version');
-        } catch (e) {
-          return BackupRestoreResult(
-            success: false,
-            message: '数据迁移失败: $e',
+          final backupDataJson = {'version': backup.version, ...backup.data};
+          final migratedJson = BackupMigrationManager.migrate(
+            backupDataJson,
+            BackupVersion.current,
           );
+          migratedData = Map<String, dynamic>.from(migratedJson)
+            ..remove('version');
+        } on SecureStorageUnavailableException {
+          rethrow;
+        } catch (e) {
+          return BackupRestoreResult(success: false, message: '数据迁移失败: $e');
         }
       }
 
-      // 恢复站点配置
-      if (migratedData['siteConfigs'] != null) {
-        final siteConfigs = (migratedData['siteConfigs'] as List)
-            .map((json) => SiteConfig.fromJson(json as Map<String, dynamic>))
-            .toList();
-        await _storageService.saveSiteConfigs(siteConfigs);
-      }
-
-      // 恢复当前激活的站点ID
-      if (migratedData['activeSiteId'] != null) {
-        await _storageService.setActiveSiteId(migratedData['activeSiteId'] as String?);
-      }
-
-      // 恢复下载器配置
+      final restoredSiteConfigs = migratedData['siteConfigs'] == null
+          ? null
+          : (migratedData['siteConfigs'] as List)
+                .map(
+                  (json) => SiteConfig.fromJson(json as Map<String, dynamic>),
+                )
+                .toList();
+      final restoredCookieCloudConfig =
+          migratedData['cookieCloudConfig'] == null
+          ? null
+          : CookieCloudConfig.fromJson(
+              migratedData['cookieCloudConfig'] as Map<String, dynamic>,
+            );
+      final restoredDownloaderPasswords = <String, String>{
+        if (migratedData['downloaderPasswords'] != null)
+          ...(migratedData['downloaderPasswords'] as Map<String, dynamic>).map(
+            (id, value) => MapEntry(id, value as String),
+          ),
+      };
+      List<Map<String, dynamic>>? sanitizedDownloaderConfigs;
+      Set<String>? restoredDownloaderIds;
       if (migratedData['downloaderConfigs'] != null) {
-        final downloaderConfigList = migratedData['downloaderConfigs'] as List<dynamic>;
-        final downloaderConfigMaps = downloaderConfigList.cast<Map<String, dynamic>>();
-        final downloaderConfigs = downloaderConfigMaps.map((configMap) => DownloaderConfig.fromJson(configMap)).toList();
-
-        // 恢复默认下载器ID
-        String? defaultDownloaderId;
-        if (migratedData['defaultDownloaderId'] != null) {
-          defaultDownloaderId = migratedData['defaultDownloaderId'] as String?;
-        }
-
-        await _storageService.saveDownloaderConfigs(downloaderConfigs, defaultId: defaultDownloaderId);
-      }
-
-      // 恢复下载器密码
-      if (migratedData['downloaderPasswords'] != null) {
-        final downloaderPasswords = migratedData['downloaderPasswords'] as Map<String, dynamic>;
-        for (final entry in downloaderPasswords.entries) {
-          final clientId = entry.key;
-          final password = entry.value as String;
-          await _storageService.saveDownloaderPassword(clientId, password);
-        }
-      }
-
-      // 恢复用户偏好设置
-      if (migratedData['userPreferences'] != null) {
-        final prefs = migratedData['userPreferences'] as Map<String, dynamic>;
-
-        if (prefs['themeMode'] != null) {
-          await _storageService.saveThemeMode(prefs['themeMode'] as String);
-        }
-        if (prefs['dynamicColor'] != null) {
-          await _storageService.saveUseDynamicColor(prefs['dynamicColor'] as bool);
-        }
-        if (prefs['seedColor'] != null) {
-          await _storageService.saveSeedColor(prefs['seedColor'] as int);
-        }
-        if (prefs['autoLoadImages'] != null) {
-          await _storageService.saveAutoLoadImages(prefs['autoLoadImages'] as bool);
-        }
-
-        // 恢复默认下载设置
-        if (prefs['defaultDownloadSettings'] != null) {
-          final downloadSettings = prefs['defaultDownloadSettings'] as Map<String, dynamic>;
-          if (downloadSettings['category'] != null) {
-            await _storageService.saveDefaultDownloadCategory(downloadSettings['category'] as String);
-          }
-          if (downloadSettings['tags'] != null) {
-            final tags = downloadSettings['tags'] as dynamic;
-            if (tags is String) {
-              await _storageService.saveDefaultDownloadTags([tags]);
-            } else if (tags is List) {
-              await _storageService.saveDefaultDownloadTags(tags.cast<String>());
+        sanitizedDownloaderConfigs = <Map<String, dynamic>>[];
+        restoredDownloaderIds = <String>{};
+        for (final value
+            in migratedData['downloaderConfigs'] as List<dynamic>) {
+          final parsed = DownloaderConfig.fromJson(
+            value as Map<String, dynamic>,
+          );
+          if (parsed.id.isNotEmpty) {
+            restoredDownloaderIds.add(parsed.id);
+            if (parsed.password.isNotEmpty) {
+              final separatePassword = restoredDownloaderPasswords[parsed.id];
+              if (separatePassword != null &&
+                  separatePassword != parsed.password) {
+                throw BackupException('下载器密码来源冲突，未执行任何恢复写入');
+              }
+              restoredDownloaderPasswords[parsed.id] = parsed.password;
             }
           }
-          if (downloadSettings['savePath'] != null) {
-            await _storageService.saveDefaultDownloadSavePath(downloadSettings['savePath'] as String);
-          }
-        }
-
-        // 恢复网络代理设置
-        if (prefs['proxy'] != null) {
-          final proxy = prefs['proxy'] as Map<String, dynamic>;
-          if (proxy['enabled'] != null) {
-            await _storageService.saveProxyEnabled(proxy['enabled'] as bool);
-          }
-          if (proxy['host'] != null) {
-            await _storageService.saveProxyHost(proxy['host'] as String);
-          }
-          if (proxy['port'] != null) {
-            await _storageService.saveProxyPort(proxy['port'] as int);
-          }
-          if (proxy['username'] != null) {
-            await _storageService.saveProxyUsername(proxy['username'] as String);
-          }
-          if (proxy['password'] != null) {
-            await _storageService.saveProxyPassword(proxy['password'] as String);
-          }
-          if (proxy['bypassLan'] != null) {
-            await _storageService.saveProxyBypassLan(proxy['bypassLan'] as bool);
-          }
-          if (proxy['bypassRules'] != null) {
-            final rules = proxy['bypassRules'] as List<dynamic>;
-            await _storageService.saveProxyBypassRules(rules.cast<String>());
-          }
-        }
-      }
-
-      // 恢复下载器的分类和标签缓存
-      if (migratedData['downloaderCategoriesCache'] != null) {
-        final categoriesCache = migratedData['downloaderCategoriesCache'] as Map<String, dynamic>;
-        for (final entry in categoriesCache.entries) {
-          final categories = (entry.value as List).cast<String>();
-          await _storageService.saveDownloaderCategories(entry.key, categories);
-        }
-      }
-      if (migratedData['downloaderTagsCache'] != null) {
-        final tagsCache = migratedData['downloaderTagsCache'] as Map<String, dynamic>;
-        for (final entry in tagsCache.entries) {
-          final tags = (entry.value as List).cast<String>();
-          await _storageService.saveDownloaderTags(entry.key, tags);
-        }
-      }
-
-      // 恢复聚合搜索设置
-      if (migratedData['aggregateSearchSettings'] != null) {
-        try {
-          final aggregateSearchSettings = AggregateSearchSettings.fromJson(
-            migratedData['aggregateSearchSettings'] as Map<String, dynamic>
+          final sanitized = Map<String, dynamic>.from(
+            parsed.copyWith(password: '').toJson(),
           );
-          await _storageService.saveAggregateSearchSettings(aggregateSearchSettings);
-        } catch (e) {
-          // 如果恢复聚合搜索设置失败，记录错误但不影响整体恢复过程
-          // 这样可以确保其他数据的恢复不受影响
+          final config = Map<String, dynamic>.from(
+            sanitized['config'] as Map<String, dynamic>,
+          )..remove('password');
+          sanitized['config'] = config;
+          sanitizedDownloaderConfigs.add(sanitized);
         }
       }
-
-      // 恢复 Cookie Cloud 配置
-      if (migratedData['cookieCloudConfig'] != null) {
-        try {
-          final cookieCloudConfig = CookieCloudConfig.fromJson(
-            migratedData['cookieCloudConfig'] as Map<String, dynamic>
-          );
-          await _storageService.saveCookieCloudConfig(cookieCloudConfig);
-        } catch (_) {
-          // 容错处理：恢复失败时不影响整体流程
-        }
-      }
-
-      return BackupRestoreResult(
-        success: true,
-        message: '数据恢复成功',
+      final restoredUserPreferences =
+          migratedData['userPreferences'] as Map<String, dynamic>?;
+      final restoredProxy =
+          restoredUserPreferences?['proxy'] as Map<String, dynamic>?;
+      final hasProxyPassword = restoredProxy?.containsKey('password') ?? false;
+      final restoredProxyPassword = hasProxyPassword
+          ? restoredProxy!['password'] as String? ?? ''
+          : '';
+      final backupPreferences = _buildRestorePreferenceSnapshot(
+        migratedData,
+        sanitizedDownloaderConfigs: sanitizedDownloaderConfigs,
       );
+      if (expected != null) {
+        _storageService.requireSecureStorageOperationEpoch(expected);
+      }
+
+      // 敏感字段与全部普通偏好共享一个 manifest/companion 提交边界。
+      await _storageService.restoreSensitiveBackupData(
+        siteConfigs: restoredSiteConfigs,
+        cookieCloudConfig: restoredCookieCloudConfig,
+        downloaderPasswords: restoredDownloaderPasswords.isEmpty
+            ? null
+            : restoredDownloaderPasswords,
+        downloaderIds: restoredDownloaderIds,
+        backupPreferences: backupPreferences.isEmpty ? null : backupPreferences,
+        hasProxyPassword: hasProxyPassword,
+        proxyPassword: restoredProxyPassword,
+        expectedSecureStorageEpoch: expected,
+      );
+
+      return BackupRestoreResult(success: true, message: '数据恢复成功');
     } catch (e) {
-      return BackupRestoreResult(
-        success: false,
-        message: '恢复失败: $e',
+      return BackupRestoreResult(success: false, message: '恢复失败: $e');
+    }
+  }
+
+  Map<String, dynamic> _buildRestorePreferenceSnapshot(
+    Map<String, dynamic> data, {
+    required List<Map<String, dynamic>>? sanitizedDownloaderConfigs,
+  }) {
+    final snapshot = <String, dynamic>{};
+    final activeSiteId = data['activeSiteId'];
+    if (activeSiteId != null) snapshot['activeSiteId'] = activeSiteId as String;
+
+    if (sanitizedDownloaderConfigs != null) {
+      snapshot['downloaderConfigs'] = sanitizedDownloaderConfigs;
+      // Presence with null means the old default must be removed.
+      snapshot['defaultDownloaderId'] = data['defaultDownloaderId'] as String?;
+    }
+
+    final preferences = data['userPreferences'] as Map<String, dynamic>?;
+    if (preferences != null) {
+      void copyIfPresent(String source, String destination) {
+        final value = preferences[source];
+        if (value != null) snapshot[destination] = value;
+      }
+
+      copyIfPresent('themeMode', 'themeMode');
+      copyIfPresent('dynamicColor', 'dynamicColor');
+      copyIfPresent('seedColor', 'seedColor');
+      copyIfPresent('autoLoadImages', 'autoLoadImages');
+
+      final downloadSettings =
+          preferences['defaultDownloadSettings'] as Map<String, dynamic>?;
+      if (downloadSettings != null) {
+        if (downloadSettings['category'] != null) {
+          snapshot['defaultDownloadCategory'] =
+              downloadSettings['category'] as String;
+        }
+        final tags = downloadSettings['tags'];
+        if (tags is String) {
+          snapshot['defaultDownloadTags'] = <String>[tags];
+        } else if (tags is List<dynamic>) {
+          snapshot['defaultDownloadTags'] = tags.cast<String>();
+        }
+        if (downloadSettings['savePath'] != null) {
+          snapshot['defaultDownloadSavePath'] =
+              downloadSettings['savePath'] as String;
+        }
+      }
+
+      final proxy = preferences['proxy'] as Map<String, dynamic>?;
+      if (proxy != null) {
+        const proxyFields = <String, String>{
+          'enabled': 'proxyEnabled',
+          'host': 'proxyHost',
+          'port': 'proxyPort',
+          'username': 'proxyUsername',
+          'bypassLan': 'proxyBypassLan',
+          'bypassRules': 'proxyBypassRules',
+        };
+        for (final entry in proxyFields.entries) {
+          final value = proxy[entry.key];
+          if (value != null) snapshot[entry.value] = value;
+        }
+      }
+    }
+
+    Map<String, dynamic>? copyStringListMap(String key) {
+      final source = data[key] as Map<String, dynamic>?;
+      if (source == null) return null;
+      return source.map(
+        (id, value) => MapEntry(id, (value as List<dynamic>).cast<String>()),
       );
     }
+
+    final categories = copyStringListMap('downloaderCategoriesCache');
+    if (categories != null) snapshot['downloaderCategoriesCache'] = categories;
+    final tags = copyStringListMap('downloaderTagsCache');
+    if (tags != null) snapshot['downloaderTagsCache'] = tags;
+
+    final aggregate = data['aggregateSearchSettings'];
+    if (aggregate != null) {
+      try {
+        snapshot['aggregateSearchSettings'] = AggregateSearchSettings.fromJson(
+          aggregate as Map<String, dynamic>,
+        ).toJson();
+      } catch (_) {
+        // Preserve the historical behavior: an invalid optional search
+        // preference does not invalidate the rest of a backup.
+      }
+    }
+    return snapshot;
   }
 
   // WebDAV集成方法
@@ -451,6 +498,9 @@ class BackupService {
     try {
       onProgress?.call('正在创建备份...');
       final prepared = await _prepareBackupFile();
+      _storageService.requireSecureStorageOperationEpoch(
+        prepared.secureStorageEpoch,
+      );
 
       // 检查WebDAV配置
       onProgress?.call('正在检查导出方式...');
@@ -459,12 +509,17 @@ class BackupService {
         try {
           // 直接上传到WebDAV，不创建本地文件
           onProgress?.call('正在上传到 WebDAV...');
-          await _webdavService.uploadBackup(
-            prepared.content,
-            filename: prepared.fileName,
+          await _storageService.runWithSecureStorageOperationEpoch(
+            prepared.secureStorageEpoch,
+            () => _webdavService.uploadBackup(
+              prepared.content,
+              filename: prepared.fileName,
+            ),
           );
           // WebDAV上传成功，返回特殊标识表示上传到云端
           return 'WebDAV云端备份';
+        } on SecureStorageUnavailableException {
+          rethrow;
         } catch (e) {
           // WebDAV上传失败，在Linux平台上直接抛出异常，避免文件选择器问题
           if (defaultTargetPlatform == TargetPlatform.linux) {
@@ -491,6 +546,9 @@ class BackupService {
           );
 
           if (result != null) {
+            _storageService.requireSecureStorageOperationEpoch(
+              prepared.secureStorageEpoch,
+            );
             final file = File(result);
             await file.writeAsString(prepared.content);
           }
@@ -506,6 +564,8 @@ class BackupService {
           bytes: utf8.encode(prepared.content),
         );
       }
+    } on SecureStorageUnavailableException {
+      rethrow;
     } catch (e) {
       throw BackupException('备份失败: $e');
     }
@@ -533,6 +593,8 @@ class BackupService {
       }
 
       return BackupData.fromJson(json);
+    } on SecureStorageUnavailableException {
+      rethrow;
     } catch (e) {
       throw BackupException('从WebDAV导入备份失败: $e');
     }
@@ -547,6 +609,8 @@ class BackupService {
       }
 
       return await _webdavService.getRemoteBackups();
+    } on SecureStorageUnavailableException {
+      rethrow;
     } catch (e) {
       throw BackupException('获取WebDAV备份列表失败: $e');
     }
@@ -574,6 +638,8 @@ class BackupService {
       }
 
       return BackupData.fromJson(json);
+    } on SecureStorageUnavailableException {
+      rethrow;
     } catch (e) {
       throw BackupException('从WebDAV下载备份失败: $e');
     }
@@ -588,6 +654,8 @@ class BackupService {
       }
 
       await _webdavService.deleteRemoteBackup(fileName);
+    } on SecureStorageUnavailableException {
+      rethrow;
     } catch (e) {
       throw BackupException('删除WebDAV备份失败: $e');
     }
@@ -608,18 +676,17 @@ class BackupRestoreResult {
   final bool success;
   final String message;
 
-  BackupRestoreResult({
-    required this.success,
-    required this.message,
-  });
+  BackupRestoreResult({required this.success, required this.message});
 }
 
 class _PreparedBackupFile {
   final String fileName;
   final String content;
+  final int secureStorageEpoch;
 
   const _PreparedBackupFile({
     required this.fileName,
     required this.content,
+    required this.secureStorageEpoch,
   });
 }

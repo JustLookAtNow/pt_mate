@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- No SharedPreferences state is safe to transplant without its Keystore keys. -->
+    <exclude domain="sharedpref" path="." />
+</full-backup-content>

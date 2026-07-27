@@ -362,53 +362,52 @@ class CookieCloudService {
     required Set<CookieCloudCandidate> selectedUpdates,
     required Set<CookieCloudCandidate> selectedAdditions,
   }) async {
-    final before = await _storage.loadSiteConfigs(includeApiKeys: false);
-    final next = before.toList();
-    var updatedCount = 0;
-    var addedCount = 0;
+    final result = await _storage
+        .updateSiteConfigsAtomically<CookieCloudApplyResult>((before) {
+          final next = before.toList();
+          var updatedCount = 0;
+          var addedCount = 0;
 
-    for (final candidate in selectedUpdates) {
-      final site = candidate.site;
-      if (site == null) continue;
-      final index = next.indexWhere((item) => item.id == site.id);
-      if (index >= 0) {
-        next[index] = next[index].copyWith(cookie: candidate.cookie);
-        updatedCount++;
-      }
-    }
+          for (final candidate in selectedUpdates) {
+            final site = candidate.site;
+            if (site == null) continue;
+            final index = next.indexWhere((item) => item.id == site.id);
+            if (index >= 0) {
+              next[index] = next[index].copyWith(cookie: candidate.cookie);
+              updatedCount++;
+            }
+          }
 
-    for (final candidate in selectedAdditions) {
-      final template = candidate.template;
-      if (template == null) continue;
-      final selectedUrl = _bestTemplateUrl(candidate.host, template);
-      final id =
-          '${template.id}-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1000)}';
-      final site = template
-          .toSiteConfig(selectedUrl: selectedUrl, cookie: candidate.cookie)
-          .copyWith(id: id);
-      next.add(site);
-      addedCount++;
-    }
+          for (final candidate in selectedAdditions) {
+            final template = candidate.template;
+            if (template == null) continue;
+            final selectedUrl = _bestTemplateUrl(candidate.host, template);
+            final id =
+                '${template.id}-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(1000)}';
+            final site = template
+                .toSiteConfig(
+                  selectedUrl: selectedUrl,
+                  cookie: candidate.cookie,
+                )
+                .copyWith(id: id);
+            next.add(site);
+            addedCount++;
+          }
 
-    try {
-      await _storage.saveSiteConfigs(
-        next.map((c) => c.copyWith(apiKey: null)).toList(),
-      );
-    } catch (_) {
-      await _storage.saveSiteConfigs(
-        before.map((c) => c.copyWith(apiKey: null)).toList(),
-      );
-      rethrow;
-    }
+          return SiteConfigAtomicUpdate<CookieCloudApplyResult>(
+            configs: next.map((c) => c.copyWith(apiKey: null)).toList(),
+            result: CookieCloudApplyResult(
+              updatedCount: updatedCount,
+              addedCount: addedCount,
+            ),
+          );
+        });
 
     await _storage.saveCookieCloudLastSync(
       syncedAt: DateTime.now(),
-      summary: '更新 $updatedCount 个站点，新增 $addedCount 个站点',
+      summary: '更新 ${result.updatedCount} 个站点，新增 ${result.addedCount} 个站点',
     );
-    return CookieCloudApplyResult(
-      updatedCount: updatedCount,
-      addedCount: addedCount,
-    );
+    return result;
   }
 
   static String? _bestTemplateUrl(String host, SiteConfigTemplate template) {

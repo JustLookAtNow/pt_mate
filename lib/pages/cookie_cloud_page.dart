@@ -7,7 +7,11 @@ import '../services/storage/storage_service.dart';
 import '../utils/notification_helper.dart';
 
 class CookieCloudPage extends StatefulWidget {
-  const CookieCloudPage({super.key});
+  const CookieCloudPage({super.key, this.loadConfig, this.saveConfig});
+
+  /// Optional seams for widget tests. Production callers use [StorageService].
+  final Future<CookieCloudConfig> Function()? loadConfig;
+  final Future<void> Function(CookieCloudConfig config)? saveConfig;
 
   @override
   State<CookieCloudPage> createState() => _CookieCloudPageState();
@@ -45,7 +49,7 @@ class _CookieCloudPageState extends State<CookieCloudPage> {
   }
 
   Future<void> _load() async {
-    final config = await StorageService.instance.loadCookieCloudConfig();
+    final config = await _loadPersistedConfig();
     if (!mounted) return;
     setState(() {
       _urlController.text = config.url;
@@ -69,9 +73,17 @@ class _CookieCloudPageState extends State<CookieCloudPage> {
     lastSyncSummary: _lastSyncSummary,
   );
 
+  Future<CookieCloudConfig> _loadPersistedConfig() =>
+      widget.loadConfig?.call() ??
+      StorageService.instance.loadCookieCloudConfig();
+
+  Future<void> _savePersistedConfig(CookieCloudConfig config) =>
+      widget.saveConfig?.call(config) ??
+      StorageService.instance.saveCookieCloudConfig(config);
+
   Future<void> _saveConfig() async {
     if (!_formKey.currentState!.validate()) return;
-    await StorageService.instance.saveCookieCloudConfig(_currentConfig());
+    await _savePersistedConfig(_currentConfig());
     if (!mounted) return;
     NotificationHelper.showInfo(context, 'Cookie Cloud 配置已保存');
   }
@@ -110,7 +122,7 @@ class _CookieCloudPageState extends State<CookieCloudPage> {
       autoSyncEnabled: false,
       lastSyncSummary: '',
     );
-    await StorageService.instance.saveCookieCloudConfig(clearedConfig);
+    await _savePersistedConfig(clearedConfig);
     if (!mounted) return;
 
     setState(() {
@@ -137,7 +149,7 @@ class _CookieCloudPageState extends State<CookieCloudPage> {
     });
     try {
       final config = _currentConfig();
-      await StorageService.instance.saveCookieCloudConfig(config);
+      await _savePersistedConfig(config);
       final plan = await CookieCloudService().fetchSyncPlan(config);
       if (!mounted) return;
       setState(() {
@@ -185,7 +197,7 @@ class _CookieCloudPageState extends State<CookieCloudPage> {
       if (shouldReloadActiveSite) {
         await appState.reloadActiveSite();
       }
-      final latest = await StorageService.instance.loadCookieCloudConfig();
+      final latest = await _loadPersistedConfig();
       if (!mounted) return;
       setState(() {
         _plan = null;

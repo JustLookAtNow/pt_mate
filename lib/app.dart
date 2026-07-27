@@ -11,6 +11,8 @@ import 'dart:math' as math;
 import 'models/app_models.dart';
 import 'models/batch_operation_models.dart';
 import 'pages/torrent_detail_page.dart';
+import 'pages/backup_restore_page.dart';
+import 'pages/secure_storage_recovery_page.dart';
 import 'services/api/api_service.dart';
 import 'services/settings/display_settings_manager.dart';
 import 'services/storage/storage_service.dart';
@@ -21,6 +23,7 @@ import 'providers/aggregate_search_provider.dart';
 import 'services/site_config_service.dart';
 import 'services/site_health_refresh_service.dart';
 import 'services/network/cookie_cloud_auto_sync_service.dart';
+import 'services/network/proxy_service.dart';
 
 import 'services/downloader/downloader_config.dart';
 import 'services/downloader/downloader_service.dart';
@@ -45,6 +48,7 @@ import 'utils/url_launcher_helper.dart';
 final Logger _logger = Logger();
 
 class AppState extends ChangeNotifier {
+  bool _isDisposed = false;
   SiteConfig? _site;
   SiteConfig? get site => _site;
 
@@ -56,27 +60,42 @@ class AppState extends ChangeNotifier {
   int get configVersion => _configVersion;
 
   Completer<void>? _initCompleter;
+  Future<void> _automaticSyncTail = Future<void>.value();
+  Future<void> Function()? _webDavAutoSyncOverrideForTest;
+  Future<void> Function()? _cookieCloudAutoSyncOverrideForTest;
 
   Future<void> loadInitial({bool forceReload = false}) async {
-    if (_initCompleter != null && !forceReload) {
-      return _initCompleter!.future;
-    }
+    // 初始化过程必须串行；强制刷新遇到已在运行的加载时复用
+    // 同一 Future，不替换共享 Completer。
+    final running = _initCompleter;
+    if (running != null) return running.future;
 
-    // 如果是强制重新加载，重置completer
-    if (forceReload) {
-      _initCompleter = null;
-    }
-
-    _initCompleter = Completer<void>();
+    final completer = Completer<void>();
+    _initCompleter = completer;
 
     // 使用microtask异步执行，避免阻塞UI
-    Future.microtask(() => _performInitialLoad(forceReload: forceReload));
+    unawaited(
+      Future.microtask(
+        () =>
+            _performInitialLoad(completer: completer, forceReload: forceReload),
+      ),
+    );
 
-    return _initCompleter!.future;
+    return completer.future;
   }
 
-  Future<void> _performInitialLoad({bool forceReload = false}) async {
+  Future<void> _performInitialLoad({
+    required Completer<void> completer,
+    bool forceReload = false,
+  }) async {
     try {
+      if (!StorageService.instance.canAccessSensitiveStorage) {
+        throw SecureStorageUnavailableException(
+          StorageService.instance.secureStorageFailureCode ??
+              'secure_storage_not_ready',
+        );
+      }
+
       final swTotal = Stopwatch()..start();
       if (kDebugMode) {
         _logger.i('AppState: _performInitialLoad开始，forceReload=$forceReload');
@@ -139,11 +158,13 @@ class AppState extends ChangeNotifier {
           'AppState: _performInitialLoad完成，总耗时=${swTotal.elapsedMilliseconds}ms，配置版本号: $_configVersion, 强制重新加载: $forceReload',
         );
       }
-      notifyListeners();
+      _notifyListenersIfActive();
 
       // 持久化在迁移过程中更新的配置
       try {
         await StorageService.instance.persistPendingConfigUpdates();
+      } on SecureStorageUnavailableException {
+        rethrow;
       } catch (e, s) {
         _logger.e(
           'StorageService.persistPendingConfigUpdates failed',
@@ -153,27 +174,64 @@ class AppState extends ChangeNotifier {
         // Don't rethrow here, as it's not critical
       }
 
-      // 应用启动时检查自动同步
-      Future.microtask(() => _checkAutoSync());
-      Future.microtask(() => _checkCookieCloudAutoSync());
+      // WebDAV restore must finish before Cookie Cloud applies its plan. Both
+      // remain non-blocking for the first frame, but share one ordered queue so
+      // a late restore cannot overwrite a newer Cookie Cloud result.
+      unawaited(_enqueueAutomaticSync(includeWebDavRestore: true));
       // 应用启动后静默刷新站点健康状态缓存
-      Future.microtask(() => _refreshSiteHealthStatusesInBackground());
+      unawaited(
+        Future.microtask(() => _refreshSiteHealthStatusesInBackground()),
+      );
 
-      _initCompleter!.complete();
-    } catch (e) {
-      _initCompleter!.completeError(e);
-      rethrow;
+      if (!completer.isCompleted) completer.complete();
+    } catch (e, stackTrace) {
+      if (!completer.isCompleted) completer.completeError(e, stackTrace);
     } finally {
       // 完成后重置completer，允许下次重新加载
-      _initCompleter = null;
+      if (identical(_initCompleter, completer)) {
+        _initCompleter = null;
+      }
     }
   }
 
+  Future<void> _enqueueAutomaticSync({required bool includeWebDavRestore}) {
+    final operation = _automaticSyncTail.then((_) async {
+      if (includeWebDavRestore) {
+        await (_webDavAutoSyncOverrideForTest ?? _checkAutoSync)();
+      }
+      if (_pauseForSecureStorageFailure()) return;
+      await (_cookieCloudAutoSyncOverrideForTest ??
+          _checkCookieCloudAutoSync)();
+    });
+    _automaticSyncTail = operation;
+    return operation;
+  }
+
+  Future<void> _checkCookieCloudAfterPendingAutomaticSync() =>
+      _enqueueAutomaticSync(includeWebDavRestore: false);
+
+  @visibleForTesting
+  void overrideAutomaticSyncChecksForTest({
+    Future<void> Function()? webDav,
+    Future<void> Function()? cookieCloud,
+  }) {
+    _webDavAutoSyncOverrideForTest = webDav;
+    _cookieCloudAutoSyncOverrideForTest = cookieCloud;
+  }
+
+  @visibleForTesting
+  Future<void> runAutomaticSyncSequenceForTest({
+    bool includeWebDavRestore = true,
+  }) => _enqueueAutomaticSync(includeWebDavRestore: includeWebDavRestore);
+
+  @visibleForTesting
+  Future<void> waitForAutomaticSyncForTest() => _automaticSyncTail;
+
   Future<void> waitForInitialization() async {
-    if (_isInitialized) return;
     if (_initCompleter != null) {
       return _initCompleter!.future;
     }
+    if (_isInitialized) return;
     // 如果还没开始初始化，等待一下
     await Future.delayed(const Duration(milliseconds: 50));
     if (_initCompleter != null) {
@@ -185,7 +243,7 @@ class AppState extends ChangeNotifier {
     await StorageService.instance.saveSite(site);
     _site = site;
     await ApiService.instance.setActiveSite(site);
-    notifyListeners();
+    _notifyListenersIfActive();
   }
 
   Future<void> setActiveSite(String siteId) async {
@@ -194,7 +252,7 @@ class AppState extends ChangeNotifier {
     if (_site != null) {
       await ApiService.instance.setActiveSite(_site!);
     }
-    notifyListeners();
+    _notifyListenersIfActive();
   }
 
   Future<void> reloadActiveSite() async {
@@ -203,71 +261,69 @@ class AppState extends ChangeNotifier {
     _site = latest;
     await ApiService.instance.setActiveSite(latest);
     _configVersion++;
-    notifyListeners();
+    _notifyListenersIfActive();
   }
 
   /// 检查自动同步
   Future<void> _checkAutoSync() async {
+    if (_pauseForSecureStorageFailure()) return;
+
+    final storage = StorageService.instance;
     try {
-      final webdavService = WebDAVService.instance;
-      final config = await webdavService.loadConfig();
+      final epoch = storage.captureSecureStorageOperationEpoch();
+      await storage.runWithSecureStorageOperationEpoch(epoch, () async {
+        final webdavService = WebDAVService.instance;
+        final config = await webdavService.loadConfig();
+        storage.requireSecureStorageOperationEpoch(epoch);
 
-      // 检查是否启用了自动同步
-      if (config != null && config.autoSync) {
-        if (kDebugMode) {
-          _logger.i('AppState: 检测到启用自动同步，开始执行自动同步检查');
-        }
-
-        final backupService = BackupService(StorageService.instance);
-
-        // 异步执行自动同步，不阻塞应用启动
-        Future.microtask(() async {
-          try {
-            // 检查是否有远程备份可以下载
-            final remoteBackups = await backupService.listWebDAVBackups();
-            if (remoteBackups.isNotEmpty) {
-              if (kDebugMode) {
-                _logger.i('AppState: 发现${remoteBackups.length}个远程备份，准备自动同步最新的');
-              }
-
-              // 获取最新的备份文件路径
-              final latestBackup = remoteBackups.first;
-              final backupPath = latestBackup['path'] as String;
-
-              // 下载并恢复最新的备份
-              final backupData = await backupService.downloadWebDAVBackup(
-                backupPath,
-              );
-              if (backupData != null) {
-                final result = await backupService.restoreBackup(backupData);
-                if (result.success) {
-                  if (kDebugMode) {
-                    _logger.i('AppState: 自动同步完成');
-                  }
-                } else {
-                  if (kDebugMode) {
-                    _logger.e('AppState: 自动同步失败: ${result.message}');
-                  }
-                }
-              }
-            } else {
-              if (kDebugMode) {
-                _logger.i('AppState: 未发现远程备份，跳过自动同步');
-              }
-            }
-          } catch (e) {
-            if (kDebugMode) {
-              _logger.e('AppState: 自动同步失败: $e');
-            }
-            // 自动同步失败不影响应用正常启动
+        // 检查是否启用了自动同步
+        if (config != null && config.autoSync) {
+          if (kDebugMode) {
+            _logger.i('AppState: 检测到启用自动同步，开始执行自动同步检查');
           }
-        });
-      } else {
-        if (kDebugMode) {
+
+          final backupService = BackupService(storage);
+
+          // 检查是否有远程备份可以下载
+          final remoteBackups = await backupService.listWebDAVBackups();
+          storage.requireSecureStorageOperationEpoch(epoch);
+          if (remoteBackups.isNotEmpty) {
+            if (kDebugMode) {
+              _logger.i('AppState: 发现${remoteBackups.length}个远程备份，准备自动同步最新的');
+            }
+
+            // 获取最新的备份文件路径
+            final latestBackup = remoteBackups.first;
+            final backupPath = latestBackup['path'] as String;
+
+            // 下载并恢复最新的备份
+            final backupData = await backupService.downloadWebDAVBackup(
+              backupPath,
+            );
+            storage.requireSecureStorageOperationEpoch(epoch);
+            if (backupData != null) {
+              final result = await backupService.restoreBackup(
+                backupData,
+                expectedSecureStorageEpoch: epoch,
+              );
+              storage.requireSecureStorageOperationEpoch(epoch);
+              if (result.success) {
+                if (kDebugMode) {
+                  _logger.i('AppState: 自动同步完成');
+                }
+              } else if (kDebugMode) {
+                _logger.e('AppState: 自动同步失败: ${result.message}');
+              }
+            }
+          } else if (kDebugMode) {
+            _logger.i('AppState: 未发现远程备份，跳过自动同步');
+          }
+        } else if (kDebugMode) {
           _logger.i('AppState: 自动同步未启用或配置不存在');
         }
-      }
+      });
     } catch (e) {
+      _pauseForSecureStorageFailure();
       if (kDebugMode) {
         _logger.e('AppState: 检查自动同步配置失败: $e');
       }
@@ -276,9 +332,12 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _refreshSiteHealthStatusesInBackground() async {
+    if (_pauseForSecureStorageFailure()) return;
+
     try {
       await SiteHealthRefreshService.instance.refreshIfNeeded();
     } catch (e) {
+      _pauseForSecureStorageFailure();
       if (kDebugMode) {
         _logger.e('AppState: 后台刷新站点健康状态失败: $e');
       }
@@ -286,19 +345,56 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _checkCookieCloudAutoSync() async {
-    final beforeCookie = _site?.cookie;
-    final beforeSiteId = _site?.id;
-    await CookieCloudAutoSyncService.instance.syncIfNeeded();
-    if (beforeSiteId == null) return;
-    final latest = await StorageService.instance.getActiveSiteConfig();
-    if (latest != null &&
-        latest.id == beforeSiteId &&
-        latest.cookie != beforeCookie) {
-      _site = latest;
-      await ApiService.instance.setActiveSite(latest);
-      _configVersion++;
-      notifyListeners();
+    if (_pauseForSecureStorageFailure()) return;
+
+    try {
+      final beforeCookie = _site?.cookie;
+      final beforeSiteId = _site?.id;
+      await CookieCloudAutoSyncService.instance.syncIfNeeded();
+      if (_pauseForSecureStorageFailure()) return;
+      if (beforeSiteId == null) return;
+      final latest = await StorageService.instance.getActiveSiteConfig();
+      if (latest != null &&
+          latest.id == beforeSiteId &&
+          latest.cookie != beforeCookie) {
+        _site = latest;
+        await ApiService.instance.setActiveSite(latest);
+        _configVersion++;
+        _notifyListenersIfActive();
+      }
+    } on SecureStorageUnavailableException {
+      _pauseForSecureStorageFailure();
+    } catch (error, stackTrace) {
+      if (_pauseForSecureStorageFailure()) return;
+      if (kDebugMode) {
+        _logger.w(
+          'AppState: Cookie Cloud 自动同步失败',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
     }
+  }
+
+  bool _pauseForSecureStorageFailure() {
+    if (StorageService.instance.canAccessSensitiveStorage) return false;
+    FocusManager.instance.primaryFocus?.unfocus();
+    ProxyService.instance
+      ..isProxyEnabled = false
+      ..proxyUsername = ''
+      ..proxyPassword = '';
+    _notifyListenersIfActive();
+    return true;
+  }
+
+  void _notifyListenersIfActive() {
+    if (!_isDisposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
   }
 }
 
@@ -1112,35 +1208,263 @@ class _SiteSelectionDialogState extends State<_SiteSelectionDialog> {
 }
 
 class MTeamApp extends StatefulWidget {
-  const MTeamApp({super.key});
+  const MTeamApp({super.key, this.appState});
+
+  @visibleForTesting
+  final AppState? appState;
 
   @override
-  State<MTeamApp> createState() => _MTeamAppState();
+  State<MTeamApp> createState() => MTeamAppState();
 }
 
-class _MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
-  final AppState _appState = AppState();
+class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
+  late final AppState _appState;
+  late final bool _ownsAppState;
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  bool _isCheckingSecureStorage = false;
+  bool _secureStorageReady = false;
+  String? _secureStorageFailureCode;
+  bool _resumeCheckRunning = false;
+  bool _backupRestoreOpen = false;
+  bool _hasLeftForeground = false;
 
   @override
   void initState() {
     super.initState();
-    _appState.loadInitial();
+    _ownsAppState = widget.appState == null;
+    _appState = widget.appState ?? AppState();
+    final storage = StorageService.instance;
+    _secureStorageReady = storage.canAccessSensitiveStorage;
+    _secureStorageFailureCode = storage.secureStorageFailureCode;
+    storage.secureStorageStatusListenable.addListener(
+      _handleSecureStorageStatusChanged,
+    );
+    if (_secureStorageReady) {
+      _loadApplicationState();
+    }
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  Future<void> _loadApplicationState({bool forceReload = false}) async {
+    try {
+      await _appState.loadInitial(forceReload: forceReload);
+    } on SecureStorageUnavailableException catch (error) {
+      _disableProxyForSecureStorageFailure();
+      if (!mounted) return;
+      setState(() {
+        _secureStorageReady = false;
+        _secureStorageFailureCode = error.code;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _secureStorageReady = false;
+        _secureStorageFailureCode = error.runtimeType.toString();
+      });
+    }
+  }
+
+  Future<void> _retrySecureStorage() async {
+    if (_isCheckingSecureStorage || _resumeCheckRunning) return;
+    setState(() {
+      _isCheckingSecureStorage = true;
+    });
+
+    final storage = StorageService.instance;
+    try {
+      await storage.initializeSecureStorage(force: true);
+      if (!storage.canAccessSensitiveStorage) {
+        throw SecureStorageUnavailableException(
+          storage.secureStorageFailureCode ?? 'secure_storage_not_ready',
+        );
+      }
+      await ProxyService.instance.init();
+      if (!mounted) return;
+      setState(() {
+        _secureStorageReady = true;
+        _secureStorageFailureCode = null;
+      });
+      await _loadApplicationState(forceReload: _appState.isInitialized);
+    } on SecureStorageUnavailableException catch (error) {
+      _disableProxyForSecureStorageFailure();
+      if (!mounted) return;
+      setState(() {
+        _secureStorageReady = false;
+        _secureStorageFailureCode = error.code;
+      });
+    } catch (error) {
+      if (!storage.canAccessSensitiveStorage) {
+        _disableProxyForSecureStorageFailure();
+      }
+      if (!mounted) return;
+      setState(() {
+        _secureStorageReady = false;
+        _secureStorageFailureCode = error.runtimeType.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCheckingSecureStorage = false;
+        });
+      }
+    }
+  }
+
+  void _openBackupRestore() {
+    final navigator = _navigatorKey.currentState;
+    if (navigator == null || _backupRestoreOpen) return;
+    setState(() {
+      _backupRestoreOpen = true;
+    });
+    navigator
+        .push(
+          MaterialPageRoute<void>(builder: (_) => const BackupRestorePage()),
+        )
+        .whenComplete(() {
+          if (!mounted) return;
+          setState(() {
+            _backupRestoreOpen = false;
+          });
+          _retrySecureStorage();
+        });
+  }
+
+  void _disableProxyForSecureStorageFailure() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    ProxyService.instance
+      ..isProxyEnabled = false
+      ..proxyUsername = ''
+      ..proxyPassword = '';
+  }
+
+  void _handleSecureStorageStatusChanged() {
+    final storage = StorageService.instance;
+    // force preflight temporarily enters `unknown`; only a confirmed
+    // unavailable state may install the blocking gate.
+    if (storage.secureStorageState != SecureStorageState.unavailable ||
+        storage.canAccessSensitiveStorage) {
+      return;
+    }
+    _disableProxyForSecureStorageFailure();
+    if (!mounted) return;
+    setState(() {
+      _secureStorageReady = false;
+      _secureStorageFailureCode = storage.secureStorageFailureCode;
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _appState.dispose();
+    StorageService.instance.secureStorageStatusListenable.removeListener(
+      _handleSecureStorageStatusChanged,
+    );
+    if (_ownsAppState) _appState.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      Future.microtask(() => _appState._checkCookieCloudAutoSync());
+    if (state != AppLifecycleState.resumed) {
+      _hasLeftForeground = true;
+      return;
+    }
+    // The startup preflight has already run in main(). Some bindings emit an
+    // initial resumed notification after the observer is attached; only a
+    // genuine background/foreground transition needs another preflight.
+    if (!_hasLeftForeground) return;
+    _hasLeftForeground = false;
+    unawaited(_handleAppResumed());
+  }
+
+  Future<void> _handleAppResumed() async {
+    if (_resumeCheckRunning || _isCheckingSecureStorage) {
+      return;
+    }
+    _resumeCheckRunning = true;
+    final storage = StorageService.instance;
+    var initializedDuringResume = false;
+    try {
+      // A failure is sticky for the current run. Foreground resume may
+      // revalidate a healthy store, but only the blocking page's explicit
+      // retry is allowed to clear an unavailable latch.
+      if (!storage.canAccessSensitiveStorage) {
+        _disableProxyForSecureStorageFailure();
+        if (mounted) {
+          setState(() {
+            _secureStorageReady = false;
+            _secureStorageFailureCode = storage.secureStorageFailureCode;
+          });
+        }
+        return;
+      }
+
+      // The restore UI may stay open, but a healthy store still needs a
+      // foreground preflight. Automatic restore/sync remains paused below.
+
+      // 启动预检已在 main 中完成；首次 resumed 先等待已开始的
+      // 迁移/站点初始化，避免 force 预检与它们并发。
+      if (!_appState.isInitialized) {
+        await _appState.loadInitial();
+        initializedDuringResume = true;
+      }
+
+      await storage.initializeSecureStorage(force: true);
+      if (!storage.canAccessSensitiveStorage) {
+        throw SecureStorageUnavailableException(
+          storage.secureStorageFailureCode ?? 'secure_storage_not_ready',
+        );
+      }
+
+      if (_backupRestoreOpen) return;
+
+      if (!_secureStorageReady) {
+        await ProxyService.instance.init();
+        if (!mounted) return;
+        setState(() {
+          _secureStorageReady = true;
+          _secureStorageFailureCode = null;
+        });
+      }
+
+      if (!_appState.isInitialized) return;
+      if (initializedDuringResume) return;
+      await _appState._checkCookieCloudAfterPendingAutomaticSync();
+      if (!storage.canAccessSensitiveStorage) {
+        throw SecureStorageUnavailableException(
+          storage.secureStorageFailureCode ?? 'secure_storage_not_ready',
+        );
+      }
+    } on SecureStorageUnavailableException catch (error) {
+      _disableProxyForSecureStorageFailure();
+      if (!mounted) return;
+      setState(() {
+        _secureStorageReady = false;
+        _secureStorageFailureCode = error.code;
+      });
+    } catch (error) {
+      if (!storage.canAccessSensitiveStorage) {
+        _disableProxyForSecureStorageFailure();
+      }
+      if (!mounted) return;
+      setState(() {
+        _secureStorageReady = false;
+        _secureStorageFailureCode = error.runtimeType.toString();
+      });
+    } finally {
+      _resumeCheckRunning = false;
     }
   }
+
+  @visibleForTesting
+  Future<void> recheckSecureStorageAfterResume() => _handleAppResumed();
+
+  @visibleForTesting
+  Future<void> retrySecureStorageForTest() => _retrySecureStorage();
+
+  @visibleForTesting
+  Future<void> waitForAutomaticSyncForTest() =>
+      _appState.waitForAutomaticSyncForTest();
 
   @override
   Widget build(BuildContext context) {
@@ -1160,6 +1484,7 @@ class _MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
       child: Consumer2<ThemeManager, AppState>(
         builder: (context, themeManager, appState, child) {
           return MaterialApp(
+            navigatorKey: _navigatorKey,
             debugShowCheckedModeBanner: false,
             title: 'PT Mate',
             theme: themeManager.lightTheme,
@@ -1178,7 +1503,7 @@ class _MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
             locale: const Locale('zh', 'CN'), // 默认使用中文简体
             builder: (context, child) {
               final mediaQueryData = MediaQuery.of(context);
-              return MediaQuery(
+              final scaledChild = MediaQuery(
                 data: mediaQueryData.copyWith(
                   textScaler: mediaQueryData.textScaler.clamp(
                     minScaleFactor: 0.8,
@@ -1186,6 +1511,30 @@ class _MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
                   ),
                 ),
                 child: child!,
+              );
+              final storage = StorageService.instance;
+              final storageUnavailable =
+                  storage.secureStorageState ==
+                      SecureStorageState.unavailable &&
+                  !storage.canAccessSensitiveStorage;
+              final storageBlocked = !_secureStorageReady || storageUnavailable;
+              if (!storageBlocked || _backupRestoreOpen) return scaledChild;
+
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  scaledChild,
+                  BlockSemantics(
+                    child: SecureStorageRecoveryPage(
+                      onRetry: _retrySecureStorage,
+                      onOpenBackupRestore: _openBackupRestore,
+                      failureCode:
+                          StorageService.instance.secureStorageFailureCode ??
+                          _secureStorageFailureCode,
+                      isRetrying: _isCheckingSecureStorage,
+                    ),
+                  ),
+                ],
               );
             },
             home: !appState.isInitialized

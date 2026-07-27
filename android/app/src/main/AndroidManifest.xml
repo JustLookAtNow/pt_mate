@@ -16,7 +16,10 @@
     <application
         android:label="PT Mate"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/launcher_icon"
+        android:allowBackup="false"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules">
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.ota_update_provider"

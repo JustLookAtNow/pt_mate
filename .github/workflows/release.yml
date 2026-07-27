@@ -7,7 +7,15 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag version (e.g., v1.0.0)'
+        description: 'New release tag to create (e.g., v2.27.0); it must not already exist'
+        required: true
+        type: string
+      source_ref:
+        description: 'Candidate source ref/commit to build (branch, tag, or SHA; do not reuse an already released tag)'
+        required: true
+        type: string
+      android_build_number:
+        description: 'Explicit Android versionCode for this candidate; must be an integer greater than 183'
         required: true
         type: string
       release_notes:
@@ -15,31 +23,103 @@ on:
         required: false
         type: string
         default: ''
+      secure_storage_transactions:
+        description: 'Enable phase-2 secure-storage transactions'
+        required: false
+        type: boolean
+        default: false
 permissions:
   contents: write
 
+# A manual candidate and a tag push for the same release tag must never build
+# concurrently. Manual runs also reject an existing tag before publishing.
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
+  secure-storage-safety:
+    uses: ./.github/workflows/secure-storage-safety.yml
+    with:
+      ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+
   build-android-linux:
+    needs: secure-storage-safety
     runs-on: ubuntu-latest
+    outputs:
+      android_build_number: ${{ steps.version.outputs.android_build_number }}
+      release_phase: ${{ steps.version.outputs.release_phase }}
+      secure_storage_transactions: ${{ steps.version.outputs.secure_storage_transactions }}
+      source_sha: ${{ steps.version.outputs.source_sha }}
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
       with:
-        ref: ${{ github.ref }}
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+        fetch-depth: 1
         
-    - name: Extract version from tag
-
+    - name: Resolve release candidate and version
       id: version
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        INPUT_TAG: ${{ inputs.tag }}
+        INPUT_ANDROID_BUILD_NUMBER: ${{ inputs.android_build_number }}
+        INPUT_SECURE_STORAGE_TRANSACTIONS: ${{ inputs.secure_storage_transactions }}
       run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          TAG="${{ github.event.inputs.tag }}"
+        set -euo pipefail
+        SOURCE_VERSION=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -1)
+        if [ -z "$SOURCE_VERSION" ]; then
+          echo "pubspec.yaml does not contain a version."
+          exit 1
+        fi
+        if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+          TAG="$INPUT_TAG"
+          BUILD_NUMBER="$INPUT_ANDROID_BUILD_NUMBER"
+          TRANSACTIONS="$INPUT_SECURE_STORAGE_TRANSACTIONS"
+          if [ -z "$TAG" ] || [ -z "$BUILD_NUMBER" ]; then
+            echo "Manual release requires both tag and android_build_number."
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Manual release tag $TAG already exists. Create a new candidate tag; never rerun a tag that may already have published Phase 1."
+            exit 1
+          fi
         else
           TAG=${GITHUB_REF#refs/tags/}
+          BUILD_NUMBER=${SOURCE_VERSION##*+}
+          # Tags are deliberately always Phase 1. Phase 2 must be a manually
+          # dispatched, separately identified candidate release.
+          TRANSACTIONS=false
+        fi
+        if [[ ! "$TAG" =~ ^v.+$ ]]; then
+          echo "Release tag must start with v."
+          exit 1
+        fi
+        if [[ ! "$BUILD_NUMBER" =~ ^[0-9]+$ ]] || [ "$BUILD_NUMBER" -le 183 ]; then
+          echo "Android build number must be an integer greater than the installed +183 baseline."
+          exit 1
+        fi
+        if [ "$TRANSACTIONS" = "true" ]; then
+          RELEASE_PHASE=phase2
+        elif [ "$TRANSACTIONS" = "false" ]; then
+          RELEASE_PHASE=phase1
+        else
+          echo "secure_storage_transactions must be true or false."
+          exit 1
         fi
         VERSION=${TAG#v}
+        EXPECTED_SOURCE_VERSION="$VERSION+$BUILD_NUMBER"
+        if [ "$SOURCE_VERSION" != "$EXPECTED_SOURCE_VERSION" ]; then
+          echo "Checked-in pubspec version must equal $EXPECTED_SOURCE_VERSION, but was $SOURCE_VERSION."
+          exit 1
+        fi
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "tag=$TAG" >> $GITHUB_OUTPUT
+        echo "android_build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+        echo "secure_storage_transactions=$TRANSACTIONS" >> $GITHUB_OUTPUT
+        echo "release_phase=$RELEASE_PHASE" >> $GITHUB_OUTPUT
+        echo "source_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
         
         # Check if tag contains beta
         if [[ "$TAG" == *"beta"* ]]; then
@@ -47,10 +127,6 @@ jobs:
         else
           echo "is_prerelease=false" >> $GITHUB_OUTPUT
         fi
-        
-    - name: Update pubspec.yaml version
-      run: |
-        sed -i "s/^version:.*/version: ${{ steps.version.outputs.version }}+${{ github.run_number }}/" pubspec.yaml
         
     - name: Setup Java
       uses: actions/setup-java@v5
@@ -106,8 +182,42 @@ jobs:
       
     - name: Build APK - ARM64 (v8a)
       run: |
-        flutter build apk --release --target-platform android-arm64
+        flutter build apk --release --target-platform android-arm64 \
+          --dart-define=ENABLE_SECURE_STORAGE_TRANSACTIONS=${{ steps.version.outputs.secure_storage_transactions }}
+        {
+          echo "## Secure-storage release gate"
+          echo "- Phase: \`${{ steps.version.outputs.release_phase }}\`"
+          echo "- ENABLE_SECURE_STORAGE_TRANSACTIONS: \`${{ steps.version.outputs.secure_storage_transactions }}\`"
+          echo "- Android versionCode: \`${{ steps.version.outputs.android_build_number }}\`"
+          echo "- Source commit: \`${{ steps.version.outputs.source_sha }}\`"
+        } >> "$GITHUB_STEP_SUMMARY"
         mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/pt_mate-${{ steps.version.outputs.version }}-arm64-v8a.apk
+
+    - name: Verify release APK identity and backup policy
+      run: |
+        APK="build/app/outputs/flutter-apk/pt_mate-${{ steps.version.outputs.version }}-arm64-v8a.apk"
+        APKANALYZER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name apkanalyzer | sort | tail -1)
+        if [ -z "$APKANALYZER" ]; then
+          echo "apkanalyzer was not found in the Android SDK."
+          exit 1
+        fi
+        APPLICATION_ID=$($APKANALYZER manifest application-id "$APK")
+        VERSION_CODE=$($APKANALYZER manifest version-code "$APK")
+        $APKANALYZER manifest print "$APK" > /tmp/ptmate-release-manifest.xml
+        test "$APPLICATION_ID" = "com.github.justlookatnow.ptmate"
+        test "$VERSION_CODE" -eq "${{ steps.version.outputs.android_build_number }}"
+        if grep -q 'securestoragetest' /tmp/ptmate-release-manifest.xml; then
+          echo "Secure-storage test profile leaked into the production APK."
+          exit 1
+        fi
+        if ! grep -q 'android:allowBackup="false"' /tmp/ptmate-release-manifest.xml; then
+          echo "Production APK does not disable Android backup."
+          exit 1
+        fi
+        if grep -q 'ALLOW_BACKUP' /tmp/ptmate-release-manifest.xml; then
+          echo "Production APK still exposes ALLOW_BACKUP."
+          exit 1
+        fi
           
     - name: Upload Android artifacts
       uses: actions/upload-artifact@v6
@@ -210,20 +320,21 @@ jobs:
         retention-days: 1
 
   build-windows:
+    needs: secure-storage-safety
     runs-on: windows-2022
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
       with:
-        ref: ${{ github.ref }}
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
         
     - name: Extract version from tag
       id: version
       shell: bash
       run: |
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          TAG="${{ github.event.inputs.tag }}"
+          TAG="${{ inputs.tag }}"
         else
           TAG=${GITHUB_REF#refs/tags/}
         fi
@@ -305,19 +416,20 @@ jobs:
         retention-days: 1
 
   build-ios-and-macos:
+    needs: secure-storage-safety
     runs-on: macos-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
       with:
-        ref: ${{ github.ref }}
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
 
     - name: Extract version from tag
       id: version
       run: |
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          TAG="${{ github.event.inputs.tag }}"
+          TAG="${{ inputs.tag }}"
         else
           TAG=${GITHUB_REF#refs/tags/}
         fi
@@ -445,13 +557,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v6
       with:
-        ref: ${{ github.ref }}
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
         
     - name: Extract version from tag
       id: version
       run: |
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          TAG="${{ github.event.inputs.tag }}"
+          TAG="${{ inputs.tag }}"
         else
           TAG=${GITHUB_REF#refs/tags/}
         fi
@@ -496,10 +608,18 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.version.outputs.tag }}
+        target_commitish: ${{ github.event_name == 'workflow_dispatch' && needs.build-android-linux.outputs.source_sha || '' }}
         name: Release ${{ steps.version.outputs.tag }}
         body: |
           ## Changes in this release
           ${{ steps.commit_message.outputs.message }}
+
+          ## Secure-storage rollout
+
+          - Phase: `${{ needs.build-android-linux.outputs.release_phase }}`
+          - `ENABLE_SECURE_STORAGE_TRANSACTIONS`: `${{ needs.build-android-linux.outputs.secure_storage_transactions }}`
+          - Android versionCode: `${{ needs.build-android-linux.outputs.android_build_number }}`
+          - Source commit: `${{ needs.build-android-linux.outputs.source_sha }}`
           
           ## 📱 Android APK Downloads
           

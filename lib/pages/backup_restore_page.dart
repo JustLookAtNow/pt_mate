@@ -139,7 +139,11 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
           _statusMessage = '正在恢复数据...';
         });
 
-        await _backupService.restoreBackup(backup);
+        final result = await _backupService.restoreBackup(backup);
+        if (!result.success) {
+          _showMessage(result.message, isError: true);
+          return;
+        }
 
         // 备份恢复完成，显示重启提示对话框
         if (mounted) {
@@ -744,9 +748,7 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('备份与恢复'),
-      ),
+      appBar: AppBar(title: const Text('备份与恢复')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(

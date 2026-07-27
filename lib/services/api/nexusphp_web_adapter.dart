@@ -56,9 +56,7 @@ class ParsedTorrentResult {
 }
 
 /// Isolate entry point for parsing search results
-ParsedTorrentResult _parseSearchResponseInIsolate(
-  ParseSearchParams params,
-) {
+ParsedTorrentResult _parseSearchResponseInIsolate(ParseSearchParams params) {
   final soup = BeautifulSoup(params.html);
   final logs = <String>[];
 
@@ -112,6 +110,7 @@ class NexusPHPWebAdapter extends SiteAdapter
   static const int _maxHtmlDumpLength = 200 * 1024; // 200KB 截断
 
   void _logRuleAndSoup(String tag, Map<String, dynamic>? rule, dynamic soup) {
+    if (!kDebugMode) return;
     try {
       final ruleJson = rule != null ? jsonEncode(rule) : '{}';
       String html = '';

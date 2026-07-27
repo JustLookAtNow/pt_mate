@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:encrypt/encrypt.dart' as encrypt;
@@ -6,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pt_mate/models/app_models.dart';
 import 'package:pt_mate/services/backup_service.dart';
+import 'package:pt_mate/services/downloader/downloader_config.dart';
 import 'package:pt_mate/services/network/cookie_cloud_service.dart';
 import 'package:pt_mate/services/site_config_service.dart';
 import 'package:pt_mate/services/storage/storage_service.dart';
@@ -60,7 +62,8 @@ void main() {
         });
   });
 
-  tearDown(() {
+  tearDown(() async {
+    await StorageService.instance.waitForPendingSecureStorageCleanup();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
   });
@@ -188,6 +191,97 @@ void main() {
   });
 
   test(
+    'concurrent restore and Cookie Cloud apply preserve the restored site set',
+    () async {
+      const original = SiteConfig(
+        id: 'site-a',
+        name: 'Site A',
+        baseUrl: 'https://a.example.org',
+        cookie: 'cookie-old',
+        siteType: SiteType.nexusphpweb,
+      );
+      const restoredOnly = SiteConfig(
+        id: 'site-b',
+        name: 'Site B',
+        baseUrl: 'https://b.example.org',
+        cookie: 'cookie-b',
+        siteType: SiteType.nexusphpweb,
+      );
+      await StorageService.instance.saveSiteConfigs(const [original]);
+      await StorageService.instance.waitForPendingSecureStorageCleanup();
+
+      final writeStarted = Completer<void>();
+      final releaseWrite = Completer<void>();
+      var blockedWrite = false;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+            switch (methodCall.method) {
+              case 'write':
+                if (!blockedWrite) {
+                  blockedWrite = true;
+                  writeStarted.complete();
+                  await releaseWrite.future;
+                }
+                secureStorage[methodCall.arguments['key'] as String] =
+                    methodCall.arguments['value'] as String;
+                return null;
+              case 'read':
+                return secureStorage[methodCall.arguments['key'] as String];
+              case 'delete':
+                secureStorage.remove(methodCall.arguments['key'] as String);
+                return null;
+              case 'containsKey':
+                return secureStorage.containsKey(
+                  methodCall.arguments['key'] as String,
+                );
+              case 'readAll':
+                return Map<String, String>.from(secureStorage);
+              default:
+                return null;
+            }
+          });
+
+      final restore = StorageService.instance.saveSiteConfigs(const [
+        original,
+        restoredOnly,
+      ]);
+      await writeStarted.future.timeout(const Duration(seconds: 2));
+
+      const candidate = CookieCloudCandidate(
+        type: CookieCloudCandidateType.updateExisting,
+        host: 'a.example.org',
+        cookie: 'cookie-cloud-new',
+        site: original,
+      );
+      const plan = CookieCloudSyncPlan(
+        updates: [candidate],
+        additions: [],
+        unknown: [],
+      );
+      final apply = service.applyPlan(
+        plan,
+        selectedUpdates: const {candidate},
+        selectedAdditions: const {},
+      );
+
+      releaseWrite.complete();
+      await restore.timeout(const Duration(seconds: 2));
+      final result = await apply.timeout(const Duration(seconds: 2));
+      final finalSites = await StorageService.instance.loadSiteConfigs();
+
+      expect(result.updatedCount, 1);
+      expect(
+        finalSites.map((site) => site.id),
+        containsAll(['site-a', 'site-b']),
+      );
+      expect(
+        finalSites.firstWhere((site) => site.id == 'site-a').cookie,
+        'cookie-cloud-new',
+      );
+    },
+  );
+
+  test(
     'save and load cookie cloud config should persist secure password',
     () async {
       await StorageService.instance.saveCookieCloudConfig(
@@ -238,6 +332,7 @@ void main() {
     expect(exportedJson['lastSyncSummary'], 'Success-backup');
 
     // 清空当前存储，用于测试恢复
+    await storage.waitForPendingSecureStorageCleanup();
     storage.resetForTest();
 
     final restoreResult = await backupService.restoreBackup(backupData);
@@ -252,33 +347,142 @@ void main() {
     expect(restored.lastSyncSummary, 'Success-backup');
   });
 
-  test('BackupMigrationManager should migrate v1.2.0 to v1.3.0 gracefully',
-      () async {
-    final legacyBackup = {
-      'version': '1.2.0',
-      'timestamp': DateTime.now().toIso8601String(),
-      'appVersion': '1.0.0',
-      'data': {
-        'siteConfigs': [],
-        'activeSiteId': null,
-        'downloaderConfigs': [],
-        'defaultDownloaderId': null,
-        'downloaderPasswords': {},
-        'userPreferences': {},
-        'downloaderCategoriesCache': {},
-        'downloaderTagsCache': {},
-        'aggregateSearchSettings': {
-          'shortcutType': 'none',
-          'searchTimeout': 15,
-          'aggregateSearchConfigs': [],
+  test(
+    'BackupService migrates an embedded downloader password on restore',
+    () async {
+      const downloaderId = 'legacy-backup-downloader';
+      const config = QbittorrentConfig(
+        id: downloaderId,
+        name: 'Legacy Backup Downloader',
+        host: 'downloader.example.com',
+        port: 8080,
+        username: 'user',
+        password: 'legacy-embedded-password',
+      );
+      final backupData = BackupData(
+        version: BackupVersion.current,
+        timestamp: DateTime(2026, 7, 20),
+        appVersion: '2.27.0',
+        data: {
+          'downloaderConfigs': [config.toJson()],
+          'defaultDownloaderId': downloaderId,
+          'downloaderPasswords': <String, String>{},
         },
-      },
-    };
+      );
 
-    final migrated = BackupMigrationManager.migrate(legacyBackup, '1.3.0');
-    expect(migrated['version'], '1.3.0');
-    expect(migrated['data']['cookieCloudConfig'], isNull); // 1.2.0 备份中不包含此字段，完美兼容
-  });
+      final result = await BackupService(
+        StorageService.instance,
+      ).restoreBackup(backupData);
+
+      expect(result.success, isTrue, reason: result.message);
+      final prefs = await SharedPreferences.getInstance();
+      final stored =
+          jsonDecode(prefs.getString(StorageKeys.downloaderConfigs)!)
+              as List<dynamic>;
+      final storedConfig = stored.single as Map<String, dynamic>;
+      final nested = storedConfig['config'] as Map<String, dynamic>;
+      expect(nested.containsKey('password'), isFalse);
+      expect(
+        await StorageService.instance.loadDownloaderPassword(downloaderId),
+        'legacy-embedded-password',
+      );
+      expect(
+        await StorageService.instance.loadDefaultDownloaderId(),
+        downloaderId,
+      );
+    },
+  );
+
+  test(
+    'BackupService rejects conflicting downloader password sources before writing',
+    () async {
+      const downloaderId = 'conflicting-backup-downloader';
+      const config = QbittorrentConfig(
+        id: downloaderId,
+        name: 'Conflicting Backup Downloader',
+        host: 'downloader.example.com',
+        port: 8080,
+        username: 'user',
+        password: 'embedded-password',
+      );
+      final backupData = BackupData(
+        version: BackupVersion.current,
+        timestamp: DateTime(2026, 7, 20),
+        appVersion: '2.27.0',
+        data: {
+          'downloaderConfigs': [config.toJson()],
+          'defaultDownloaderId': downloaderId,
+          'downloaderPasswords': const <String, String>{
+            downloaderId: 'separate-password',
+          },
+        },
+      );
+
+      final result = await BackupService(
+        StorageService.instance,
+      ).restoreBackup(backupData);
+
+      expect(result.success, isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey(StorageKeys.downloaderConfigs), isFalse);
+      expect(
+        await StorageService.instance.loadDownloaderPassword(downloaderId),
+        isNull,
+      );
+    },
+  );
+
+  test(
+    'BackupService refuses to generate an empty backup from corrupt downloader JSON',
+    () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(StorageKeys.downloaderConfigs, '{corrupt-json');
+
+      await expectLater(
+        BackupService(StorageService.instance).createBackup(),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'downloader_config_load_failed',
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'BackupMigrationManager should migrate v1.2.0 to v1.3.0 gracefully',
+    () async {
+      final legacyBackup = {
+        'version': '1.2.0',
+        'timestamp': DateTime.now().toIso8601String(),
+        'appVersion': '1.0.0',
+        'data': {
+          'siteConfigs': [],
+          'activeSiteId': null,
+          'downloaderConfigs': [],
+          'defaultDownloaderId': null,
+          'downloaderPasswords': {},
+          'userPreferences': {},
+          'downloaderCategoriesCache': {},
+          'downloaderTagsCache': {},
+          'aggregateSearchSettings': {
+            'shortcutType': 'none',
+            'searchTimeout': 15,
+            'aggregateSearchConfigs': [],
+          },
+        },
+      };
+
+      final migrated = BackupMigrationManager.migrate(legacyBackup, '1.3.0');
+      expect(migrated['version'], '1.3.0');
+      expect(
+        migrated['data']['cookieCloudConfig'],
+        isNull,
+      ); // 1.2.0 备份中不包含此字段，完美兼容
+    },
+  );
 }
 
 Map<String, String> _cookieMap(String cookie) {

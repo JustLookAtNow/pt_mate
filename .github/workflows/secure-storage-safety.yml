@@ -1,0 +1,87 @@
+name: Secure storage safety
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref whose source and tests must pass the safety gate'
+        required: false
+        type: string
+        default: ''
+  pull_request:
+    paths:
+      - 'android/app/**'
+      - 'lib/**'
+      - 'test/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.flutter-version'
+      - 'android/gradle/**'
+      - 'android/*.gradle*'
+      - 'android/gradle.properties'
+      - '.github/workflows/secure-storage-safety.yml'
+      - '.github/workflows/release.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'android/app/**'
+      - 'lib/**'
+      - 'test/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.flutter-version'
+      - 'android/gradle/**'
+      - 'android/*.gradle*'
+      - 'android/gradle.properties'
+      - '.github/workflows/secure-storage-safety.yml'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .flutter-version
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart sources
+        run: flutter analyze
+
+      - name: Run Android secure-storage classifier tests
+        working-directory: android
+        run: >-
+          ./gradlew :app:testDebugUnitTest
+          --tests com.github.justlookatnow.ptmate.SecureStorageProbeClassifierTest
+
+      - name: Run secure-storage Dart safety tests
+        run: >-
+          flutter test
+          test/services/secure_storage_transaction_test.dart
+          test/services/secure_storage_gate_test.dart
+          test/services/secure_storage_operation_epoch_test.dart
+          test/app_secure_storage_gate_test.dart
+          test/app_automatic_sync_order_test.dart
+          test/pages/secure_storage_recovery_page_test.dart
+          test/services/storage/storage_service_safety_test.dart
+          test/services/storage/android_secure_storage_profile_resolver_test.dart
+          test/services/storage/android_secure_storage_policy_test.dart
+          test/services/storage/android_secure_storage_test_profile_policy_test.dart
+          test/services/cookie_cloud_service_test.dart
+          test/services/site_health_refresh_service_test.dart
+          test/storage_service_test.dart

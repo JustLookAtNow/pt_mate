@@ -37,6 +37,34 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
+class _SecureFallbackConflictWarning extends StatelessWidget {
+  const _SecureFallbackConflictWarning();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: StorageService.instance.hasSecureStorageFallbackConflict(),
+      builder: (context, snapshot) {
+        if (snapshot.data != true) return const SizedBox.shrink();
+        final colors = Theme.of(context).colorScheme;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Card(
+            color: colors.errorContainer,
+            child: ListTile(
+              leading: Icon(Icons.warning_amber_rounded, color: colors.error),
+              title: const Text('检测到明文降级数据冲突'),
+              subtitle: const Text(
+                '安全存储中的值已继续使用，冲突的明文副本没有被覆盖或删除。请重新保存相关密码或同步配置，确认后再清理旧副本。',
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 // 查询分类配置已移至站点配置中，请在服务器设置页面进行配置
 
 class _SettingsBody extends StatelessWidget {
@@ -47,6 +75,7 @@ class _SettingsBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        const _SecureFallbackConflictWarning(),
         // 主题设置
         Text('主题设置', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),

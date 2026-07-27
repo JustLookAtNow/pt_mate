@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'dart:math';
@@ -17,6 +18,14 @@ import '../utils/format.dart';
 import '../utils/reorder_haptic_feedback.dart';
 import '../app.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
+
+/// Only used by the isolated secure-storage device-test APKs. This flag is
+/// intentionally ineffective outside debug mode, so a release build can never
+/// bypass the normal connection/profile verification on save.
+const bool _skipSiteConnectionValidationForSecureStorageTest =
+    bool.fromEnvironment(
+      'SKIP_SITE_CONNECTION_VALIDATION_FOR_SECURE_STORAGE_TEST',
+    );
 
 class ServerSettingsPage extends StatefulWidget {
   const ServerSettingsPage({super.key});
@@ -2446,7 +2455,10 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
       final site = _composeCurrentSite();
       final adapter = await ApiService.instance.createTemporaryAdapter(site);
-      if (_siteFeatures.supportMemberProfile) {
+      final shouldFetchMemberProfile =
+          _siteFeatures.supportMemberProfile &&
+          !(kDebugMode && _skipSiteConnectionValidationForSecureStorageTest);
+      if (shouldFetchMemberProfile) {
         // 支持用户资料接口：获取并展示用户信息
         final profile = await adapter.fetchMemberProfile();
 
