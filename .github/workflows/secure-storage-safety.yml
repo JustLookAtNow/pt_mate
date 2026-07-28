@@ -63,6 +63,9 @@ jobs:
       - name: Analyze Dart sources
         run: flutter analyze
 
+      - name: Prepare Android build files
+        run: flutter build apk --config-only
+
       - name: Run Android secure-storage classifier tests
         working-directory: android
         run: >-
