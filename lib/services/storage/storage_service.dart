@@ -598,6 +598,23 @@ class StorageService {
       identical(Zone.current[_secureStoragePreflightZoneKey], this);
 
   bool _isLinuxKeyringFailure(Object error) {
+    if (!_allowsPlaintextFallback) return false;
+
+    if (error is PlatformException) {
+      final normalizedCode = error.code.trim().toLowerCase().replaceAll(
+        RegExp(r'[\s_-]'),
+        '',
+      );
+      // flutter_secure_storage_linux reports a missing, unavailable or locked
+      // Secret Service using these platform codes. KeyringLocked contains no
+      // spaces, so relying on the human-readable message misses the common
+      // headless/minimal-Linux case.
+      if (normalizedCode == 'keyringlocked' ||
+          normalizedCode == 'libsecreterror') {
+        return true;
+      }
+    }
+
     final message = error.toString().toLowerCase();
     return message.contains('libsecret') ||
         message.contains('unlock the keyring') ||

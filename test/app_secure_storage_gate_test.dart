@@ -60,6 +60,29 @@ void main() {
     expect(find.text('备份与恢复'), findsOneWidget);
   });
 
+  testWidgets('Linux KeyringLocked 使用明文 fallback 而不显示阻断页', (tester) async {
+    storage.resetForTest();
+    storage.overridePlatformForTest(TargetPlatform.linux);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageChannel, (call) async {
+          if (call.method == 'read') {
+            throw PlatformException(
+              code: 'KeyringLocked',
+              message: 'KeyringLocked',
+            );
+          }
+          return null;
+        });
+
+    await storage.initializeSecureStorage();
+    await tester.pumpWidget(const MTeamApp());
+    await _pumpUntilFound(tester, find.byType(ServerSettingsPage));
+
+    expect(storage.canAccessSensitiveStorage, isTrue);
+    expect(find.text('暂时无法读取安全存储'), findsNothing);
+    expect(find.byType(ServerSettingsPage), findsOneWidget);
+  });
+
   testWidgets('resume failure blocks the currently visible nested route', (
     tester,
   ) async {

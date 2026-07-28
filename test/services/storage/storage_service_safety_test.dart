@@ -726,6 +726,49 @@ void main() {
     expect(storage.canAccessSensitiveStorage, isFalse);
   });
 
+  test('Linux 无 Keyring 服务时按插件 KeyringLocked 错误回退到明文', () async {
+    const existingId = 'linux-existing-downloader';
+    const newId = 'linux-new-downloader';
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      StorageKeys.downloaderPasswordFallbackKey(existingId):
+          'existing-password',
+    });
+    storage.overridePlatformForTest(TargetPlatform.linux);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageChannel, (call) async {
+          if (call.method == 'read') {
+            throw PlatformException(
+              code: 'KeyringLocked',
+              message: 'KeyringLocked',
+            );
+          }
+          return null;
+        });
+
+    await storage.initializeSecureStorage();
+
+    expect(storage.canAccessSensitiveStorage, isTrue);
+    expect(storage.isSecureStorageReady, isFalse);
+    expect(
+      storage.secureStorageProfile,
+      SecureStorageProfile.linuxPlaintextFallback,
+    );
+    expect(storage.secureStorageFailureCode, 'linux_keyring_unavailable');
+    expect(
+      await storage.loadDownloaderPassword(existingId),
+      'existing-password',
+    );
+
+    await storage.saveDownloaderPassword(newId, 'new-password');
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(
+      prefs.getString(StorageKeys.downloaderPasswordFallbackKey(newId)),
+      'new-password',
+    );
+    expect(await storage.loadDownloaderPassword(newId), 'new-password');
+  });
+
   test('Linux keyring 不可用时仍可删除既有明文 fallback', () async {
     const downloaderId = 'linux-delete-downloader';
     const webdavId = 'linux-delete-webdav';
@@ -740,8 +783,8 @@ void main() {
         .setMockMethodCallHandler(secureStorageChannel, (call) async {
           if (call.method == 'read') {
             throw PlatformException(
-              code: 'keyring_locked',
-              message: 'Failed to unlock the keyring',
+              code: 'KeyringLocked',
+              message: 'KeyringLocked',
             );
           }
           return null;
