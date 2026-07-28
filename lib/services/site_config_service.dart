@@ -255,6 +255,7 @@ class SiteConfigService {
         result = _convertDefaultTemplateToSiteConfigTemplate(
           templateId,
           defaultTemplate,
+          siteType,
         );
       }
     }
@@ -276,6 +277,7 @@ class SiteConfigService {
   static SiteConfigTemplate? _convertDefaultTemplateToSiteConfigTemplate(
     String templateId,
     Map<String, dynamic> defaultTemplate,
+    SiteType siteType,
   ) {
     try {
       // 解析搜索分类配置
@@ -325,12 +327,6 @@ class SiteConfigService {
           defaultTemplate['request'] as Map<String, dynamic>,
         );
       }
-
-      // 确定站点类型
-      SiteType siteType = SiteType.values.firstWhere(
-        (type) => type.id == templateId,
-        orElse: () => SiteType.mteam,
-      );
 
       return SiteConfigTemplate(
         id: templateId,

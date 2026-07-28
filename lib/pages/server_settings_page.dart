@@ -2304,13 +2304,12 @@ class _SiteEditPageState extends State<SiteEditPage> {
         siteType: template.siteType,
         searchCategories: _searchCategories,
         features: _siteFeatures,
-        cookie:
-            (template.siteType == SiteType.nexusphpweb ||
-                template.siteType == SiteType.gazelle)
+        cookie: template.siteType.usesCookieAuthentication
             ? _savedCookie
             : null,
         templateId: templateId,
         siteColor: _siteColor?.toARGB32(),
+        operationIntervalMs: template.operationIntervalMs,
       );
     }
 
@@ -2333,9 +2332,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
       siteType: _selectedSiteType!,
       searchCategories: _searchCategories,
       features: _siteFeatures,
-      cookie:
-          (_selectedSiteType == SiteType.nexusphpweb ||
-              _selectedSiteType == SiteType.gazelle)
+      cookie: _selectedSiteType?.usesCookieAuthentication == true
           ? _savedCookie
           : null,
       templateId: templateId,
@@ -2376,9 +2373,8 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
   Future<void> _resetSearchCategories() async {
     // 检查必要的配置是否完整
-    if (_selectedSiteType == SiteType.nexusphpweb ||
-        _selectedSiteType == SiteType.gazelle) {
-      // nexusphpweb类型需要cookie
+    if (_selectedSiteType?.usesCookieAuthentication == true) {
+      // Cookie认证站点需要Cookie
       if (_savedCookie == null || _savedCookie!.isEmpty) {
         if (mounted) {
           NotificationHelper.showError(context, '请先完成登录获取Cookie');
@@ -2990,6 +2986,13 @@ class _SiteEditPageState extends State<SiteEditPage> {
                     border: OutlineInputBorder(),
                   ),
                   items: SiteType.values
+                      // 已保存的 Web 站点仍需保留当前项，避免编辑页的
+                      // DropdownButton 与 initialValue 不匹配。
+                      .where(
+                        (type) =>
+                            type.isAvailableForCustomSite ||
+                            type == _selectedSiteType,
+                      )
                       .map(
                         (type) => DropdownMenuItem(
                           value: type,
@@ -3208,8 +3211,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
 
               // API Key输入或登录按钮（只有在用户做出选择时才显示）
               if (_hasUserMadeSelection &&
-                  _selectedSiteType != SiteType.nexusphpweb &&
-                  _selectedSiteType != SiteType.gazelle) ...[
+                  _selectedSiteType?.usesCookieAuthentication != true) ...[
                 TextFormField(
                   controller: _apiKeyController,
                   decoration: InputDecoration(
@@ -3227,7 +3229,7 @@ class _SiteEditPageState extends State<SiteEditPage> {
                 ),
                 const SizedBox(height: 16),
               ] else if (_hasUserMadeSelection) ...[
-                // NexusPHPWeb类型显示登录认证（只有在用户做出选择时才显示）
+                // Cookie认证站点显示登录认证（只有在用户做出选择时才显示）
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),

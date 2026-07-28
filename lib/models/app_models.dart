@@ -83,7 +83,10 @@ class MemberProfile {
       lastAccess: json['lastAccess'] != null
           ? DateTime.tryParse(json['lastAccess'].toString())?.toLocal()
           : (json['last_access'] != null
-                ? Formatters.parseDateTimeCustom(json['last_access'].toString(), fieldName: 'lastAccess')
+                ? Formatters.parseDateTimeCustom(
+                    json['last_access'].toString(),
+                    fieldName: 'lastAccess',
+                  )
                 : null),
       bonusPerHour: bonusPerHourVal == null
           ? null
@@ -141,6 +144,7 @@ class TorrentItem {
   final DiscountType discount; // 优惠类型枚举
   final DateTime? discountEndTime; // 优惠结束时间
   final String? downloadUrl; //下载链接，有些网站可以直接通过列表接口获取到
+  final String? detailUrl; //详情链接，有些网站可以直接通过列表接口获取到
   final String? description; //描述，有些网站可以直接通过列表接口获取到
   final int seeders;
   final int leechers;
@@ -164,6 +168,7 @@ class TorrentItem {
     this.discount = DiscountType.normal,
     required this.discountEndTime,
     required this.downloadUrl,
+    this.detailUrl,
     this.description,
     required this.seeders,
     required this.leechers,
@@ -187,6 +192,7 @@ class TorrentItem {
     DiscountType? discount,
     DateTime? discountEndTime,
     String? downloadUrl,
+    String? detailUrl,
     String? description,
     int? seeders,
     int? leechers,
@@ -207,6 +213,7 @@ class TorrentItem {
       discount: discount ?? this.discount,
       discountEndTime: discountEndTime ?? this.discountEndTime,
       downloadUrl: downloadUrl ?? this.downloadUrl,
+      detailUrl: detailUrl ?? this.detailUrl,
       description: description ?? this.description,
       seeders: seeders ?? this.seeders,
       leechers: leechers ?? this.leechers,
@@ -399,6 +406,7 @@ enum SiteType {
     '控制面板-设定首页-访问令牌（权限都勾上）',
   ),
   nexusphpweb('NexusPHPWeb', 'NexusPHP(web)', 'Cookie认证', '通过网页登录获取认证信息'),
+  web('Web', 'Web (Alpha)', 'Cookie认证', '通过网页登录获取认证信息'),
   rousi(
     'RousiPro',
     'Rousi pro',
@@ -413,6 +421,18 @@ enum SiteType {
   final String displayName;
   final String apiKeyLabel;
   final String apiKeyHint;
+
+  /// 是否通过浏览器登录态 Cookie 认证。
+  bool get usesCookieAuthentication =>
+      this == SiteType.nexusphpweb ||
+      this == SiteType.web ||
+      this == SiteType.gazelle;
+
+  /// `usetoken=1` 是 JSON Gazelle 下载接口的专属能力。
+  bool get supportsGazelleDownloadToken => this == SiteType.gazelle;
+
+  /// Web 解析器只由内置模板驱动，不能作为自定义站点类型新建。
+  bool get isAvailableForCustomSite => this != SiteType.web;
 }
 
 // 站点功能配置
@@ -746,7 +766,7 @@ class SiteConfig {
   final String? apiKey; // x-api-key
   final String? passKey; // NexusPHP类型网站的passKey
   final String? authKey; // Gazelle类型网站的authKey
-  final String? cookie; // NexusPHPWeb类型网站的登录cookie
+  final String? cookie; // Cookie认证站点的登录cookie
   final String? userId; // 用户ID，从fetchMemberProfile获取
   final SiteType siteType; // 网站类型
   final bool isActive; // 是否激活

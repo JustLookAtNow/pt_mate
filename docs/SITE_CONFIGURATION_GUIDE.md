@@ -43,14 +43,14 @@
 | `isShow`           | boolean | ❌   | 是否在下拉列表中显示，默认 `true`                   |
 | `baseUrls`         | array   | ✅   | 网站基础 URL 列表                                   |
 | `primaryUrl`       | string  | ✅   | 主要 URL                                            |
-| `siteType`         | string  | ✅   | 网站类型，支持：`M-Team`、`NexusPHP`、`NexusPHPWeb` |
+| `siteType`         | string  | ✅   | 网站类型，支持：`M-Team`、`NexusPHP`、`NexusPHPWeb`、`Web` |
 | `searchCategories` | array   | ❌   | 搜索分类配置  如果这里有配置会直接根据这里配置返回，
 适用于api权限没开或者dom比较难适配的网站                                                    |
 | `features`         | object  | ✅   | 功能支持配置                                        |
 | `discountMapping`  | object  | ❌   | 折扣映射配置                                        |
 | `tagMapping`       | object  | ❌   | 标签映射配置                                        |
-| `infoFinder`       | object  | ❌   | 信息提取配置（仅 NexusPHPWeb 类型需要）             |
-| `request`          | object  | ❌   | 自定义请求配置（暂不完善有具体需求可以提issue）     |
+| `infoFinder`       | object  | ❌   | HTML 信息提取配置（`NexusPHPWeb`、`Web` 类型使用）  |
+| `request`          | object  | ❌   | 自定义请求配置                                      |
 
 ### 2. 功能配置 (features)
 
@@ -120,9 +120,11 @@
 
 ### 5. 自定义请求配置 (request)
 
-用于配置各种 HTTP 请求（如搜索、收藏、登录页）。该配置支持**层级回退逻辑**：
+用于配置各种 HTTP 请求（如搜索、收藏、登录页）。`NexusPHPWeb` 支持**层级回退逻辑**：
 1. 搜索自定义配置 -> 指定模板配置 -> `NexusPHPWeb` 默认模板配置。
 2. 如果子配置中缺少某个字段（如 `headers`），会自动从上层（模板）中继承。
+
+`Web` 类型只读取内置站点 JSON 中明确声明的规则，不会回退到 `NexusPHPWeb` 的默认规则；缺少必需规则时会明确报错。
 
 #### 常用请求动作 (Actions)
 
@@ -173,7 +175,7 @@
 在 `path` 、 `params` 和 `headers` 中可以使用以下占位符，应用在发送请求前会进行动态替换：
 
 - `{keyword}` - 搜索关键词。
-- `{page}` - 当前页码（从 0 开始）。
+- `{page}` - 当前页码（`Web` 使用界面传入的页码；`NexusPHPWeb` 保持原有从 0 开始的协议）。
 - `{pageSize}` - 每页种子数量。
 - `{onlyFav}` - 仅看收藏。若启用（`onlyFav=1`）则替换为 `1`，否则自动移除该参数。
 - `{torrentId}` - 种子 ID。
@@ -182,13 +184,27 @@
 
 ### 6. 信息提取配置 (infoFinder)
 
-仅适用于 `NexusPHPWeb` 类型网站，用于配置如何从网页中提取信息。
+适用于 `NexusPHPWeb` 与配置驱动的 `Web` 类型网站，用于配置如何从网页中提取信息。`Web` 类型必须在内置站点 JSON 中完整声明所需规则。
 
 #### 主要构成
 - `userInfo`: 用户信息提取配置。
 - `passKey`: 用户密钥提取配置。
 - `search`: 种子列表提取配置。
 - `categories`: 网站分类提取配置。
+
+#### 通用 Web 扩展
+
+`Web` 支持通过 `userInfo.steps` 顺序请求多个页面；前一步已提取字段可用于后续 `path` 或 `params` 的占位符。例如先从 `/index.php` 提取 `userId`，再请求 `/user.php?id={userId}`。
+
+搜索请求使用 `request.search`，其中 `params` 支持 `{keyword}`、`{page}`、`{pageSize}`，并会合并分类配置中的参数。`infoFinder.search.parser` 默认为 `flatTable`；Gazelle 风格的分组表使用 `gazelleGrouped`，并可配置：
+
+- `groupFields`：父级专辑行字段；
+- `childFields`：`group_torrent_redline` 子行字段，配合 `childColumnOffset` 处理省略列；
+- `standaloneFields`：独立 `torrent_redline`/`torrent` 行字段；
+- `stripSelectors`（或 `excludeSelectors`）：提取文本前移除标签、评论链接等子元素，避免污染父级标题；
+- `join` 与 `separator`：将已提取的非空字段组合为计算字段。例如 `{"torrentName":{"join":["title","artist"],"separator":" - "}}` 会生成“标题 - 艺术家”；缺少艺术家时不会留下多余分隔符；
+- `cover`：封面字段使用图片的 `src` 属性；相对地址会自动转为站点绝对 URL；
+- `detailUrl` 与 `downloadUrl`：直接从页面提取，适配器会转为绝对 URL，不应拼接或保存认证参数。
 
 #### 配置示例
 里面的具体内容都大同小异，下面以`userInfo`为例：
@@ -233,6 +249,7 @@
   - 支持属性过滤，比如：`[href^=\"userdetails.php?id=\"]`表示提取所有`href`属性以`userdetails.php?id=`开头的元素。
     同时支持三种符号表达式：
     - `^=`：表示以...开头
+    - `*=`：表示包含...
     - `~=`：表示以正则表达式匹配
     - `==`：表示相等
   - 一些特殊用法：
@@ -302,6 +319,12 @@
 - 需要详细配置 `infoFinder`
 - 兼容性完全依赖于页面布局，可能需要大量适配工作
 
+### Web 类型
+
+- 适用于没有兼容 JSON API、且页面结构可由站点 JSON 描述的 legacy/非 NexusPHP 网站。
+- 通过 Cookie 认证；站点需要显式配置 `infoFinder`、`request.search` 与功能开关。
+- 规则仅随内置站点 JSON 发布，不提供应用内规则编辑或文件导入；不会使用 NexusPHPWeb 默认解析规则。
+
 ## 添加新网站步骤
 
 ### 步骤 1：创建配置文件
@@ -350,6 +373,10 @@ assets/sites/newsite.json
   }
 }
 ```
+
+#### 使用 Web 类型（用于配置驱动的通用网页解析）
+
+`Web` 类型用于内置的特定站点适配。除基础字段外，必须提供该站点的 `infoFinder` 和 `request.search`；请使用页面已有的详情、下载链接，不要在配置中保存 Cookie、passkey 或认证 URL。
 
 ### 步骤 3：更新网站清单
 

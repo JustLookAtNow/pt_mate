@@ -76,6 +76,10 @@ void main() {
         hasLength(1),
       );
       expect(
+        harness.findElementBySelector(soup, 'a[href*="details.php?id="]'),
+        hasLength(2),
+      );
+      expect(
         harness.findElementBySelector(soup, 'img[title=="Free"]'),
         hasLength(1),
       );

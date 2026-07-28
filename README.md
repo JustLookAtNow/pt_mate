@@ -23,17 +23,19 @@ A Flutter-based private tracker client built with Material Design 3. PT Mate sup
 - `NexusPHPWeb`
 - `RousiPro`
 - `Unit3D`
+- `Web`
 
 ## Supported Sites
 
-The following list is based on `assets/sites/*.json` (37 total):
+The following list is based on `assets/sites/*.json` (40 total):
 
 - `Gazelle` (1): DIC Music
 - `M-Team` (1): M-Team
 - `NexusPHP` (13): 藏宝阁, 天枢, 自由农场, 好学, 垃圾堆, 幸运, momentpt, PTFans, PT GTK, PTSKit, PTZone, 肉丝, 织梦
-- `NexusPHPWeb` (20): AFUN, 末日, Audiences, 比特校园, 财神, FRDS, HDDolby, HDFans, 麒麟, HHanClub, 老师, OurBits, ptt, 青蛙, SSD, TTG, U2Share, UBits, 星陨阁, 猪猪
+- `NexusPHPWeb` (22): AFUN, 末日, Audiences, 比特校园, 财神, FRDS, HDDolby, HDFans, 麒麟, HHanClub, 老师, 皇后, OurBits, ptt, 青蛙, SSD, TTG, U2Share, UBits, 星陨阁, 猪猪, 海棠PT
 - `RousiPro` (1): 肉丝Pro(beta)
 - `Unit3D` (1): MonikaDesign
+- `Web` (1): JPopSuki
 
 ## Screenshots
 

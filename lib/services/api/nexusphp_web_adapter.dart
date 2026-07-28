@@ -8,12 +8,12 @@ import '../site_config_service.dart';
 import 'base_web_adapter.dart';
 import 'package:dio/dio.dart';
 import 'package:beautiful_soup_dart/beautiful_soup.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'dart:convert';
 import '../logging/log_file_service.dart';
 import 'nexusphp_helper.dart';
 import 'html_extractor.dart';
 import 'torrent_extractor.dart';
+import 'web_adapter.dart';
 
 /// 参数对象，用于 Isolate 搜索解析
 class ParseSearchParams {
@@ -152,17 +152,11 @@ class NexusPHPWebAdapter extends SiteAdapter
     }
 
     final swDio = Stopwatch()..start();
-    _dio = Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 10),
-        sendTimeout: const Duration(seconds: 30),
-      ),
-    );
-    _dio.options.baseUrl = _siteConfig.baseUrl;
-    _dio.options.headers['User-Agent'] =
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36';
-    _dio.options.responseType = ResponseType.plain; // 设置为plain避免JSON解析警告
+    // 与通用 Web 适配器共享 Cookie 注入和登录重定向识别；NexusPHPWeb
+    // 仍沿用原有较短的页面请求超时与安全的内容类型转换器。
+    _dio = WebAdapterCore.createCookieDio(_siteConfig);
+    _dio.options.connectTimeout = const Duration(seconds: 5);
+    _dio.options.receiveTimeout = const Duration(seconds: 10);
     _dio.transformer = _SafeContentTypeTransformer();
     swDio.stop();
     if (kDebugMode) {
@@ -171,63 +165,6 @@ class NexusPHPWebAdapter extends SiteAdapter
       );
     }
 
-    // 添加响应拦截器处理302重定向
-    final swInterceptors = Stopwatch()..start();
-    _dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) {
-          // 动态添加Cookie
-          if (_siteConfig.cookie != null && _siteConfig.cookie!.isNotEmpty) {
-            options.headers['Cookie'] = _siteConfig.cookie;
-          }
-          handler.next(options);
-        },
-        onResponse: (response, handler) {
-          // 检查是否是302重定向到登录页面
-          // Dio默认会自动跟随重定向，因此最终状态码可能是200。
-          // 我们需要检查最终的URI或重定向记录来判断是否跳转到了登录页。
-          final isLoginRedirect =
-              response.realUri.toString().contains('login') ||
-              response.redirects.any(
-                (r) => r.location.toString().contains('login'),
-              );
-
-          if (isLoginRedirect) {
-            throw SiteAuthenticationException(
-              message: 'Cookie已过期，请重新登录更新Cookie',
-            );
-          }
-
-          if (response.statusCode == 302) {
-            final location = response.headers.value('location');
-            if (location != null && location.contains('login')) {
-              throw SiteAuthenticationException(
-                message: 'Cookie已过期，请重新登录更新Cookie',
-              );
-            }
-          }
-          handler.next(response);
-        },
-        onError: (error, handler) {
-          // 检查DioException中的响应状态码
-          if (error.response?.statusCode == 302) {
-            final location = error.response?.headers.value('location');
-            if (location != null && location.contains('login')) {
-              throw SiteAuthenticationException(
-                message: 'Cookie已过期，请重新登录更新Cookie',
-              );
-            }
-          }
-          handler.next(error);
-        },
-      ),
-    );
-    swInterceptors.stop();
-    if (kDebugMode) {
-      _logger.d(
-        'NexusPHPWebAdapter.init: 添加拦截器耗时=${swInterceptors.elapsedMilliseconds}ms',
-      );
-    }
     swTotal.stop();
     if (kDebugMode) {
       _logger.d(
@@ -659,7 +596,6 @@ class NexusPHPWebAdapter extends SiteAdapter
         throw Exception('未找到搜索配置: $searchAction');
       }
 
-      final path = requestConfig['path'] as String? ?? '/torrents.php';
       final method = requestConfig['method'] as String? ?? 'GET';
       final configParams = Map<String, dynamic>.from(
         requestConfig['params'] as Map<String, dynamic>? ?? {},
@@ -674,39 +610,32 @@ class NexusPHPWebAdapter extends SiteAdapter
         }
       }
 
-      // 构建最终查询参数
+      final variables = <String, dynamic>{
+        'keyword': keyword ?? '',
+        // NexusPHPWeb 的既有分页协议是从 0 开始；保留该语义。
+        'page': pageNumber - 1,
+        'pageSize': pageSize,
+        'categoryId': categoryId,
+        'onlyFav': onlyFav == 1 ? '1' : '',
+      };
+      final path = WebAdapterCore.replacePlaceholders(
+        requestConfig['path'] as String? ?? '/torrents.php',
+        variables,
+      );
+
+      // 构建最终查询参数。占位符替换与通用 Web 适配器共用，NexusPHPWeb
+      // 只保留它特有的“无分类/非收藏时省略参数”语义。
       final queryParams = <String, dynamic>{};
-
-      // 替换占位符并填充参数
       configParams.forEach((key, value) {
-        if (value is String) {
-          String val = value;
-          val = val.replaceAll('{keyword}', keyword ?? '');
-          val = val.replaceAll('{page}', (pageNumber - 1).toString());
-          val = val.replaceAll('{pageSize}', pageSize.toString());
-
-          // 处理 {categoryId} 占位符：无分类时移除该参数
-          if (val.contains('{categoryId}')) {
-            if (categoryId.isNotEmpty) {
-              val = val.replaceAll('{categoryId}', categoryId);
-            } else {
-              return; // 没有分类 ID，不加入 queryParams
-            }
-          }
-
-          // 处理 {onlyFav} 占位符
-          if (val.contains('{onlyFav}')) {
-            if (onlyFav == 1) {
-              val = val.replaceAll('{onlyFav}', '1');
-              queryParams[key] = val;
-            }
-            // 如果不是 1，则不加入 queryParams (即移除该参数)
-          } else {
-            queryParams[key] = val;
-          }
-        } else {
-          queryParams[key] = value;
+        if (value is String &&
+            ((value.contains('{categoryId}') && categoryId.isEmpty) ||
+                (value.contains('{onlyFav}') && onlyFav != 1))) {
+          return;
         }
+        queryParams[key] = WebAdapterCore.replacePlaceholdersDeep(
+          value,
+          variables,
+        );
       });
 
       // 添加其他额外参数
@@ -977,12 +906,16 @@ class NexusPHPWebAdapter extends SiteAdapter
   Future<TorrentDetail> fetchTorrentDetail(
     String id, {
     String? description,
+    String? detailUrl,
   }) async {
     // 构建种子详情页面URL
     final baseUrl = _siteConfig.baseUrl.endsWith('/')
         ? _siteConfig.baseUrl.substring(0, _siteConfig.baseUrl.length - 1)
         : _siteConfig.baseUrl;
-    final detailUrl = '$baseUrl/details.php?id=$id&hit=1';
+    final defaultDetailUrl = '$baseUrl/details.php?id=$id&hit=1';
+    final resolvedDetailUrl =
+        WebAdapterCore.resolveHttpUrl(detailUrl, _siteConfig.baseUrl) ??
+        defaultDetailUrl;
 
     // 如果启用了原生详情渲染，提取 DOM
     if (_siteConfig.features.nativeDetail) {
@@ -992,13 +925,10 @@ class NexusPHPWebAdapter extends SiteAdapter
           return TorrentDetail(
             descr: '',
             descrHtml: description,
-            webviewUrl: detailUrl,
+            webviewUrl: resolvedDetailUrl,
           );
         }
-        final response = await _dio.get(
-          '/details.php',
-          queryParameters: {'id': id, 'hit': '1'},
-        );
+        final response = await _dio.get(resolvedDetailUrl);
         final soup = BeautifulSoup(response.data);
 
         // 尝试通过配置获取详情选择器和内容类型
@@ -1036,7 +966,7 @@ class NexusPHPWebAdapter extends SiteAdapter
           if (isBbcode) {
             return TorrentDetail(
               descr: extractedContent,
-              webviewUrl: detailUrl,
+              webviewUrl: resolvedDetailUrl,
             );
           } else {
             // HTML 模式：处理相对URL
@@ -1052,7 +982,7 @@ class NexusPHPWebAdapter extends SiteAdapter
             return TorrentDetail(
               descr: '',
               descrHtml: extractedContent,
-              webviewUrl: detailUrl,
+              webviewUrl: resolvedDetailUrl,
             );
           }
         }
@@ -1070,33 +1000,12 @@ class NexusPHPWebAdapter extends SiteAdapter
     }
 
     // WebView 模式（默认行为或 nativeDetail fallback）
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      // 设置Cookie到baseUrl域下，HTTPOnly避免带到图片请求
-      final cookieManager = CookieManager.instance();
-      final baseUri = Uri.parse(_siteConfig.baseUrl);
-
-      if (_siteConfig.cookie != null && _siteConfig.cookie!.isNotEmpty) {
-        // 解析cookie字符串并设置到域下
-        final cookies = _siteConfig.cookie!.split(';');
-        for (final cookieStr in cookies) {
-          final parts = cookieStr.trim().split('=');
-          if (parts.length == 2) {
-            await cookieManager.setCookie(
-              url: WebUri(_siteConfig.baseUrl),
-              name: parts[0].trim(),
-              value: parts[1].trim(),
-              domain: baseUri.host,
-              isHttpOnly: true,
-            );
-          }
-        }
-      }
-    }
+    await WebAdapterCore.syncCookiesToWebView(_siteConfig);
 
     // 返回包含webview URL的TorrentDetail对象，让页面组件来处理嵌入式显示
     return TorrentDetail(
       descr: '', // 空描述，因为内容将通过webview显示
-      webviewUrl: detailUrl, // 传递URL给页面组件
+      webviewUrl: resolvedDetailUrl, // 传递URL给页面组件
     );
   }
 

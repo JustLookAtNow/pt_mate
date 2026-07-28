@@ -347,6 +347,7 @@ class NexusPHPAdapter with NexusPHPHelper implements SiteAdapter {
   Future<TorrentDetail> fetchTorrentDetail(
     String id, {
     String? description,
+    String? detailUrl,
   }) async {
     try {
       if (description != null && description.isNotEmpty) {

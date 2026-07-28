@@ -2352,9 +2352,10 @@ class _HomePageState extends State<HomePage> {
       });
     }
     try {
-      // 获取当前分类的额外参数 - 仅在站点支持高级搜索功能时使用
+      // 分类筛选与高级搜索是两项独立能力。分类站点即使不支持高级搜索，
+      // 也需要把分类模板参数（例如 Jpopsuki 的 filter_cat）传给适配器。
       Map<String, dynamic>? additionalParams;
-      if ((_currentSite?.features.supportAdvancedSearch ?? true) &&
+      if ((_currentSite?.features.supportCategories ?? true) &&
           _categories.isNotEmpty &&
           _selectedCategoryIndex >= 0 &&
           _selectedCategoryIndex < _categories.length) {
@@ -2475,7 +2476,8 @@ class _HomePageState extends State<HomePage> {
         builder: (_) => TorrentDownloadDialog(
           torrentName: item.name,
           downloadUrl: url,
-          isGazelleSite: _currentSite?.siteType == SiteType.gazelle,
+          isGazelleSite:
+              _currentSite?.siteType.supportsGazelleDownloadToken ?? false,
         ),
       );
 
@@ -2511,7 +2513,8 @@ class _HomePageState extends State<HomePage> {
 
         // 4. 发送到下载器
         String finalUrl = url;
-        if (downloadContext.useToken == true &&
+        if (_currentSite?.siteType.supportsGazelleDownloadToken == true &&
+            downloadContext.useToken == true &&
             !finalUrl.contains('usetoken=1')) {
           finalUrl += '&usetoken=1';
         }
@@ -2766,7 +2769,9 @@ class _HomePageState extends State<HomePage> {
         );
       } else {
         // 远程下载器模式
-        if (downloadContext.useToken == true && !url.contains('usetoken=1')) {
+        if (_currentSite?.siteType.supportsGazelleDownloadToken == true &&
+            downloadContext.useToken == true &&
+            !url.contains('usetoken=1')) {
           url += '&usetoken=1';
         }
         await DownloaderService.instance.addTask(
@@ -3604,7 +3609,8 @@ class _HomePageState extends State<HomePage> {
       context: context,
       builder: (context) => TorrentDownloadDialog(
         itemCount: selectedItems.length,
-        isGazelleSite: _currentSite?.siteType == SiteType.gazelle,
+        isGazelleSite:
+            _currentSite?.siteType.supportsGazelleDownloadToken ?? false,
       ),
     );
 

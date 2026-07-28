@@ -2,6 +2,7 @@ import '../../models/app_models.dart';
 import 'mteam_adapter.dart';
 import 'nexusphp_adapter.dart';
 import 'nexusphp_web_adapter.dart';
+import 'web_adapter.dart';
 import 'rousi_adapter.dart';
 import 'gazelle_adapter.dart';
 import 'unit3d_adapter.dart';
@@ -28,10 +29,18 @@ abstract class SiteAdapter {
   });
 
   /// 获取种子详情
-  Future<TorrentDetail> fetchTorrentDetail(String id, {String? description});
+  Future<TorrentDetail> fetchTorrentDetail(
+    String id, {
+    String? description,
+    String? detailUrl,
+  });
 
   /// 获取种子评论列表
-  Future<TorrentCommentList> fetchComments(String id, {int pageNumber = 1, int pageSize = 20});
+  Future<TorrentCommentList> fetchComments(
+    String id, {
+    int pageNumber = 1,
+    int pageSize = 20,
+  });
 
   /// 生成下载令牌并返回下载URL
   Future<String> genDlToken({required String id, String? url});
@@ -62,6 +71,8 @@ class SiteAdapterFactory {
         return NexusPHPAdapter();
       case SiteType.nexusphpweb:
         return NexusPHPWebAdapter();
+      case SiteType.web:
+        return WebAdapter();
       case SiteType.rousi:
         return RousiAdapter();
       case SiteType.gazelle:

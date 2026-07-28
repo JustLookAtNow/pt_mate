@@ -190,6 +190,24 @@ void main() {
     expect(plan.unknown, isEmpty);
   });
 
+  test('buildSyncPlan should update generic Web cookie sites', () async {
+    await StorageService.instance.saveSiteConfigs([
+      const SiteConfig(
+        id: 'web-site',
+        name: 'Web Site',
+        baseUrl: 'https://web.example.org/',
+        cookie: 'sid=old',
+        siteType: SiteType.web,
+      ),
+    ]);
+
+    final plan = await service.buildSyncPlan({'web.example.org': 'sid=new'});
+
+    expect(plan.updates, hasLength(1));
+    expect(plan.updates.single.site?.id, 'web-site');
+    expect(plan.updates.single.cookie, 'sid=new');
+  });
+
   test(
     'concurrent restore and Cookie Cloud apply preserve the restored site set',
     () async {

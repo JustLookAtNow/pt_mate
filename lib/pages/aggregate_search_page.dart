@@ -1260,7 +1260,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         builder: (_) => TorrentDownloadDialog(
           torrentName: item.torrent.name,
           downloadUrl: url,
-          isGazelleSite: siteConfig!.siteType == SiteType.gazelle,
+          isGazelleSite: siteConfig!.siteType.supportsGazelleDownloadToken,
         ),
       );
 
@@ -1278,7 +1278,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
       // 5. 发送到 qBittorrent
       String finalUrl = url;
-      if (useToken == true && !finalUrl.contains('usetoken=1')) {
+      if (siteConfig.siteType.supportsGazelleDownloadToken &&
+          useToken == true &&
+          !finalUrl.contains('usetoken=1')) {
         finalUrl += '&usetoken=1';
       }
 
@@ -1454,8 +1456,8 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     );
 
     // 远程下载器模式
-    if (downloadContext.useToken == true &&
-        siteConfig.siteType == SiteType.gazelle &&
+    if (siteConfig.siteType.supportsGazelleDownloadToken &&
+        downloadContext.useToken == true &&
         !url.contains('usetoken=1')) {
       url += '&usetoken=1';
     }
@@ -1621,8 +1623,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     if (!mounted) return;
 
     final sitesById = {for (final site in allSites) site.id: site};
-    bool hasGazelle = selectedItems.any(
-      (item) => sitesById[item.siteId]?.siteType == SiteType.gazelle,
+    final hasGazelle = selectedItems.any(
+      (item) =>
+          sitesById[item.siteId]?.siteType.supportsGazelleDownloadToken == true,
     );
 
     // 显示批量下载设置对话框

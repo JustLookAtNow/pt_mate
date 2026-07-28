@@ -23,7 +23,9 @@ class ApiService {
       await _initAdapter(activeSite);
       swInitAdapter.stop();
       if (kDebugMode) {
-        _logger.d('ApiService.init: 初始化活跃适配器耗时=${swInitAdapter.elapsedMilliseconds}ms');
+        _logger.d(
+          'ApiService.init: 初始化活跃适配器耗时=${swInitAdapter.elapsedMilliseconds}ms',
+        );
       }
     }
     swTotal.stop();
@@ -43,7 +45,10 @@ class ApiService {
       return _adapters[adapterId]!;
     }
 
-    final adapter = await _createAndInitAdapter(siteConfig, logLabel: 'getAdapter');
+    final adapter = await _createAndInitAdapter(
+      siteConfig,
+      logLabel: 'getAdapter',
+    );
     _adapters[adapterId] = adapter;
 
     return adapter;
@@ -51,7 +56,10 @@ class ApiService {
 
   /// 创建一个不进入缓存的临时适配器
   Future<SiteAdapter> createTemporaryAdapter(SiteConfig siteConfig) {
-    return _createAndInitAdapter(siteConfig, logLabel: 'createTemporaryAdapter');
+    return _createAndInitAdapter(
+      siteConfig,
+      logLabel: 'createTemporaryAdapter',
+    );
   }
 
   Future<SiteAdapter> _createAndInitAdapter(
@@ -156,18 +164,27 @@ class ApiService {
     String id, {
     SiteConfig? siteConfig,
     String? description,
+    String? detailUrl,
   }) async {
     // 如果提供了siteConfig，使用临时适配器
     if (siteConfig != null) {
       final adapter = await getAdapter(siteConfig);
-      return adapter.fetchTorrentDetail(id, description: description);
+      return adapter.fetchTorrentDetail(
+        id,
+        description: description,
+        detailUrl: detailUrl,
+      );
     }
 
     // 否则使用当前活跃适配器
     if (_activeAdapter == null) {
       throw StateError('No active site adapter available');
     }
-    return _activeAdapter!.fetchTorrentDetail(id, description: description);
+    return _activeAdapter!.fetchTorrentDetail(
+      id,
+      description: description,
+      detailUrl: detailUrl,
+    );
   }
 
   /// 获取种子评论列表
@@ -180,14 +197,22 @@ class ApiService {
     // 如果提供了siteConfig，使用临时适配器
     if (siteConfig != null) {
       final adapter = await getAdapter(siteConfig);
-      return adapter.fetchComments(id, pageNumber: pageNumber, pageSize: pageSize);
+      return adapter.fetchComments(
+        id,
+        pageNumber: pageNumber,
+        pageSize: pageSize,
+      );
     }
 
     // 否则使用当前活跃适配器
     if (_activeAdapter == null) {
       throw StateError('No active site adapter available');
     }
-    return _activeAdapter!.fetchComments(id, pageNumber: pageNumber, pageSize: pageSize);
+    return _activeAdapter!.fetchComments(
+      id,
+      pageNumber: pageNumber,
+      pageSize: pageSize,
+    );
   }
 
   /// 生成下载令牌

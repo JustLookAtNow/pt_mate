@@ -235,7 +235,9 @@ class GazelleAdapter extends SiteAdapter {
       final rawGroupName = FormatUtil.unescapeHtml(
         (group['groupName'] ?? group['name'] ?? '').toString(),
       );
-      final artist = FormatUtil.unescapeHtml((group['artist'] ?? '').toString());
+      final artist = FormatUtil.unescapeHtml(
+        (group['artist'] ?? '').toString(),
+      );
       final cover = (group['cover'] ?? group['wikiImage'] ?? '').toString();
 
       for (final torrent in torrents) {
@@ -260,7 +262,8 @@ class GazelleAdapter extends SiteAdapter {
         items.add(
           TorrentItem(
             id: id,
-            name: '${artist.isNotEmpty ? '$artist - ' : ''}$rawGroupName'
+            name:
+                '${artist.isNotEmpty ? '$artist - ' : ''}$rawGroupName'
                 ' - ${torrent['format'] ?? ''} / ${torrent['encoding'] ?? ''}',
             smallDescr: '',
             discount: _parseDiscountType(torrent['isFreeleech'] == true),
@@ -308,8 +311,12 @@ class GazelleAdapter extends SiteAdapter {
       if (group is! Map<String, dynamic>) continue;
 
       final torrents = group['torrents'] as List? ?? [];
-      final rawGroupName = FormatUtil.unescapeHtml((group['name'] ?? '').toString());
-      final artist = FormatUtil.unescapeHtml((group['artist'] ?? '').toString());
+      final rawGroupName = FormatUtil.unescapeHtml(
+        (group['name'] ?? '').toString(),
+      );
+      final artist = FormatUtil.unescapeHtml(
+        (group['artist'] ?? '').toString(),
+      );
       final cover = (group['image'] ?? '').toString();
 
       for (final torrent in torrents) {
@@ -334,7 +341,8 @@ class GazelleAdapter extends SiteAdapter {
         items.add(
           TorrentItem(
             id: id,
-            name: '${artist.isNotEmpty ? '$artist - ' : ''}$rawGroupName'
+            name:
+                '${artist.isNotEmpty ? '$artist - ' : ''}$rawGroupName'
                 ' - ${torrent['format'] ?? ''} / ${torrent['encoding'] ?? ''}',
             smallDescr: '',
             discount: _parseDiscountType(
@@ -371,11 +379,11 @@ class GazelleAdapter extends SiteAdapter {
     );
   }
 
-
   @override
   Future<TorrentDetail> fetchTorrentDetail(
     String id, {
     String? description,
+    String? detailUrl,
   }) async {
     // Gazelle 没有专门的详情 API，返回 webviewUrl 供嵌入显示
     final baseUrl = _siteConfig.baseUrl.endsWith('/')

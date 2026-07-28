@@ -515,6 +515,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         widget.torrentItem.id,
         siteConfig: widget.siteConfig, // 传入站点配置
         description: widget.torrentItem.description, // 传入列表可能携带的描述
+        detailUrl: widget.torrentItem.detailUrl,
       );
       if (mounted) {
         setState(() {
@@ -682,7 +683,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         builder: (_) => TorrentDownloadDialog(
           torrentName: widget.torrentItem.name,
           downloadUrl: url,
-          isGazelleSite: widget.siteConfig?.siteType == SiteType.gazelle,
+          isGazelleSite:
+              widget.siteConfig?.siteType.supportsGazelleDownloadToken ?? false,
         ),
       );
 
@@ -719,7 +721,9 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
 
         // 4. 发送到下载器
         String finalUrl = url;
-        if (useToken == true && !finalUrl.contains('usetoken=1')) {
+        if (widget.siteConfig?.siteType.supportsGazelleDownloadToken == true &&
+            useToken == true &&
+            !finalUrl.contains('usetoken=1')) {
           finalUrl += '&usetoken=1';
         }
 

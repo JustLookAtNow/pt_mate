@@ -420,7 +420,7 @@ class CookieCloudService {
   }
 
   static bool _shouldSyncCookie(SiteType siteType) =>
-      siteType == SiteType.nexusphpweb || siteType == SiteType.gazelle;
+      siteType.usesCookieAuthentication;
 
   static bool _hasLocalSiteForTemplate(
     SiteConfigTemplate template,

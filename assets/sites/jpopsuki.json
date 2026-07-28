@@ -1,0 +1,345 @@
+{
+  "id": "jpopsuki",
+  "name": "JPopSuki",
+  "isShow": true,
+  "baseUrls": [
+    "https://jpopsuki.eu/"
+  ],
+  "primaryUrl": "https://jpopsuki.eu/",
+  "siteType": "Web",
+  "operationIntervalMs": 1000,
+  "searchCategories": [
+    {
+      "id": "all",
+      "displayName": "All",
+      "parameters": ""
+    },
+    {
+      "id": "album",
+      "displayName": "Album",
+      "parameters": "{\"filter_cat[1]\": \"1\"}"
+    },
+    {
+      "id": "single",
+      "displayName": "Single",
+      "parameters": "{\"filter_cat[2]\": \"1\"}"
+    },
+    {
+      "id": "pv",
+      "displayName": "PV",
+      "parameters": "{\"filter_cat[3]\": \"1\"}"
+    },
+    {
+      "id": "dvd",
+      "displayName": "DVD",
+      "parameters": "{\"filter_cat[4]\": \"1\"}"
+    },
+    {
+      "id": "tv_music",
+      "displayName": "TV-Music",
+      "parameters": "{\"filter_cat[5]\": \"1\"}"
+    },
+    {
+      "id": "tv_variety",
+      "displayName": "TV-Variety",
+      "parameters": "{\"filter_cat[6]\": \"1\"}"
+    },
+    {
+      "id": "tv_drama",
+      "displayName": "TV-Drama",
+      "parameters": "{\"filter_cat[7]\": \"1\"}"
+    },
+    {
+      "id": "fansubs",
+      "displayName": "Fansubs",
+      "parameters": "{\"filter_cat[8]\": \"1\"}"
+    },
+    {
+      "id": "pictures",
+      "displayName": "Pictures",
+      "parameters": "{\"filter_cat[9]\": \"1\"}"
+    },
+    {
+      "id": "misc",
+      "displayName": "Misc",
+      "parameters": "{\"filter_cat[10]\": \"1\"}"
+    }
+  ],
+  "features": {
+    "userProfile": true,
+    "torrentSearch": true,
+    "torrentBrowse": true,
+    "torrentDetail": true,
+    "download": true,
+    "favorites": false,
+    "downloadHistory": false,
+    "categorySearch": true,
+    "advancedSearch": false,
+    "showCover": true,
+    "commentDetail": false,
+    "nativeDetail": false
+  },
+  "discountMapping": {
+    "Freeleech": "FREE",
+    "Freeleech!": "FREE"
+  },
+  "tagMapping": {},
+  "infoFinder": {
+    "userInfo": {
+      "steps": [
+        {
+          "path": "/index.php",
+          "rows": {
+            "selector": "@@body"
+          },
+          "fields": {
+            "userId": {
+              "selector": "@@a.username[href*='user.php?id=']",
+              "attribute": "href",
+              "required": true,
+              "filter": {
+                "name": "regexp",
+                "args": "[?&]id=(\\d+)",
+                "value": "$1"
+              }
+            },
+            "userName": {
+              "selector": "@@a.username[href*='user.php?id=']",
+              "attribute": "text"
+            }
+          }
+        },
+        {
+          "path": "/user.php?id={userId}",
+          "rows": {
+            "selector": "@@body"
+          },
+          "fields": {
+            "upload": {
+              "selector": "div:contains('Stats'||'統計情報') > next > li:contains('Uploaded'||'アップロード数')",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": "(?:Uploaded|アップロード数)\\s*:?\\s*([\\d.,]+\\s*[KMGTPE]?i?B)",
+                "value": "$1"
+              }
+            },
+            "download": {
+              "selector": "div:contains('Stats'||'統計情報') > next > li:contains('Downloaded'||'ダウンロード')",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": "(?:Downloaded|ダウンロード(?:数)?)\\s*:?\\s*([\\d.,]+\\s*[KMGTPE]?i?B)",
+                "value": "$1"
+              }
+            },
+            "ratio": {
+              "selector": "div:contains('Stats'||'統計情報') > next > li:contains('Ratio'||'共有率')",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": "(?:Ratio|共有率)\\s*:\\s*([\\d.,]+)",
+                "value": "$1"
+              }
+            },
+            "bonus": {
+              "selector": "div:contains('Stats'||'統計情報') > next > li:contains('Bonus Points'||'SeedBonus'||'ボーナスポイント')",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": "(?:Bonus Points|SeedBonus|ボーナスポイント)\\s*:\\s*([\\d.,]+)",
+                "value": "$1"
+              }
+            },
+            "levelName": {
+              "selector": "div:contains('Personal'||'個人情報') > next > li:contains('Class'||'階級')",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": "(?:Class|階級)\\s*:\\s*(.+)$",
+                "value": "$1"
+              }
+            },
+            "seeding": {
+              "selector": "div:contains('Community'||'コミュニティ') > next > li:contains('Seeding'||'シード中')",
+              "attribute": "text",
+              "filter": {
+                "name": "regexp",
+                "args": "(?:Seeding|シード中)\\s*:\\s*([\\d,]+)",
+                "value": "$1"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "search": {
+      "parser": "gazelleGrouped",
+      "rows": {
+        "selector": "@@table.torrent_table tbody > tr"
+      },
+      "groupRows": {
+        "selector": "@@tr.group_redline"
+      },
+      "torrentRows": {
+        "selector": "@@tr.group_torrent_redline, tr.torrent_redline, tr.torrent"
+      },
+      "childColumnOffset": 3,
+      "groupFields": {
+        "title": {
+          "selector": "@@a[href*='torrents.php?id=']",
+          "attribute": "text"
+        },
+        "artist": {
+          "selector": "@@a[href*='artist.php?id=']",
+          "attribute": "text"
+        },
+        "torrentName": {
+          "join": [
+            "title",
+            "artist"
+          ],
+          "separator": " - "
+        },
+        "cover": {
+          "selector": "@@img[style='max-width:64px; max-height:64px']",
+          "attribute": "src"
+        },
+        "category": {
+          "selector": "td:nth-child(2) > a",
+          "attribute": "text"
+        },
+        "comments": {
+          "selector": "@@a[title='View Comments']",
+          "attribute": "text",
+          "filter": {
+            "name": "regexp",
+            "args": "(\\d+)",
+            "value": "$1"
+          }
+        },
+        "discount": {
+          "selector": "strong:contains('Freeleech!')",
+          "attribute": "text"
+        }
+      },
+      "fields": {
+        "torrentId": {
+          "selector": "@@a[href*='torrents.php?action=download&id='][title='Download']",
+          "attribute": "href",
+          "filter": {
+            "name": "regexp",
+            "args": "[?&]id=(\\d+)",
+            "value": "$1"
+          }
+        },
+        "detailUrl": {
+          "selector": "@@a[href*='torrents.php?id=']",
+          "attribute": "href"
+        },
+        "downloadUrl": {
+          "selector": "@@a[href*='torrents.php?action=download'][title='Download']",
+          "attribute": "href"
+        },
+        "discount": {
+          "selector": "strong:contains('Freeleech!')",
+          "attribute": "text"
+        }
+      },
+      "childFields": {
+        "description": {
+          "selector": "td:nth-child(4) > @@a[href*='torrents.php?id=']",
+          "attribute": "text"
+        },
+        "createDate": {
+          "selector": "td:nth-child(6)",
+          "attribute": "title",
+          "time": {
+            "format": "MMM dd yyyy, HH:mm",
+            "zone": "+00:00"
+          }
+        },
+        "sizeText": {
+          "selector": "td:nth-child(7)",
+          "attribute": "text"
+        },
+        "seedersText": {
+          "selector": "td:nth-child(9)",
+          "attribute": "text"
+        },
+        "leechersText": {
+          "selector": "td:nth-child(10)",
+          "attribute": "text"
+        }
+      },
+      "standaloneFields": {
+        "title": {
+          "selector": "td:nth-child(4) > @@a[href*='torrents.php?id=']",
+          "attribute": "text"
+        },
+        "artist": {
+          "selector": "td:nth-child(4) > @@a[href*='artist.php?id=']",
+          "attribute": "text"
+        },
+        "torrentName": {
+          "join": [
+            "title",
+            "artist"
+          ],
+          "separator": " - "
+        },
+        "cover": {
+          "selector": "@@img[style='max-width:64px; max-height:64px']",
+          "attribute": "src"
+        },
+        "createDate": {
+          "selector": "td:nth-child(6)",
+          "attribute": "title",
+          "time": {
+            "format": "MMM dd yyyy, HH:mm",
+            "zone": "+00:00"
+          }
+        },
+        "sizeText": {
+          "selector": "td:nth-child(7)",
+          "attribute": "text"
+        },
+        "seedersText": {
+          "selector": "td:nth-child(9)",
+          "attribute": "text"
+        },
+        "leechersText": {
+          "selector": "td:nth-child(10)",
+          "attribute": "text"
+        }
+      },
+      "totalPages": {
+        "rows": {
+          "selector": "#ajax_torrents > .linkbox > a:last-child"
+        },
+        "fields": {
+          "totalPages": {
+            "attribute": "href",
+            "filter": {
+              "name": "regexp",
+              "args": "[?&]page=(\\d+)",
+              "value": "$1"
+            }
+          }
+        }
+      }
+    }
+  },
+  "request": {
+    "search": {
+      "path": "/torrents.php",
+      "method": "GET",
+      "params": {
+        "searchsubmit": "1",
+        "searchstr": "{keyword}",
+        "page": "{page}"
+      }
+    }
+  },
+  "logo": "assets/sites_icon/jpopsuki.png"
+}

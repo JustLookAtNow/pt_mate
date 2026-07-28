@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>JPopSuki parser fixture</title>
+  </head>
+  <body>
+    <!-- Synthetic, credential-free fixture. Relative links deliberately exercise URL resolution. -->
+    <table class="torrent_table">
+      <tbody>
+        <tr>
+          <th>#</th>
+          <th>Category</th>
+          <th></th>
+          <th>Release</th>
+          <th></th>
+          <th>Time</th>
+          <th>Size</th>
+          <th>Snatched</th>
+          <th>Seeders</th>
+          <th>Leechers</th>
+        </tr>
+        <tr class="group_redline">
+          <td>1</td>
+          <td><a href="/torrents.php?filter_cat=1">Album</a></td>
+          <td></td>
+          <td>
+            <span class="group_image"><img src="/static/covers/example-album.jpg" style="max-width:64px; max-height:64px" alt="Example Album cover"></span>
+            <a href="/artist.php?id=100">Example Artist</a> -
+            <a href="/torrents.php?id=900">Example Album</a>
+            <strong>Freeleech!</strong>
+            <a href="/torrents.php?id=900#comments" title="View Comments">(2)</a>
+          </td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        <tr class="group_torrent_redline">
+          <td>
+            <a href="/torrents.php?id=900&amp;torrentid=901">MP3 / 320 / Log / Cue</a>
+            <a href="/torrents.php?action=download&amp;id=901&amp;token=fixture-download" title="Download">Download</a>
+          </td>
+          <td></td>
+          <td title="Apr 01 2025, 15:12">Apr 01 2025, 15:12</td>
+          <td>1.20 GiB</td>
+          <td>15</td>
+          <td>7</td>
+          <td>2</td>
+        </tr>
+        <tr class="torrent_redline">
+          <td>2</td>
+          <td><a href="/torrents.php?filter_cat=2">Single</a></td>
+          <td></td>
+          <td>
+            <img src="//cdn.jpopsuki.example/covers/independent-single.webp" style="max-width:64px; max-height:64px" alt="Independent Single cover">
+            <a href="/artist.php?id=200">Independent Artist</a> -
+            <a href="/torrents.php?id=300">Independent Single</a>
+            <strong>Freeleech!</strong>
+            <a href="/torrents.php?action=download&amp;id=300&amp;token=fixture-download" title="Download">Download</a>
+          </td>
+          <td></td>
+          <td title="Apr 02 2025, 09:30">Apr 02 2025, 09:30</td>
+          <td>700 MiB</td>
+          <td>8</td>
+          <td>4</td>
+          <td>1</td>
+        </tr>
+      </tbody>
+    </table>
+    <div id="ajax_torrents">
+      <div class="linkbox">
+        <a href="torrents.php?page=1&amp;order_by=s3&amp;order_way=DESC">1</a>
+        <a href="torrents.php?page=6505&amp;order_by=s3&amp;order_way=DESC">6505</a>
+      </div>
+    </div>
+  </body>
+</html>

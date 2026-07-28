@@ -169,6 +169,27 @@
       },
       "tagMapping": {}
     },
+    "Web": {
+      "name": "通用 Web 站点",
+      "baseUrl": "https://",
+      "operationIntervalMs": 500,
+      "searchCategories": [],
+      "features": {
+        "userProfile": false,
+        "torrentSearch": false,
+        "torrentBrowse": false,
+        "torrentDetail": true,
+        "download": false,
+        "favorites": false,
+        "downloadHistory": false,
+        "categorySearch": false,
+        "advancedSearch": false,
+        "showCover": false,
+        "commentDetail": false
+      },
+      "discountMapping": {},
+      "tagMapping": {}
+    },
     "Unit3D": {
       "name": "Unit3D 站点",
       "baseUrl": "https://",

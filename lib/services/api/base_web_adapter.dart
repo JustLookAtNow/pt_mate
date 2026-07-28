@@ -110,7 +110,7 @@ mixin BaseWebAdapterMixin {
 
   // Cached static regexes
   static final RegExp _classAndAttrValueRegExp = RegExp(
-    r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$',
+    r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)([\^=~*])="([^"]+)"\]$',
   );
   static final RegExp _classAndAttrExistsRegExp = RegExp(
     r'^([a-zA-Z0-9_-]*)\.([a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)\]$',
@@ -119,7 +119,7 @@ mixin BaseWebAdapterMixin {
     r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)\]$',
   );
   static final RegExp _attributeValueRegExp = RegExp(
-    r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)([\^=~])="([^"]+)"\]$',
+    r'^([a-zA-Z0-9_-]*)\[([a-zA-Z0-9_-]+)([\^=~*])="([^"]+)"\]$',
   );
   static final RegExp _containsAllRegExp = RegExp(
     r'^([^:]*):contains\((.*)\)$',
@@ -678,6 +678,8 @@ mixin BaseWebAdapterMixin {
     switch (selector.operator) {
       case '^':
         return compareValue.startsWith(value);
+      case '*':
+        return compareValue.contains(value);
       case '=':
         return compareValue == value;
       case '~':

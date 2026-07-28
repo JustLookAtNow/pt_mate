@@ -56,13 +56,15 @@ class RousiAdapter implements SiteAdapter {
     );
 
     if (kDebugMode) {
-      _dio.interceptors.add(LogInterceptor(
-        requestHeader: true,
-        requestBody: true,
-        responseHeader: true,
-        responseBody: true,
-        error: true,
-      ));
+      _dio.interceptors.add(
+        LogInterceptor(
+          requestHeader: true,
+          requestBody: true,
+          responseHeader: true,
+          responseBody: true,
+          error: true,
+        ),
+      );
     }
   }
 
@@ -234,7 +236,10 @@ class RousiAdapter implements SiteAdapter {
       name: name,
       smallDescr: map['subtitle'] as String? ?? '',
       discount: discount,
-      discountEndTime: Formatters.parseDateTimeCustom(discountEndTime, fieldName: 'discountEndTime'),
+      discountEndTime: Formatters.parseDateTimeCustom(
+        discountEndTime,
+        fieldName: 'discountEndTime',
+      ),
       downloadUrl: null, // 列表不返回下载链接，需详情获取
       seeders: (map['seeders'] ?? 0).toInt(),
       leechers: (map['leechers'] ?? 0).toInt(),
@@ -256,6 +261,7 @@ class RousiAdapter implements SiteAdapter {
   Future<TorrentDetail> fetchTorrentDetail(
     String id, {
     String? description,
+    String? detailUrl,
   }) async {
     try {
       if (description != null && description.isNotEmpty) {
@@ -344,7 +350,10 @@ class RousiAdapter implements SiteAdapter {
   TorrentComment _parseComment(Map<String, dynamic> c, String tId) {
     return TorrentComment(
       id: c['id'].toString(),
-      createdDate: Formatters.parseDateTimeCustom(c['created_at']?.toString(), fieldName: 'createdDate'),
+      createdDate: Formatters.parseDateTimeCustom(
+        c['created_at']?.toString(),
+        fieldName: 'createdDate',
+      ),
       lastModifiedDate: Formatters.parseDateTimeCustom(
         c['created_at']?.toString(),
         fieldName: 'lastModifiedDate',
@@ -373,14 +382,14 @@ class RousiAdapter implements SiteAdapter {
         // 判断是否是付费种子且未购买 (极致强壮的兜底判定)
         final rawIsPurchased = data['data']['is_purchased'];
         final rawPrice = data['data']['price'];
-        
+
         bool isPurchased = true;
         if (rawIsPurchased is bool) {
           isPurchased = rawIsPurchased;
         } else if (rawIsPurchased is String) {
           isPurchased = rawIsPurchased.toLowerCase() == 'true';
         }
-        
+
         double price = 0;
         if (rawPrice is num) {
           price = rawPrice.toDouble();
@@ -389,7 +398,7 @@ class RousiAdapter implements SiteAdapter {
         }
 
         // 如果获取到的 download_url 确实为空，且价格大于0或者被明确标识为未购买
-        if ((dUrl == null || dUrl.toString().isEmpty) && 
+        if ((dUrl == null || dUrl.toString().isEmpty) &&
             (price > 0 || isPurchased == false || rawIsPurchased == 'false')) {
           throw SiteApiException(message: 'NEED_PURCHASE', responseData: data);
         }
