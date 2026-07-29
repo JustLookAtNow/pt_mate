@@ -3391,7 +3391,7 @@ class _HomePageState extends State<HomePage> {
                                           ? _showSiteSelectionDialog
                                           : null,
                                       icon: const Icon(Icons.swap_horiz),
-                                      label: const Text('切换站点'),
+                                      label: const Text('切换'),
                                     )
                                   : FloatingActionButton(
                                       heroTag: 'home-site-switch-fab',
