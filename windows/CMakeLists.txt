@@ -32,6 +32,13 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
+# MSVC 14.51 (Visual Studio 2026) rejects the deprecated
+# <experimental/coroutine> header still used by current WinRT plugins.
+# Remove this compatibility definition after those plugins migrate.
+if(MSVC)
+  add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+endif()
+
 # Help CMake's FindJNI module resolve JDK headers when package:jni is built as
 # a Flutter Windows plugin in CI. The plugin calls find_package(JNI) internally.
 if(WIN32 AND DEFINED ENV{JAVA_HOME})
