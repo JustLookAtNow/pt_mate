@@ -10,6 +10,7 @@ import '../services/storage/storage_service.dart';
 import '../services/api/api_service.dart';
 import '../services/settings/display_settings_manager.dart';
 import '../services/aggregate_search_service.dart';
+import '../services/theme/app_tokens.dart';
 import '../services/downloader/downloader_config.dart';
 import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
@@ -28,7 +29,9 @@ import '../utils/screen_utils.dart';
 import '../utils/url_launcher_helper.dart';
 
 class AggregateSearchPage extends StatefulWidget {
-  const AggregateSearchPage({super.key});
+  const AggregateSearchPage({super.key, this.searchService});
+
+  final AggregateSearchService? searchService;
 
   @override
   State<AggregateSearchPage> createState() => _AggregateSearchPageState();
@@ -49,14 +52,14 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   final GlobalKey _listKey = GlobalKey();
 
   final ScrollController _listController = ScrollController();
-  final ScrollController _errorListController = ScrollController();
 
   // String? _overlaySiteName; // Moved to _AggregateSearchScrollbar
   // double _overlayOpacity = 0.0; // Moved to _AggregateSearchScrollbar
   // Timer? _overlayTimer; // Moved to _AggregateSearchScrollbar
   final Map<String, Color> _siteColors = {};
   bool _isFastScrolling = false;
-  bool _showErrorWidget = true;
+  bool _retryingFailedSites = false;
+  int _searchOperationGeneration = 0;
 
   // 头部隐藏动画相关
   double _headerProgress = 1.0; // 1.0=完全显示, 0.0=完全隐藏
@@ -132,13 +135,6 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         });
       }
       _lastScrollOffset = currentOffset;
-
-      // 一旦开始滑动，就隐藏错误提示
-      if (_showErrorWidget && _listController.offset > 0) {
-        setState(() {
-          _showErrorWidget = false;
-        });
-      }
     });
   }
 
@@ -146,7 +142,6 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   void dispose() {
     _searchController.dispose();
     _listController.dispose();
-    _errorListController.dispose();
     // _overlayTimer?.cancel(); // Moved to _AggregateSearchScrollbar
     super.dispose();
   }
@@ -272,13 +267,16 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                                 ),
                                               );
                                             }).toList(),
-                                            onChanged: (value) {
-                                              if (value != null) {
-                                                provider.setSelectedStrategy(
-                                                  value,
-                                                );
-                                              }
-                                            },
+                                            onChanged: _retryingFailedSites
+                                                ? null
+                                                : (value) {
+                                                    if (value != null) {
+                                                      provider
+                                                          .setSelectedStrategy(
+                                                            value,
+                                                          );
+                                                    }
+                                                  },
                                           ),
                                         ),
                                       ),
@@ -294,6 +292,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                               : null,
                                         ),
                                         tooltip: '排序',
+                                        enabled:
+                                            !provider.searching &&
+                                            !_retryingFailedSites,
                                         onSelected: (value) {
                                           // 与 app.dart 的行为保持一致：
                                           // 选择相同的排序类型时切换升降序；选择新的类型时默认降序
@@ -540,6 +541,22 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       4.0,
                                     ),
                                   ),
+                                  if (provider.searchErrors.isNotEmpty) ...[
+                                    const SizedBox(height: AppSpacing.xs),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.sm,
+                                      ),
+                                      child: _AggregateSearchErrorBanner(
+                                        errorCount:
+                                            provider.searchErrors.length,
+                                        retrying: _retryingFailedSites,
+                                        onTap: _retryingFailedSites
+                                            ? null
+                                            : _showSearchErrorsSheet,
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -619,121 +636,6 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                         const SizedBox(height: 16),
                       ],
 
-                      // 搜索结果
-                      if (provider.searchErrors.isNotEmpty &&
-                          _showErrorWidget) ...[
-                        FutureBuilder<List<SiteConfig>>(
-                          future: Provider.of<StorageService>(
-                            context,
-                            listen: false,
-                          ).loadSiteConfigs(),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return const SizedBox(); // or a loading indicator
-                            }
-                            if (snapshot.hasError) {
-                              return const SizedBox(); // or an error message
-                            }
-                            final sites = snapshot.data ?? [];
-                            return Card(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.errorContainer,
-                              child: ExpansionTile(
-                                visualDensity: VisualDensity.compact,
-                                title: Text(
-                                  '部分站点搜索失败',
-                                  style: Theme.of(context).textTheme.titleSmall
-                                      ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onErrorContainer,
-                                      ),
-                                ),
-                                iconColor: Theme.of(
-                                  context,
-                                ).colorScheme.onErrorContainer,
-                                collapsedIconColor: Theme.of(
-                                  context,
-                                ).colorScheme.onErrorContainer,
-                                tilePadding: const EdgeInsets.symmetric(
-                                  horizontal: 16.0,
-                                  vertical: 0,
-                                ),
-                                childrenPadding: const EdgeInsets.fromLTRB(
-                                  4.0,
-                                  0,
-                                  8.0,
-                                  8.0,
-                                ),
-                                children: [
-                                  Container(
-                                    constraints: const BoxConstraints(
-                                      maxHeight: 240,
-                                    ),
-                                    child: Scrollbar(
-                                      thumbVisibility: true,
-                                      controller: _errorListController,
-                                      child: ListView.separated(
-                                        controller: _errorListController,
-                                        shrinkWrap: true,
-                                        padding: EdgeInsets.zero,
-                                        itemCount: provider.searchErrors.length,
-                                        separatorBuilder: (context, index) =>
-                                            Divider(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onErrorContainer
-                                                  .withValues(alpha: 0.2),
-                                              height: 1,
-                                            ),
-                                        itemBuilder: (context, index) {
-                                          final entry = provider
-                                              .searchErrors
-                                              .entries
-                                              .elementAt(index);
-                                          final siteName = sites
-                                              .firstWhere(
-                                                (site) => site.id == entry.key,
-                                                orElse: () => SiteConfig(
-                                                  id: '',
-                                                  name: '未知站点',
-                                                  baseUrl: '',
-                                                ),
-                                              )
-                                              .name;
-                                          return Padding(
-                                            padding: const EdgeInsets.fromLTRB(
-                                              8.0,
-                                              0,
-                                              8.0,
-                                              8.0,
-                                            ),
-                                            child: Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: Text(
-                                                '$siteName: ${entry.value}',
-                                                textAlign: TextAlign.left,
-                                                style: TextStyle(
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .onErrorContainer,
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                      ],
                       if (_batchProgress != null) _buildBatchProgressCard(),
                       Expanded(
                         child:
@@ -1029,14 +931,18 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                         ? FloatingActionButton.extended(
                             key: const ValueKey('aggregate-search-fab'),
                             heroTag: 'aggregate-search-fab',
-                            onPressed: _showSearchDialog,
+                            onPressed: _retryingFailedSites
+                                ? null
+                                : _showSearchDialog,
                             icon: const Icon(Icons.search),
                             label: const Text('搜索'),
                           )
                         : FloatingActionButton(
                             key: const ValueKey('aggregate-search-fab'),
                             heroTag: 'aggregate-search-fab',
-                            onPressed: _showSearchDialog,
+                            onPressed: _retryingFailedSites
+                                ? null
+                                : _showSearchDialog,
                             tooltip: '搜索',
                             child: const Icon(Icons.search),
                           );
@@ -1132,8 +1038,116 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     _performSearch(result.keyword);
   }
 
+  Future<void> _showSearchErrorsSheet() async {
+    if (_retryingFailedSites) return;
+
+    final provider = Provider.of<AggregateSearchProvider>(
+      context,
+      listen: false,
+    );
+    final errors = Map<String, String>.from(provider.searchErrors);
+    if (errors.isEmpty) return;
+
+    final siteConfigs = Provider.of<StorageService>(
+      context,
+      listen: false,
+    ).loadSiteConfigs();
+
+    final shouldRetry = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      constraints: const BoxConstraints(maxWidth: 560),
+      builder: (sheetContext) =>
+          _AggregateSearchErrorSheet(errors: errors, siteConfigs: siteConfigs),
+    );
+
+    if (shouldRetry == true && mounted) {
+      await _retryFailedSites(errors.keys.toSet());
+    }
+  }
+
+  Future<void> _retryFailedSites(Set<String> siteIds) async {
+    if (_retryingFailedSites || siteIds.isEmpty) return;
+
+    final provider = Provider.of<AggregateSearchProvider>(
+      context,
+      listen: false,
+    );
+    final operationGeneration = ++_searchOperationGeneration;
+    final sortBy = provider.sortBy;
+    final sortAscending = provider.sortAscending;
+    final streamResults = sortBy == 'none';
+    setState(() {
+      _retryingFailedSites = true;
+    });
+
+    try {
+      final result =
+          await (widget.searchService ?? AggregateSearchService.instance)
+              .performAggregateSearch(
+                keyword: provider.searchKeyword.trim(),
+                configId: provider.selectedStrategy,
+                maxResultsPerSite: 50,
+                targetSiteIds: siteIds,
+                onProgress: (_) {},
+                onSiteResults: streamResults
+                    ? (items) {
+                        if (!mounted ||
+                            operationGeneration != _searchOperationGeneration) {
+                          return;
+                        }
+                        provider.mergeSearchResults(items);
+                      }
+                    : null,
+              );
+      if (!mounted || operationGeneration != _searchOperationGeneration) {
+        return;
+      }
+
+      provider.mergeRetriedSearchResult(
+        retriedSiteIds: siteIds,
+        items: result.items,
+        errors: result.errors,
+      );
+      provider.setSearchResults(
+        _applySorting(provider.searchResults, sortBy, sortAscending),
+      );
+
+      final recoveredCount = siteIds.length - result.errors.length;
+      final message = result.errors.isEmpty
+          ? '已恢复 ${siteIds.length} 个站点'
+          : '重试完成：$recoveredCount 个站点恢复，${result.errors.length} 个仍未响应';
+      NotificationHelper.showInfo(context, message);
+    } catch (e) {
+      if (mounted && operationGeneration == _searchOperationGeneration) {
+        NotificationHelper.showError(context, '重试失败站点失败：$e');
+      }
+    } finally {
+      if (mounted && operationGeneration == _searchOperationGeneration) {
+        setState(() {
+          _retryingFailedSites = false;
+        });
+      }
+    }
+  }
+
+  static String _shortErrorReason(String error) {
+    final normalized = error
+        .replaceFirst(RegExp(r'^(Exception|Error):\s*'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (normalized.contains('超时') ||
+        normalized.toLowerCase().contains('timeout')) {
+      return '连接超时';
+    }
+    return normalized.isEmpty ? '搜索失败' : normalized;
+  }
+
   void _performSearch(String query) async {
     // 允许空关键字搜索，用于获取站点最新种子
+    if (_retryingFailedSites) return;
 
     final provider = Provider.of<AggregateSearchProvider>(
       context,
@@ -1146,34 +1160,50 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       return;
     }
 
+    if (provider.searching) {
+      provider.cancelSearch();
+    }
+    final operationGeneration = ++_searchOperationGeneration;
+    final sortBy = provider.sortBy;
+    final sortAscending = provider.sortAscending;
+    final streamResults = sortBy == 'none';
+
     provider.createCancelToken();
     provider.setSearching(true);
     provider.setSearchResults([]);
     provider.setSearchErrors({});
     provider.setSearchProgress(null);
-    setState(() {
-      _showErrorWidget = true;
-    });
 
     try {
-      final result = await AggregateSearchService.instance
-          .performAggregateSearch(
-            keyword: query.trim().isEmpty ? '' : query.trim(),
-            configId: provider.selectedStrategy,
-            maxResultsPerSite: 50,
-            onProgress: (progress) {
-              if (mounted) {
-                provider.setSearchProgress(progress);
-              }
-            },
-            cancelToken: provider.cancelToken,
-          );
+      final result =
+          await (widget.searchService ?? AggregateSearchService.instance)
+              .performAggregateSearch(
+                keyword: query.trim().isEmpty ? '' : query.trim(),
+                configId: provider.selectedStrategy,
+                maxResultsPerSite: 50,
+                onProgress: (progress) {
+                  if (mounted &&
+                      operationGeneration == _searchOperationGeneration) {
+                    provider.setSearchProgress(progress);
+                  }
+                },
+                cancelToken: provider.cancelToken,
+                onSiteResults: streamResults
+                    ? (items) {
+                        if (!mounted ||
+                            operationGeneration != _searchOperationGeneration) {
+                          return;
+                        }
+                        provider.mergeSearchResults(items);
+                      }
+                    : null,
+              );
 
-      if (mounted) {
+      if (mounted && operationGeneration == _searchOperationGeneration) {
         final sortedResults = _applySorting(
           result.items,
-          provider.sortBy,
-          provider.sortAscending,
+          sortBy,
+          sortAscending,
         );
         provider.setSearchResults(sortedResults);
         provider.setSearchErrors(result.errors);
@@ -1187,7 +1217,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         NotificationHelper.showInfo(context, message);
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && operationGeneration == _searchOperationGeneration) {
         provider.setSearching(false);
         provider.setSearchProgress(null);
         NotificationHelper.showError(context, '搜索失败：$e');
@@ -2056,6 +2086,260 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     setState(() {
       _isFastScrolling = v;
     });
+  }
+}
+
+class _AggregateSearchErrorBanner extends StatelessWidget {
+  const _AggregateSearchErrorBanner({
+    required this.errorCount,
+    required this.retrying,
+    required this.onTap,
+  });
+
+  final int errorCount;
+  final bool retrying;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = colorScheme.brightness == Brightness.dark;
+    final accent = isDark ? const Color(0xFFFFC46B) : const Color(0xFF9A5A00);
+    final background = Color.alphaBlend(
+      accent.withValues(alpha: isDark ? 0.12 : 0.08),
+      colorScheme.surfaceContainerLow,
+    );
+
+    return Material(
+      key: const ValueKey('aggregate-search-error-banner'),
+      color: background,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        side: BorderSide(color: accent.withValues(alpha: 0.28)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 64),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 24, color: accent),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        retrying
+                            ? '正在重试 $errorCount 个站点'
+                            : '$errorCount 个站点未响应',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        retrying ? '已保留当前搜索结果' : '其他站点结果已正常显示',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                if (retrying)
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: accent,
+                    ),
+                  )
+                else ...[
+                  Text(
+                    '查看',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(Icons.chevron_right_rounded, size: 20, color: accent),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AggregateSearchErrorEntry {
+  const _AggregateSearchErrorEntry({
+    required this.siteId,
+    required this.siteName,
+    required this.reason,
+  });
+
+  final String siteId;
+  final String siteName;
+  final String reason;
+}
+
+class _AggregateSearchErrorSheet extends StatelessWidget {
+  const _AggregateSearchErrorSheet({
+    required this.errors,
+    required this.siteConfigs,
+  });
+
+  final Map<String, String> errors;
+  final Future<List<SiteConfig>> siteConfigs;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    // showDragHandle 会额外占用高度，内容区使用 52% 后整体约为屏幕的 58%。
+    final sheetHeight = MediaQuery.sizeOf(context).height * 0.52;
+
+    return SizedBox(
+      key: const ValueKey('aggregate-search-error-sheet'),
+      height: sheetHeight,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          0,
+          AppSpacing.lg,
+          AppSpacing.md,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '未响应的站点',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              '请求超时，不影响其他搜索结果',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Expanded(
+              child: FutureBuilder<List<SiteConfig>>(
+                future: siteConfigs,
+                builder: (context, snapshot) {
+                  final siteNames = {
+                    for (final site in snapshot.data ?? const <SiteConfig>[])
+                      site.id: site.name,
+                  };
+                  final entries = errors.entries
+                      .map(
+                        (entry) => _AggregateSearchErrorEntry(
+                          siteId: entry.key,
+                          siteName: siteNames[entry.key] ?? entry.key,
+                          reason: _AggregateSearchPageState._shortErrorReason(
+                            entry.value,
+                          ),
+                        ),
+                      )
+                      .toList();
+
+                  return ListView.separated(
+                    padding: EdgeInsets.zero,
+                    itemCount: entries.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final entry = entries[index];
+                      return SizedBox(
+                        key: ValueKey('aggregate-search-error-${entry.siteId}'),
+                        height: 48,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.sm,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.public_rounded,
+                                size: 18,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Text(
+                                entry.siteName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Flexible(
+                              child: Text(
+                                entry.reason,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.end,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton(
+                key: const ValueKey('aggregate-search-retry-button'),
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text('重试 ${errors.length} 个站点'),
+              ),
+            ),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('暂不处理'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

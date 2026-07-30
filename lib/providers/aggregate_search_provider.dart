@@ -110,6 +110,41 @@ class AggregateSearchProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 增量合并已完成站点的搜索结果。
+  void mergeSearchResults(List<AggregateSearchResultItem> items) {
+    if (items.isEmpty) return;
+    _searchResults = _mergeSearchResultItems(items);
+    notifyListeners();
+  }
+
+  /// 合并失败站点的重试结果，保留原有成功结果。
+  void mergeRetriedSearchResult({
+    required Set<String> retriedSiteIds,
+    required List<AggregateSearchResultItem> items,
+    required Map<String, String> errors,
+  }) {
+    final mergedErrors = Map<String, String>.from(_searchErrors)
+      ..removeWhere((siteId, _) => retriedSiteIds.contains(siteId))
+      ..addAll(errors);
+
+    _searchResults = _mergeSearchResultItems(items);
+    _searchErrors = mergedErrors;
+    notifyListeners();
+  }
+
+  List<AggregateSearchResultItem> _mergeSearchResultItems(
+    List<AggregateSearchResultItem> items,
+  ) {
+    final mergedItems = <String, AggregateSearchResultItem>{};
+    for (final item in _searchResults) {
+      mergedItems['${item.siteId}:${item.torrent.id}'] = item;
+    }
+    for (final item in items) {
+      mergedItems['${item.siteId}:${item.torrent.id}'] = item;
+    }
+    return mergedItems.values.toList();
+  }
+
   void setSearchProgress(AggregateSearchProgress? progress) {
     _searchProgress = progress;
     notifyListeners();

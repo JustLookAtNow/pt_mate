@@ -34,6 +34,9 @@ class AggregateSearchResult {
   });
 }
 
+typedef AggregateSearchSiteResultsCallback =
+    void Function(List<AggregateSearchResultItem> items);
+
 /// 聚合搜索进度
 class AggregateSearchProgress {
   final int totalSites;
@@ -75,6 +78,8 @@ class AggregateSearchService {
     required Function(AggregateSearchProgress) onProgress,
     int maxResultsPerSite = 30,
     AggregateSearchCancelToken? cancelToken,
+    Set<String>? targetSiteIds,
+    AggregateSearchSiteResultsCallback? onSiteResults,
   }) async {
     // 加载搜索配置
     final settings = await StorageService.instance
@@ -92,7 +97,12 @@ class AggregateSearchService {
     final allSiteIds = activeSites.map((site) => site.id).toList();
 
     // 获取启用的站点对象列表
-    final enabledSiteItems = config.getEnabledSites(allSiteIds);
+    final enabledSiteItems = config
+        .getEnabledSites(allSiteIds)
+        .where(
+          (site) => targetSiteIds == null || targetSiteIds.contains(site.id),
+        )
+        .toList();
 
     // 根据站点对象列表获取实际的站点配置
     List<SiteConfig> targetSites = [];
@@ -181,6 +191,17 @@ class AggregateSearchService {
             )
             .toList();
         results.addAll(siteResults);
+        if (siteResults.isNotEmpty && onSiteResults != null) {
+          try {
+            onSiteResults(List.unmodifiable(siteResults));
+          } catch (error, stackTrace) {
+            Logger().e(
+              '发布站点 ${site.name} 增量搜索结果失败',
+              error: error,
+              stackTrace: stackTrace,
+            );
+          }
+        }
       } else {
         errors[site.id] = result.error ?? '搜索失败';
       }
