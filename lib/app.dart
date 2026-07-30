@@ -33,6 +33,7 @@ import 'services/local_download_service.dart';
 import 'pages/server_settings_page.dart';
 import 'widgets/qb_speed_indicator.dart';
 import 'widgets/batch_progress_card.dart';
+import 'widgets/category_filter_dialog.dart';
 import 'widgets/responsive_layout.dart';
 import 'widgets/torrent_download_dialog.dart';
 import 'widgets/torrent_list_item.dart';
@@ -395,137 +396,6 @@ class AppState extends ChangeNotifier {
   void dispose() {
     _isDisposed = true;
     super.dispose();
-  }
-}
-
-class _CategoryFilterDialog extends StatefulWidget {
-  final List<SearchCategoryConfig> categories;
-  final int selectedCategoryIndex;
-  final String keyword;
-
-  const _CategoryFilterDialog({
-    required this.categories,
-    required this.selectedCategoryIndex,
-    required this.keyword,
-  });
-
-  @override
-  State<_CategoryFilterDialog> createState() => _CategoryFilterDialogState();
-}
-
-class _CategoryFilterDialogState extends State<_CategoryFilterDialog> {
-  late int _selectedCategoryIndex;
-  late TextEditingController _keywordController;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedCategoryIndex = widget.selectedCategoryIndex;
-    _keywordController = TextEditingController(text: widget.keyword);
-  }
-
-  @override
-  void dispose() {
-    _keywordController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final availableHeight =
-        MediaQuery.sizeOf(context).height -
-        MediaQuery.viewInsetsOf(context).bottom;
-    final categoryListHeight = (availableHeight * 0.32).clamp(96.0, 200.0);
-
-    return AlertDialog(
-      scrollable: true,
-      title: const Text('分类筛选'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 搜索框
-            Text('搜索关键词', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            TextField(
-              key: const ValueKey('search-keyword-field'),
-              controller: _keywordController,
-              autofocus: true,
-              onTapOutside: (event) => FocusScope.of(context).unfocus(),
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: '输入关键词（可选）',
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 分类选择
-            Text('选择分类', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            if (widget.categories.isEmpty)
-              const Text('暂无可用分类', style: TextStyle(color: Colors.grey))
-            else
-              SizedBox(
-                height: categoryListHeight,
-                child: RadioGroup<int>(
-                  groupValue: _selectedCategoryIndex,
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _selectedCategoryIndex = value;
-                      });
-                    }
-                  },
-                  child: ListView.builder(
-                    itemCount: widget.categories.length,
-                    itemBuilder: (context, index) {
-                      final category = widget.categories[index];
-                      final isSelected = index == _selectedCategoryIndex;
-                      return ListTile(
-                        title: Text(category.displayName),
-                        leading: Radio<int>(value: index),
-                        selected: isSelected,
-                        selectedTileColor: Theme.of(
-                          context,
-                        ).colorScheme.primaryContainer.withValues(alpha: 0.3),
-                        onTap: () {
-                          setState(() {
-                            _selectedCategoryIndex = index;
-                          });
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          style: TextButton.styleFrom(
-            side: BorderSide(
-              color: Theme.of(context).colorScheme.outline,
-              width: 1.0,
-            ),
-          ),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          onPressed: () {
-            Navigator.of(context).pop({
-              'categoryIndex': _selectedCategoryIndex,
-              'keyword': _keywordController.text,
-            });
-          },
-          child: const Text('确定'),
-        ),
-      ],
-    );
   }
 }
 
@@ -2583,7 +2453,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _showCategoryFilterDialog() async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => _CategoryFilterDialog(
+      builder: (context) => CategoryFilterDialog(
         categories: _categories,
         selectedCategoryIndex: _selectedCategoryIndex,
         keyword: _keywordCtrl.text,
