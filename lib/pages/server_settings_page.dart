@@ -27,6 +27,8 @@ const bool _skipSiteConnectionValidationForSecureStorageTest =
       'SKIP_SITE_CONNECTION_VALIDATION_FOR_SECURE_STORAGE_TEST',
     );
 
+const double _siteListBottomPadding = 160;
+
 class ServerSettingsPage extends StatefulWidget {
   const ServerSettingsPage({super.key});
 
@@ -766,7 +768,12 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
                 Expanded(
                   child: ListView.builder(
                     controller: _siteListScrollController,
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      _siteListBottomPadding,
+                    ),
                     itemCount: _filteredSites.length,
                     itemBuilder: (context, index) {
                       final site = _filteredSites[index];
