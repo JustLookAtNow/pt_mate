@@ -23,6 +23,7 @@ import '../widgets/qb_speed_indicator.dart';
 import '../widgets/torrent_list_item.dart';
 import '../widgets/torrent_download_dialog.dart';
 import '../widgets/tag_filter_bar.dart';
+import '../widgets/aggregate_search_strategy_list.dart';
 import 'torrent_detail_page.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
 import '../utils/screen_utils.dart';
@@ -215,69 +216,12 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       // 搜索策略选择
                                       Expanded(
                                         flex: 1,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 0,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.surfaceContainer,
-                                            borderRadius: BorderRadius.circular(
-                                              25,
-                                            ),
-                                          ),
-                                          child: DropdownButton<String>(
-                                            value:
-                                                provider
-                                                    .selectedStrategy
-                                                    .isEmpty
-                                                ? null
-                                                : provider.selectedStrategy,
-                                            hint: const Text('选择搜索策略'),
-                                            isExpanded: true,
-                                            underline: const SizedBox(),
-                                            icon: const SizedBox.shrink(),
-                                            items: provider.searchConfigs.map((
-                                              config,
-                                            ) {
-                                              return DropdownMenuItem<String>(
-                                                value: config.id,
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      config.isAllSitesType
-                                                          ? Icons.public
-                                                          : Icons.group,
-                                                      size: 16,
-                                                      color: Theme.of(
-                                                        context,
-                                                      ).colorScheme.primary,
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Expanded(
-                                                      child: Text(
-                                                        config.name,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              );
-                                            }).toList(),
-                                            onChanged: _retryingFailedSites
-                                                ? null
-                                                : (value) {
-                                                    if (value != null) {
-                                                      provider
-                                                          .setSelectedStrategy(
-                                                            value,
-                                                          );
-                                                    }
-                                                  },
-                                          ),
+                                        child: _StrategySelectorButton(
+                                          configs: provider.searchConfigs,
+                                          selectedStrategy:
+                                              provider.selectedStrategy,
+                                          enabled: !_retryingFailedSites,
+                                          onTap: _showSearchDialog,
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -2089,6 +2033,78 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   }
 }
 
+class _StrategySelectorButton extends StatelessWidget {
+  const _StrategySelectorButton({
+    required this.configs,
+    required this.selectedStrategy,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final List<AggregateSearchConfig> configs;
+  final String selectedStrategy;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final selectedConfig = configs
+        .where((config) => config.id == selectedStrategy)
+        .firstOrNull;
+    final canOpen = enabled && configs.isNotEmpty;
+    final foregroundColor = canOpen
+        ? colorScheme.onSurface
+        : colorScheme.onSurface.withValues(alpha: 0.38);
+
+    return Material(
+      color: colorScheme.surfaceContainer,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: const ValueKey('aggregate-search-strategy-selector'),
+        onTap: canOpen ? onTap : null,
+        child: SizedBox(
+          height: 48,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: Row(
+              children: [
+                Icon(
+                  selectedConfig?.isAllSitesType == true
+                      ? Icons.public
+                      : Icons.group,
+                  size: 18,
+                  color: canOpen
+                      ? colorScheme.primary
+                      : colorScheme.onSurface.withValues(alpha: 0.38),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    selectedConfig?.name ?? '选择搜索策略',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge?.copyWith(color: foregroundColor),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 20,
+                  color: foregroundColor,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _AggregateSearchErrorBanner extends StatelessWidget {
   const _AggregateSearchErrorBanner({
     required this.errorCount,
@@ -2401,8 +2417,15 @@ class _AggregateSearchDialogState extends State<_AggregateSearchDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final dialogWidth = ScreenUtils.isLargeScreen(context)
+        ? math.min(screenWidth * 0.5, 440.0)
+        : screenWidth * 0.8;
+
     return AlertDialog(
+      key: const ValueKey('aggregate-search-dialog'),
       scrollable: true,
+      constraints: BoxConstraints(minWidth: dialogWidth, maxWidth: dialogWidth),
       title: const Text('聚合搜索'),
       content: SizedBox(
         width: double.maxFinite,
@@ -2410,29 +2433,6 @@ class _AggregateSearchDialogState extends State<_AggregateSearchDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('搜索策略', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              key: const ValueKey('aggregate-search-strategy-field'),
-              initialValue: _selectedStrategy,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              items: widget.configs
-                  .map(
-                    (config) => DropdownMenuItem<String>(
-                      value: config.id,
-                      child: Text(config.name, overflow: TextOverflow.ellipsis),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() {
-                _selectedStrategy = value;
-              }),
-            ),
-            const SizedBox(height: 16),
             Text('搜索关键词', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             TextField(
@@ -2446,6 +2446,20 @@ class _AggregateSearchDialogState extends State<_AggregateSearchDialog> {
                 isDense: true,
               ),
               onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: 16),
+            Text('搜索策略', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            AggregateSearchStrategyList(
+              configs: widget.configs,
+              selectedStrategy: _selectedStrategy,
+              maximumHeight: 200,
+              availableHeightFactor: 0.32,
+              onChanged: (value) {
+                setState(() {
+                  _selectedStrategy = value;
+                });
+              },
             ),
           ],
         ),

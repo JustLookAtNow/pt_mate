@@ -19,6 +19,7 @@ void main() {
     final settings = AggregateSearchSettings(
       searchConfigs: const [
         AggregateSearchConfig(id: 'test-strategy', name: '测试策略'),
+        AggregateSearchConfig(id: 'backup-strategy', name: '备用策略'),
       ],
     );
     SharedPreferences.setMockInitialValues({
@@ -52,7 +53,58 @@ void main() {
     StorageService.instance.resetForTest();
   });
 
-  testWidgets('search FAB opens the strategy and keyword dialog', (
+  testWidgets('top strategy selector and FAB open the same search dialog', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(393, 852);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final provider = AggregateSearchProvider();
+    final searchService = _FakeAggregateSearchService();
+    await _pumpSearchPage(tester, provider, searchService);
+
+    expect(provider.selectedStrategy, 'test-strategy');
+    expect(find.byType(DropdownButton<String>), findsNothing);
+
+    await tester.tap(
+      find.byKey(const ValueKey('aggregate-search-strategy-selector')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('aggregate-search-dialog')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('search-keyword-field')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('aggregate-search-strategy-list')),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(TextButton, '取消'));
+    await tester.pumpAndSettle();
+    expect(provider.selectedStrategy, 'test-strategy');
+    expect(searchService.invocations, isEmpty);
+
+    await tester.tap(find.byKey(const ValueKey('aggregate-search-fab')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('aggregate-search-dialog')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('search-keyword-field')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('aggregate-search-strategy-list')),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(TextButton, '取消'));
+    await tester.pumpAndSettle();
+    expect(searchService.invocations, isEmpty);
+  });
+
+  testWidgets('search dialog puts keyword above temporary strategy selection', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(360, 800);
@@ -60,19 +112,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(create: (_) => AggregateSearchProvider()),
-          ChangeNotifierProvider(
-            create: (_) => DisplaySettingsManager(StorageService.instance),
-          ),
-          Provider<StorageService>.value(value: StorageService.instance),
-        ],
-        child: const MaterialApp(home: AggregateSearchPage()),
-      ),
-    );
-    await tester.pumpAndSettle();
+    final provider = AggregateSearchProvider();
+    final searchService = _FakeAggregateSearchService();
+    await _pumpSearchPage(tester, provider, searchService);
 
     expect(find.text('测试策略'), findsOneWidget);
     expect(find.byKey(const ValueKey('aggregate-search-fab')), findsOneWidget);
@@ -81,13 +123,81 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('aggregate-search-fab')));
     await tester.pumpAndSettle();
 
+    expect(find.byType(DropdownButton<String>), findsNothing);
     expect(
-      find.byKey(const ValueKey('aggregate-search-strategy-field')),
+      find.byKey(const ValueKey('aggregate-search-strategy-list')),
       findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('aggregate-search-strategy-dialog')),
+      findsNothing,
     );
     expect(find.byKey(const ValueKey('search-keyword-field')), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '搜索'), findsOneWidget);
+    expect(
+      tester
+          .getBottomLeft(find.byKey(const ValueKey('search-keyword-field')))
+          .dy,
+      lessThan(tester.getTopLeft(find.text('搜索策略')).dy),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('aggregate-search-strategy-backup-strategy')),
+    );
+    await tester.pump();
+
+    expect(provider.selectedStrategy, 'test-strategy');
+    expect(
+      tester
+          .widget<ListTile>(
+            find.byKey(
+              const ValueKey('aggregate-search-strategy-backup-strategy'),
+            ),
+          )
+          .selected,
+      isTrue,
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, '搜索'));
+    await tester.pump();
+
+    expect(provider.selectedStrategy, 'backup-strategy');
+    expect(searchService.invocations.single.configId, 'backup-strategy');
+
+    searchService.invocations.single.complete(items: const []);
+    await _finishSearchNotifications(tester);
   });
+
+  testWidgets(
+    'search dialog uses 80% mobile width and capped 50% large width',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final provider = AggregateSearchProvider();
+      final searchService = _FakeAggregateSearchService();
+      await _pumpSearchPage(tester, provider, searchService);
+      await tester.tap(find.byKey(const ValueKey('aggregate-search-fab')));
+      await tester.pumpAndSettle();
+
+      var dialog = tester.widget<AlertDialog>(find.byType(AlertDialog));
+      expect(dialog.constraints?.minWidth, 288);
+      expect(dialog.constraints?.maxWidth, 288);
+
+      await tester.tap(find.widgetWithText(TextButton, '取消'));
+      await tester.pumpAndSettle();
+      tester.view.physicalSize = const Size(800, 900);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('aggregate-search-fab')));
+      await tester.pumpAndSettle();
+
+      dialog = tester.widget<AlertDialog>(find.byType(AlertDialog));
+      expect(dialog.constraints?.minWidth, 400);
+      expect(dialog.constraints?.maxWidth, 400);
+    },
+  );
 
   testWidgets('partial failures use a compact banner and bottom sheet', (
     tester,
@@ -367,6 +477,7 @@ class _FakeAggregateSearchService implements AggregateSearchService {
     AggregateSearchSiteResultsCallback? onSiteResults,
   }) {
     final invocation = _SearchInvocation(
+      configId: configId,
       onSiteResults: onSiteResults,
       cancelToken: cancelToken,
     );
@@ -377,8 +488,13 @@ class _FakeAggregateSearchService implements AggregateSearchService {
 }
 
 class _SearchInvocation {
-  _SearchInvocation({required this.onSiteResults, required this.cancelToken});
+  _SearchInvocation({
+    required this.configId,
+    required this.onSiteResults,
+    required this.cancelToken,
+  });
 
+  final String configId;
   final AggregateSearchSiteResultsCallback? onSiteResults;
   final AggregateSearchCancelToken? cancelToken;
   final Completer<AggregateSearchResult> completer =
