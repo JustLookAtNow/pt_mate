@@ -50,9 +50,7 @@ void main() {
     });
 
     test('should handle empty value as hasValue false', () {
-      final config = FieldConfig.fromJson({
-        'value': '',
-      });
+      final config = FieldConfig.fromJson({'value': ''});
 
       expect(config.value, '');
       expect(config.hasValue, false);
@@ -75,9 +73,7 @@ void main() {
     });
 
     test('should not include null value in toJson', () {
-      final config = FieldConfig(
-        selector: 'td.name',
-      );
+      final config = FieldConfig(selector: 'td.name');
 
       final json = config.toJson();
       expect(json.containsKey('value'), false);
@@ -254,17 +250,11 @@ void main() {
 
     group('parseDiscount', () {
       test('should return normal for null', () {
-        expect(
-          TypedConverter.parseDiscount(null, {}),
-          DiscountType.normal,
-        );
+        expect(TypedConverter.parseDiscount(null, {}), DiscountType.normal);
       });
 
       test('should return normal for empty mapping', () {
-        expect(
-          TypedConverter.parseDiscount('FREE', {}),
-          DiscountType.normal,
-        );
+        expect(TypedConverter.parseDiscount('FREE', {}), DiscountType.normal);
       });
 
       test('should parse mapped discount', () {
@@ -298,10 +288,7 @@ void main() {
       test('should parse mapped tag', () {
         final mapping = {'cn': 'chinese', 'official_tag': 'official'};
 
-        expect(
-          TypedConverter.parseTagType('cn', mapping),
-          TagType.chinese,
-        );
+        expect(TypedConverter.parseTagType('cn', mapping), TagType.chinese);
         expect(
           TypedConverter.parseTagType('official_tag', mapping),
           TagType.official,
@@ -344,6 +331,42 @@ void main() {
         expect(tags.contains(TagType.resolution1080), true);
       });
 
+      test('should match bracketed VR variants', () {
+        final tags = TypedConverter.parseTags('Movie ［vR］ [VR]', '', [], {});
+
+        expect(tags.contains(TagType.vr), true);
+        expect(tags.where((tag) => tag == TagType.vr), hasLength(1));
+      });
+
+      test('should not match unbracketed VR', () {
+        final tags = TypedConverter.parseTags(
+          'Movie vr VirtualReality',
+          '',
+          [],
+          {},
+        );
+
+        expect(tags.contains(TagType.vr), false);
+      });
+
+      test('should match 8K as a standalone term', () {
+        final tags = TypedConverter.parseTags(
+          'Movie 8k [8K] 8K-UHD',
+          '',
+          [],
+          {},
+        );
+
+        expect(tags.contains(TagType.eightK), true);
+        expect(tags.where((tag) => tag == TagType.eightK), hasLength(1));
+      });
+
+      test('should not match 8K inside another word', () {
+        final tags = TypedConverter.parseTags('Movie 18K 8K2', '', [], {});
+
+        expect(tags.contains(TagType.eightK), false);
+      });
+
       test('should include mapped tags', () {
         final tags = TypedConverter.parseTags(
           'Movie',
@@ -376,7 +399,10 @@ void main() {
 
       test('should return absolute URL as-is', () {
         expect(
-          TypedConverter.resolveUrl('https://cdn.example.com/img.jpg', 'https://example.com'),
+          TypedConverter.resolveUrl(
+            'https://cdn.example.com/img.jpg',
+            'https://example.com',
+          ),
           'https://cdn.example.com/img.jpg',
         );
       });
@@ -412,7 +438,10 @@ void main() {
           'https://pt.example.com',
         );
 
-        expect(url, 'https://pt.example.com/download.php?id=12345&passkey=abc123');
+        expect(
+          url,
+          'https://pt.example.com/download.php?id=12345&passkey=abc123',
+        );
       });
 
       test('should handle base URL with trailing slash', () {
@@ -424,7 +453,10 @@ void main() {
           userId: '20148',
         );
 
-        expect(url, 'https://example.com/download.php?downhash=20148.jwt_token');
+        expect(
+          url,
+          'https://example.com/download.php?downhash=20148.jwt_token',
+        );
       });
 
       test('should not replace userId when not provided', () {
@@ -435,7 +467,10 @@ void main() {
           'https://example.com/',
         );
 
-        expect(url, 'https://example.com/download.php?downhash={userId}.jwt_token');
+        expect(
+          url,
+          'https://example.com/download.php?downhash={userId}.jwt_token',
+        );
       });
 
       test('should replace userId with empty string when empty', () {
@@ -460,10 +495,7 @@ void main() {
           'attribute': 'href',
           'filter': {'name': 'regexp', 'args': r'id=(\d+)', 'value': r'$1'},
         },
-        'torrentName': {
-          'selector': 'a.title',
-          'attribute': 'text',
-        },
+        'torrentName': {'selector': 'a.title', 'attribute': 'text'},
       });
 
       expect(configs.length, 2);

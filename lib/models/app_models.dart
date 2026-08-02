@@ -350,8 +350,10 @@ enum TagType {
     r'\bEP\d*\b|S\d+E\d+|E\d+\-E\d+|第[^\s]+集',
   ),
   fourK('4K', Colors.orange, r'\b4K\b|\b2160p\b'),
+  eightK('8K', Colors.cyan, r'\b8K\b'),
   resolution1080('1080p', Colors.blue, r'\b1080p\b|x1080'),
   hdr('HDR', Colors.purple, r'\bHDR\b|\bHDR10\b'),
+  vr('VR', Colors.indigo, r'［vr］|\[vr\]'),
   h265(
     'H265',
     Color.fromARGB(255, 51, 162, 217),
