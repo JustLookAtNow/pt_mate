@@ -1,10 +1,10 @@
 {
   "name": "PT Mate",
   "identifier": "com.github.justlookatnow.ptmate.source",
-  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0-beta/altsource/AltSource.json",
-  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0-beta/screenshots/1.png",
+  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0/altsource/AltSource.json",
+  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0/screenshots/1.png",
   "website": "https://github.com/JustLookAtNow/pt_mate",
-  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0-beta/mt.png",
+  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0/mt.png",
   "subtitle": "PT private tracker companion",
   "description": "This is the official source for PT Mate.\n\nFor full details, check the GitHub repository:\nhttps://github.com/JustLookAtNow/pt_mate",
   "tintColor": "1D4ED8",
@@ -15,21 +15,28 @@
       "bundleIdentifier": "com.github.justlookatnow.ptmate",
       "developerName": "JustLookAtNow",
       "subtitle": "PT private tracker companion",
-      "version": "2.27.0",
-      "versionDate": "2026-07-15T13:54:35Z",
-      "versionDescription": "Changes in this release\nrelease: 2.27.0\n\n🎉Highlights\n- 优化聚合搜索入口与弹窗交互，搜索操作更直观顺手。\n- 改进站点配置排序体验，调整站点顺序时反馈更清晰。\n\n✨新增功能\n- 支持 NexusPHP 仅提供分区分类的站点配置解析。\n\n🐛修复问题\n- 修复部分 NexusPHP 站点分类结构不完整时无法正确识别分类的问题。\n- 优化搜索弹框交互，减少入口与弹窗状态切换中的不一致体验。\n\n📋其它\n- 精简关于页面内容，移除项目能力说明。\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
-      "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.27.0/pt_mate-2.27.0-unsigned.ipa",
+      "version": "2.28.0",
+      "versionDate": "2026-08-07T07:28:41Z",
+      "versionDescription": "Changes in this release\nrelease: 2.28.0\n\n🎉Highlights\n\n- 聚合搜索体验升级：统一搜索交互，支持增量结果展示、错误查看及失败站点单独重试。\n- 加固 Android 安全存储保护，并新增异常提示与备份恢复引导。\n\n✨新增功能\n\n- 新增 Jpopsuki、杏坛站点支持及杏坛分类。\n- 新增 VR、8K 标签识别。\n\n🐛修复问题\n\n- 修复 ruTorrent 保存目录不存在导致任务添加失败、302 错误及列表顺序问题。\n- 修复站点设置操作按钮被悬浮按钮遮挡的问题。\n- 修复 Linux 无 Keyring 环境下的安全存储回退问题。\n- 优化首页站点切换按钮显示。\n\n\nSecure-storage rollout\n\n- Phase: `phase1`\n- `ENABLE_SECURE_STORAGE_TRANSACTIONS`: `false`\n- Android versionCode: `186`\n- Source commit: `0fe5811acc1481a1590985141d55b6788995da46`\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
+      "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.28.0/pt_mate-2.28.0-unsigned.ipa",
       "localizedDescription": "PT Mate is a Flutter-based private tracker client for browsing, searching, and managing downloads across multiple PT sites.",
-      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0-beta/mt.png",
+      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0/mt.png",
       "tintColor": "1D4ED8",
       "category": "utilities",
-      "size": 13503094,
+      "size": 13761318,
       "screenshotURLs": [
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0-beta/screenshots/1.png",
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0-beta/screenshots/2.png",
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0-beta/screenshots/3.png"
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0/screenshots/1.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0/screenshots/2.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0/screenshots/3.png"
       ],
       "versions": [
+        {
+          "version": "2.28.0",
+          "date": "2026-08-07T07:28:41Z",
+          "localizedDescription": "Changes in this release\nrelease: 2.28.0\n\n🎉Highlights\n\n- 聚合搜索体验升级：统一搜索交互，支持增量结果展示、错误查看及失败站点单独重试。\n- 加固 Android 安全存储保护，并新增异常提示与备份恢复引导。\n\n✨新增功能\n\n- 新增 Jpopsuki、杏坛站点支持及杏坛分类。\n- 新增 VR、8K 标签识别。\n\n🐛修复问题\n\n- 修复 ruTorrent 保存目录不存在导致任务添加失败、302 错误及列表顺序问题。\n- 修复站点设置操作按钮被悬浮按钮遮挡的问题。\n- 修复 Linux 无 Keyring 环境下的安全存储回退问题。\n- 优化首页站点切换按钮显示。\n\n\nSecure-storage rollout\n\n- Phase: `phase1`\n- `ENABLE_SECURE_STORAGE_TRANSACTIONS`: `false`\n- Android versionCode: `186`\n- Source commit: `0fe5811acc1481a1590985141d55b6788995da46`\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
+          "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.28.0/pt_mate-2.28.0-unsigned.ipa",
+          "size": 13761318
+        },
         {
           "version": "2.27.0",
           "date": "2026-07-15T13:54:35Z",
@@ -211,13 +218,6 @@
           "localizedDescription": "Changes in this release\nrelease: 2.20.9\n\n🎉Highlights\n- 批量收藏和批量下载体验重构，新增实时进度、状态反馈和失败重试，批量任务过程更清晰也更可控。\n\n✨新增功能\n- 批量操作新增进度卡片，可显示当前处理项、进度条、成功/失败计数，并支持完成后手动关闭。\n- 批量操作中的失败项支持单项重试和全部重试，已成功项目状态会被保留。\n- 下载任务卡片的操作按钮补充提示信息，减少误触和辨识成本。\n\n🐛修复问题\n- 批量操作全部成功时会自动关闭进度卡片，减少完成后的界面残留。\n- 修复 OTA 镜像测速与选择逻辑，提升镜像选择结果的稳定性。\n- 调整通知相关依赖与回调顺序，改善通知触发的兼容性问题。\n\n🔧性能优化\n- 优化标签匹配时的正则缓存，减少重复计算带来的性能损耗。\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
           "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.20.9/pt_mate-2.20.9-unsigned.ipa",
           "size": 16096912
-        },
-        {
-          "version": "2.20.8",
-          "date": "2026-03-10T08:53:49Z",
-          "localizedDescription": "Changes in this release\nrelease: 2.20.8\n\n✨新增功能\n- 为多个仅图标按钮补充了提示文案，覆盖筛选、下载任务、服务器设置等页面，提升可用性和无障碍体验。\n\n🐛修复问题\n- 修复站点测试时可能覆盖当前激活适配器的问题。\n- 优化种子详情页标题换行显示，减少标题过长时的布局问题。\n- 修复种子列表封面占位布局异常。\n- 修复 Telegram 发布通知中附件发送与归档附带的问题。\n\n🔧性能优化\n- 优化正则表达式的缓存与复用，降低解析过程中的编译开销，提升页面和数据处理性能。\n\n📋其它\n- 调整种子列表项的间距、标签文字样式和溢出处理，列表显示更紧凑稳定。\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
-          "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.20.8/pt_mate-2.20.8-unsigned.ipa",
-          "size": 16051945
         }
       ],
       "appPermissions": {
@@ -229,14 +229,14 @@
   "news": [
     {
       "appID": "com.github.justlookatnow.ptmate",
-      "title": "2.27.0 - 15 Jul",
-      "identifier": "release-2.27.0",
+      "title": "2.28.0 - 07 Aug",
+      "identifier": "release-2.28.0",
       "caption": "Update for PT Mate now available!",
-      "date": "2026-07-15T13:54:35Z",
+      "date": "2026-08-07T07:28:41Z",
       "tintColor": "1D4ED8",
       "imageURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/1.png",
       "notify": true,
-      "url": "https://github.com/JustLookAtNow/pt_mate/releases/tag/v2.27.0"
+      "url": "https://github.com/JustLookAtNow/pt_mate/releases/tag/v2.28.0"
     }
   ]
 }
