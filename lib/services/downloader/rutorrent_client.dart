@@ -337,8 +337,7 @@ class RuTorrentClient
       for (final member in document.findAllElements('member')) {
         final name = member.getElement('name')?.innerText;
         if (name == 'faultString') {
-          message =
-              member.getElement('value')?.innerText.trim() ?? message;
+          message = member.getElement('value')?.innerText.trim() ?? message;
           break;
         }
       }
@@ -621,26 +620,35 @@ class RuTorrentClient
     final useRelay = config.useLocalRelay || forceRelay;
 
     final savePath = params.savePath?.trim() ?? '';
-    if (savePath.isNotEmpty) {
-      _validateSavePath(savePath);
-    }
 
-    // 附加命令：记录添加时间（ruTorrent约定的custom字段）、保存路径与标签
+    // 附加命令：记录添加时间（ruTorrent约定的custom字段）与标签
     // label需URL编码，与ruTorrent存储格式一致
-    final commands = <String>[
-      'd.custom.set=addtime,${DateTime.now().millisecondsSinceEpoch ~/ 1000}',
-    ];
-    if (savePath.isNotEmpty) {
-      commands.add('d.directory.set="$savePath"');
-    }
+    final addTimeCommand =
+        'd.custom.set=addtime,'
+        '${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
+    final commands = <String>[addTimeCommand];
     if (params.category != null && params.category!.isNotEmpty) {
       commands.add('d.custom1.set=${Uri.encodeComponent(params.category!)}');
     }
 
     final startPaused = params.startPaused == true;
+    final directMagnet = url.startsWith('magnet:') && !useRelay;
+
+    // ruTorrent只有在服务端可信连接中才能执行目录校验与mkdir -p。
+    // 带保存路径的任务统一交给addtorrent.php处理，避免raw XML-RPC代理
+    // 将execute2作为不可信命令拒绝。
+    if (directMagnet && savePath.isNotEmpty) {
+      await _addMagnetViaWeb(
+        url,
+        params,
+        savePath: savePath,
+        addTimeCommand: addTimeCommand,
+      );
+      return;
+    }
 
     String xml;
-    if (url.startsWith('magnet:') && !useRelay) {
+    if (directMagnet) {
       // Magnet链接：由rTorrent直接加载
       final method = startPaused ? 'load.normal' : 'load.start';
       xml = _buildMethodCallXML(method, ['', url, ...commands]);
@@ -655,20 +663,18 @@ class RuTorrentClient
       // 与ruTorrent官方相同的判断：base64编码后达到包大小上限的种子
       // 无法经load.raw提交，改走addtorrent.php由服务端落盘后加载
       final base64Length = ((torrentData.length + 2) ~/ 3) * 4;
-      if (base64Length >= rtorrentPacketLimit) {
-        await _addTorrentFileViaWeb(torrentData, params);
+      if (savePath.isNotEmpty || base64Length >= rtorrentPacketLimit) {
+        await _addTorrentFileViaWeb(
+          torrentData,
+          params,
+          savePath: savePath,
+          addTimeCommand: addTimeCommand,
+        );
         return;
       }
 
       final method = startPaused ? 'load.raw' : 'load.raw_start';
       xml = _buildMethodCallXML(method, ['', torrentData, ...commands]);
-    }
-
-    // 官方sendTorrent/sendMagnet设置保存路径前会先在服务端execute mkdir -p，
-    // 避免目录不存在时rTorrent开始写入才失败；~与相对路径由服务端配置解析，
-    // 客户端无法复刻，仅对绝对路径创建
-    if (savePath.startsWith('/')) {
-      await _ensureRemoteDirectory(savePath);
     }
 
     final response = await _request(
@@ -681,45 +687,30 @@ class RuTorrentClient
     _checkXmlRpcFault(response.data.toString());
   }
 
-  /// 校验保存路径，对应官方addtorrent.php经correctDirectory()的拒绝行为
-  /// 官方基于服务器配置解析路径归属，客户端无法复刻，
-  /// 此处拦截会破坏rTorrent命令引用的非法字符
-  void _validateSavePath(String path) {
-    if (path.contains('"') || path.codeUnits.any((c) => c < 0x20)) {
-      throw Exception('ruTorrent: invalid save path (FailedDirectory)');
-    }
+  /// 通过 /php/addtorrent.php 添加Magnet，由服务端校验并创建保存目录
+  Future<void> _addMagnetViaWeb(
+    String magnet,
+    AddTaskParams params, {
+    required String savePath,
+    required String addTimeCommand,
+  }) async {
+    final form = <String, dynamic>{'url': magnet, 'json': '1'};
+    _addWebTaskOptions(
+      form,
+      params,
+      savePath: savePath,
+      addTimeCommand: addTimeCommand,
+    );
+    await _submitAddTorrentForm(form);
   }
 
-  /// 在服务端创建保存目录，等价于官方sendTorrent中的execute mkdir -p
-  /// （官方经方法表把execute映射为execute2并前置空target，
-  /// execute2在rTorrent 0.9.4至当前master均可用）
-  /// 官方multicall中mkdir失败不阻断load，此处保持一致
-  Future<void> _ensureRemoteDirectory(String directory) async {
-    try {
-      final xml = _buildMethodCallXML('execute2', [
-        '',
-        'mkdir',
-        '-p',
-        directory,
-      ]);
-      await _request(
-        'POST',
-        '/plugins/httprpc/action.php',
-        headers: {'Content-Type': 'application/xml'},
-        body: xml,
-      );
-    } catch (_) {
-      // 目录创建失败不阻断添加，写入问题由rTorrent自身报告
-    }
-  }
-
-  /// 通过 /php/addtorrent.php 以multipart上传种子文件（大文件专用）
-  /// addtime由ruTorrent的seedingtime插件注册的inserted_new事件自动写入，
-  /// 无需在此设置
+  /// 通过 /php/addtorrent.php 以multipart上传种子文件
   Future<void> _addTorrentFileViaWeb(
     List<int> torrentData,
-    AddTaskParams params,
-  ) async {
+    AddTaskParams params, {
+    required String savePath,
+    required String addTimeCommand,
+  }) async {
     final form = <String, dynamic>{
       'torrent_file': MultipartFile.fromBytes(
         torrentData,
@@ -727,8 +718,24 @@ class RuTorrentClient
       ),
       'json': '1',
     };
-    if (params.savePath != null && params.savePath!.isNotEmpty) {
-      form['dir_edit'] = params.savePath!;
+    _addWebTaskOptions(
+      form,
+      params,
+      savePath: savePath,
+      addTimeCommand: addTimeCommand,
+    );
+    await _submitAddTorrentForm(form);
+  }
+
+  /// 填充addtorrent.php通用参数
+  void _addWebTaskOptions(
+    Map<String, dynamic> form,
+    AddTaskParams params, {
+    required String savePath,
+    required String addTimeCommand,
+  }) {
+    if (savePath.isNotEmpty) {
+      form['dir_edit'] = savePath;
     }
     if (params.category != null && params.category!.isNotEmpty) {
       // 服务端会自行URL编码后存入custom1
@@ -738,6 +745,11 @@ class RuTorrentClient
       form['torrents_start_stopped'] = '1';
     }
 
+    // 即使未启用seedingtime插件，也保留真实添加时间用于列表排序。
+    form['addition[]'] = addTimeCommand;
+  }
+
+  Future<void> _submitAddTorrentForm(Map<String, dynamic> form) async {
     final response = await _request(
       'POST',
       '/php/addtorrent.php',

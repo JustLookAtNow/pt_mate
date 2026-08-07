@@ -82,14 +82,8 @@ class _FakeHttpClientAdapter implements HttpClientAdapter {
   /// 种子文件下载内容
   List<int> torrentFileBytes = [1, 2, 3, 4];
 
-  /// 记录发往 addtorrent.php 的multipart请求体
+  /// 记录发往 addtorrent.php 的表单请求体
   final List<String> uploadRequests = [];
-
-  /// 记录 execute2 mkdir 请求体
-  final List<String> mkdirRequests = [];
-
-  /// mkdir 命令返回 fault
-  bool failMkdir = false;
 
   /// addtorrent.php 通过302 Location返回的result[]值
   String addTorrentResult = 'Success';
@@ -173,17 +167,6 @@ class _FakeHttpClientAdapter implements HttpClientAdapter {
         }
         return ResponseBody.fromString(
           _multicallResponse(),
-          200,
-          headers: {
-            Headers.contentTypeHeader: ['text/xml'],
-          },
-        );
-      }
-
-      if (body.contains('<methodName>execute2</methodName>')) {
-        mkdirRequests.add(body);
-        return ResponseBody.fromString(
-          failMkdir ? _faultResponse : _successResponse,
           200,
           headers: {
             Headers.contentTypeHeader: ['text/xml'],
@@ -355,7 +338,7 @@ void main() {
       );
     });
 
-    test('addTask magnet uses load.start with commands', () async {
+    test('addTask magnet with savePath uses addtorrent.php', () async {
       final adapter = _FakeHttpClientAdapter();
       final client = buildClient(adapter, useLocalRelay: false);
 
@@ -364,19 +347,21 @@ void main() {
           url: 'magnet:?xt=urn:btih:abcdef0123456789',
           savePath: '/data',
           category: '电影',
+          startPaused: true,
         ),
       );
 
-      expect(adapter.xmlRequests.length, 1);
-      final xml = adapter.xmlRequests.first;
-      expect(xml, contains('<methodName>load.start</methodName>'));
-      expect(xml, contains('magnet:?xt=urn:btih:abcdef0123456789'));
-      expect(xml, contains('d.custom.set=addtime,'));
-      expect(xml, contains('d.directory.set="/data"'));
-      expect(
-        xml,
-        contains('d.custom1.set=${Uri.encodeComponent('电影')}'),
-      );
+      expect(adapter.xmlRequests, isEmpty);
+      final body = adapter.uploadRequests.single;
+      expect(body, contains('name="url"'));
+      expect(body, contains('magnet:?xt=urn:btih:abcdef0123456789'));
+      expect(body, contains('name="dir_edit"'));
+      expect(body, contains('/data'));
+      expect(body, contains('name="label"'));
+      expect(body, contains('电影'));
+      expect(body, contains('name="torrents_start_stopped"'));
+      expect(body, contains('name="addition[]"'));
+      expect(body, contains('d.custom.set=addtime,'));
     });
 
     test('addTask magnet with startPaused uses load.normal', () async {
@@ -393,77 +378,55 @@ void main() {
       );
     });
 
-    test('addTask torrent url downloads file and uses load.raw_start',
-        () async {
+    test(
+      'addTask torrent url downloads file and uses load.raw_start',
+      () async {
+        final adapter = _FakeHttpClientAdapter()
+          ..torrentFileBytes = [1, 2, 3, 4];
+        final client = buildClient(adapter);
+
+        await client.addTask(
+          AddTaskParams(url: 'https://example.com/test.torrent'),
+        );
+
+        final xml = adapter.xmlRequests.single;
+        expect(xml, contains('<methodName>load.raw_start</methodName>'));
+        expect(xml, contains('<base64>${base64Encode([1, 2, 3, 4])}</base64>'));
+      },
+    );
+
+    test(
+      'addTask small torrent with savePath uses addtorrent.php multipart',
+      () async {
+        final adapter = _FakeHttpClientAdapter()
+          ..torrentFileBytes = [1, 2, 3, 4];
+        final client = buildClient(adapter);
+
+        await client.addTask(
+          AddTaskParams(
+            url: 'https://example.com/test.torrent',
+            savePath: '/data/new',
+          ),
+        );
+
+        expect(adapter.xmlRequests, isEmpty);
+        final body = adapter.uploadRequests.single;
+        expect(body, contains('name="torrent_file"'));
+        expect(body, contains('name="dir_edit"'));
+        expect(body, contains('/data/new'));
+        expect(body, contains('name="addition[]"'));
+        expect(body, contains('d.custom.set=addtime,'));
+      },
+    );
+
+    test('addTask propagates FailedDirectory from addtorrent.php', () async {
       final adapter = _FakeHttpClientAdapter()
-        ..torrentFileBytes = [1, 2, 3, 4];
-      final client = buildClient(adapter);
-
-      await client.addTask(
-        AddTaskParams(url: 'https://example.com/test.torrent'),
-      );
-
-      final xml = adapter.xmlRequests.single;
-      expect(xml, contains('<methodName>load.raw_start</methodName>'));
-      expect(xml, contains('<base64>${base64Encode([1, 2, 3, 4])}</base64>'));
-    });
-
-    test('addTask creates missing save directory via execute2 mkdir -p',
-        () async {
-      final adapter = _FakeHttpClientAdapter();
+        ..addTorrentResult = 'FailedDirectory';
       final client = buildClient(adapter, useLocalRelay: false);
 
-      await client.addTask(
-        AddTaskParams(url: 'magnet:?xt=urn:btih:abc', savePath: '/data/new'),
-      );
-
-      final mkdir = adapter.mkdirRequests.single;
-      expect(mkdir, contains('<methodName>execute2</methodName>'));
-      expect(mkdir, contains('<string>mkdir</string>'));
-      expect(mkdir, contains('<string>-p</string>'));
-      expect(mkdir, contains('<string>/data/new</string>'));
       expect(
-        adapter.xmlRequests.single,
-        contains('d.directory.set="/data/new"'),
-      );
-    });
-
-    test('addTask torrent file with savePath creates directory first',
-        () async {
-      final adapter = _FakeHttpClientAdapter()..torrentFileBytes = [1, 2, 3, 4];
-      final client = buildClient(adapter);
-
-      await client.addTask(
-        AddTaskParams(
-          url: 'https://example.com/test.torrent',
-          savePath: '/data/new',
-        ),
-      );
-
-      expect(adapter.mkdirRequests, hasLength(1));
-      expect(adapter.xmlRequests.single, contains('load.raw_start'));
-    });
-
-    test('addTask proceeds when mkdir reports fault (official behavior)',
-        () async {
-      final adapter = _FakeHttpClientAdapter()..failMkdir = true;
-      final client = buildClient(adapter, useLocalRelay: false);
-
-      await client.addTask(
-        AddTaskParams(url: 'magnet:?xt=urn:btih:abc', savePath: '/data/new'),
-      );
-
-      // mkdir失败不阻断加载，与官方multicall行为一致
-      expect(adapter.xmlRequests.single, contains('load.start'));
-    });
-
-    test('addTask rejects save path with illegal characters', () async {
-      final adapter = _FakeHttpClientAdapter();
-      final client = buildClient(adapter, useLocalRelay: false);
-
-      await expectLater(
-        client.addTask(
-          AddTaskParams(url: 'magnet:?xt=urn:btih:abc', savePath: '/da"ta\n'),
+        () => client.addTask(
+          AddTaskParams(url: 'magnet:?xt=urn:btih:abc', savePath: '/invalid'),
         ),
         throwsA(
           isA<Exception>().having(
@@ -473,71 +436,55 @@ void main() {
           ),
         ),
       );
-
-      // 校验在任何请求发出前完成
-      expect(adapter.mkdirRequests, isEmpty);
-      expect(adapter.xmlRequests, isEmpty);
-    });
-
-    test('addTask non-absolute savePath skips client-side mkdir', () async {
-      final adapter = _FakeHttpClientAdapter();
-      final client = buildClient(adapter, useLocalRelay: false);
-
-      await client.addTask(
-        AddTaskParams(url: 'magnet:?xt=urn:btih:abc', savePath: 'tv/season1'),
-      );
-
-      // ~与相对路径需由服务端解析，客户端不发mkdir，仅设置目录
-      expect(adapter.mkdirRequests, isEmpty);
-      expect(
-        adapter.xmlRequests.single,
-        contains('d.directory.set="tv/season1"'),
-      );
     });
 
     // ruTorrent官方上限RTORRENT_PACKET_LIMIT=1572864按base64后长度比较：
     // 原始1179645字节 -> base64 1572860（未达上限，走load.raw）
     // 原始1179646字节 -> base64 1572864（达到上限，走addtorrent.php）
-    test('addTask torrent at packet limit boundary stays on load.raw',
-        () async {
-      final adapter = _FakeHttpClientAdapter()
-        ..torrentFileBytes = List.filled(1179645, 0);
-      final client = buildClient(adapter);
+    test(
+      'addTask torrent at packet limit boundary stays on load.raw',
+      () async {
+        final adapter = _FakeHttpClientAdapter()
+          ..torrentFileBytes = List.filled(1179645, 0);
+        final client = buildClient(adapter);
 
-      await client.addTask(
-        AddTaskParams(url: 'https://example.com/test.torrent'),
-      );
+        await client.addTask(
+          AddTaskParams(url: 'https://example.com/test.torrent'),
+        );
 
-      expect(adapter.uploadRequests, isEmpty);
-      expect(adapter.xmlRequests.single, contains('load.raw_start'));
-    });
+        expect(adapter.uploadRequests, isEmpty);
+        expect(adapter.xmlRequests.single, contains('load.raw_start'));
+      },
+    );
 
-    test('addTask large torrent falls back to addtorrent.php multipart',
-        () async {
-      final adapter = _FakeHttpClientAdapter()
-        ..torrentFileBytes = List.filled(1179646, 0);
-      final client = buildClient(adapter);
+    test(
+      'addTask large torrent falls back to addtorrent.php multipart',
+      () async {
+        final adapter = _FakeHttpClientAdapter()
+          ..torrentFileBytes = List.filled(1179646, 0);
+        final client = buildClient(adapter);
 
-      await client.addTask(
-        AddTaskParams(
-          url: 'https://example.com/test.torrent',
-          savePath: '/data',
-          category: '电影',
-          startPaused: true,
-        ),
-      );
+        await client.addTask(
+          AddTaskParams(
+            url: 'https://example.com/test.torrent',
+            category: '电影',
+            startPaused: true,
+          ),
+        );
 
-      // 未经XML-RPC提交，且302被视为成功
-      expect(adapter.xmlRequests, isEmpty);
-      final body = adapter.uploadRequests.single;
-      expect(body, contains('name="torrent_file"'));
-      expect(body, contains('name="json"'));
-      expect(body, contains('name="dir_edit"'));
-      expect(body, contains('/data'));
-      expect(body, contains('name="label"'));
-      expect(body, contains('电影'));
-      expect(body, contains('name="torrents_start_stopped"'));
-    });
+        // 未经XML-RPC提交，且302被视为成功
+        expect(adapter.xmlRequests, isEmpty);
+        final body = adapter.uploadRequests.single;
+        expect(body, contains('name="torrent_file"'));
+        expect(body, contains('name="json"'));
+        expect(body, isNot(contains('name="dir_edit"')));
+        expect(body, contains('name="label"'));
+        expect(body, contains('电影'));
+        expect(body, contains('name="torrents_start_stopped"'));
+        expect(body, contains('name="addition[]"'));
+        expect(body, contains('d.custom.set=addtime,'));
+      },
+    );
 
     test('addTask large torrent omits optional fields when unset', () async {
       final adapter = _FakeHttpClientAdapter()
@@ -552,6 +499,8 @@ void main() {
       expect(body, isNot(contains('name="dir_edit"')));
       expect(body, isNot(contains('name="label"')));
       expect(body, isNot(contains('name="torrents_start_stopped"')));
+      expect(body, contains('name="addition[]"'));
+      expect(body, contains('d.custom.set=addtime,'));
     });
 
     test('addTask throws when addtorrent.php reports failure', () async {
@@ -574,19 +523,21 @@ void main() {
       );
     });
 
-    test('addTask accepts JSON result when redirect already followed',
-        () async {
-      final adapter = _FakeHttpClientAdapter()
-        ..torrentFileBytes = List.filled(1179646, 0)
-        ..addTorrentRespondJson = true;
-      final client = buildClient(adapter);
+    test(
+      'addTask accepts JSON result when redirect already followed',
+      () async {
+        final adapter = _FakeHttpClientAdapter()
+          ..torrentFileBytes = List.filled(1179646, 0)
+          ..addTorrentRespondJson = true;
+        final client = buildClient(adapter);
 
-      await client.addTask(
-        AddTaskParams(url: 'https://example.com/test.torrent'),
-      );
+        await client.addTask(
+          AddTaskParams(url: 'https://example.com/test.torrent'),
+        );
 
-      expect(adapter.uploadRequests, hasLength(1));
-    });
+        expect(adapter.uploadRequests, hasLength(1));
+      },
+    );
 
     test('addTask throws on XML-RPC fault', () async {
       final adapter = _FakeHttpClientAdapter()..faultOnLoad = true;
