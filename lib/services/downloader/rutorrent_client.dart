@@ -19,6 +19,12 @@ class RuTorrentClient
   final RuTorrentConfig config;
   final String password;
 
+  /// ruTorrent官方的base64负载上限（php/rtorrent.php RTORRENT_PACKET_LIMIT）
+  /// base64编码后达到该长度时，load.raw会超出rTorrent的XML-RPC包大小限制；
+  /// 官方此时改为写服务器临时文件再按路径加载，该回退依赖服务器文件系统，
+  /// 客户端只能改走 /php/addtorrent.php 上传由服务端处理
+  static const int rtorrentPacketLimit = 1572864;
+
   // HTTP客户端
   late final Dio _dio;
 
@@ -32,7 +38,12 @@ class RuTorrentClient
     required this.config,
     required this.password,
     Function(RuTorrentConfig)? onConfigUpdated,
+    Dio? dio, // 供测试注入
   }) : _onConfigUpdated = onConfigUpdated {
+    if (dio != null) {
+      _dio = dio;
+      return;
+    }
     _dio = Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 10),
@@ -90,12 +101,15 @@ class RuTorrentClient
   }
 
   /// 执行HTTP请求
+  /// [acceptRedirect] 为true时不跟随重定向，且3xx不视为错误
+  /// （addtorrent.php以302的Location参数返回结果）
   Future<Response> _request(
     String method,
     String endpoint, {
     Map<String, String>? headers,
     dynamic body,
     bool useAuth = true,
+    bool acceptRedirect = false,
   }) async {
     final url = '$_baseUrl$endpoint';
 
@@ -134,6 +148,10 @@ class RuTorrentClient
             options: Options(
               headers: requestHeaders,
               contentType: requestHeaders['Content-Type'],
+              followRedirects: acceptRedirect ? false : null,
+              validateStatus: acceptRedirect
+                  ? (status) => status != null && status < 400
+                  : null,
             ),
           );
           break;
@@ -268,6 +286,65 @@ class RuTorrentClient
     return builder.buildDocument().toXmlString();
   }
 
+  /// 构建单个方法调用的XML-RPC请求
+  /// 参数支持字符串和二进制数据（List&lt;int&gt;，编码为base64）
+  String _buildMethodCallXML(String method, List<dynamic> params) {
+    final builder = XmlBuilder();
+    builder.processing('xml', 'version="1.0" encoding="UTF-8"');
+    builder.element(
+      'methodCall',
+      nest: () {
+        builder.element('methodName', nest: method);
+        builder.element(
+          'params',
+          nest: () {
+            for (final param in params) {
+              builder.element(
+                'param',
+                nest: () {
+                  builder.element(
+                    'value',
+                    nest: () {
+                      if (param is List<int>) {
+                        builder.element('base64', nest: base64Encode(param));
+                      } else {
+                        builder.element('string', nest: param.toString());
+                      }
+                    },
+                  );
+                },
+              );
+            }
+          },
+        );
+      },
+    );
+
+    return builder.buildDocument().toXmlString();
+  }
+
+  /// 检查XML-RPC响应中的fault，出错时抛出异常
+  void _checkXmlRpcFault(String xmlString) {
+    final XmlDocument document;
+    try {
+      document = XmlDocument.parse(xmlString);
+    } catch (_) {
+      // 响应不是合法XML（如网关返回的HTML错误页），不在此处判定失败
+      return;
+    }
+    if (document.findAllElements('fault').isNotEmpty) {
+      String message = 'Unknown XML-RPC fault';
+      for (final member in document.findAllElements('member')) {
+        final name = member.getElement('name')?.innerText;
+        if (name == 'faultString') {
+          message = member.getElement('value')?.innerText.trim() ?? message;
+          break;
+        }
+      }
+      throw Exception('XML-RPC fault: $message');
+    }
+  }
+
   /// 解析XML-RPC响应
   List<String> _parseResponseXML(String xmlString) {
     final document = XmlDocument.parse(xmlString);
@@ -290,8 +367,6 @@ class RuTorrentClient
   int _iv(String? val) {
     return FormatUtil.parseInt(val) ?? 0;
   }
-
-
 
   @override
   Future<void> testConnection() async {
@@ -457,16 +532,80 @@ class RuTorrentClient
     final Map<String, dynamic> torrents =
         data['t'] as Map<String, dynamic>? ?? {};
 
+    // 列表接口不包含添加/完成时间，需单独从custom字段获取
+    final timeCustoms = await _fetchTimeCustoms();
+
     final tasks = <DownloadTask>[];
 
     for (final entry in torrents.entries) {
       final hash = entry.key;
       final torrentData = entry.value as List<dynamic>;
+      final times = timeCustoms[hash.toUpperCase()];
 
-      tasks.add(_convertToDownloadTask(hash, torrentData));
+      tasks.add(
+        _convertToDownloadTask(
+          hash,
+          torrentData,
+          addTime: times?.$1 ?? 0,
+          completedTime: times?.$2 ?? 0,
+        ),
+      );
     }
 
     return tasks;
+  }
+
+  /// 获取所有种子的添加时间与完成时间
+  /// ruTorrent将其存储在custom字段addtime/seedingtime中，mode=list不返回
+  /// 返回 hash(大写) -> (addtime, seedingtime)，字段未设置时为0
+  Future<Map<String, (int, int)>> _fetchTimeCustoms() async {
+    try {
+      final xml = _buildMethodCallXML('d.multicall2', [
+        '',
+        'main',
+        'd.hash=',
+        'd.custom=addtime',
+        'd.custom=seedingtime',
+      ]);
+
+      final response = await _request(
+        'POST',
+        '/plugins/httprpc/action.php',
+        headers: {'Content-Type': 'application/xml'},
+        body: xml,
+      );
+
+      final document = XmlDocument.parse(response.data.toString());
+      final result = <String, (int, int)>{};
+
+      final dataElements = document.findAllElements('data');
+      if (dataElements.isEmpty) return result;
+
+      // 外层data的每个value对应一个种子：[hash, addtime, seedingtime]
+      for (final value in dataElements.first.childElements.where(
+        (e) => e.name.local == 'value',
+      )) {
+        final strings = value.findAllElements('string').toList();
+        if (strings.isEmpty) continue;
+
+        final hash = strings[0].innerText.trim();
+        final addTime = strings.length > 1
+            ? (int.tryParse(strings[1].innerText.trim()) ?? 0)
+            : 0;
+        final completedTime = strings.length > 2
+            ? (int.tryParse(strings[2].innerText.trim()) ?? 0)
+            : 0;
+
+        if (hash.isNotEmpty) {
+          result[hash.toUpperCase()] = (addTime, completedTime);
+        }
+      }
+
+      return result;
+    } catch (_) {
+      // 获取失败时不影响任务列表本身
+      return {};
+    }
   }
 
   @override
@@ -480,50 +619,167 @@ class RuTorrentClient
 
     final useRelay = config.useLocalRelay || forceRelay;
 
-    if (url.startsWith('magnet:') && !useRelay) {
-      // Magnet链接，使用URLSearchParams
-      final body = <String, dynamic>{'url': url, 'json': '1'};
+    final savePath = params.savePath?.trim() ?? '';
 
-      if (params.savePath != null) {
-        body['dir_edit'] = params.savePath;
-      }
-      if (params.startPaused == true) {
-        body['torrents_start_stopped'] = '1';
-      }
-      if (params.category != null && params.category!.isNotEmpty) {
-        body['label'] = params.category;
-      }
+    // 附加命令：记录添加时间（ruTorrent约定的custom字段）与标签
+    // label需URL编码，与ruTorrent存储格式一致
+    final addTimeCommand =
+        'd.custom.set=addtime,'
+        '${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
+    final commands = <String>[addTimeCommand];
+    if (params.category != null && params.category!.isNotEmpty) {
+      commands.add('d.custom1.set=${Uri.encodeComponent(params.category!)}');
+    }
 
-      final formData = FormData.fromMap(body);
-      await _request('POST', '/php/addtorrent.php', body: formData);
+    final startPaused = params.startPaused == true;
+    final directMagnet = url.startsWith('magnet:') && !useRelay;
+
+    // ruTorrent只有在服务端可信连接中才能执行目录校验与mkdir -p。
+    // 带保存路径的任务统一交给addtorrent.php处理，避免raw XML-RPC代理
+    // 将execute2作为不可信命令拒绝。
+    if (directMagnet && savePath.isNotEmpty) {
+      await _addMagnetViaWeb(
+        url,
+        params,
+        savePath: savePath,
+        addTimeCommand: addTimeCommand,
+      );
+      return;
+    }
+
+    String xml;
+    if (directMagnet) {
+      // Magnet链接：由rTorrent直接加载
+      final method = startPaused ? 'load.normal' : 'load.start';
+      xml = _buildMethodCallXML(method, ['', url, ...commands]);
     } else {
-      // 种子文件，需要先下载
+      // 种子文件：先下载到本地
       final torrentData = await downloadTorrentFileCommon(
         _dio,
         url,
         siteConfig: siteConfig,
       );
 
-      final body = <String, dynamic>{
-        'torrent_file': MultipartFile.fromBytes(
+      // 与ruTorrent官方相同的判断：base64编码后达到包大小上限的种子
+      // 无法经load.raw提交，改走addtorrent.php由服务端落盘后加载
+      final base64Length = ((torrentData.length + 2) ~/ 3) * 4;
+      if (savePath.isNotEmpty || base64Length >= rtorrentPacketLimit) {
+        await _addTorrentFileViaWeb(
           torrentData,
-          filename: 'ptmate.torrent',
-        ),
-        'json': '1',
-      };
-
-      if (params.savePath != null) {
-        body['dir_edit'] = params.savePath;
-      }
-      if (params.startPaused == true) {
-        body['torrents_start_stopped'] = '1';
-      }
-      if (params.category != null && params.category!.isNotEmpty) {
-        body['label'] = params.category;
+          params,
+          savePath: savePath,
+          addTimeCommand: addTimeCommand,
+        );
+        return;
       }
 
-      final formData = FormData.fromMap(body);
-      await _request('POST', '/php/addtorrent.php', body: formData);
+      final method = startPaused ? 'load.raw' : 'load.raw_start';
+      xml = _buildMethodCallXML(method, ['', torrentData, ...commands]);
+    }
+
+    final response = await _request(
+      'POST',
+      '/plugins/httprpc/action.php',
+      headers: {'Content-Type': 'application/xml'},
+      body: xml,
+    );
+
+    _checkXmlRpcFault(response.data.toString());
+  }
+
+  /// 通过 /php/addtorrent.php 添加Magnet，由服务端校验并创建保存目录
+  Future<void> _addMagnetViaWeb(
+    String magnet,
+    AddTaskParams params, {
+    required String savePath,
+    required String addTimeCommand,
+  }) async {
+    final form = <String, dynamic>{'url': magnet, 'json': '1'};
+    _addWebTaskOptions(
+      form,
+      params,
+      savePath: savePath,
+      addTimeCommand: addTimeCommand,
+    );
+    await _submitAddTorrentForm(form);
+  }
+
+  /// 通过 /php/addtorrent.php 以multipart上传种子文件
+  Future<void> _addTorrentFileViaWeb(
+    List<int> torrentData,
+    AddTaskParams params, {
+    required String savePath,
+    required String addTimeCommand,
+  }) async {
+    final form = <String, dynamic>{
+      'torrent_file': MultipartFile.fromBytes(
+        torrentData,
+        filename: 'pt_mate.torrent',
+      ),
+      'json': '1',
+    };
+    _addWebTaskOptions(
+      form,
+      params,
+      savePath: savePath,
+      addTimeCommand: addTimeCommand,
+    );
+    await _submitAddTorrentForm(form);
+  }
+
+  /// 填充addtorrent.php通用参数
+  void _addWebTaskOptions(
+    Map<String, dynamic> form,
+    AddTaskParams params, {
+    required String savePath,
+    required String addTimeCommand,
+  }) {
+    if (savePath.isNotEmpty) {
+      form['dir_edit'] = savePath;
+    }
+    if (params.category != null && params.category!.isNotEmpty) {
+      // 服务端会自行URL编码后存入custom1
+      form['label'] = params.category!;
+    }
+    if (params.startPaused == true) {
+      form['torrents_start_stopped'] = '1';
+    }
+
+    // 即使未启用seedingtime插件，也保留真实添加时间用于列表排序。
+    form['addition[]'] = addTimeCommand;
+  }
+
+  Future<void> _submitAddTorrentForm(Map<String, dynamic> form) async {
+    final response = await _request(
+      'POST',
+      '/php/addtorrent.php',
+      body: FormData.fromMap(form),
+      acceptRedirect: true,
+    );
+
+    final result = _parseAddTorrentResult(response);
+    if (result != 'Success') {
+      throw Exception(
+        'ruTorrent addtorrent.php failed: '
+        '${result ?? 'unexpected response (HTTP ${response.statusCode})'}',
+      );
+    }
+  }
+
+  /// 解析addtorrent.php的结果
+  /// 正常返回302，结果在Location头的result[]参数中；
+  /// 若反向代理等中间层已跟随重定向，则按JSON响应解析
+  String? _parseAddTorrentResult(Response response) {
+    if (response.statusCode == 302) {
+      final location = response.headers.value('location') ?? '';
+      return RegExp(r'result\[\]=(\w+)').firstMatch(location)?.group(1);
+    }
+    try {
+      final data = response.data;
+      final map = data is Map ? data : jsonDecode(data.toString());
+      return map['result']?.toString();
+    } catch (_) {
+      return null;
     }
   }
 
@@ -646,10 +902,13 @@ class RuTorrentClient
   }
 
   /// 将ruTorrent API响应转换为DownloadTask
+  /// [addTime]/[completedTime] 来自custom字段，未设置时为0
   DownloadTask _convertToDownloadTask(
     String infoHash,
-    List<dynamic> rawTorrent,
-  ) {
+    List<dynamic> rawTorrent, {
+    int addTime = 0,
+    int completedTime = 0,
+  }) {
     // 解析各字段
     final isOpen = _iv(rawTorrent[0].toString());
     final isHashChecking = _iv(rawTorrent[1].toString());
@@ -719,9 +978,10 @@ class RuTorrentClient
       eta: 0, // ruTorrent API 中没有直接的 ETA 字段
       category: torrentLabel,
       tags: torrentLabel.isNotEmpty ? [torrentLabel] : [],
-      completionOn: 0,
+      completionOn: completedTime,
       contentPath: savePath,
-      addedOn: created,
+      // addtime未设置时回退到种子文件创建时间
+      addedOn: addTime > 0 ? addTime : created,
       amountLeft: torrentSize - torrentDownloaded,
       ratio: ratio / 1000.0, // 转换为实际比率
       timeActive: 0,
