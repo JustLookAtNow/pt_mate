@@ -1046,26 +1046,27 @@ class _TorrentCoverState extends State<TorrentCover> {
   Widget build(BuildContext context) {
     final torrent = widget.torrent;
     final colorScheme = Theme.of(context).colorScheme;
-    return SizedBox(
-      width: _coverWidth,
-      height: _coverHeight,
-      child: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: AppPlaceholderColors.bone(colorScheme),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: colorScheme.outline.withValues(alpha: 0.3),
-                width: 1,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: torrent.cover.isNotEmpty ? () => _handleTap(context) : null,
+      child: SizedBox(
+        width: _coverWidth,
+        height: _coverHeight,
+        child: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: AppPlaceholderColors.bone(colorScheme),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: colorScheme.outline.withValues(alpha: 0.3),
+                  width: 1,
+                ),
               ),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: torrent.cover.isNotEmpty
-                  ? GestureDetector(
-                      onTap: () => _handleTap(context),
-                      child: CachedNetworkImage(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: torrent.cover.isNotEmpty
+                    ? CachedNetworkImage(
                         key: ValueKey('${torrent.cover}::$_reloadKey'),
                         imageUrl: torrent.cover,
                         siteConfig: widget.currentSite,
@@ -1098,30 +1099,26 @@ class _TorrentCoverState extends State<TorrentCover> {
                             text: '加载失败',
                           );
                         },
+                      )
+                    : _buildCoverPlaceholder(
+                        context,
+                        icon: const Icon(Icons.image_outlined, size: 24),
+                        text: '暂无',
                       ),
-                    )
-                  : _buildCoverPlaceholder(
-                      context,
-                      icon: const Icon(Icons.image_outlined, size: 24),
-                      text: '暂无',
-                    ),
+              ),
             ),
-          ),
-          if (widget.hasDouban || widget.hasImdb)
-            Positioned(
-              left: 0,
-              bottom: 0,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => _handleTap(context),
+            if (widget.hasDouban || widget.hasImdb)
+              Positioned(
+                left: 0,
+                bottom: 0,
                 child: _CoverRatingBadges(
                   torrent: torrent,
                   hasDouban: widget.hasDouban,
                   hasImdb: widget.hasImdb,
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
