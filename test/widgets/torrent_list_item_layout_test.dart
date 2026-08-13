@@ -47,6 +47,86 @@ void main() {
     );
   }
 
+  TorrentItem createDiscountTorrent({DateTime? discountEndTime}) {
+    return TorrentItem(
+      id: 'discount-test',
+      name: 'Discount Test Torrent',
+      smallDescr: '',
+      sizeBytes: 1024,
+      seeders: 1,
+      leechers: 0,
+      createdDate: DateTime.parse('2023-10-27T10:00:00Z'),
+      discountEndTime: discountEndTime,
+      downloadUrl: '',
+      imageList: const [],
+      cover: '',
+      downloadStatus: DownloadStatus.none,
+      discount: DiscountType.free,
+      collection: false,
+      isTop: false,
+      doubanRating: '0',
+      imdbRating: '0',
+      tags: const [],
+    );
+  }
+
+  testWidgets('discount badge formats remaining hours and minutes', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      createWidgetUnderTest(
+        width: 360,
+        torrent: createDiscountTorrent(
+          discountEndTime: DateTime.now().add(
+            const Duration(hours: 1, minutes: 59),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('FREE 1h'), findsOneWidget);
+
+    await tester.pumpWidget(
+      createWidgetUnderTest(
+        width: 360,
+        torrent: createDiscountTorrent(
+          discountEndTime: DateTime.now().add(
+            const Duration(minutes: 35, seconds: 30),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('FREE 35m'), findsOneWidget);
+
+    await tester.pumpWidget(
+      createWidgetUnderTest(
+        width: 360,
+        torrent: createDiscountTorrent(
+          discountEndTime: DateTime.now().add(const Duration(seconds: 30)),
+        ),
+      ),
+    );
+    expect(find.text('FREE 0m'), findsOneWidget);
+  });
+
+  testWidgets('discount badge omits time when expired or without end time', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      createWidgetUnderTest(
+        width: 360,
+        torrent: createDiscountTorrent(
+          discountEndTime: DateTime.now().subtract(const Duration(seconds: 1)),
+        ),
+      ),
+    );
+    expect(find.text('FREE'), findsOneWidget);
+
+    await tester.pumpWidget(
+      createWidgetUnderTest(width: 360, torrent: createDiscountTorrent()),
+    );
+    expect(find.text('FREE'), findsOneWidget);
+  });
+
   testWidgets('mobile torrent size stays on one line on narrow screens', (
     WidgetTester tester,
   ) async {

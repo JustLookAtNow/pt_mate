@@ -856,8 +856,13 @@ class _DiscountBadge extends StatelessWidget {
     final baseText = torrent.discount.displayText;
     final endTime = torrent.discountEndTime;
     if (torrent.discount != DiscountType.normal && endTime != null) {
-      final hoursLeft = endTime.difference(DateTime.now()).inHours;
-      if (hoursLeft > 0) return '$baseText ${hoursLeft}h';
+      final remaining = endTime.difference(DateTime.now());
+      if (remaining.inMicroseconds > 0) {
+        if (remaining.inHours >= 1) {
+          return '$baseText ${remaining.inHours}h';
+        }
+        return '$baseText ${remaining.inMinutes}m';
+      }
     }
     return baseText;
   }
