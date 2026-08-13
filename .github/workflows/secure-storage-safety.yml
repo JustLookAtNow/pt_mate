@@ -8,19 +8,6 @@ on:
         required: false
         type: string
         default: ''
-  pull_request:
-    paths:
-      - 'android/app/**'
-      - 'lib/**'
-      - 'test/**'
-      - 'pubspec.yaml'
-      - 'pubspec.lock'
-      - '.flutter-version'
-      - 'android/gradle/**'
-      - 'android/*.gradle*'
-      - 'android/gradle.properties'
-      - '.github/workflows/secure-storage-safety.yml'
-      - '.github/workflows/release.yml'
   push:
     branches:
       - master
