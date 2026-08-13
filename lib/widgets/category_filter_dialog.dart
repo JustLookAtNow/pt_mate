@@ -159,7 +159,11 @@ class _CategoryFilterDialogState extends State<CategoryFilterDialog> {
                           final isSelected = index == _selectedCategoryIndex;
                           return ListTile(
                             key: ValueKey('category-item-$index'),
-                            title: Text(category.displayName),
+                            title: Text(
+                              category.displayName,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             leading: Radio<int>(value: index),
                             selected: isSelected,
                             selectedTileColor: Theme.of(context)

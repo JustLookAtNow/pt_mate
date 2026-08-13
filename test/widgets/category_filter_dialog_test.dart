@@ -96,6 +96,25 @@ void main() {
     );
   });
 
+  testWidgets('limits long category names to two lines', (tester) async {
+    const longCategoryName = '这是一个非常长的分类名称用于验证分类标题最多只会显示两行内容';
+    await _openDialog(
+      tester,
+      categories: const [
+        SearchCategoryConfig(
+          id: 'long-category',
+          displayName: longCategoryName,
+          parameters: '{}',
+        ),
+      ],
+      selectedCategoryIndex: 0,
+    );
+
+    final categoryTitle = tester.widget<Text>(find.text(longCategoryName));
+    expect(categoryTitle.maxLines, 2);
+    expect(categoryTitle.overflow, TextOverflow.ellipsis);
+  });
+
   testWidgets('handles an invalid category selection', (tester) async {
     await _openDialog(
       tester,
