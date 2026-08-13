@@ -1,0 +1,168 @@
+name: PR validation
+
+on:
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  flutter-analyze:
+    name: Flutter analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Read Flutter version
+        id: flutter-version
+        run: echo "version=$(tr -d '[:space:]' < .flutter-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
+          channel: stable
+          cache: true
+
+      - name: Cache Pub dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze Dart sources
+        run: flutter analyze
+
+  flutter-test:
+    name: Flutter tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Read Flutter version
+        id: flutter-version
+        run: echo "version=$(tr -d '[:space:]' < .flutter-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
+          channel: stable
+          cache: true
+
+      - name: Cache Pub dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run all Flutter tests
+        run: flutter test
+
+  go-test:
+    name: Go tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: server/go.mod
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      - name: Run all Go tests
+        run: go test ./...
+
+  android-test:
+    name: Android unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Read Flutter version
+        id: flutter-version
+        run: echo "version=$(tr -d '[:space:]' < .flutter-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '17'
+          cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
+          channel: stable
+          cache: true
+
+      - name: Cache Pub dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Prepare Android build files
+        run: flutter build apk --config-only
+
+      - name: Run all Android debug unit tests
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest
+
+  pr-gate:
+    name: PR gate
+    if: ${{ always() }}
+    needs:
+      - flutter-analyze
+      - flutter-test
+      - go-test
+      - android-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require all validation jobs to pass
+        env:
+          FLUTTER_ANALYZE_RESULT: ${{ needs.flutter-analyze.result }}
+          FLUTTER_TEST_RESULT: ${{ needs.flutter-test.result }}
+          GO_TEST_RESULT: ${{ needs.go-test.result }}
+          ANDROID_TEST_RESULT: ${{ needs.android-test.result }}
+        run: |
+          test "$FLUTTER_ANALYZE_RESULT" = success
+          test "$FLUTTER_TEST_RESULT" = success
+          test "$GO_TEST_RESULT" = success
+          test "$ANDROID_TEST_RESULT" = success

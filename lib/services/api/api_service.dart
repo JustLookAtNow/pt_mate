@@ -271,7 +271,7 @@ class ApiService {
   Future<bool> testConnectionWithSite(SiteConfig siteConfig) async {
     try {
       final adapter = await getAdapter(siteConfig);
-      return adapter.testConnection();
+      return await adapter.testConnection();
     } catch (e) {
       return false;
     }
