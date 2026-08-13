@@ -133,6 +133,14 @@ jobs:
       with:
         distribution: 'zulu'
         java-version: '17'
+
+    - name: Read Flutter version
+      id: flutter-version
+      shell: bash
+      run: |
+        version="$(tr -d '[:space:]' < .flutter-version)"
+        test -n "$version"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
         
     - name: Get Java Version
       run: echo "JAVA_VERSION=$(java -XshowSettings:properties -version 2>&1 | grep 'java.runtime.version' | awk '{print $3}')" >> $GITHUB_ENV
@@ -141,7 +149,7 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version-file: .flutter-version
+        flutter-version: ${{ steps.flutter-version.outputs.version }}
         channel: 'stable'
         cache: true  # 启用 Flutter SDK 缓存
         cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
@@ -347,12 +355,20 @@ jobs:
       with:
         distribution: 'zulu'
         java-version: '17'
+
+    - name: Read Flutter version
+      id: flutter-version
+      shell: bash
+      run: |
+        version="$(tr -d '[:space:]' < .flutter-version)"
+        test -n "$version"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
         
     # Flutter SDK 缓存
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version-file: .flutter-version
+        flutter-version: ${{ steps.flutter-version.outputs.version }}
         channel: 'stable'
         cache: true  # 启用 Flutter SDK 缓存
         cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
@@ -436,12 +452,20 @@ jobs:
         VERSION=${TAG#v}
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+    - name: Read Flutter version
+      id: flutter-version
+      shell: bash
+      run: |
+        version="$(tr -d '[:space:]' < .flutter-version)"
+        test -n "$version"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
         
     # Flutter SDK 缓存
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version-file: .flutter-version
+        flutter-version: ${{ steps.flutter-version.outputs.version }}
         channel: 'stable'
         cache: true  # 启用 Flutter SDK 缓存
         cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
