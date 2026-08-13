@@ -21,10 +21,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Read Flutter version
+        id: flutter-version
+        run: echo "version=$(tr -d '[:space:]' < .flutter-version)" >> "$GITHUB_OUTPUT"
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version-file: .flutter-version
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
+          channel: stable
           cache: true
 
       - name: Cache Pub dependencies
@@ -49,10 +54,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Read Flutter version
+        id: flutter-version
+        run: echo "version=$(tr -d '[:space:]' < .flutter-version)" >> "$GITHUB_OUTPUT"
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version-file: .flutter-version
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
+          channel: stable
           cache: true
 
       - name: Cache Pub dependencies
@@ -98,6 +108,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Read Flutter version
+        id: flutter-version
+        run: echo "version=$(tr -d '[:space:]' < .flutter-version)" >> "$GITHUB_OUTPUT"
+
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
@@ -108,7 +122,8 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version-file: .flutter-version
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
+          channel: stable
           cache: true
 
       - name: Cache Pub dependencies

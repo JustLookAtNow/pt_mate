@@ -8,6 +8,11 @@ import 'dart:io';
 import 'package:pt_mate/services/api/nexusphp_web_adapter.dart';
 
 void main() {
+  final htmlDir = Directory('test/html');
+  final htmlFixtureSkip = htmlDir.existsSync()
+      ? false
+      : '未提供本地私有 HTML 夹具；NexusPHP Web 页面诊断默认跳过。';
+
   group('NexusPHP Web Adapter Tests', () {
     late List<File> htmlFiles;
     late Map<String, String> htmlContents;
@@ -25,7 +30,6 @@ void main() {
         ),
       );
       // 遍历html文件夹中的所有HTML文件
-      final htmlDir = Directory('test/html');
       htmlFiles = htmlDir
           .listSync()
           .where((entity) => entity is File && entity.path.endsWith('.html'))
@@ -245,5 +249,5 @@ void main() {
         }
       }
     });
-  });
+  }, skip: htmlFixtureSkip);
 }
