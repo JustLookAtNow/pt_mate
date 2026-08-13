@@ -17,6 +17,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Read Flutter version
+        id: flutter-version
+        shell: bash
+        run: |
+          version="$(tr -d '[:space:]' < .flutter-version)"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
@@ -30,7 +38,7 @@ jobs:
         id: cache_flutter_linux
         uses: subosito/flutter-action@v2
         with:
-          flutter-version-file: .flutter-version
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
           channel: 'stable'
           cache: true
           cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
@@ -122,6 +130,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Read Flutter version
+        id: flutter-version
+        shell: bash
+        run: |
+          version="$(tr -d '[:space:]' < .flutter-version)"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
@@ -132,7 +148,7 @@ jobs:
         id: cache_flutter_windows
         uses: subosito/flutter-action@v2
         with:
-          flutter-version-file: .flutter-version
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
           channel: 'stable'
           cache: true
           cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
@@ -183,11 +199,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Read Flutter version
+        id: flutter-version
+        shell: bash
+        run: |
+          version="$(tr -d '[:space:]' < .flutter-version)"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Setup Flutter (cached)
         id: cache_flutter_macos
         uses: subosito/flutter-action@v2
         with:
-          flutter-version-file: .flutter-version
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
           channel: 'stable'
           cache: true
           cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
