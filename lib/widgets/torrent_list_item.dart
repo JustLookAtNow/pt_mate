@@ -91,6 +91,10 @@ class TorrentListItem extends StatelessWidget {
 
   /// 下载回调
   final VoidCallback? onDownload;
+
+  /// 点击封面回调；为 null 时保留内置的全屏预览行为
+  final VoidCallback? onCoverTap;
+
   final BatchOperationType? batchOperationType;
   final BatchItemState batchItemState;
   final String? batchErrorMessage;
@@ -108,6 +112,7 @@ class TorrentListItem extends StatelessWidget {
     this.onLongPress,
     this.onToggleCollection,
     this.onDownload,
+    this.onCoverTap,
     this.suspendImageLoading,
     this.showCoverSetting,
     this.batchOperationType,
@@ -203,6 +208,7 @@ class TorrentListItem extends StatelessWidget {
                       onRetryBatchAction: onRetryBatchAction,
                       onToggleCollection: onToggleCollection,
                       onDownload: onDownload,
+                      onCoverTap: onCoverTap,
                       aggregateSiteColor: aggregateSiteColor,
                     ),
                   ),
@@ -378,6 +384,7 @@ class _TorrentListItemRow extends StatelessWidget {
   final VoidCallback? onRetryBatchAction;
   final VoidCallback? onToggleCollection;
   final VoidCallback? onDownload;
+  final VoidCallback? onCoverTap;
   final Color? aggregateSiteColor;
 
   const _TorrentListItemRow({
@@ -397,6 +404,7 @@ class _TorrentListItemRow extends StatelessWidget {
     this.onRetryBatchAction,
     this.onToggleCollection,
     this.onDownload,
+    this.onCoverTap,
     this.aggregateSiteColor,
   });
 
@@ -415,6 +423,7 @@ class _TorrentListItemRow extends StatelessWidget {
             isMobile: isMobile,
             hasDouban: hasDouban,
             hasImdb: hasImdb,
+            onTap: onCoverTap,
           ),
         Expanded(
           child: TorrentInfo(
@@ -961,6 +970,9 @@ class TorrentCover extends StatefulWidget {
   final bool hasDouban;
   final bool hasImdb;
 
+  /// 点击封面回调；为 null 时使用内置全屏预览
+  final VoidCallback? onTap;
+
   const TorrentCover({
     super.key,
     required this.torrent,
@@ -968,6 +980,7 @@ class TorrentCover extends StatefulWidget {
     required this.isMobile,
     required this.hasDouban,
     required this.hasImdb,
+    this.onTap,
   });
 
   @override
@@ -1013,6 +1026,11 @@ class _TorrentCoverState extends State<TorrentCover> {
 
   void _handleTap(BuildContext context) {
     if (widget.torrent.cover.isEmpty) return;
+    if (widget.onTap != null) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      widget.onTap!();
+      return;
+    }
     final data = _imageData;
     if (data != null) {
       _showCoverPreview(context, data);
