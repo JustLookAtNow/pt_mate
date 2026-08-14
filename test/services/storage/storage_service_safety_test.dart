@@ -92,6 +92,12 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(secureStorageProfileChannel, (call) async {
           calls.add(call.method);
+          if (call.method == 'probeModernSecureStorageCapability') {
+            return <String, Object?>{
+              'status': 'supported',
+              'failureCode': null,
+            };
+          }
           if (call.method == 'initializeFreshAndroidSecureStorage') {
             return <String, Object?>{
               'status': 'ready',
@@ -131,6 +137,7 @@ void main() {
 
     expect(calls, <String>[
       'probeAndroidSecureStorage',
+      'probeModernSecureStorageCapability',
       'initializeFreshAndroidSecureStorage',
       'probeAndroidSecureStorage',
     ]);
@@ -215,6 +222,12 @@ void main() {
         });
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(secureStorageProfileChannel, (call) async {
+          if (call.method == 'probeModernSecureStorageCapability') {
+            return <String, Object?>{
+              'status': 'supported',
+              'failureCode': null,
+            };
+          }
           if (call.method == 'probeAndroidSecureStorage') {
             probeCount++;
             return <String, Object?>{
@@ -252,6 +265,132 @@ void main() {
     expect(probeCount, 1);
     expect(secureCalls, 0);
     expect(storage.secureStorageState, SecureStorageState.unavailable);
+  });
+
+  test('全新 Android 仅在明确不支持算法时永久进入明文模式', () async {
+    storage.overridePlatformForTest(TargetPlatform.android);
+    storage.overrideAndroidSecureStorageProfileForTest(null);
+    var probeCount = 0;
+    var securePluginCalls = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageChannel, (_) async {
+          securePluginCalls++;
+          return null;
+        });
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageProfileChannel, (call) async {
+          switch (call.method) {
+            case 'probeAndroidSecureStorage':
+              probeCount++;
+              return <String, Object?>{
+                'status': probeCount == 1 ? 'fresh' : 'ready',
+                'profile': probeCount == 1 ? 'fresh' : 'plaintext',
+                'keyCipher': null,
+                'storageCipher': null,
+                'hasEncryptedEntries': false,
+                'hasWrappedKeys': false,
+                'failureCode': null,
+              };
+            case 'probeModernSecureStorageCapability':
+              return <String, Object?>{
+                'status': 'unsupported',
+                'failureCode': 'unsupported_algorithm',
+              };
+            case 'enableAndroidPlaintextFallback':
+              return <String, Object?>{
+                'status': 'ready',
+                'profile': 'plaintext',
+                'keyCipher': null,
+                'storageCipher': null,
+                'hasEncryptedEntries': false,
+                'hasWrappedKeys': false,
+                'failureCode': null,
+              };
+            default:
+              fail('unexpected native call: ${call.method}');
+          }
+        });
+
+    await storage.initializeSecureStorage();
+
+    expect(storage.secureStorageState, SecureStorageState.ready);
+    expect(storage.isAndroidPlaintextFallback, isTrue);
+    expect(securePluginCalls, 0);
+  });
+
+  test('全新 Android 能力探测临时失败时禁止明文回退', () async {
+    storage.overridePlatformForTest(TargetPlatform.android);
+    storage.overrideAndroidSecureStorageProfileForTest(null);
+    var enabledPlaintext = false;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageProfileChannel, (call) async {
+          if (call.method == 'probeAndroidSecureStorage') {
+            return <String, Object?>{
+              'status': 'fresh',
+              'profile': 'fresh',
+              'keyCipher': null,
+              'storageCipher': null,
+              'hasEncryptedEntries': false,
+              'hasWrappedKeys': false,
+              'failureCode': null,
+            };
+          }
+          if (call.method == 'probeModernSecureStorageCapability') {
+            return <String, Object?>{
+              'status': 'unavailable',
+              'failureCode': 'capability_probe_failed',
+            };
+          }
+          if (call.method == 'enableAndroidPlaintextFallback') {
+            enabledPlaintext = true;
+          }
+          return null;
+        });
+
+    await expectLater(
+      storage.initializeSecureStorage(),
+      throwsA(
+        isA<SecureStorageUnavailableException>().having(
+          (error) => error.code,
+          'code',
+          'capability_probe_failed',
+        ),
+      ),
+    );
+
+    expect(enabledPlaintext, isFalse);
+    expect(storage.secureStorageState, SecureStorageState.unavailable);
+  });
+
+  test('Android 明文存储 I/O 失败后立即锁定且不得表现为空值', () async {
+    storage.overridePlatformForTest(TargetPlatform.android);
+    storage.overrideAndroidSecureStorageProfileForTest(
+      AndroidSecureStorageProfile.plaintext,
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageProfileChannel, (call) async {
+          if (call.method == 'readAndroidPlaintextSensitive') return null;
+          if (call.method == 'commitAndroidPlaintextSensitive') {
+            return <String, Object?>{
+              'status': 'unavailable',
+              'failureCode': 'plaintext_commit_failed',
+            };
+          }
+          fail('unexpected native call: ${call.method}');
+        });
+
+    await storage.initializeSecureStorage();
+    await expectLater(
+      storage.saveDeviceId('must-not-be-lost'),
+      throwsA(isA<SecureStorageUnavailableException>()),
+    );
+
+    expect(storage.secureStorageState, SecureStorageState.unavailable);
+    expect(storage.canAccessSensitiveStorage, isFalse);
+    await expectLater(
+      storage.loadDeviceId(),
+      throwsA(isA<SecureStorageUnavailableException>()),
+    );
   });
 
   test('解密异常不会把已有站点配置转换为空列表', () async {
@@ -1000,9 +1139,9 @@ void main() {
     await storage.checkAndMigrate();
 
     final prefs = await SharedPreferences.getInstance();
-    final stored =
-        (jsonDecode(prefs.getString(StorageKeys.downloaderConfigs)!)
-            as List<dynamic>);
+    final stored = (jsonDecode(
+      prefs.getString(StorageKeys.downloaderConfigs)!,
+    ) as List<dynamic>);
     final config = stored.single as Map<String, dynamic>;
     expect(
       (config['config'] as Map<String, dynamic>).containsKey('password'),

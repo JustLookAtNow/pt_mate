@@ -1,3 +1,6 @@
+// Callback parameter names are part of the transaction test/consumer API.
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 import 'dart:convert';
 
