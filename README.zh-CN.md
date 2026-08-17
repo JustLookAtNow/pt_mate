@@ -114,4 +114,4 @@ MIT License，详见 [LICENSE](./LICENSE)。
 
 ## Star 趋势
 
-[![Star History Chart](https://api.star-history.com/svg?repos=JustLookAtNow/pt_mate&type=Date)](https://star-history.com/#JustLookAtNow/pt_mate&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=JustLookAtNow/pt_mate&type=Date)](https://star-history.dera.page/#JustLookAtNow/pt_mate&Date)
