@@ -8,11 +8,25 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.Settings
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileOutputStream
+import java.security.KeyPairGenerator
+import java.security.KeyStore
+import java.security.NoSuchAlgorithmException
+import java.security.SecureRandom
+import java.security.spec.MGF1ParameterSpec
+import java.util.UUID
+import javax.crypto.Cipher
+import javax.crypto.NoSuchPaddingException
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.OAEPParameterSpec
+import javax.crypto.spec.PSource
+import javax.crypto.spec.SecretKeySpec
 
 class MainActivity : FlutterActivity() {
     private var secureStorageTestBootstrapFailureCode: String? = null
@@ -85,6 +99,37 @@ class MainActivity : FlutterActivity() {
 
                 "initializeFreshAndroidSecureStorage" -> {
                     result.success(initializeFreshAndroidSecureStorage())
+                }
+
+                "probeModernSecureStorageCapability" -> {
+                    result.success(probeModernSecureStorageCapability())
+                }
+
+                "enableAndroidPlaintextFallback" -> {
+                    result.success(enableAndroidPlaintextFallback())
+                }
+
+                "readAndroidPlaintextSensitive" -> {
+                    val key = call.argument<String>("key")
+                    if (key.isNullOrBlank() || !isAllowedPlaintextSensitiveKey(key)) {
+                        result.error("invalid_key", "Unsupported plaintext key", null)
+                    } else {
+                        result.success(readAndroidPlaintextSensitive(key))
+                    }
+                }
+
+                "commitAndroidPlaintextSensitive" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val mutations = call.argument<Map<String, Any?>>("mutations")
+                    result.success(commitAndroidPlaintextSensitive(mutations))
+                }
+
+                "resetLegacyAndroidSecureStorage" -> {
+                    result.success(
+                        resetLegacyAndroidSecureStorage(
+                            call.argument<Boolean>("confirmed") == true,
+                        ),
+                    )
                 }
 
                 "flushAndroidSecureStorage" -> {
@@ -260,8 +305,32 @@ class MainActivity : FlutterActivity() {
                     failureCode = bootstrapFailure,
                 ).toMethodChannelMap()
             }
+            val input = readSecureStorageProbeInput()
+            if (isAndroidPlaintextFallbackEnabled()) {
+                if (input.hasEncryptedEntries || input.hasWrappedKeys ||
+                    input.namespacedConfig.isNotEmpty() || input.legacyConfig.isNotEmpty()
+                ) {
+                    return SecureStorageProbeResult(
+                        status = "inconsistent",
+                        profile = "inconsistent",
+                        hasEncryptedEntries = input.hasEncryptedEntries,
+                        hasWrappedKeys = input.hasWrappedKeys,
+                        failureCode = "plaintext_secure_artifact_conflict",
+                    ).toMethodChannelMap()
+                }
+                return SecureStorageProbeResult(
+                    status = "ready",
+                    profile = "plaintext",
+                ).toMethodChannelMap()
+            }
+            if (isLegacyResetAuthorized(input)) {
+                return SecureStorageProbeResult(
+                    status = "fresh",
+                    profile = "fresh",
+                ).toMethodChannelMap()
+            }
             validateSecureStorageTestProfile(
-                SecureStorageProbeClassifier.classify(readSecureStorageProbeInput()),
+                SecureStorageProbeClassifier.classify(input),
             ).toMethodChannelMap()
         } catch (_: Exception) {
             SecureStorageProbeResult(
@@ -269,6 +338,266 @@ class MainActivity : FlutterActivity() {
                 profile = "inconsistent",
                 failureCode = "probe_failed",
             ).toMethodChannelMap()
+        }
+    }
+
+    /** Tests OAEP wrapping and AES-GCM using a throwaway KeyStore alias. */
+    private fun probeModernSecureStorageCapability(): Map<String, Any?> {
+        val input = readSecureStorageProbeInput()
+        val before = SecureStorageProbeClassifier.classify(input)
+        if ((!isLegacyResetAuthorized(input) && before.status != "fresh") ||
+            input.hasEncryptedEntries || input.hasWrappedKeys ||
+            input.namespacedConfig.isNotEmpty() || input.legacyConfig.isNotEmpty()
+        ) {
+            return mapOf(
+                "status" to "unavailable",
+                "failureCode" to "capability_probe_requires_fresh_storage",
+            )
+        }
+        val alias = "$packageName.ptmate.oaep-capability.${UUID.randomUUID()}"
+        return try {
+            val generator = KeyPairGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_RSA,
+                ANDROID_KEYSTORE_PROVIDER,
+            )
+            generator.initialize(
+                KeyGenParameterSpec.Builder(
+                    alias,
+                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+                )
+                    .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA1)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_OAEP)
+                    .build(),
+            )
+            generator.generateKeyPair()
+
+            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE_PROVIDER).apply { load(null) }
+            val certificate = keyStore.getCertificate(alias)
+                ?: throw IllegalStateException("capability_certificate_missing")
+            val privateKey = keyStore.getKey(alias, null)
+                ?: throw IllegalStateException("capability_private_key_missing")
+            val oaepSpec = OAEPParameterSpec(
+                "SHA-256",
+                "MGF1",
+                MGF1ParameterSpec.SHA1,
+                PSource.PSpecified.DEFAULT,
+            )
+            val secret = ByteArray(32).also(SecureRandom()::nextBytes)
+            val encryptCipher = Cipher.getInstance(
+                "RSA/ECB/OAEPPadding",
+                ANDROID_KEYSTORE_CIPHER_PROVIDER,
+            ).apply { init(Cipher.ENCRYPT_MODE, certificate.publicKey, oaepSpec) }
+            val wrapped = encryptCipher.doFinal(secret)
+            val unwrapped = Cipher.getInstance(
+                "RSA/ECB/OAEPPadding",
+                ANDROID_KEYSTORE_CIPHER_PROVIDER,
+            ).apply { init(Cipher.DECRYPT_MODE, privateKey, oaepSpec) }.doFinal(wrapped)
+            check(secret.contentEquals(unwrapped)) { "oaep_round_trip_failed" }
+
+            val aesKey = SecretKeySpec(secret, "AES")
+            val gcmEncrypt = Cipher.getInstance("AES/GCM/NoPadding").apply {
+                init(Cipher.ENCRYPT_MODE, aesKey)
+            }
+            val plaintext = "ptmate-gcm-capability".toByteArray()
+            val ciphertext = gcmEncrypt.doFinal(plaintext)
+            val decrypted = Cipher.getInstance("AES/GCM/NoPadding").apply {
+                init(Cipher.DECRYPT_MODE, aesKey, GCMParameterSpec(128, gcmEncrypt.iv))
+            }.doFinal(ciphertext)
+            check(plaintext.contentEquals(decrypted)) { "gcm_round_trip_failed" }
+            mapOf<String, Any?>("status" to "supported", "failureCode" to null)
+        } catch (error: Throwable) {
+            if (isExplicitAlgorithmUnsupported(error)) {
+                mapOf(
+                    "status" to "unsupported",
+                    "failureCode" to "unsupported_algorithm",
+                )
+            } else {
+                mapOf(
+                    "status" to "unavailable",
+                    "failureCode" to "capability_probe_failed",
+                )
+            }
+        } finally {
+            try {
+                KeyStore.getInstance(ANDROID_KEYSTORE_PROVIDER).apply {
+                    load(null)
+                    deleteEntry(alias)
+                }
+            } catch (_: Exception) {
+                // The alias is test-only and best-effort cleanup is safe here.
+            }
+        }
+    }
+
+    private fun isExplicitAlgorithmUnsupported(error: Throwable): Boolean {
+        var current: Throwable? = error
+        while (current != null) {
+            if (current is NoSuchAlgorithmException ||
+                current is NoSuchPaddingException ||
+                current is UnsupportedOperationException
+            ) {
+                return true
+            }
+            val message = current.message?.lowercase().orEmpty()
+            if (message.contains("unsupported algorithm") ||
+                message.contains("algorithm not available")
+            ) {
+                return true
+            }
+            current = current.cause
+        }
+        return false
+    }
+
+    private fun enableAndroidPlaintextFallback(): Map<String, Any?> {
+        val input = readSecureStorageProbeInput()
+        val before = SecureStorageProbeClassifier.classify(input)
+        if ((!isLegacyResetAuthorized(input) && before.status != "fresh") ||
+            input.hasEncryptedEntries || input.hasWrappedKeys ||
+            input.namespacedConfig.isNotEmpty() || input.legacyConfig.isNotEmpty()
+        ) {
+            return SecureStorageProbeResult(
+                status = "inconsistent",
+                profile = "inconsistent",
+                hasEncryptedEntries = before.hasEncryptedEntries,
+                hasWrappedKeys = before.hasWrappedKeys,
+                failureCode = "plaintext_enable_requires_fresh_storage",
+            ).toMethodChannelMap()
+        }
+        val committed = getSharedPreferences(
+            ANDROID_PLAINTEXT_PREFS,
+            Context.MODE_PRIVATE,
+        ).edit()
+            .putBoolean(ANDROID_PLAINTEXT_MODE_KEY, true)
+            .remove(LEGACY_RESET_AUTHORIZED_KEY)
+            .commit()
+        if (!committed || !isAndroidPlaintextFallbackEnabled()) {
+            return SecureStorageProbeResult(
+                status = "inconsistent",
+                profile = "inconsistent",
+                failureCode = "plaintext_enable_commit_failed",
+            ).toMethodChannelMap()
+        }
+        return SecureStorageProbeResult(
+            status = "ready",
+            profile = "plaintext",
+        ).toMethodChannelMap()
+    }
+
+    private fun isAndroidPlaintextFallbackEnabled(): Boolean =
+        getSharedPreferences(ANDROID_PLAINTEXT_PREFS, Context.MODE_PRIVATE)
+            .getBoolean(ANDROID_PLAINTEXT_MODE_KEY, false)
+
+    private fun readAndroidPlaintextSensitive(key: String): String? {
+        if (!isAndroidPlaintextFallbackEnabled()) return null
+        return getSharedPreferences(ANDROID_PLAINTEXT_PREFS, Context.MODE_PRIVATE)
+            .getString(key, null)
+    }
+
+    private fun commitAndroidPlaintextSensitive(
+        mutations: Map<String, Any?>?,
+    ): Map<String, Any?> {
+        if (!isAndroidPlaintextFallbackEnabled() || mutations == null) {
+            return mapOf(
+                "status" to "unavailable",
+                "failureCode" to "plaintext_mode_not_enabled",
+            )
+        }
+        if (mutations.keys.any { !isAllowedPlaintextSensitiveKey(it) } ||
+            mutations.values.any { it != null && it !is String }
+        ) {
+            return mapOf(
+                "status" to "unavailable",
+                "failureCode" to "invalid_plaintext_mutation",
+            )
+        }
+        val preferences = getSharedPreferences(ANDROID_PLAINTEXT_PREFS, Context.MODE_PRIVATE)
+        val editor = preferences.edit()
+        for ((key, value) in mutations) {
+            if (value == null) editor.remove(key) else editor.putString(key, value as String)
+        }
+        if (!editor.commit()) {
+            return mapOf(
+                "status" to "unavailable",
+                "failureCode" to "plaintext_commit_failed",
+            )
+        }
+        for ((key, value) in mutations) {
+            if (preferences.getString(key, null) != value) {
+                return mapOf(
+                    "status" to "unavailable",
+                    "failureCode" to "plaintext_commit_verification_failed",
+                )
+            }
+        }
+        return mapOf<String, Any?>("status" to "ready", "failureCode" to null)
+    }
+
+    private fun isAllowedPlaintextSensitiveKey(key: String): Boolean =
+        key == "site.apiKey" ||
+            key == "network.proxyPassword" ||
+            key == "device_id" ||
+            key == "cookieCloud.url" ||
+            key == "cookieCloud.uuid" ||
+            key == "cookieCloud.password" ||
+            key == "cookieCloud.secrets.v2" ||
+            key.startsWith("site.apiKey.") ||
+            key.startsWith("site.cookie.") ||
+            key.startsWith("downloader.password.") ||
+            key.startsWith("qb.password.") ||
+            key.startsWith("webdav.password.") ||
+            key.startsWith(SENSITIVE_REVISION_KEY_PREFIX) ||
+            key == BACKUP_RESTORE_CHECKPOINT_KEY
+
+    private fun resetLegacyAndroidSecureStorage(confirmed: Boolean): Map<String, Any?> {
+        if (!confirmed) {
+            return mapOf("status" to "unavailable", "failureCode" to "confirmation_required")
+        }
+        val before = SecureStorageProbeClassifier.classify(readSecureStorageProbeInput())
+        if (before.profile !in setOf("pkcs1Gcm", "pkcs1Cbc")) {
+            return mapOf("status" to "unavailable", "failureCode" to "legacy_profile_required")
+        }
+        return try {
+            val preferenceNames = listOf(
+                SECURE_STORAGE_LEGACY_CONFIG_PREFS,
+                SECURE_STORAGE_NAMESPACED_CONFIG_PREFS,
+                SECURE_STORAGE_KEY_PREFS,
+                SECURE_STORAGE_DATA_PREFS,
+                ANDROID_PLAINTEXT_PREFS,
+            )
+            if (preferenceNames.any {
+                    !getSharedPreferences(it, Context.MODE_PRIVATE).edit().clear().commit()
+                }
+            ) {
+                return mapOf("status" to "unavailable", "failureCode" to "legacy_reset_commit_failed")
+            }
+            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE_PROVIDER).apply { load(null) }
+            for (alias in listOf(
+                "$packageName.FlutterSecureStoragePluginKey",
+                "$packageName.FlutterSecureStoragePluginKeyOAEP",
+            )) {
+                keyStore.deleteEntry(alias)
+            }
+            val after = readSecureStorageProbeInput()
+            if (after.hasEncryptedEntries || after.hasWrappedKeys ||
+                after.namespacedConfig.isNotEmpty() || after.legacyConfig.isNotEmpty()
+            ) {
+                return mapOf(
+                    "status" to "unavailable",
+                    "failureCode" to "legacy_reset_verification_failed",
+                )
+            }
+            val authorized = getSharedPreferences(
+                ANDROID_PLAINTEXT_PREFS,
+                Context.MODE_PRIVATE,
+            ).edit().putBoolean(LEGACY_RESET_AUTHORIZED_KEY, true).commit()
+            if (authorized && isLegacyResetAuthorized(readSecureStorageProbeInput())) {
+                mapOf<String, Any?>("status" to "fresh", "failureCode" to null)
+            } else {
+                mapOf("status" to "unavailable", "failureCode" to "legacy_reset_verification_failed")
+            }
+        } catch (_: Exception) {
+            mapOf("status" to "unavailable", "failureCode" to "legacy_reset_failed")
         }
     }
 
@@ -283,13 +612,12 @@ class MainActivity : FlutterActivity() {
      */
     private fun initializeFreshAndroidSecureStorage(): Map<String, Any?> {
         return try {
-            val before = SecureStorageProbeClassifier.classify(
-                readSecureStorageProbeInput(),
-            )
-            if (before.status != "fresh" ||
-                before.profile != "fresh" ||
-                before.hasEncryptedEntries ||
-                before.hasWrappedKeys
+            val input = readSecureStorageProbeInput()
+            val before = SecureStorageProbeClassifier.classify(input)
+            if ((!isLegacyResetAuthorized(input) &&
+                    (before.status != "fresh" || before.profile != "fresh")) ||
+                input.hasEncryptedEntries || input.hasWrappedKeys ||
+                input.namespacedConfig.isNotEmpty() || input.legacyConfig.isNotEmpty()
             ) {
                 return SecureStorageProbeResult(
                     status = "inconsistent",
@@ -319,6 +647,15 @@ class MainActivity : FlutterActivity() {
                     status = "inconsistent",
                     profile = "inconsistent",
                     failureCode = "fresh_initialization_commit_failed",
+                ).toMethodChannelMap()
+            }
+            if (!getSharedPreferences(ANDROID_PLAINTEXT_PREFS, Context.MODE_PRIVATE)
+                    .edit().remove(LEGACY_RESET_AUTHORIZED_KEY).commit()
+            ) {
+                return SecureStorageProbeResult(
+                    status = "inconsistent",
+                    profile = "inconsistent",
+                    failureCode = "legacy_reset_authorization_cleanup_failed",
                 ).toMethodChannelMap()
             }
 
@@ -431,6 +768,7 @@ class MainActivity : FlutterActivity() {
                 SECURE_STORAGE_NAMESPACED_CONFIG_PREFS,
                 SECURE_STORAGE_KEY_PREFS,
                 SECURE_STORAGE_DATA_PREFS,
+                ANDROID_PLAINTEXT_PREFS,
             )
             var committed = true
             for (preferenceName in preferenceNames) {
@@ -507,6 +845,14 @@ class MainActivity : FlutterActivity() {
         return primary.exists() || backup.exists()
     }
 
+    private fun isLegacyResetAuthorized(input: SecureStorageProbeInput): Boolean =
+        !input.hasEncryptedEntries &&
+            !input.hasWrappedKeys &&
+            input.namespacedConfig.isEmpty() &&
+            input.legacyConfig.isEmpty() &&
+            getSharedPreferences(ANDROID_PLAINTEXT_PREFS, Context.MODE_PRIVATE)
+                .getBoolean(LEGACY_RESET_AUTHORIZED_KEY, false)
+
     /**
      * Allows a fresh, isolated debug application to initialize one of the historical profiles.
      * The Gradle-generated suffix and BuildConfig.DEBUG checks make this unreachable in production.
@@ -549,6 +895,8 @@ class MainActivity : FlutterActivity() {
         const val CHANNEL = "pt_mate/android_install_permission"
         const val LOCAL_DOWNLOADS_CHANNEL = "pt_mate/local_downloads"
         const val SECURE_STORAGE_PROFILE_CHANNEL = "pt_mate/secure_storage_profile"
+        const val ANDROID_KEYSTORE_PROVIDER = "AndroidKeyStore"
+        const val ANDROID_KEYSTORE_CIPHER_PROVIDER = "AndroidKeyStoreBCWorkaround"
         const val DOWNLOADS_SUBDIRECTORY = "PT Mate"
         const val DOWNLOADS_DISPLAY_PATH = "Downloads/PT Mate"
 
@@ -560,6 +908,11 @@ class MainActivity : FlutterActivity() {
         const val SECURE_STORAGE_LEGACY_CONFIG_PREFS = "FlutterSecureStorageConfiguration"
         const val SECURE_STORAGE_NAMESPACED_CONFIG_PREFS =
             "FlutterSecureStorageConfiguration:FlutterSecureStorage"
+        const val ANDROID_PLAINTEXT_PREFS = "ptmate.android.plaintext_sensitive.v1"
+        const val ANDROID_PLAINTEXT_MODE_KEY = "__ptmate_plaintext_mode_v1__"
+        const val LEGACY_RESET_AUTHORIZED_KEY = "__ptmate_legacy_reset_authorized_v1__"
+        const val SENSITIVE_REVISION_KEY_PREFIX = "secureStorage.sensitiveRevision.v1."
+        const val BACKUP_RESTORE_CHECKPOINT_KEY = "secureStorage.backupRestoreCheckpoint.v1"
         const val SECURE_STORAGE_GCM_WRAPPED_KEY =
             "AESVGhpcyBpcyB0aGUga2V5IGZvciBhIHNlY3VyZSBzdG9yYWdlIEFFUyBLZXkK"
         const val SECURE_STORAGE_CBC_WRAPPED_KEY =

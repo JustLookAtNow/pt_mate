@@ -5,14 +5,60 @@ class SecureStorageRecoveryPage extends StatelessWidget {
     super.key,
     required this.onRetry,
     required this.onOpenBackupRestore,
+    this.onDiscardLegacyData,
     this.failureCode,
     this.isRetrying = false,
   });
 
   final Future<void> Function() onRetry;
   final VoidCallback onOpenBackupRestore;
+
+  /// Invoked only after the user explicitly confirms that they want to discard
+  /// legacy encrypted data without restoring a backup.
+  final Future<void> Function()? onDiscardLegacyData;
   final String? failureCode;
   final bool isRetrying;
+
+  bool get _requiresLegacyBackupRestore =>
+      failureCode == 'legacy_secure_storage_backup_restore_required';
+
+  Future<void> _confirmDiscardLegacyData(BuildContext context) async {
+    final confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('确认放弃旧安全数据'),
+            content: const Text(
+              '这会永久删除旧版安全存储中的 Cookie、API Key 和密码，且无法恢复。\n\n'
+              '只有在您确认没有可用备份时才继续。',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(dialogContext).colorScheme.error,
+                  foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+                ),
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('放弃旧数据'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || onDiscardLegacyData == null) return;
+
+    try {
+      await onDiscardLegacyData!();
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('无法重置旧安全数据，请重试或恢复备份。')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,19 +84,25 @@ class SecureStorageRecoveryPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        '暂时无法读取安全存储',
+                        _requiresLegacyBackupRestore
+                            ? '需要恢复旧版安全存储数据'
+                            : '暂时无法读取安全存储',
                         style: theme.textTheme.headlineSmall,
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        '为避免把读取异常误判为配置为空，站点初始化、自动同步、健康检查和备份上传已暂停。应用不会自动清空或重建安全存储。',
+                        _requiresLegacyBackupRestore
+                            ? '此版本无法直接读取旧版安全存储。请先选择并解析一份有效备份；确认后，应用才会清理旧数据并恢复备份。'
+                            : '为避免把读取异常误判为配置为空，站点初始化、自动同步、健康检查和备份上传已暂停。应用不会自动清空或重建安全存储。',
                         style: theme.textTheme.bodyLarge,
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        '如果重试仍失败，请先在系统中清除应用数据或重装，使安全存储回到全新状态，再进入备份恢复；这里不会原地重建或覆盖现有密钥。',
+                        _requiresLegacyBackupRestore
+                            ? '备份文件包含 Cookie、API Key 和密码等敏感信息。请妥善保管，并在恢复成功后删除备份文件。'
+                            : '如果重试仍失败，请先在系统中清除应用数据或重装，使安全存储回到全新状态，再进入备份恢复；这里不会原地重建或覆盖现有密钥。',
                         style: theme.textTheme.bodyMedium,
                         textAlign: TextAlign.center,
                       ),
@@ -65,30 +117,50 @@ class SecureStorageRecoveryPage extends StatelessWidget {
                         ),
                       ],
                       const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: isRetrying ? null : () => onRetry(),
-                          icon: isRetrying
-                              ? const SizedBox.square(
-                                  dimension: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.refresh),
-                          label: Text(isRetrying ? '正在重试…' : '重试'),
+                      if (!_requiresLegacyBackupRestore)
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: isRetrying ? null : () => onRetry(),
+                            icon: isRetrying
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.refresh),
+                            label: Text(isRetrying ? '正在重试…' : '重试'),
+                          ),
                         ),
-                      ),
+                      if (!_requiresLegacyBackupRestore)
+                        const SizedBox(height: 12),
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
                           onPressed: isRetrying ? null : onOpenBackupRestore,
                           icon: const Icon(Icons.restore),
-                          label: const Text('进入备份恢复'),
+                          label: Text(
+                            _requiresLegacyBackupRestore
+                                ? '选择有效备份并恢复'
+                                : '进入备份恢复',
+                          ),
                         ),
                       ),
+                      if (_requiresLegacyBackupRestore) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton.icon(
+                            onPressed: isRetrying || onDiscardLegacyData == null
+                                ? null
+                                : () => _confirmDiscardLegacyData(context),
+                            icon: const Icon(Icons.delete_forever_outlined),
+                            label: const Text('没有备份，放弃旧数据'),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

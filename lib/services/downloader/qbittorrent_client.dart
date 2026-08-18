@@ -1,3 +1,6 @@
+// Keep the public `onConfigUpdated` named parameter stable.
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -44,8 +47,7 @@ class QbittorrentClient
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 30),
         headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
         },
         followRedirects: true,
         maxRedirects: 5,
@@ -56,8 +58,11 @@ class QbittorrentClient
       dio.httpClientAdapter = IOHttpClientAdapter(
         createHttpClient: () {
           final HttpClient client = HttpClient()
-            ..badCertificateCallback =
-                (X509Certificate cert, String host, int port) => true;
+            ..badCertificateCallback = (
+              X509Certificate cert,
+              String host,
+              int port,
+            ) => true;
           return client;
         },
       );

@@ -57,4 +57,37 @@ void main() {
     expect(filledButton.onPressed, isNull);
     expect(outlinedButton.onPressed, isNull);
   });
+
+  testWidgets('legacy recovery requires a backup or an explicit discard', (
+    tester,
+  ) async {
+    var openBackupCount = 0;
+    var discardCount = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SecureStorageRecoveryPage(
+          failureCode: 'legacy_secure_storage_backup_restore_required',
+          onRetry: () async {},
+          onOpenBackupRestore: () => openBackupCount++,
+          onDiscardLegacyData: () async => discardCount++,
+        ),
+      ),
+    );
+
+    expect(find.text('需要恢复旧版安全存储数据'), findsOneWidget);
+    expect(find.text('选择有效备份并恢复'), findsOneWidget);
+    expect(find.text('没有备份，放弃旧数据'), findsOneWidget);
+    expect(find.text('重试'), findsNothing);
+
+    await tester.tap(find.text('选择有效备份并恢复'));
+    await tester.pump();
+    expect(openBackupCount, 1);
+
+    await tester.tap(find.text('没有备份，放弃旧数据'));
+    await tester.pumpAndSettle();
+    expect(find.text('确认放弃旧安全数据'), findsOneWidget);
+    await tester.tap(find.text('放弃旧数据'));
+    await tester.pumpAndSettle();
+    expect(discardCount, 1);
+  });
 }
