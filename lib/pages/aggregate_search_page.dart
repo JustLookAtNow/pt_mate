@@ -8,6 +8,7 @@ import '../models/app_models.dart';
 import '../models/batch_operation_models.dart';
 import '../services/storage/storage_service.dart';
 import '../services/api/api_service.dart';
+import '../services/image_http_client.dart';
 import '../services/settings/display_settings_manager.dart';
 import '../services/aggregate_search_service.dart';
 import '../services/theme/app_tokens.dart';
@@ -21,6 +22,8 @@ import '../widgets/batch_progress_card.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/qb_speed_indicator.dart';
 import '../widgets/torrent_list_item.dart';
+import '../widgets/torrent_cover_gallery_viewer.dart';
+import '../widgets/list_index_scroller.dart';
 import '../widgets/torrent_download_dialog.dart';
 import '../widgets/tag_filter_bar.dart';
 import '../widgets/aggregate_search_strategy_list.dart';
@@ -53,6 +56,10 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   final GlobalKey _listKey = GlobalKey();
 
   final ScrollController _listController = ScrollController();
+  late final ListIndexScroller _listScroller = ListIndexScroller(
+    controller: _listController,
+    listViewKey: _listKey,
+  );
 
   // String? _overlaySiteName; // Moved to _AggregateSearchScrollbar
   // double _overlayOpacity = 0.0; // Moved to _AggregateSearchScrollbar
@@ -667,6 +674,8 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                                       _buildRetryCallbackForItem(
                                                         item,
                                                       ),
+                                                  onCoverTap: () =>
+                                                      _openCoverGallery(index),
                                                   suspendImageLoading:
                                                       _isFastScrolling,
                                                   onTap: _isSelectionMode
@@ -1167,6 +1176,82 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         NotificationHelper.showError(context, '搜索失败：$e');
       }
     }
+  }
+
+  /// 打开封面画廊查看器，可左右翻页并联动滚动列表。
+  void _openCoverGallery(int listIndex) {
+    final provider = Provider.of<AggregateSearchProvider>(
+      context,
+      listen: false,
+    );
+    final items = provider.filteredResults;
+    if (listIndex < 0 || listIndex >= items.length) return;
+    if (items[listIndex].torrent.cover.isEmpty) return;
+
+    final coverIndices = <int>[
+      for (var i = 0; i < items.length; i++)
+        if (items[i].torrent.cover.isNotEmpty) i,
+    ];
+    final initialPosition = coverIndices.indexOf(listIndex);
+    if (initialPosition == -1) return;
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.7),
+      builder: (dialogContext) {
+        return TorrentCoverGalleryViewer(
+          itemCount: coverIndices.length,
+          initialIndex: initialPosition,
+          titleFor: (position) {
+            final i = (position >= 0 && position < coverIndices.length)
+                ? coverIndices[position]
+                : null;
+            return (i != null && i < items.length) ? items[i].torrent.name : '';
+          },
+          loadCover: (position) async {
+            final i = (position >= 0 && position < coverIndices.length)
+                ? coverIndices[position]
+                : null;
+            if (i == null || i >= items.length) return null;
+            final item = items[i];
+            if (item.torrent.cover.isEmpty) return null;
+            SiteConfig? siteConfig;
+            try {
+              final storage = Provider.of<StorageService>(
+                context,
+                listen: false,
+              );
+              final sites = storage.siteConfigsCache ?? [];
+              for (final s in sites) {
+                if (s.id == item.siteId) {
+                  siteConfig = s;
+                  break;
+                }
+              }
+            } catch (_) {}
+            try {
+              final response = await ImageHttpClient.instance.fetchImage(
+                item.torrent.cover,
+                siteBaseUrl: siteConfig?.baseUrl,
+                siteCookie: siteConfig?.cookie,
+              );
+              return response.data == null
+                  ? null
+                  : Uint8List.fromList(response.data!);
+            } catch (_) {
+              return null;
+            }
+          },
+          onPageChanged: (position) {
+            if (position < 0 || position >= coverIndices.length) return;
+            final i = coverIndices[position];
+            if (i < items.length) {
+              _listScroller.scrollToIndex(i);
+            }
+          },
+        );
+      },
+    );
   }
 
   Future<void> _onTorrentTap(AggregateSearchResultItem item) async {
