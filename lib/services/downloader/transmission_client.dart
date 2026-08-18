@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import '../../models/app_models.dart';
+import '../network/timeout_retry.dart';
 
 import '../../utils/format.dart';
 import 'downloader_client.dart';
@@ -32,17 +33,19 @@ class TransmissionClient
     required this.password,
     Function(TransmissionConfig)? onConfigUpdated,
   }) : _onConfigUpdated = onConfigUpdated {
-    _dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 30),
-      headers: {
+    _dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 30),
+        headers: {
           'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
-              'Content-Type': 'application/json',
-      },
+          'Content-Type': 'application/json',
+        },
         followRedirects: true,
         maxRedirects: 5,
-    ));
+      ),
+    );
   }
 
   /// 获取基础URL
@@ -85,18 +88,15 @@ class TransmissionClient
   }) async {
     final url = '$_baseUrl$_rpcPath';
 
-    final requestBody = {
-      'method': method,
-      'arguments': ?arguments,
-    };
+    final requestBody = {'method': method, 'arguments': ?arguments};
 
-    final requestHeaders = <String, String>{
-      'Content-Type': 'application/json',
-    };
+    final requestHeaders = <String, String>{'Content-Type': 'application/json'};
 
     // 添加认证信息
     if (config.username.isNotEmpty) {
-      final credentials = base64Encode(utf8.encode('${config.username}:$password'));
+      final credentials = base64Encode(
+        utf8.encode('${config.username}:$password'),
+      );
       requestHeaders['Authorization'] = 'Basic $credentials';
     }
 
@@ -126,10 +126,14 @@ class TransmissionClient
         throw HttpException('HTTP ${response.statusCode}: ${response.data}');
       }
     } on DioException catch (e) {
+      if (isTimeoutError(e)) rethrow;
+
       // 检查是否需要会话ID
       if (e.response?.statusCode == 409) {
         // 从响应头中提取会话ID
-        final sessionId = e.response?.headers.value('X-Transmission-Session-Id');
+        final sessionId = e.response?.headers.value(
+          'X-Transmission-Session-Id',
+        );
         if (sessionId != null) {
           _sessionId = sessionId;
           // 重试请求
@@ -142,14 +146,14 @@ class TransmissionClient
       }
 
       if (e.response?.statusCode != null && e.response!.statusCode! >= 400) {
-        throw HttpException('HTTP ${e.response!.statusCode}: ${e.response!.data}');
+        throw HttpException(
+          'HTTP ${e.response!.statusCode}: ${e.response!.data}',
+        );
       }
 
       throw Exception('Request failed: ${e.message}');
     }
   }
-
-
 
   @override
   Future<void> testConnection() async {
@@ -283,13 +287,16 @@ class TransmissionClient
   }
 
   @override
-  Future<void> deleteTasks(List<String> hashes, {bool deleteFiles = false}) async {
+  Future<void> deleteTasks(
+    List<String> hashes, {
+    bool deleteFiles = false,
+  }) async {
     final ids = await _hashesToIds(hashes);
     if (ids.isNotEmpty) {
-      await _rpcRequest('torrent-remove', arguments: {
-        'ids': ids,
-        'delete-local-data': deleteFiles,
-      });
+      await _rpcRequest(
+        'torrent-remove',
+        arguments: {'ids': ids, 'delete-local-data': deleteFiles},
+      );
     }
   }
 
@@ -303,9 +310,12 @@ class TransmissionClient
   @override
   Future<List<String>> getTags() async {
     // 获取所有种子的标签
-    final response = await _rpcRequest('torrent-get', arguments: {
-      'fields': ['labels'],
-    });
+    final response = await _rpcRequest(
+      'torrent-get',
+      arguments: {
+        'fields': ['labels'],
+      },
+    );
 
     final List<dynamic> torrents = response['torrents'] as List<dynamic>? ?? [];
     final Set<String> allLabels = {};
@@ -346,9 +356,12 @@ class TransmissionClient
   @override
   Future<List<String>> getPaths() async {
     // 获取所有种子的下载路径
-    final response = await _rpcRequest('torrent-get', arguments: {
-      'fields': ['downloadDir'],
-    });
+    final response = await _rpcRequest(
+      'torrent-get',
+      arguments: {
+        'fields': ['downloadDir'],
+      },
+    );
 
     final List<dynamic> torrents = response['torrents'] as List<dynamic>? ?? [];
     final Set<String> allPaths = {};
@@ -386,9 +399,12 @@ class TransmissionClient
   Future<List<int>> _hashesToIds(List<String> hashes) async {
     if (hashes.isEmpty) return [];
 
-    final response = await _rpcRequest('torrent-get', arguments: {
-      'fields': ['id', 'hashString'],
-    });
+    final response = await _rpcRequest(
+      'torrent-get',
+      arguments: {
+        'fields': ['id', 'hashString'],
+      },
+    );
 
     final List<dynamic> torrents = response['torrents'] as List<dynamic>? ?? [];
     final List<int> ids = [];
@@ -457,7 +473,9 @@ class TransmissionClient
       addedOn: torrent['addedDate'] ?? 0,
       amountLeft: leftUntilDone,
       ratio: (torrent['uploadRatio'] as num? ?? 0).toDouble(),
-      timeActive: (torrent['activityDate'] as int? ?? 0) - (torrent['addedDate'] as int? ?? 0),
+      timeActive:
+          (torrent['activityDate'] as int? ?? 0) -
+          (torrent['addedDate'] as int? ?? 0),
       uploaded: torrent['uploadedEver'] ?? 0,
     );
   }

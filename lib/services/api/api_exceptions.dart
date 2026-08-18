@@ -52,6 +52,8 @@ class SiteNetworkException extends SiteException {
 
   const SiteNetworkException({required this.timeoutType, String? detail})
     : super('网络请求超时: $timeoutType', detail);
+
+  bool get isTimeout => const {'连接超时', '发送超时', '接收超时'}.contains(timeoutType);
 }
 
 /// 服务端异常

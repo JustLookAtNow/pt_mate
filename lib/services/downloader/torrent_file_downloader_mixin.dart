@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import '../../models/app_models.dart';
+import '../network/timeout_retry.dart';
 
 /// 种子文件下载通用逻辑混入
 mixin TorrentFileDownloaderMixin {
@@ -24,14 +25,16 @@ mixin TorrentFileDownloaderMixin {
         headers['Cookie'] = siteConfig!.cookie!;
       }
 
-      final response = await dio.get<List<int>>(
-        requestUrl,
-        options: Options(
-          responseType: ResponseType.bytes,
-          followRedirects: true,
-          maxRedirects: 5,
-          headers: headers.isEmpty ? null : headers,
-          validateStatus: (status) => status != null && status < 400,
+      final response = await retryOnTimeout(
+        () => dio.get<List<int>>(
+          requestUrl,
+          options: Options(
+            responseType: ResponseType.bytes,
+            followRedirects: true,
+            maxRedirects: 5,
+            headers: headers.isEmpty ? null : headers,
+            validateStatus: (status) => status != null && status < 400,
+          ),
         ),
       );
 

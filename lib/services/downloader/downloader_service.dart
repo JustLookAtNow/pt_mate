@@ -6,6 +6,7 @@ import '../../models/app_models.dart';
 import 'downloader_config.dart';
 import 'downloader_factory.dart';
 import 'downloader_models.dart';
+import '../network/timeout_retry.dart';
 import '../storage/storage_service.dart';
 
 /// 下载器服务
@@ -167,7 +168,9 @@ class DownloaderService {
       config: config,
       password: password,
     );
-    await client.addTask(params, siteConfig: siteConfig);
+    await retryOnTimeout<void>(
+      () => client.addTask(params, siteConfig: siteConfig),
+    );
   }
 
   /// 暂停下载任务

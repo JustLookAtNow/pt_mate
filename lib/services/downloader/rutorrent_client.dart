@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:pt_mate/models/app_models.dart';
+import 'package:pt_mate/services/network/timeout_retry.dart';
 import 'package:pt_mate/utils/format.dart';
 import 'package:xml/xml.dart';
 
@@ -161,6 +162,8 @@ class RuTorrentClient
 
       return response;
     } on DioException catch (e) {
+      if (isTimeoutError(e)) rethrow;
+
       if (e.response?.statusCode == 401) {
         throw Exception('Authentication failed');
       }

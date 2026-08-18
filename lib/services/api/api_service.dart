@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import '../../models/app_models.dart';
+import '../network/timeout_retry.dart';
 import '../storage/storage_service.dart';
 import 'site_adapter.dart';
 
@@ -228,14 +229,14 @@ class ApiService {
     // 如果提供了siteConfig，使用临时适配器
     if (siteConfig != null) {
       final adapter = await getAdapter(siteConfig);
-      return adapter.genDlToken(id: id, url: url);
+      return retryOnTimeout(() => adapter.genDlToken(id: id, url: url));
     }
 
     // 否则使用当前活跃适配器
     if (_activeAdapter == null) {
       throw StateError('No active site adapter available');
     }
-    return _activeAdapter!.genDlToken(id: id, url: url);
+    return retryOnTimeout(() => _activeAdapter!.genDlToken(id: id, url: url));
   }
 
   /// 查询下载历史
@@ -256,7 +257,9 @@ class ApiService {
     if (_activeAdapter == null) {
       throw StateError('No active site adapter available');
     }
-    return _activeAdapter!.toggleCollection(torrentId: id, make: make);
+    return retryOnTimeout(
+      () => _activeAdapter!.toggleCollection(torrentId: id, make: make),
+    );
   }
 
   /// 测试连接
