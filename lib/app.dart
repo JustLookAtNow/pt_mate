@@ -2320,11 +2320,14 @@ class _HomePageState extends State<HomePage> {
     if (listIndex < 0 || listIndex >= items.length) return;
     if (items[listIndex].cover.isEmpty) return;
 
-    // 有封面条目的下标列表（画廊 position ↔ 列表下标映射）
-    final coverIndices = <int>[
-      for (var i = 0; i < items.length; i++)
-        if (items[i].cover.isNotEmpty) i,
+    // 有封面条目的下标列表（画廊 position ↔ 列表下标映射）。
+    // 列表数据只追加且去重，已有下标稳定，因此每次调用重新计算即可
+    // 响应分页追加后的新条目。
+    List<int> computeCoverIndices() => [
+      for (var i = 0; i < _filteredItems.length; i++)
+        if (_filteredItems[i].cover.isNotEmpty) i,
     ];
+    final coverIndices = computeCoverIndices();
     final initialPosition = coverIndices.indexOf(listIndex);
     if (initialPosition == -1) return;
 
@@ -2333,19 +2336,21 @@ class _HomePageState extends State<HomePage> {
       barrierColor: Colors.black.withValues(alpha: 0.7),
       builder: (dialogContext) {
         return TorrentCoverGalleryViewer(
-          itemCount: coverIndices.length,
+          itemCount: () => computeCoverIndices().length,
           initialIndex: initialPosition,
           titleFor: (position) {
-            final i = (position >= 0 && position < coverIndices.length)
-                ? coverIndices[position]
+            final indices = computeCoverIndices();
+            final i = (position >= 0 && position < indices.length)
+                ? indices[position]
                 : null;
             return (i != null && i < _filteredItems.length)
                 ? _filteredItems[i].name
                 : '';
           },
           loadCover: (position) async {
-            final i = (position >= 0 && position < coverIndices.length)
-                ? coverIndices[position]
+            final indices = computeCoverIndices();
+            final i = (position >= 0 && position < indices.length)
+                ? indices[position]
                 : null;
             if (i == null || i >= _filteredItems.length) return null;
             final item = _filteredItems[i];
@@ -2364,12 +2369,15 @@ class _HomePageState extends State<HomePage> {
             }
           },
           onPageChanged: (position) {
-            if (position < 0 || position >= coverIndices.length) return;
-            final i = coverIndices[position];
+            final indices = computeCoverIndices();
+            if (position < 0 || position >= indices.length) return;
+            final i = indices[position];
             if (i < _filteredItems.length) {
               _listScroller.scrollToIndex(i);
             }
           },
+          hasMore: () => _hasMore,
+          onLoadMore: () => _loadMore(),
         );
       },
     );

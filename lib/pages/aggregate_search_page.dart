@@ -1188,10 +1188,12 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     if (listIndex < 0 || listIndex >= items.length) return;
     if (items[listIndex].torrent.cover.isEmpty) return;
 
-    final coverIndices = <int>[
+    // 列表数据只追加，已有下标稳定，每次调用重算即可响应数据变化
+    List<int> computeCoverIndices() => [
       for (var i = 0; i < items.length; i++)
         if (items[i].torrent.cover.isNotEmpty) i,
     ];
+    final coverIndices = computeCoverIndices();
     final initialPosition = coverIndices.indexOf(listIndex);
     if (initialPosition == -1) return;
 
@@ -1200,17 +1202,19 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       barrierColor: Colors.black.withValues(alpha: 0.7),
       builder: (dialogContext) {
         return TorrentCoverGalleryViewer(
-          itemCount: coverIndices.length,
+          itemCount: () => computeCoverIndices().length,
           initialIndex: initialPosition,
           titleFor: (position) {
-            final i = (position >= 0 && position < coverIndices.length)
-                ? coverIndices[position]
+            final indices = computeCoverIndices();
+            final i = (position >= 0 && position < indices.length)
+                ? indices[position]
                 : null;
             return (i != null && i < items.length) ? items[i].torrent.name : '';
           },
           loadCover: (position) async {
-            final i = (position >= 0 && position < coverIndices.length)
-                ? coverIndices[position]
+            final indices = computeCoverIndices();
+            final i = (position >= 0 && position < indices.length)
+                ? indices[position]
                 : null;
             if (i == null || i >= items.length) return null;
             final item = items[i];
@@ -1243,8 +1247,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
             }
           },
           onPageChanged: (position) {
-            if (position < 0 || position >= coverIndices.length) return;
-            final i = coverIndices[position];
+            final indices = computeCoverIndices();
+            if (position < 0 || position >= indices.length) return;
+            final i = indices[position];
             if (i < items.length) {
               _listScroller.scrollToIndex(i);
             }

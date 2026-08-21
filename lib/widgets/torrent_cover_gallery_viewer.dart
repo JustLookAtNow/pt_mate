@@ -6,7 +6,8 @@ import 'package:flutter/services.dart';
 /// 宿主通过 [loadCover] 提供指定位置的数据，通过 [onPageChanged]
 /// 感知翻页（用于联动滚动背后的列表）。
 class TorrentCoverGalleryViewer extends StatefulWidget {
-  final int itemCount;
+  /// 动态获取当前条目数；宿主列表追加数据后返回值会随之增大。
+  final int Function() itemCount;
   final int initialIndex;
 
   /// 加载指定位置的封面数据；返回 null 表示无法加载（如条目已被移除）。
@@ -18,6 +19,12 @@ class TorrentCoverGalleryViewer extends StatefulWidget {
   /// 翻页回调（position 为新位置）。
   final ValueChanged<int>? onPageChanged;
 
+  /// 宿主是否还可能加载到更多数据（如下一页）。
+  final bool Function()? hasMore;
+
+  /// 请求宿主加载下一页数据；宿主需自行做防并发处理。
+  final Future<void> Function()? onLoadMore;
+
   const TorrentCoverGalleryViewer({
     super.key,
     required this.itemCount,
@@ -25,6 +32,8 @@ class TorrentCoverGalleryViewer extends StatefulWidget {
     required this.loadCover,
     required this.titleFor,
     this.onPageChanged,
+    this.hasMore,
+    this.onLoadMore,
   });
 
   @override
@@ -40,6 +49,7 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
   late int _position;
   Uint8List? _imageData;
   bool _isLoading = true;
+  bool _isLoadingMore = false;
   Object? _error;
   int _requestToken = 0;
   bool _neighborsPreloaded = false;
@@ -95,7 +105,7 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
     if (_neighborsPreloaded) return;
     _neighborsPreloaded = true;
     // 前一张通常已在内存缓存（用户刚从列表点开），后一张预取即可
-    if (_position + 1 < widget.itemCount) {
+    if (_position + 1 < widget.itemCount()) {
       widget.loadCover(_position + 1).then((_) {}, onError: (_) {});
     }
   }
@@ -106,7 +116,7 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
   }
 
   void _goTo(int position) {
-    if (position < 0 || position >= widget.itemCount) return;
+    if (position < 0 || position >= widget.itemCount()) return;
     if (position == _position) return;
     setState(() {
       _position = position;
@@ -116,12 +126,40 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
     widget.onPageChanged?.call(position);
   }
 
+  /// 已翻到已知末尾但宿主可能还有下一页时，请求加载后继续前进。
+  Future<void> _goToNextWithLoadMore() async {
+    if (_isLoadingMore) return;
+    final loadMore = widget.onLoadMore;
+    if (loadMore == null) return;
+
+    setState(() => _isLoadingMore = true);
+    try {
+      await loadMore();
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingMore = false);
+      }
+    }
+    if (!mounted) return;
+
+    if (_position + 1 < widget.itemCount()) {
+      _goTo(_position + 1);
+    } else {
+      // 没有新增数据，仅刷新按钮可见性
+      setState(() {});
+    }
+  }
+
   void _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent) return;
     if (event.physicalKey == PhysicalKeyboardKey.arrowLeft) {
       if (_position > 0) _goTo(_position - 1);
     } else if (event.physicalKey == PhysicalKeyboardKey.arrowRight) {
-      if (_position + 1 < widget.itemCount) _goTo(_position + 1);
+      if (_position + 1 < widget.itemCount()) {
+        _goTo(_position + 1);
+      } else if (widget.hasMore?.call() ?? false) {
+        _goToNextWithLoadMore();
+      }
     }
   }
 
@@ -146,7 +184,8 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
   @override
   Widget build(BuildContext context) {
     final canPrev = _position > 0;
-    final canNext = _position + 1 < widget.itemCount;
+    final canNext =
+        _position + 1 < widget.itemCount() || (widget.hasMore?.call() ?? false);
 
     return KeyboardListener(
       focusNode: _focusNode,
@@ -186,11 +225,29 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
               if (canNext)
                 Align(
                   alignment: Alignment.centerRight,
-                  child: _NavButton(
-                    icon: Icons.chevron_right,
-                    tooltip: '下一个',
-                    onPressed: () => _goTo(_position + 1),
-                  ),
+                  child: _isLoadingMore
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 28),
+                          child: SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )
+                      : _NavButton(
+                          icon: Icons.chevron_right,
+                          tooltip: '下一个',
+                          onPressed: () {
+                            if (_position + 1 < widget.itemCount()) {
+                              _goTo(_position + 1);
+                            } else {
+                              _goToNextWithLoadMore();
+                            }
+                          },
+                        ),
                 ),
               Align(
                 alignment: Alignment.bottomCenter,
@@ -209,7 +266,7 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
                           maxWidth: MediaQuery.of(context).size.width * 0.7,
                         ),
                         child: Text(
-                          '${widget.titleFor(_position)}  (${_position + 1} / ${widget.itemCount})',
+                          '${widget.titleFor(_position)}  (${_position + 1} / ${widget.itemCount()})',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
