@@ -1029,6 +1029,9 @@ class _TorrentCoverState extends State<TorrentCover> {
     if (widget.onTap != null) {
       FocusManager.instance.primaryFocus?.unfocus();
       widget.onTap!();
+      // 打开外部封面画廊后重载小图：画廊成功加载会写入 ImageHttpClient 缓存，
+      // 此时重试可命中缓存（或与画廊共享同一进行中的请求）。
+      _reload();
       return;
     }
     final data = _imageData;
