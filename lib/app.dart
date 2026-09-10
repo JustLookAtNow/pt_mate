@@ -17,6 +17,7 @@ import 'pages/torrent_detail_page.dart';
 import 'pages/backup_restore_page.dart';
 import 'pages/secure_storage_recovery_page.dart';
 import 'services/api/api_service.dart';
+import 'services/image_http_client.dart';
 import 'services/settings/display_settings_manager.dart';
 import 'services/storage/storage_service.dart';
 import 'services/theme/theme_manager.dart';
@@ -41,6 +42,8 @@ import 'widgets/responsive_layout.dart';
 import 'widgets/torrent_download_dialog.dart';
 import 'widgets/torrent_list_item.dart';
 import 'widgets/torrent_list_skeleton.dart';
+import 'widgets/torrent_cover_gallery_viewer.dart';
+import 'widgets/list_index_scroller.dart';
 import 'widgets/tag_filter_bar.dart';
 import 'services/update_service.dart';
 import 'widgets/update_notification_dialog.dart';
@@ -1476,6 +1479,12 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
                       failureCode:
                           StorageService.instance.secureStorageFailureCode ??
                           _secureStorageFailureCode,
+                      failureStage: StorageService
+                          .instance
+                          .secureStorageFailureStage
+                          ?.name,
+                      failureType:
+                          StorageService.instance.secureStorageFailureType,
                       isRetrying: _isCheckingSecureStorage,
                     ),
                   ),
@@ -1506,6 +1515,10 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final _keywordCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
+  late final ListIndexScroller _listScroller = ListIndexScroller(
+    controller: _scrollCtrl,
+    listViewKey: _listKey,
+  );
 
   int _selectedCategoryIndex = 0;
   List<SearchCategoryConfig> _categories = [];
@@ -2378,6 +2391,75 @@ class _HomePageState extends State<HomePage> {
     if (mounted) setState(() {}); // 触发重建以显示排序结果
   }
 
+  /// 打开封面画廊查看器，可左右翻页并联动滚动列表。
+  void _openCoverGallery(int listIndex) {
+    final items = _filteredItems;
+    if (listIndex < 0 || listIndex >= items.length) return;
+    if (items[listIndex].cover.isEmpty) return;
+
+    // 有封面条目的下标列表（画廊 position ↔ 列表下标映射）。
+    // 列表数据只追加且去重，已有下标稳定，因此每次调用重新计算即可
+    // 响应分页追加后的新条目。
+    List<int> computeCoverIndices() => [
+      for (var i = 0; i < _filteredItems.length; i++)
+        if (_filteredItems[i].cover.isNotEmpty) i,
+    ];
+    final coverIndices = computeCoverIndices();
+    final initialPosition = coverIndices.indexOf(listIndex);
+    if (initialPosition == -1) return;
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.7),
+      builder: (dialogContext) {
+        return TorrentCoverGalleryViewer(
+          itemCount: () => computeCoverIndices().length,
+          initialIndex: initialPosition,
+          titleFor: (position) {
+            final indices = computeCoverIndices();
+            final i = (position >= 0 && position < indices.length)
+                ? indices[position]
+                : null;
+            return (i != null && i < _filteredItems.length)
+                ? _filteredItems[i].name
+                : '';
+          },
+          loadCover: (position) async {
+            final indices = computeCoverIndices();
+            final i = (position >= 0 && position < indices.length)
+                ? indices[position]
+                : null;
+            if (i == null || i >= _filteredItems.length) return null;
+            final item = _filteredItems[i];
+            if (item.cover.isEmpty) return null;
+            try {
+              final response = await ImageHttpClient.instance.fetchImage(
+                item.cover,
+                siteBaseUrl: _currentSite?.baseUrl,
+                siteCookie: _currentSite?.cookie,
+              );
+              return response.data == null
+                  ? null
+                  : Uint8List.fromList(response.data!);
+            } catch (_) {
+              return null;
+            }
+          },
+          onPageChanged: (position) {
+            final indices = computeCoverIndices();
+            if (position < 0 || position >= indices.length) return;
+            final i = indices[position];
+            if (i < _filteredItems.length) {
+              _listScroller.scrollToIndex(i);
+            }
+          },
+          hasMore: () => _hasMore,
+          onLoadMore: () => _loadMore(),
+        );
+      },
+    );
+  }
+
   void _onTorrentTap(TorrentItem item) async {
     // 检查站点是否支持种子详情功能
     if (_currentSite?.features.supportTorrentDetail == false) {
@@ -3161,6 +3243,8 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                         onRetryBatchAction:
                                             _buildRetryCallbackForItem(item),
+                                        onCoverTap: () =>
+                                            _openCoverGallery(index),
                                         onTap: () => _isSelectionMode
                                             ? _onToggleSelection(item, index)
                                             : _onTorrentTap(item),

@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 
 import '../../models/app_models.dart';
+import '../network/timeout_retry.dart';
 
 import '../../utils/format.dart';
 import 'downloader_client.dart';
@@ -128,6 +129,8 @@ class TransmissionClient
         throw HttpException('HTTP ${response.statusCode}: ${response.data}');
       }
     } on DioException catch (e) {
+      if (isTimeoutError(e)) rethrow;
+
       // 检查是否需要会话ID
       if (e.response?.statusCode == 409) {
         // 从响应头中提取会话ID

@@ -8,6 +8,7 @@ import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../models/app_models.dart';
+import '../network/timeout_retry.dart';
 import '../../utils/format.dart';
 
 import 'downloader_client.dart';
@@ -193,6 +194,8 @@ class QbittorrentClient
 
       return response;
     } on DioException catch (e) {
+      if (isTimeoutError(e)) rethrow;
+
       // 检查响应状态
       if (e.response?.statusCode == 403) {
         // 会话可能已过期，清除会话并重试一次
@@ -244,6 +247,8 @@ class QbittorrentClient
 
       _authCookieHeader = cookieHeader;
     } on DioException catch (e) {
+      if (isTimeoutError(e)) rethrow;
+
       throw Exception('Login failed: ${e.message}');
     }
   }

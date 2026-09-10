@@ -7,6 +7,8 @@ class SecureStorageRecoveryPage extends StatelessWidget {
     required this.onOpenBackupRestore,
     this.onDiscardLegacyData,
     this.failureCode,
+    this.failureStage,
+    this.failureType,
     this.isRetrying = false,
   });
 
@@ -17,6 +19,8 @@ class SecureStorageRecoveryPage extends StatelessWidget {
   /// legacy encrypted data without restoring a backup.
   final Future<void> Function()? onDiscardLegacyData;
   final String? failureCode;
+  final String? failureStage;
+  final String? failureType;
   final bool isRetrying;
 
   bool get _requiresLegacyBackupRestore =>
@@ -106,14 +110,43 @@ class SecureStorageRecoveryPage extends StatelessWidget {
                         style: theme.textTheme.bodyMedium,
                         textAlign: TextAlign.center,
                       ),
-                      if (failureCode != null && failureCode!.isNotEmpty) ...[
+                      if ((failureStage != null && failureStage!.isNotEmpty) ||
+                          (failureType != null && failureType!.isNotEmpty) ||
+                          (failureCode != null && failureCode!.isNotEmpty)) ...[
                         const SizedBox(height: 16),
-                        SelectableText(
-                          '错误代码：$failureCode',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                        Semantics(
+                          label: '安全存储诊断信息',
+                          child: Column(
+                            children: [
+                              if (failureStage != null &&
+                                  failureStage!.isNotEmpty)
+                                SelectableText(
+                                  '失败阶段：$failureStage',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              if (failureType != null &&
+                                  failureType!.isNotEmpty)
+                                SelectableText(
+                                  '异常类别：$failureType',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              if (failureCode != null &&
+                                  failureCode!.isNotEmpty)
+                                SelectableText(
+                                  '错误代码：$failureCode',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                            ],
                           ),
-                          textAlign: TextAlign.center,
                         ),
                       ],
                       const SizedBox(height: 24),

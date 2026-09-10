@@ -1,10 +1,10 @@
 {
   "name": "PT Mate",
   "identifier": "com.github.justlookatnow.ptmate.source",
-  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0/altsource/AltSource.json",
-  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0/screenshots/1.png",
+  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/altsource/AltSource.json",
+  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/1.png",
   "website": "https://github.com/JustLookAtNow/pt_mate",
-  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0/mt.png",
+  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/mt.png",
   "subtitle": "PT private tracker companion",
   "description": "This is the official source for PT Mate.\n\nFor full details, check the GitHub repository:\nhttps://github.com/JustLookAtNow/pt_mate",
   "tintColor": "1D4ED8",
@@ -15,21 +15,28 @@
       "bundleIdentifier": "com.github.justlookatnow.ptmate",
       "developerName": "JustLookAtNow",
       "subtitle": "PT private tracker companion",
-      "version": "2.28.0",
-      "versionDate": "2026-08-07T07:28:41Z",
-      "versionDescription": "Changes in this release\nrelease: 2.28.0\n\n🎉Highlights\n\n- 聚合搜索体验升级：统一搜索交互，支持增量结果展示、错误查看及失败站点单独重试。\n- 加固 Android 安全存储保护，并新增异常提示与备份恢复引导。\n\n✨新增功能\n\n- 新增 Jpopsuki、杏坛站点支持及杏坛分类。\n- 新增 VR、8K 标签识别。\n\n🐛修复问题\n\n- 修复 ruTorrent 保存目录不存在导致任务添加失败、302 错误及列表顺序问题。\n- 修复站点设置操作按钮被悬浮按钮遮挡的问题。\n- 修复 Linux 无 Keyring 环境下的安全存储回退问题。\n- 优化首页站点切换按钮显示。\n\n\nSecure-storage rollout\n\n- Phase: `phase1`\n- `ENABLE_SECURE_STORAGE_TRANSACTIONS`: `false`\n- Android versionCode: `186`\n- Source commit: `0fe5811acc1481a1590985141d55b6788995da46`\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
-      "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.28.0/pt_mate-2.28.0-unsigned.ipa",
+      "version": "2.28.1",
+      "versionDate": "2026-08-18T11:57:12Z",
+      "versionDescription": "Changes in this release\nrelease: 2.28.1\n\n🎉Highlights\n- 封面查看器全新升级：支持左右翻页浏览，并与列表滚动智能联动，浏览体验更流畅\n\n✨新增功能\n- 收藏和下载操作新增超时自动重试，弱网环境下更稳定\n- 封面查看器支持左右翻页并联动滚动列表\n\n🐛修复问题\n- 优惠标签支持分钟级倒计时，时间展示更精准\n- 修复分类名称过长时的显示问题，最多显示两行\n- 扩大封面加载失败后的重试点击区域，操作更易触发\n\n\nSecure-storage rollout\n\n- Phase: `phase1`\n- `ENABLE_SECURE_STORAGE_TRANSACTIONS`: `false`\n- Android versionCode: `187`\n- Source commit: `b2972c751a734764bb55a6ce7d38fc3149858c75`\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
+      "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.28.1/pt_mate-2.28.1-unsigned.ipa",
       "localizedDescription": "PT Mate is a Flutter-based private tracker client for browsing, searching, and managing downloads across multiple PT sites.",
-      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0/mt.png",
+      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/mt.png",
       "tintColor": "1D4ED8",
       "category": "utilities",
-      "size": 13761318,
+      "size": 13772453,
       "screenshotURLs": [
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0/screenshots/1.png",
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0/screenshots/2.png",
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.28.0/screenshots/3.png"
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/1.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/2.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/3.png"
       ],
       "versions": [
+        {
+          "version": "2.28.1",
+          "date": "2026-08-18T11:57:12Z",
+          "localizedDescription": "Changes in this release\nrelease: 2.28.1\n\n🎉Highlights\n- 封面查看器全新升级：支持左右翻页浏览，并与列表滚动智能联动，浏览体验更流畅\n\n✨新增功能\n- 收藏和下载操作新增超时自动重试，弱网环境下更稳定\n- 封面查看器支持左右翻页并联动滚动列表\n\n🐛修复问题\n- 优惠标签支持分钟级倒计时，时间展示更精准\n- 修复分类名称过长时的显示问题，最多显示两行\n- 扩大封面加载失败后的重试点击区域，操作更易触发\n\n\nSecure-storage rollout\n\n- Phase: `phase1`\n- `ENABLE_SECURE_STORAGE_TRANSACTIONS`: `false`\n- Android versionCode: `187`\n- Source commit: `b2972c751a734764bb55a6ce7d38fc3149858c75`\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
+          "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.28.1/pt_mate-2.28.1-unsigned.ipa",
+          "size": 13772453
+        },
         {
           "version": "2.28.0",
           "date": "2026-08-07T07:28:41Z",
@@ -211,13 +218,6 @@
           "localizedDescription": "Changes in this release\nrelease: 2.20.11\n\n🎉Highlights\n- 优化自定义通知的整体体验，多行消息显示更稳定，并避免通知遮挡页面浮动操作按钮。\n\n🐛修复问题\n- 修复自定义通知在多行内容下圆角样式失衡和文字越界的问题。\n- 修复自定义通知偶发无法自动消失的问题。\n- 修复通知显示期间影响首页切换站点等浮动按钮点击的问题。\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
           "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.20.11/pt_mate-2.20.11-unsigned.ipa",
           "size": 16223257
-        },
-        {
-          "version": "2.20.9",
-          "date": "2026-03-27T09:02:57Z",
-          "localizedDescription": "Changes in this release\nrelease: 2.20.9\n\n🎉Highlights\n- 批量收藏和批量下载体验重构，新增实时进度、状态反馈和失败重试，批量任务过程更清晰也更可控。\n\n✨新增功能\n- 批量操作新增进度卡片，可显示当前处理项、进度条、成功/失败计数，并支持完成后手动关闭。\n- 批量操作中的失败项支持单项重试和全部重试，已成功项目状态会被保留。\n- 下载任务卡片的操作按钮补充提示信息，减少误触和辨识成本。\n\n🐛修复问题\n- 批量操作全部成功时会自动关闭进度卡片，减少完成后的界面残留。\n- 修复 OTA 镜像测速与选择逻辑，提升镜像选择结果的稳定性。\n- 调整通知相关依赖与回调顺序，改善通知触发的兼容性问题。\n\n🔧性能优化\n- 优化标签匹配时的正则缓存，减少重复计算带来的性能损耗。\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
-          "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.20.9/pt_mate-2.20.9-unsigned.ipa",
-          "size": 16096912
         }
       ],
       "appPermissions": {
@@ -229,14 +229,14 @@
   "news": [
     {
       "appID": "com.github.justlookatnow.ptmate",
-      "title": "2.28.0 - 07 Aug",
-      "identifier": "release-2.28.0",
+      "title": "2.28.1 - 18 Aug",
+      "identifier": "release-2.28.1",
       "caption": "Update for PT Mate now available!",
-      "date": "2026-08-07T07:28:41Z",
+      "date": "2026-08-18T11:57:12Z",
       "tintColor": "1D4ED8",
       "imageURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/1.png",
       "notify": true,
-      "url": "https://github.com/JustLookAtNow/pt_mate/releases/tag/v2.28.0"
+      "url": "https://github.com/JustLookAtNow/pt_mate/releases/tag/v2.28.1"
     }
   ]
 }

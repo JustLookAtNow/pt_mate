@@ -1,10 +1,14 @@
 import '../utils/screen_utils.dart';
+
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../models/app_models.dart';
 import '../services/storage/storage_service.dart';
 import '../services/theme/app_tokens.dart';
+
 import 'dart:math' as math;
 
 import '../utils/format.dart';
@@ -91,6 +95,10 @@ class TorrentListItem extends StatelessWidget {
 
   /// 下载回调
   final VoidCallback? onDownload;
+
+  /// 点击封面回调；为 null 时保留内置的全屏预览行为
+  final VoidCallback? onCoverTap;
+
   final BatchOperationType? batchOperationType;
   final BatchItemState batchItemState;
   final String? batchErrorMessage;
@@ -108,6 +116,7 @@ class TorrentListItem extends StatelessWidget {
     this.onLongPress,
     this.onToggleCollection,
     this.onDownload,
+    this.onCoverTap,
     this.suspendImageLoading,
     this.showCoverSetting,
     this.batchOperationType,
@@ -203,6 +212,7 @@ class TorrentListItem extends StatelessWidget {
                       onRetryBatchAction: onRetryBatchAction,
                       onToggleCollection: onToggleCollection,
                       onDownload: onDownload,
+                      onCoverTap: onCoverTap,
                       aggregateSiteColor: aggregateSiteColor,
                     ),
                   ),
@@ -254,9 +264,8 @@ class TorrentListItem extends StatelessWidget {
                       ? Colors.red.shade800
                       : Colors.red)
                 : (Theme.of(context).brightness == Brightness.dark
-                      ? Theme.of(
-                          context,
-                        ).colorScheme.secondary.withValues(alpha: 0.7)
+                      ? Theme.of(context).colorScheme.secondary
+                            .withValues(alpha: 0.7)
                       : Theme.of(context).colorScheme.secondary),
             borderRadius: BorderRadius.circular(8),
             child: InkWell(
@@ -378,6 +387,7 @@ class _TorrentListItemRow extends StatelessWidget {
   final VoidCallback? onRetryBatchAction;
   final VoidCallback? onToggleCollection;
   final VoidCallback? onDownload;
+  final VoidCallback? onCoverTap;
   final Color? aggregateSiteColor;
 
   const _TorrentListItemRow({
@@ -397,6 +407,7 @@ class _TorrentListItemRow extends StatelessWidget {
     this.onRetryBatchAction,
     this.onToggleCollection,
     this.onDownload,
+    this.onCoverTap,
     this.aggregateSiteColor,
   });
 
@@ -415,6 +426,7 @@ class _TorrentListItemRow extends StatelessWidget {
             isMobile: isMobile,
             hasDouban: hasDouban,
             hasImdb: hasImdb,
+            onTap: onCoverTap,
           ),
         Expanded(
           child: TorrentInfo(
@@ -442,9 +454,8 @@ class _TorrentListItemRow extends StatelessWidget {
             child: Container(
               width: 1,
               height: math.max(60, desktopSideHeight - 16),
-              color: Theme.of(
-                context,
-              ).colorScheme.outlineVariant.withValues(alpha: 0.5),
+              color: Theme.of(context).colorScheme.outlineVariant
+                  .withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(width: 4),
@@ -544,12 +555,12 @@ class TorrentInfo extends StatelessWidget {
           ),
         );
       case BatchItemState.success:
-        final successContainerColor = Theme.of(
-          context,
-        ).colorScheme.tertiaryContainer;
-        final successForegroundColor = Theme.of(
-          context,
-        ).colorScheme.onTertiaryContainer;
+        final successContainerColor = Theme.of(context)
+            .colorScheme
+            .tertiaryContainer;
+        final successForegroundColor = Theme.of(context)
+            .colorScheme
+            .onTertiaryContainer;
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
@@ -563,9 +574,8 @@ class TorrentInfo extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 '批量${_batchActionLabel()}成功',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: successForegroundColor),
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: successForegroundColor),
               ),
             ],
           ),
@@ -581,9 +591,8 @@ class TorrentInfo extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.errorContainer.withValues(alpha: 0.9),
+                  color: Theme.of(context).colorScheme.errorContainer
+                      .withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Row(
@@ -961,6 +970,9 @@ class TorrentCover extends StatefulWidget {
   final bool hasDouban;
   final bool hasImdb;
 
+  /// 点击封面回调；为 null 时使用内置全屏预览
+  final VoidCallback? onTap;
+
   const TorrentCover({
     super.key,
     required this.torrent,
@@ -968,6 +980,7 @@ class TorrentCover extends StatefulWidget {
     required this.isMobile,
     required this.hasDouban,
     required this.hasImdb,
+    this.onTap,
   });
 
   @override
@@ -1013,6 +1026,14 @@ class _TorrentCoverState extends State<TorrentCover> {
 
   void _handleTap(BuildContext context) {
     if (widget.torrent.cover.isEmpty) return;
+    if (widget.onTap != null) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      widget.onTap!();
+      // 打开外部封面画廊后重载小图：画廊成功加载会写入 ImageHttpClient 缓存，
+      // 此时重试可命中缓存（或与画廊共享同一进行中的请求）。
+      _reload();
+      return;
+    }
     final data = _imageData;
     if (data != null) {
       _showCoverPreview(context, data);

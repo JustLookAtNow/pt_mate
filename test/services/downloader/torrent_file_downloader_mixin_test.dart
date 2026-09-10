@@ -9,6 +9,8 @@ class _DownloadHarness with TorrentFileDownloaderMixin {}
 
 class _RecordingHttpClientAdapter implements HttpClientAdapter {
   Map<String, dynamic>? lastHeaders;
+  int requestCount = 0;
+  int timeoutCount = 0;
 
   @override
   Future<ResponseBody> fetch(
@@ -16,7 +18,14 @@ class _RecordingHttpClientAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    requestCount++;
     lastHeaders = Map<String, dynamic>.from(options.headers);
+    if (requestCount <= timeoutCount) {
+      throw DioException(
+        requestOptions: options,
+        type: DioExceptionType.receiveTimeout,
+      );
+    }
     return ResponseBody.fromBytes(const <int>[100, 51, 58, 52], 200);
   }
 
@@ -68,6 +77,20 @@ void main() {
       );
 
       expect(adapter.lastHeaders?.containsKey('Cookie'), isFalse);
+    });
+
+    test('retries the torrent request once after a timeout', () async {
+      final adapter = _RecordingHttpClientAdapter()..timeoutCount = 1;
+      final dio = Dio()..httpClientAdapter = adapter;
+      final harness = _DownloadHarness();
+
+      final result = await harness.downloadTorrentFileCommon(
+        dio,
+        'https://tracker.example.org/download/1',
+      );
+
+      expect(result, const <int>[100, 51, 58, 52]);
+      expect(adapter.requestCount, 2);
     });
   });
 }

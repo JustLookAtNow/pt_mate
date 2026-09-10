@@ -114,4 +114,10 @@ MIT License，详见 [LICENSE](./LICENSE)。
 
 ## Star 趋势
 
-[![Star History Chart](https://api.star-history.com/svg?repos=JustLookAtNow/pt_mate&type=Date)](https://star-history.com/#JustLookAtNow/pt_mate&Date)
+<a href="https://www.star-history.com/?type=date&repos=JustLookAtNow%2Fpt_mate">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=JustLookAtNow/pt_mate&type=date&theme=dark&legend=top-left&sealed_token=oGvG8BxnJBegGpMRqHZKqPu0DzdgRr5709NsgF0ER046oY-wdqreskuzY127FJ8__EV4uie-0HSe9Gin94iVJ7WRPeDeJqCZvKern3qqu-IfcU_XqWSFlUVUEforyPudF31lxWZSxsZGxl7njZF8rd9DCkO_5oDBiVNAgz7rjyYXXcYrUJ99HlemM2kF" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=JustLookAtNow/pt_mate&type=date&legend=top-left&sealed_token=oGvG8BxnJBegGpMRqHZKqPu0DzdgRr5709NsgF0ER046oY-wdqreskuzY127FJ8__EV4uie-0HSe9Gin94iVJ7WRPeDeJqCZvKern3qqu-IfcU_XqWSFlUVUEforyPudF31lxWZSxsZGxl7njZF8rd9DCkO_5oDBiVNAgz7rjyYXXcYrUJ99HlemM2kF" />
+    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=JustLookAtNow/pt_mate&type=date&legend=top-left&sealed_token=oGvG8BxnJBegGpMRqHZKqPu0DzdgRr5709NsgF0ER046oY-wdqreskuzY127FJ8__EV4uie-0HSe9Gin94iVJ7WRPeDeJqCZvKern3qqu-IfcU_XqWSFlUVUEforyPudF31lxWZSxsZGxl7njZF8rd9DCkO_5oDBiVNAgz7rjyYXXcYrUJ99HlemM2kF" />
+  </picture>
+</a>
