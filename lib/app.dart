@@ -1404,6 +1404,12 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
                       failureCode:
                           StorageService.instance.secureStorageFailureCode ??
                           _secureStorageFailureCode,
+                      failureStage: StorageService
+                          .instance
+                          .secureStorageFailureStage
+                          ?.name,
+                      failureType:
+                          StorageService.instance.secureStorageFailureType,
                       isRetrying: _isCheckingSecureStorage,
                     ),
                   ),

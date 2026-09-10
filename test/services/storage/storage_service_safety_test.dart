@@ -545,6 +545,101 @@ void main() {
         ),
       );
       expect(storage.secureStorageFailureCode, testCase.code);
+      expect(
+        storage.secureStorageFailureStage,
+        SecureStorageFailureStage.cipherInitialization,
+      );
+    });
+  }
+
+  test('插件通用错误从 message/details 提取脱敏异常类别与初始化阶段', () async {
+    const canary = 'logical-key-and-secret-canary';
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageChannel, (call) async {
+          if (call.method == 'read') {
+            throw PlatformException(
+              code: 'Exception encountered',
+              message:
+                  'Key mismatch after algorithm change '
+                  '(Bad padding, wrong key for cipher algorithm)',
+              details: 'javax.crypto.BadPaddingException: BAD_DECRYPT $canary',
+            );
+          }
+          return null;
+        });
+
+    await expectLater(
+      storage.initializeSecureStorage(),
+      throwsA(
+        isA<SecureStorageUnavailableException>()
+            .having((error) => error.code, 'code', 'bad_padding')
+            .having(
+              (error) => error.stage,
+              'stage',
+              SecureStorageFailureStage.cipherInitialization,
+            )
+            .having(
+              (error) => error.failureType,
+              'failureType',
+              'BadPaddingException',
+            ),
+      ),
+    );
+    expect(storage.secureStorageFailureCode, 'bad_padding');
+    expect(
+      storage.secureStorageFailureStage,
+      SecureStorageFailureStage.cipherInitialization,
+    );
+    expect(storage.secureStorageFailureType, 'BadPaddingException');
+    expect(storage.secureStorageFailureType, isNot(contains(canary)));
+  });
+
+  for (final testCase in <({String details, String code, String failureType})>[
+    (
+      details: 'java.security.UnrecoverableKeyException: unavailable',
+      code: 'key_unrecoverable',
+      failureType: 'UnrecoverableKeyException',
+    ),
+    (
+      details: 'android.security.keystore.KeyPermanentlyInvalidatedException',
+      code: 'key_permanently_invalidated',
+      failureType: 'KeyPermanentlyInvalidatedException',
+    ),
+    (
+      details:
+          'java.security.ProviderException: '
+          'android.security.KeyStoreException: KeyMint failure',
+      code: 'keystore_provider_error',
+      failureType: 'ProviderException',
+    ),
+  ]) {
+    test('插件 details 归一为 ${testCase.failureType}', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(secureStorageChannel, (call) async {
+            if (call.method == 'read') {
+              throw PlatformException(
+                code: 'Exception encountered',
+                message: 'Failed to initialize storage cipher',
+                details: testCase.details,
+              );
+            }
+            return null;
+          });
+
+      await expectLater(
+        storage.initializeSecureStorage(),
+        throwsA(
+          isA<SecureStorageUnavailableException>()
+              .having((error) => error.code, 'code', testCase.code)
+              .having(
+                (error) => error.failureType,
+                'failureType',
+                testCase.failureType,
+              ),
+        ),
+      );
+      expect(storage.secureStorageFailureCode, testCase.code);
+      expect(storage.secureStorageFailureType, testCase.failureType);
     });
   }
 
@@ -560,6 +655,9 @@ void main() {
             throw PlatformException(
               code: 'storage_failure',
               message: '$siteCanary $keyCanary $secretCanary',
+              details:
+                  'stack without allow-listed exception '
+                  '$siteCanary $keyCanary $secretCanary',
             );
           }
           return null;
@@ -574,6 +672,8 @@ void main() {
     final line = auditLines.single;
     expect(line, contains('profile='));
     expect(line, contains('state=unavailable'));
+    expect(line, contains('stage=cipherInitialization'));
+    expect(line, contains('type=PlatformException'));
     expect(line, contains('code=platform_error'));
     expect(line, isNot(contains(siteCanary)));
     expect(line, isNot(contains(keyCanary)));
@@ -602,6 +702,10 @@ void main() {
       ),
     );
     expect(secureCalls, 0);
+    expect(
+      storage.secureStorageFailureStage,
+      SecureStorageFailureStage.profileProbe,
+    );
   });
 
   test('manifest 存在但活动密文缺失时要求恢复', () async {
@@ -617,12 +721,26 @@ void main() {
     await expectLater(
       storage.initializeSecureStorage(),
       throwsA(
-        isA<SecureStorageUnavailableException>().having(
-          (error) => error.code,
-          'code',
-          'secure_transaction_requires_restore',
-        ),
+        isA<SecureStorageUnavailableException>()
+            .having(
+              (error) => error.code,
+              'code',
+              'secure_transaction_requires_restore',
+            )
+            .having(
+              (error) => error.stage,
+              'stage',
+              SecureStorageFailureStage.transactionReconciliation,
+            ),
       ),
+    );
+    expect(
+      storage.secureStorageFailureStage,
+      SecureStorageFailureStage.transactionReconciliation,
+    );
+    expect(
+      storage.secureStorageStatusListenable.value.failureStage,
+      SecureStorageFailureStage.transactionReconciliation,
     );
   });
 

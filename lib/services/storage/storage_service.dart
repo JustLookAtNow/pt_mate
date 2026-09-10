@@ -255,6 +255,17 @@ class _LegacyCookieCloudSecrets {
 
 enum SecureStorageState { unknown, ready, unavailable }
 
+enum SecureStorageFailureStage {
+  profileProbe,
+  cipherInitialization,
+  durabilityBarrier,
+  witnessVerification,
+  transactionReconciliation,
+  companionRecovery,
+  namespaceMarker,
+  runtimeOperation,
+}
+
 enum SecureStorageProfile {
   androidOaepGcm,
   androidPkcs1Gcm,
@@ -264,10 +275,17 @@ enum SecureStorageProfile {
 }
 
 class SecureStorageStatus {
-  const SecureStorageStatus({required this.state, this.failureCode});
+  const SecureStorageStatus({
+    required this.state,
+    this.failureCode,
+    this.failureStage,
+    this.failureType,
+  });
 
   final SecureStorageState state;
   final String? failureCode;
+  final SecureStorageFailureStage? failureStage;
+  final String? failureType;
 }
 
 enum SecureReadStatus { found, missing, unavailable }
@@ -293,13 +311,27 @@ class SecureReadResult<T> {
 }
 
 class SecureStorageUnavailableException implements Exception {
-  const SecureStorageUnavailableException(this.code, [this.cause]);
+  const SecureStorageUnavailableException(
+    this.code, [
+    this.cause,
+    this.stage,
+    this.failureType,
+  ]);
 
   final String code;
   final Object? cause;
+  final SecureStorageFailureStage? stage;
+  final String? failureType;
 
   @override
   String toString() => 'SecureStorageUnavailableException($code)';
+}
+
+class _SecureStorageFailureClassification {
+  const _SecureStorageFailureClassification(this.code, [this.failureType]);
+
+  final String code;
+  final String? failureType;
 }
 
 class SiteConfigAtomicUpdate<T> {
@@ -316,6 +348,7 @@ class StorageService {
   static final Object _secureStoragePreflightZoneKey = Object();
   static final Object _secureStorageOperationEpochZoneKey = Object();
   static final Object _linuxPlaintextFallbackReplayZoneKey = Object();
+  static final Object _secureStorageFailureStageZoneKey = Object();
   static const Duration _secureStorageTimeout = Duration(milliseconds: 800);
   static const Duration _secureStorageInitializationTimeout = Duration(
     seconds: 5,
@@ -379,6 +412,8 @@ class StorageService {
   TargetPlatform? _platformOverrideForTest;
   SecureStorageState _secureStorageState = SecureStorageState.unknown;
   String? _secureStorageFailureCode;
+  SecureStorageFailureStage? _secureStorageFailureStage;
+  String? _secureStorageFailureType;
   bool _secureStorageUnavailableLatched = false;
   int _secureStorageOperationGeneration = 0;
   final ValueNotifier<SecureStorageStatus> _secureStorageStatusNotifier =
@@ -448,6 +483,11 @@ class StorageService {
 
   String? get secureStorageFailureCode => _secureStorageFailureCode;
 
+  SecureStorageFailureStage? get secureStorageFailureStage =>
+      _secureStorageFailureStage;
+
+  String? get secureStorageFailureType => _secureStorageFailureType;
+
   int? get _expectedSecureStorageOperationEpoch =>
       Zone.current[_secureStorageOperationEpochZoneKey] as int?;
 
@@ -463,6 +503,9 @@ class StorageService {
     if (!canAccessSensitiveStorage) {
       throw SecureStorageUnavailableException(
         _secureStorageFailureCode ?? 'secure_storage_not_ready',
+        null,
+        _secureStorageFailureStage,
+        _secureStorageFailureType,
       );
     }
     return _secureStorageOperationGeneration;
@@ -633,57 +676,172 @@ class StorageService {
   void _setSecureStorageStatus(
     SecureStorageState state, {
     String? failureCode,
+    SecureStorageFailureStage? failureStage,
+    String? failureType,
   }) {
     final changed =
         _secureStorageState != state ||
-        _secureStorageFailureCode != failureCode;
+        _secureStorageFailureCode != failureCode ||
+        _secureStorageFailureStage != failureStage ||
+        _secureStorageFailureType != failureType;
     _secureStorageState = state;
     _secureStorageFailureCode = failureCode;
+    _secureStorageFailureStage = failureStage;
+    _secureStorageFailureType = failureType;
     if (changed) {
       _secureStorageStatusNotifier.value = SecureStorageStatus(
         state: state,
         failureCode: failureCode,
+        failureStage: failureStage,
+        failureType: failureType,
       );
     }
   }
 
-  String _failureCodeFor(Object error) {
-    if (error is TimeoutException) return 'timeout';
-    if (_isLinuxKeyringFailure(error)) return 'linux_keyring_unavailable';
-    final categorySource = error is PlatformException
-        ? '${error.code} ${error.message ?? ''}'.toLowerCase()
-        : error.toString().toLowerCase();
-    if (categorySource.contains('badpadding') ||
-        categorySource.contains('bad_padding')) {
-      return 'bad_padding';
+  _SecureStorageFailureClassification _classifyFailure(Object error) {
+    if (error is SecureStorageUnavailableException) {
+      final cause = error.cause;
+      final causeClassification = cause == null
+          ? null
+          : _classifyFailure(cause);
+      return _SecureStorageFailureClassification(
+        error.code,
+        error.failureType ?? causeClassification?.failureType,
+      );
     }
-    if (categorySource.contains('aeadbadtagexception') ||
-        categorySource.contains('tag mismatch') ||
-        categorySource.contains('authentication_failed')) {
-      return 'authentication_failed';
+    if (error is TimeoutException) {
+      return const _SecureStorageFailureClassification(
+        'timeout',
+        'TimeoutException',
+      );
     }
-    if (categorySource.contains('keypermanentlyinvalidated') ||
-        categorySource.contains('key_permanently_invalidated')) {
-      return 'key_permanently_invalidated';
+    if (_isLinuxKeyringFailure(error)) {
+      return const _SecureStorageFailureClassification(
+        'linux_keyring_unavailable',
+        'LinuxKeyringUnavailable',
+      );
     }
-    if (categorySource.contains('invalidkey') ||
-        categorySource.contains('invalid_key')) {
-      return 'invalid_key';
+
+    final String categorySource;
+    if (error is PlatformException) {
+      // flutter_secure_storage places the Java exception chain in details.
+      // It can also contain logical storage keys, so it is used only for
+      // allow-listed classification and is never retained, logged or shown.
+      final details = error.details is String ? error.details! as String : '';
+      categorySource = '${error.code} ${error.message ?? ''} $details'
+          .toLowerCase();
+    } else {
+      categorySource = error.toString().toLowerCase();
     }
-    if (categorySource.contains('unknown algorithm') ||
-        categorySource.contains('unknown_algorithm') ||
-        categorySource.contains('nosuchalgorithm') ||
-        categorySource.contains('unsupported_algorithm')) {
-      return 'unsupported_algorithm';
+
+    bool containsAny(Iterable<String> patterns) =>
+        patterns.any(categorySource.contains);
+
+    if (containsAny(const <String>[
+      'keypermanentlyinvalidatedexception',
+      'keypermanentlyinvalidated',
+      'key_permanently_invalidated',
+    ])) {
+      return const _SecureStorageFailureClassification(
+        'key_permanently_invalidated',
+        'KeyPermanentlyInvalidatedException',
+      );
     }
-    if (error is PlatformException) return 'platform_error';
+    if (containsAny(const <String>[
+      'unrecoverablekeyexception',
+      'unrecoverable key',
+      'key_unrecoverable',
+    ])) {
+      return const _SecureStorageFailureClassification(
+        'key_unrecoverable',
+        'UnrecoverableKeyException',
+      );
+    }
+    if (containsAny(const <String>[
+      'aeadbadtagexception',
+      'tag mismatch',
+      'mac check',
+      'authentication_failed',
+    ])) {
+      return const _SecureStorageFailureClassification(
+        'authentication_failed',
+        'AEADBadTagException',
+      );
+    }
+    if (containsAny(const <String>[
+      'badpaddingexception',
+      'badpadding',
+      'bad padding',
+      'bad_padding',
+      'bad_decrypt',
+      'bad decrypt',
+    ])) {
+      return const _SecureStorageFailureClassification(
+        'bad_padding',
+        'BadPaddingException',
+      );
+    }
+    if (containsAny(const <String>[
+      'invalidkeyexception',
+      'invalidkey',
+      'invalid key',
+      'invalid_key',
+      'failed to unwrap key',
+    ])) {
+      return const _SecureStorageFailureClassification(
+        'invalid_key',
+        'InvalidKeyException',
+      );
+    }
+    if (containsAny(const <String>[
+      'nosuchalgorithmexception',
+      'unknown algorithm',
+      'unknown_algorithm',
+      'nosuchalgorithm',
+      'unsupported_algorithm',
+    ])) {
+      return const _SecureStorageFailureClassification(
+        'unsupported_algorithm',
+        'NoSuchAlgorithmException',
+      );
+    }
+    if (containsAny(const <String>[
+      'keystoreexception',
+      'providerexception',
+      'keymint',
+      'km_error',
+      'androidkeystore',
+    ])) {
+      final failureType = categorySource.contains('providerexception')
+          ? 'ProviderException'
+          : categorySource.contains('keystoreexception')
+          ? 'KeyStoreException'
+          : 'KeyMintException';
+      return _SecureStorageFailureClassification(
+        'keystore_provider_error',
+        failureType,
+      );
+    }
+    if (error is PlatformException) {
+      return const _SecureStorageFailureClassification(
+        'platform_error',
+        'PlatformException',
+      );
+    }
     final type = error.runtimeType.toString().trim();
-    return type.isEmpty ? 'unknown_error' : type.toLowerCase();
+    return _SecureStorageFailureClassification(
+      type.isEmpty ? 'unknown_error' : type.toLowerCase(),
+      type.isEmpty ? null : type,
+    );
   }
+
+  String _failureCodeFor(Object error) => _classifyFailure(error).code;
 
   void _markSecureStorageUnavailable(
     Object error, {
     String? code,
+    SecureStorageFailureStage? stage,
+    String? failureType,
     int? operationGeneration,
   }) {
     if (_isSecureStorageOperationInvalidated(error) ||
@@ -702,7 +860,20 @@ class StorageService {
     // error; otherwise the same operation could no longer use the approved
     // plaintext fallback on replay.
     if (_isPlaintextFallbackActive) return;
-    final failureCode = code ?? _failureCodeFor(error);
+    final classification = _classifyFailure(error);
+    final failureCode = code ?? classification.code;
+    final resolvedStage =
+        stage ??
+        (error is SecureStorageUnavailableException ? error.stage : null) ??
+        Zone.current[_secureStorageFailureStageZoneKey]
+            as SecureStorageFailureStage? ??
+        SecureStorageFailureStage.runtimeOperation;
+    final resolvedFailureType =
+        failureType ??
+        (error is SecureStorageUnavailableException
+            ? error.failureType
+            : null) ??
+        classification.failureType;
     // Linux is the sole supported plaintext fallback. A keyring failure moves
     // the current run into that explicitly supported mode; it is not a new
     // run, so the operation that observed the failure must be allowed to
@@ -717,6 +888,8 @@ class StorageService {
     _setSecureStorageStatus(
       SecureStorageState.unavailable,
       failureCode: failureCode,
+      failureStage: resolvedStage,
+      failureType: resolvedFailureType,
     );
     if (_hasLoggedSecureStorageUnavailable) {
       return;
@@ -726,6 +899,8 @@ class StorageService {
         'Secure storage '
         'profile=${_secureStorageProfile?.name ?? 'unknown'}, '
         'state=${SecureStorageState.unavailable.name}, '
+        'stage=${_secureStorageFailureStage?.name ?? 'unknown'}, '
+        'type=${_secureStorageFailureType ?? 'unknown'}, '
         'code=$_secureStorageFailureCode';
     _secureStorageAuditObserverForTest?.call(auditLine);
     if (kDebugMode) _logger.w(auditLine);
@@ -871,6 +1046,37 @@ class StorageService {
     }
   }
 
+  Future<T> _runSecureStorageInitializationStage<T>(
+    SecureStorageFailureStage stage,
+    Future<T> Function() operation,
+  ) async {
+    try {
+      return await runZoned(
+        operation,
+        zoneValues: <Object?, Object?>{
+          _secureStorageFailureStageZoneKey: stage,
+        },
+      );
+    } catch (error) {
+      if (_isSecureStorageOperationInvalidated(error)) rethrow;
+      final classification = _classifyFailure(error);
+      if (error is SecureStorageUnavailableException) {
+        throw SecureStorageUnavailableException(
+          error.code,
+          error.cause ?? error,
+          error.stage ?? stage,
+          error.failureType ?? classification.failureType,
+        );
+      }
+      throw SecureStorageUnavailableException(
+        classification.code,
+        error,
+        stage,
+        classification.failureType,
+      );
+    }
+  }
+
   Future<void> initializeSecureStorage({bool force = false}) async {
     _requireExpectedSecureStorageOperationEpoch();
     if (!force && _secureStorageState == SecureStorageState.ready) return;
@@ -878,6 +1084,9 @@ class StorageService {
       if (_isPlaintextFallbackActive) return;
       throw SecureStorageUnavailableException(
         _secureStorageFailureCode ?? 'secure_storage_unavailable',
+        null,
+        _secureStorageFailureStage,
+        _secureStorageFailureType,
       );
     }
 
@@ -888,6 +1097,9 @@ class StorageService {
         if (_isPlaintextFallbackActive) return;
         throw SecureStorageUnavailableException(
           _secureStorageFailureCode ?? 'secure_storage_unavailable',
+          null,
+          _secureStorageFailureStage,
+          _secureStorageFailureType,
         );
       }
       await _initializeSecureStorageUnlocked(force: force);
@@ -905,81 +1117,115 @@ class StorageService {
     }
 
     try {
-      if (_isAndroidPlatform) {
-        AndroidSecureStorageProfile profile;
-        final override = _androidProfileOverrideForTest;
-        if (override != null) {
-          profile = override;
-        } else {
-          var probe = await _androidProfileResolver.probe();
-          if (!probe.isReady) {
-            throw SecureStorageUnavailableException(
-              probe.failureCode ?? 'android_secure_storage_profile_invalid',
-            );
-          }
-          if (probe.profile == AndroidSecureStorageProfile.fresh) {
-            final initialized = await _androidProfileResolver
-                .initializeFreshOaepGcm();
-            if (!initialized.isReady ||
-                initialized.profile != AndroidSecureStorageProfile.oaepGcm) {
-              throw SecureStorageUnavailableException(
-                initialized.failureCode ??
-                    'android_fresh_initialization_invalid',
-              );
+      await _runSecureStorageInitializationStage(
+        SecureStorageFailureStage.profileProbe,
+        () async {
+          if (_isAndroidPlatform) {
+            AndroidSecureStorageProfile profile;
+            final override = _androidProfileOverrideForTest;
+            if (override != null) {
+              profile = override;
+            } else {
+              var probe = await _androidProfileResolver.probe();
+              if (!probe.isReady) {
+                throw SecureStorageUnavailableException(
+                  probe.failureCode ?? 'android_secure_storage_profile_invalid',
+                );
+              }
+              if (probe.profile == AndroidSecureStorageProfile.fresh) {
+                final initialized = await _androidProfileResolver
+                    .initializeFreshOaepGcm();
+                if (!initialized.isReady ||
+                    initialized.profile !=
+                        AndroidSecureStorageProfile.oaepGcm) {
+                  throw SecureStorageUnavailableException(
+                    initialized.failureCode ??
+                        'android_fresh_initialization_invalid',
+                  );
+                }
+                probe = await _androidProfileResolver.probe();
+                if (!probe.isReady ||
+                    probe.profile != AndroidSecureStorageProfile.oaepGcm) {
+                  throw SecureStorageUnavailableException(
+                    probe.failureCode ??
+                        'android_fresh_initialization_verification_failed',
+                  );
+                }
+              }
+              profile = probe.profile;
             }
-            probe = await _androidProfileResolver.probe();
-            if (!probe.isReady ||
-                probe.profile != AndroidSecureStorageProfile.oaepGcm) {
-              throw SecureStorageUnavailableException(
-                probe.failureCode ??
-                    'android_fresh_initialization_verification_failed',
-              );
-            }
+            _secureStorageProfile = _publicProfileForAndroid(profile);
+            _androidSecureOptions = _optionsForProfile(profile);
+          } else {
+            _secureStorageProfile = SecureStorageProfile.platformDefault;
+            _androidSecureOptions = _androidModernSecureOptions;
           }
-          profile = probe.profile;
-        }
-        _secureStorageProfile = _publicProfileForAndroid(profile);
-        _androidSecureOptions = _optionsForProfile(profile);
-      } else {
-        _secureStorageProfile = SecureStorageProfile.platformDefault;
-        _androidSecureOptions = _androidModernSecureOptions;
-      }
+        },
+      );
 
       final operationGeneration = _secureStorageOperationGeneration;
-      await _secure
-          .read(
-            key: '__ptmate_secure_storage_probe__',
-            aOptions: _androidSecureOptions!,
-            iOptions: _iosSecureOptions,
-          )
-          .timeout(_secureStorageInitializationTimeout);
+      await _runSecureStorageInitializationStage(
+        SecureStorageFailureStage.cipherInitialization,
+        () => _secure
+            .read(
+              key: '__ptmate_secure_storage_probe__',
+              aOptions: _androidSecureOptions!,
+              iOptions: _iosSecureOptions,
+            )
+            .timeout(_secureStorageInitializationTimeout),
+      );
       // flutter_secure_storage persists freshly created wrapped keys and
       // algorithm metadata with SharedPreferences.apply(). Establish a native
       // synchronous barrier before this run is allowed to observe "ready".
-      await _flushAndroidSecureStorageDurabilityBarrier();
-      await _ensureAndroidEncryptedEntriesWitness();
-      final transaction = await _getSensitiveTransaction();
+      await _runSecureStorageInitializationStage(
+        SecureStorageFailureStage.durabilityBarrier,
+        _flushAndroidSecureStorageDurabilityBarrier,
+      );
+      await _runSecureStorageInitializationStage(
+        SecureStorageFailureStage.witnessVerification,
+        _ensureAndroidEncryptedEntriesWitness,
+      );
+      final transaction = await _runSecureStorageInitializationStage(
+        SecureStorageFailureStage.transactionReconciliation,
+        _getSensitiveTransaction,
+      );
       final reconciliation = await runZoned(() async {
-        final result = await transaction.reconcile(cleanupIfHealthy: false);
-        if (!result.isHealthy) {
-          throw const SecureStorageUnavailableException(
-            'secure_transaction_requires_restore',
-          );
-        }
-        await _recoverPendingCompanionPreferences(transaction);
+        final result = await _runSecureStorageInitializationStage(
+          SecureStorageFailureStage.transactionReconciliation,
+          () async {
+            final result = await transaction.reconcile(cleanupIfHealthy: false);
+            if (!result.isHealthy) {
+              throw const SecureStorageUnavailableException(
+                'secure_transaction_requires_restore',
+              );
+            }
+            return result;
+          },
+        );
+        await _runSecureStorageInitializationStage(
+          SecureStorageFailureStage.companionRecovery,
+          () => _recoverPendingCompanionPreferences(transaction),
+        );
         return result;
       }, zoneValues: <Object?, Object?>{_secureStoragePreflightZoneKey: this});
       if (_isAndroidPlatform) {
-        final prefs = await _prefs;
-        await _requirePreferenceMutation(
-          mutate: () => prefs.setBool(
-            StorageKeys.secureStorageNamespaceInitializedV1,
-            true,
-          ),
-          verify: () =>
-              prefs.getBool(StorageKeys.secureStorageNamespaceInitializedV1) ==
-              true,
-          failureCode: 'secure_storage_namespace_marker_commit_failed',
+        await _runSecureStorageInitializationStage(
+          SecureStorageFailureStage.namespaceMarker,
+          () async {
+            final prefs = await _prefs;
+            await _requirePreferenceMutation(
+              mutate: () => prefs.setBool(
+                StorageKeys.secureStorageNamespaceInitializedV1,
+                true,
+              ),
+              verify: () =>
+                  prefs.getBool(
+                    StorageKeys.secureStorageNamespaceInitializedV1,
+                  ) ==
+                  true,
+              failureCode: 'secure_storage_namespace_marker_commit_failed',
+            );
+          },
         );
       }
       // Publish ready only after profile probing, encrypted-witness verification,
@@ -1003,15 +1249,27 @@ class StorageService {
         unawaited(cleanup);
       }
     } catch (error) {
+      final classification = _classifyFailure(error);
       final code = error is SecureStorageUnavailableException
           ? error.code
-          : _failureCodeFor(error);
-      _markSecureStorageUnavailable(error, code: code);
+          : classification.code;
+      final stage = error is SecureStorageUnavailableException
+          ? error.stage
+          : SecureStorageFailureStage.runtimeOperation;
+      final failureType = error is SecureStorageUnavailableException
+          ? error.failureType ?? classification.failureType
+          : classification.failureType;
+      _markSecureStorageUnavailable(
+        error,
+        code: code,
+        stage: stage,
+        failureType: failureType,
+      );
       if (_isPlaintextFallbackActive) {
         _secureStorageProfile = SecureStorageProfile.linuxPlaintextFallback;
         return;
       }
-      throw SecureStorageUnavailableException(code, error);
+      throw SecureStorageUnavailableException(code, error, stage, failureType);
     }
   }
 

@@ -30,6 +30,8 @@ void main() async {
           'Secure storage '
           'profile=${StorageService.instance.secureStorageProfile?.name ?? 'unknown'}, '
           'state=${StorageService.instance.secureStorageState.name}, '
+          'stage=${StorageService.instance.secureStorageFailureStage?.name ?? 'unknown'}, '
+          'type=${StorageService.instance.secureStorageFailureType ?? 'unknown'}, '
           'code=$secureStorageFailureCode',
         );
       }
@@ -47,6 +49,8 @@ void main() async {
             'Secure storage '
             'profile=${StorageService.instance.secureStorageProfile?.name ?? 'unknown'}, '
             'state=${StorageService.instance.secureStorageState.name}, '
+            'stage=${StorageService.instance.secureStorageFailureStage?.name ?? 'unknown'}, '
+            'type=${StorageService.instance.secureStorageFailureType ?? 'unknown'}, '
             'code=${error.code}',
           );
         }
