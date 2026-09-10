@@ -95,6 +95,54 @@ class SiteApiException extends SiteException {
   }
 }
 
+/// 需要先购买才能访问种子内容的异常
+///
+/// [message] 固定为 `NEED_PURCHASE`，以兼容历史调用方基于文案的判断；
+/// 面向用户的提示请使用 [displayMessage]。
+class SitePurchaseRequiredException extends SiteException {
+  /// 需要购买的种子 ID（PeerGo 数字 ID）
+  final String torrentId;
+
+  /// 种子标题，便于购买弹窗展示
+  final String? torrentTitle;
+
+  SitePurchaseRequiredException({required this.torrentId, this.torrentTitle})
+    : super('NEED_PURCHASE', '该种子为付费种子，需先购买后才能下载');
+
+  String get displayMessage => detail ?? '该种子为付费种子，需先购买后才能下载';
+}
+
+/// 购买失败原因
+enum PurchaseFailureReason {
+  /// 魔力值余额不足（HTTP 402）
+  insufficientBalance,
+
+  /// 种子价格已变化（HTTP 409）
+  priceChanged,
+
+  /// 权限不足：缺少 scope、账号受限或购买功能关闭（HTTP 403）
+  forbidden,
+
+  /// 当前状态无需或不允许购买（HTTP 409）
+  notAllowed,
+
+  /// 其他未知错误
+  unknown,
+}
+
+/// 购买流程异常
+class SitePurchaseException extends SiteException {
+  final PurchaseFailureReason reason;
+  final int? statusCode;
+
+  const SitePurchaseException({
+    required this.reason,
+    required String message,
+    this.statusCode,
+    String? detail,
+  }) : super(message, detail);
+}
+
 /// 异常转换工具类
 /// 将原生异常转换为结构化的站点异常
 class ApiExceptionAdapter {
