@@ -578,6 +578,27 @@ class MainActivity : FlutterActivity() {
             )) {
                 keyStore.deleteEntry(alias)
             }
+            // The deleted ciphertext must not remain referenced by a Dart
+            // transaction manifest or a pending companion recovery journal.
+            // Remove only secure-storage metadata, preserving user settings.
+            val flutterPreferences = getSharedPreferences(
+                FLUTTER_SHARED_PREFERENCES,
+                Context.MODE_PRIVATE,
+            )
+            val metadataCleared = LegacySecureStorageMetadata.clear(
+                commitRemoval = { keys ->
+                    val editor = flutterPreferences.edit()
+                    keys.forEach { editor.remove(it) }
+                    editor.commit()
+                },
+                contains = flutterPreferences::contains,
+            )
+            if (!metadataCleared) {
+                return mapOf(
+                    "status" to "unavailable",
+                    "failureCode" to "legacy_reset_metadata_commit_failed",
+                )
+            }
             val after = readSecureStorageProbeInput()
             if (after.hasEncryptedEntries || after.hasWrappedKeys ||
                 after.namespacedConfig.isNotEmpty() || after.legacyConfig.isNotEmpty()

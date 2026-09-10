@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:flutter/services.dart';
@@ -388,15 +389,14 @@ void main() {
         },
       );
 
-      final result = await BackupService(
-        StorageService.instance,
-      ).restoreBackup(backupData);
+      final result = await BackupService(StorageService.instance)
+          .restoreBackup(backupData);
 
       expect(result.success, isTrue, reason: result.message);
       final prefs = await SharedPreferences.getInstance();
-      final stored =
-          jsonDecode(prefs.getString(StorageKeys.downloaderConfigs)!)
-              as List<dynamic>;
+      final stored = jsonDecode(
+        prefs.getString(StorageKeys.downloaderConfigs)!,
+      ) as List<dynamic>;
       final storedConfig = stored.single as Map<String, dynamic>;
       final nested = storedConfig['config'] as Map<String, dynamic>;
       expect(nested.containsKey('password'), isFalse);
@@ -411,63 +411,128 @@ void main() {
     },
   );
 
+  test('BackupService rejects conflicting downloader password sources before writing', () async {
+    const downloaderId = 'conflicting-backup-downloader';
+    const config = QbittorrentConfig(
+      id: downloaderId,
+      name: 'Conflicting Backup Downloader',
+      host: 'downloader.example.com',
+      port: 8080,
+      username: 'user',
+      password: 'embedded-password',
+    );
+    final backupData = BackupData(
+      version: BackupVersion.current,
+      timestamp: DateTime(2026, 7, 20),
+      appVersion: '2.27.0',
+      data: {
+        'downloaderConfigs': [config.toJson()],
+        'defaultDownloaderId': downloaderId,
+        'downloaderPasswords': const <String, String>{
+          downloaderId: 'separate-password',
+        },
+      },
+    );
+
+    var resetCalled = false;
+    final result = await BackupService(StorageService.instance).restoreBackup(
+      backupData,
+      onBeforeRestore: () async {
+        resetCalled = true;
+      },
+    );
+
+    expect(result.success, isFalse);
+    expect(resetCalled, isFalse);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.containsKey(StorageKeys.downloaderConfigs), isFalse);
+    expect(
+      await StorageService.instance.loadDownloaderPassword(downloaderId),
+      isNull,
+    );
+  });
+
+  for (final invalidData in <Map<String, dynamic>>[
+    {'siteConfigs': 'not-a-list'},
+    {
+      'userPreferences': {'dynamicColor': 'not-a-bool'},
+    },
+    {
+      'userPreferences': {
+        'proxy': {'port': 'not-an-int'},
+      },
+    },
+  ]) {
+    test(
+      'invalid backup $invalidData never invokes destructive reset',
+      () async {
+        var resetCalled = false;
+        final backup = BackupData(
+          version: BackupVersion.current,
+          timestamp: DateTime(2026),
+          appVersion: 'test',
+          data: invalidData,
+        );
+        final result = await BackupService(StorageService.instance)
+            .restoreBackup(
+              backup,
+              onBeforeRestore: () async {
+                resetCalled = true;
+              },
+            );
+        expect(result.success, isFalse);
+        expect(resetCalled, isFalse);
+        expect(secureStorage, isEmpty);
+      },
+    );
+  }
+
   test(
-    'BackupService rejects conflicting downloader password sources before writing',
+    'valid backup invokes reset before writing and restores passwords',
     () async {
-      const downloaderId = 'conflicting-backup-downloader';
-      const config = QbittorrentConfig(
-        id: downloaderId,
-        name: 'Conflicting Backup Downloader',
-        host: 'downloader.example.com',
-        port: 8080,
-        username: 'user',
-        password: 'embedded-password',
-      );
-      final backupData = BackupData(
+      var resetCalled = false;
+      final backup = BackupData(
         version: BackupVersion.current,
-        timestamp: DateTime(2026, 7, 20),
-        appVersion: '2.27.0',
+        timestamp: DateTime(2026),
+        appVersion: 'test',
         data: {
-          'downloaderConfigs': [config.toJson()],
-          'defaultDownloaderId': downloaderId,
-          'downloaderPasswords': const <String, String>{
-            downloaderId: 'separate-password',
+          'userPreferences': {
+            'proxy': {'password': 'restored-password'},
           },
         },
       );
-
-      final result = await BackupService(
-        StorageService.instance,
-      ).restoreBackup(backupData);
-
-      expect(result.success, isFalse);
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.containsKey(StorageKeys.downloaderConfigs), isFalse);
+      final result = await BackupService(StorageService.instance).restoreBackup(
+        backup,
+        onBeforeRestore: () async {
+          expect(secureStorage, isEmpty);
+          resetCalled = true;
+          await StorageService.instance.initializeSecureStorage();
+        },
+      );
+      expect(resetCalled, isTrue);
+      expect(result.success, isTrue);
       expect(
-        await StorageService.instance.loadDownloaderPassword(downloaderId),
-        isNull,
+        await StorageService.instance.loadProxyPassword(),
+        'restored-password',
       );
     },
   );
 
-  test(
-    'BackupService refuses to generate an empty backup from corrupt downloader JSON',
-    () async {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(StorageKeys.downloaderConfigs, '{corrupt-json');
+  test('BackupService refuses to generate an empty backup from corrupt downloader JSON', () async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(StorageKeys.downloaderConfigs, '{corrupt-json');
 
-      await expectLater(
-        BackupService(StorageService.instance).createBackup(),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            'downloader_config_load_failed',
-          ),
+    await expectLater(
+      BackupService(StorageService.instance).createBackup(),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'downloader_config_load_failed',
         ),
-      );
-    },
-  );
+      ),
+    );
+  });
 
   test(
     'BackupMigrationManager should migrate v1.2.0 to v1.3.0 gracefully',

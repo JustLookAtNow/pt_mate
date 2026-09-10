@@ -163,13 +163,10 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
             ? '正在重置旧安全存储...'
             : '正在恢复数据...';
       });
-      await widget.onBeforeRestore?.call();
-      if (!mounted) return;
-      setState(() {
-        _statusMessage = '正在恢复数据...';
-      });
-
-      final result = await _backupService.restoreBackup(backup);
+      final result = await _backupService.restoreBackup(
+        backup,
+        onBeforeRestore: widget.onBeforeRestore,
+      );
       if (!result.success) {
         _showMessage(result.message, isError: true);
         return;
@@ -195,7 +192,7 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
           builder: (context) => AlertDialog(
             title: const Text('确认恢复备份'),
             content: Text(
-              '${widget.isLegacySecureStorageRecovery ? '已选择并验证备份文件。确认后将先清理不兼容的旧安全存储，再' : ''}恢复备份将会覆盖当前的所有应用数据，包括：\n\n'
+              '${widget.isLegacySecureStorageRecovery ? '已选择备份文件。确认后将完整校验备份；校验通过才会清理不兼容的旧安全存储。\n\n' : ''}恢复备份将会覆盖当前的所有应用数据，包括：\n\n'
               '• 站点配置\n'
               '• qBittorrent客户端配置\n'
               '• 用户偏好设置\n'

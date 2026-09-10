@@ -362,6 +362,113 @@ void main() {
     expect(storage.secureStorageState, SecureStorageState.unavailable);
   });
 
+  test('Android 明文事务保存、重启读取及删除保持一致', () async {
+    void configure() {
+      storage.overridePlatformForTest(TargetPlatform.android);
+      storage.overrideAndroidSecureStorageProfileForTest(
+        AndroidSecureStorageProfile.plaintext,
+      );
+    }
+
+    configure();
+    final values = <String, String>{};
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageProfileChannel, (call) async {
+          final args = call.arguments as Map;
+          if (call.method == 'readAndroidPlaintextSensitive') {
+            return values[args['key']];
+          }
+          if (call.method == 'commitAndroidPlaintextSensitive') {
+            for (final entry in (args['mutations'] as Map).entries) {
+              if (entry.value == null) {
+                values.remove(entry.key);
+              } else {
+                values[entry.key as String] = entry.value as String;
+              }
+            }
+            return {'status': 'ready', 'failureCode': null};
+          }
+          fail('unexpected native call: ${call.method}');
+        });
+    await storage.initializeSecureStorage();
+    await storage.saveDownloaderPassword('plaintext-roundtrip', 'first');
+    expect(
+      await storage.loadDownloaderPassword('plaintext-roundtrip'),
+      'first',
+    );
+    await storage.saveDownloaderPassword('plaintext-roundtrip', 'second');
+    await storage.waitForPendingSecureStorageCleanup();
+    storage.resetForTest();
+    configure();
+    // A persisted manifest must remain authoritative even if the new build
+    // has disabled creation of new transactions.
+    storage.overrideSecureStorageTransactionsForTest(false);
+    await storage.initializeSecureStorage();
+    expect(
+      await storage.loadDownloaderPassword('plaintext-roundtrip'),
+      'second',
+    );
+    await storage.deleteDownloaderPassword('plaintext-roundtrip');
+    expect(await storage.loadDownloaderPassword('plaintext-roundtrip'), isNull);
+  });
+
+  test('旧 Android 重置后不再对已删除的事务密文执行恢复', () async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      manifestKey,
+      jsonEncode({
+        'version': 1,
+        'revision': 'old-revision',
+        'entries': {'downloader.password.old': 'deleted-physical-key'},
+        'garbage': <String>[],
+      }),
+    );
+    await prefs.setString(
+      StorageKeys.pendingSensitiveCompanionV1,
+      'old-journal',
+    );
+    await prefs.setString('unrelated-setting', 'keep');
+    storage.overridePlatformForTest(TargetPlatform.android);
+    storage.overrideAndroidSecureStorageProfileForTest(null);
+    var reset = false;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageProfileChannel, (call) async {
+          if (call.method == 'resetLegacyAndroidSecureStorage') {
+            expect(call.arguments, {'confirmed': true});
+            reset = true;
+            await prefs.remove(manifestKey);
+            await prefs.remove(StorageKeys.pendingSensitiveCompanionV1);
+            secureValues.clear();
+            return {'status': 'fresh', 'failureCode': null};
+          }
+          if (call.method == 'probeAndroidSecureStorage') {
+            return {
+              'status': 'ready',
+              'profile': reset ? 'oaepGcm' : 'pkcs1Gcm',
+              'keyCipher': reset
+                  ? 'RSA_ECB_OAEPwithSHA_256andMGF1Padding'
+                  : 'RSA_ECB_PKCS1Padding',
+              'storageCipher': 'AES_GCM_NoPadding',
+              'hasEncryptedEntries': false,
+              'hasWrappedKeys': true,
+              'failureCode': null,
+            };
+          }
+          fail('unexpected native call: ${call.method}');
+        });
+    await expectLater(
+      storage.initializeSecureStorage(),
+      throwsA(isA<SecureStorageUnavailableException>()),
+    );
+    await storage.resetLegacyAndroidStorageForRestore();
+    expect(storage.isSecureStorageReady, isTrue);
+    expect(prefs.containsKey(manifestKey), isFalse);
+    expect(prefs.containsKey(StorageKeys.pendingSensitiveCompanionV1), isFalse);
+    expect(prefs.getString('unrelated-setting'), 'keep');
+    await storage.saveDownloaderPassword('restored', 'new-password');
+    expect(await storage.loadDownloaderPassword('restored'), 'new-password');
+  });
+
   test('Android 明文存储 I/O 失败后立即锁定且不得表现为空值', () async {
     storage.overridePlatformForTest(TargetPlatform.android);
     storage.overrideAndroidSecureStorageProfileForTest(

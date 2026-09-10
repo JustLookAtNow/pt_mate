@@ -504,6 +504,12 @@ class StorageService {
     _androidSecureOptions = null;
     _sensitiveTransaction = null;
     _pendingSecureStorageCleanup = Future<void>.value();
+    // Native reset removes the manifest and companion journal too. Refresh
+    // the Dart cache before reconciliation can observe the old revision.
+    await (await _prefs).reload();
+    _siteConfigsCacheDirty = true;
+    _siteApiKeysCache.clear();
+    _siteCookiesCache.clear();
     await initializeSecureStorage(force: true);
   }
 
@@ -1755,6 +1761,23 @@ class StorageService {
     return decoded;
   }
 
+  /// Pure validation shared with backup preflight before destructive reset.
+  void validateBackupRestorePayload({
+    List<SiteConfig>? siteConfigs,
+    CookieCloudConfig? cookieCloudConfig,
+    required Map<String, dynamic> backupPreferences,
+  }) {
+    if (siteConfigs != null) {
+      _validatePlainSiteConfigsPayload(_encodePlainSiteConfigs(siteConfigs));
+    }
+    if (cookieCloudConfig != null) {
+      _validateCookieCloudPreferencesPayload(
+        _encodeCookieCloudPreferences(cookieCloudConfig),
+      );
+    }
+    _validateBackupPreferencesPayload(jsonEncode(backupPreferences));
+  }
+
   Map<String, dynamic> _validateBackupPreferencesPayload(String encoded) {
     final decoded = jsonDecode(encoded);
     if (decoded is! Map<String, dynamic>) {
@@ -2340,7 +2363,7 @@ class StorageService {
       // actually failed. A healthy Linux keyring must use the same revision
       // manifest path as every other platform, otherwise a process kill can
       // still leave a partially updated batch of secrets.
-      if (_isPlaintextFallbackActive) {
+      if (_isLinuxPlaintextFallbackActive) {
         return _loadSecureWithFallback(key: key, fallbackKey: fallbackKey);
       }
 
