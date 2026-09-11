@@ -181,7 +181,7 @@ jobs:
           ${{ runner.os }}-gradle-
         
     - name: Get dependencies
-      run: flutter pub get
+      uses: ./.github/actions/pub-get
       
     - name: Decode keystore
       run: |
@@ -399,7 +399,7 @@ jobs:
           ${{ runner.os }}-vs-state-v2-release-
     
     - name: Get dependencies
-      run: flutter pub get
+      uses: ./.github/actions/pub-get
       
     - name: Clear stale Windows CMake build
       run: |
@@ -518,7 +518,7 @@ jobs:
           ${{ runner.os }}-xcode-release-
         
     - name: Get dependencies
-      run: flutter pub get
+      uses: ./.github/actions/pub-get
 
     - name: Install CocoaPods dependencies
       run: |

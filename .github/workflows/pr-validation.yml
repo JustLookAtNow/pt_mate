@@ -41,7 +41,7 @@ jobs:
             ${{ runner.os }}-pub-
 
       - name: Get dependencies
-        run: flutter pub get
+        uses: ./.github/actions/pub-get
 
       - name: Analyze Dart sources
         run: flutter analyze
@@ -74,7 +74,7 @@ jobs:
             ${{ runner.os }}-pub-
 
       - name: Get dependencies
-        run: flutter pub get
+        uses: ./.github/actions/pub-get
 
       - name: Run all Flutter tests
         run: flutter test
@@ -141,7 +141,7 @@ jobs:
             ${{ runner.os }}-pub-
 
       - name: Get dependencies
-        run: flutter pub get
+        uses: ./.github/actions/pub-get
 
       - name: Prepare Android build files
         run: flutter build apk --config-only
