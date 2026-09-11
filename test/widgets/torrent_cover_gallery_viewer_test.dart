@@ -53,6 +53,40 @@ void main() {
     );
   }
 
+  /// 以对话框形式打开查看器，用于验证“保持打开/点击关闭”等弹窗级行为。
+  Future<void> pumpViewerInDialog(
+    WidgetTester tester, {
+    int initialIndex = 0,
+    ValueChanged<int>? onPageChanged,
+  }) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => Center(
+              child: ElevatedButton(
+                onPressed: () => showDialog<void>(
+                  context: context,
+                  barrierColor: Colors.black.withValues(alpha: 0.7),
+                  builder: (_) => TorrentCoverGalleryViewer(
+                    itemCount: () => images.length,
+                    initialIndex: initialIndex,
+                    loadCover: loadCover,
+                    titleFor: (p) => 'Title $p',
+                    onPageChanged: onPageChanged,
+                  ),
+                ),
+                child: const Text('打开'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('打开'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('初始加载显示第一张图与位置指示', (tester) async {
     await tester.pumpWidget(buildViewer());
     await tester.pumpAndSettle();
@@ -95,6 +129,135 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(changed, 1);
+  });
+
+  testWidgets('未放大时向上滑动翻到下一张并触发回调', (tester) async {
+    var changed = -1;
+    await tester.pumpWidget(buildViewer(onPageChanged: (p) => changed = p));
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(InteractiveViewer), const Offset(0, -120));
+    await tester.pumpAndSettle();
+
+    expect(changed, 1);
+    expect(find.text('Title 1  (2 / 3)'), findsOneWidget);
+  });
+
+  testWidgets('未放大时向下滑动翻回上一张', (tester) async {
+    var changed = -1;
+    await tester.pumpWidget(
+      buildViewer(initialIndex: 1, onPageChanged: (p) => changed = p),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(InteractiveViewer), const Offset(0, 120));
+    await tester.pumpAndSettle();
+
+    expect(changed, 0);
+    expect(find.text('Title 0  (1 / 3)'), findsOneWidget);
+  });
+
+  testWidgets('水平拖动不翻页', (tester) async {
+    var changed = -1;
+    await tester.pumpWidget(buildViewer(onPageChanged: (p) => changed = p));
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(InteractiveViewer), const Offset(-200, 0));
+    await tester.pumpAndSettle();
+
+    expect(changed, -1);
+    expect(find.text('Title 0  (1 / 3)'), findsOneWidget);
+  });
+
+  testWidgets('小幅垂直拖动不翻页', (tester) async {
+    var changed = -1;
+    await tester.pumpWidget(buildViewer(onPageChanged: (p) => changed = p));
+    await tester.pumpAndSettle();
+
+    await tester.timedDrag(
+      find.byType(InteractiveViewer),
+      const Offset(0, -20),
+      const Duration(milliseconds: 400),
+    );
+    await tester.pumpAndSettle();
+
+    expect(changed, -1);
+    expect(find.text('Title 0  (1 / 3)'), findsOneWidget);
+  });
+
+  testWidgets('第一张向下滑动不翻页也不关闭查看器', (tester) async {
+    var changed = -1;
+    await pumpViewerInDialog(tester, onPageChanged: (p) => changed = p);
+
+    await tester.drag(find.byType(InteractiveViewer), const Offset(0, 120));
+    await tester.pumpAndSettle();
+
+    expect(changed, -1);
+    expect(find.text('Title 0  (1 / 3)'), findsOneWidget);
+    expect(find.byType(TorrentCoverGalleryViewer), findsOneWidget);
+  });
+
+  testWidgets('点击空白处仍可关闭查看器', (tester) async {
+    await pumpViewerInDialog(tester);
+
+    await tester.tapAt(const Offset(20, 300));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TorrentCoverGalleryViewer), findsNothing);
+  });
+
+  testWidgets('末尾向上滑动触发加载下一页', (tester) async {
+    var count = 2;
+    var loadMoreCalls = 0;
+    Future<void> loadMore() async {
+      loadMoreCalls++;
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      count = 3;
+    }
+
+    await tester.pumpWidget(
+      buildViewer(
+        initialIndex: 1,
+        itemCount: () => count,
+        hasMore: () => count < 3,
+        onLoadMore: loadMore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(InteractiveViewer), const Offset(0, -120));
+    await tester.pumpAndSettle();
+
+    expect(loadMoreCalls, 1);
+    expect(find.text('Title 2  (3 / 3)'), findsOneWidget);
+  });
+
+  testWidgets('放大后拖动只平移图片，重置缩放后恢复滑动翻页', (tester) async {
+    var changed = -1;
+    await tester.pumpWidget(buildViewer(onPageChanged: (p) => changed = p));
+    await tester.pumpAndSettle();
+
+    final controller = tester
+        .widget<InteractiveViewer>(find.byType(InteractiveViewer))
+        .transformationController!;
+    controller.value = Matrix4.diagonal3Values(2.0, 2.0, 1.0);
+    await tester.pump();
+
+    final translationBefore = controller.value.getTranslation().y;
+    await tester.drag(find.byType(InteractiveViewer), const Offset(0, -60));
+    await tester.pumpAndSettle();
+
+    expect(changed, -1);
+    expect(controller.value.getTranslation().y, isNot(translationBefore));
+
+    controller.value = Matrix4.identity();
+    await tester.pump();
+
+    await tester.drag(find.byType(InteractiveViewer), const Offset(0, -120));
+    await tester.pumpAndSettle();
+
+    expect(changed, 1);
+    expect(find.text('Title 1  (2 / 3)'), findsOneWidget);
   });
 
   testWidgets('加载失败时显示错误并可继续翻页', (tester) async {

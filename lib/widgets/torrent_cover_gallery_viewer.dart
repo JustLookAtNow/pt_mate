@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 ///
 /// 宿主通过 [loadCover] 提供指定位置的数据，通过 [onPageChanged]
 /// 感知翻页（用于联动滚动背后的列表）。
+/// 图片处于原始尺寸（未放大/未平移）时，上下滑动等同点击上一个/下一个按钮
+/// （向上滑 = 下一个，向下滑 = 上一个）。
 class TorrentCoverGalleryViewer extends StatefulWidget {
   /// 动态获取当前条目数；宿主列表追加数据后返回值会随之增大。
   final int Function() itemCount;
@@ -42,6 +44,13 @@ class TorrentCoverGalleryViewer extends StatefulWidget {
 }
 
 class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
+  /// 滑动翻页阈值：累计垂直位移或结束速度超过任一阈值即视为一次滑动。
+  static const double _swipeDistanceThreshold = 60;
+  static const double _swipeVelocityThreshold = 300;
+
+  /// 位移小于该值时改用速度方向判断翻页方向。
+  static const double _swipeDirectionDeadZone = 20;
+
   final TransformationController _transformationController =
       TransformationController();
   final FocusNode _focusNode = FocusNode();
@@ -54,19 +63,33 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
   int _requestToken = 0;
   bool _neighborsPreloaded = false;
 
+  /// 图片是否被变换（放大/缩小/平移）；未变换时上下滑动用于翻页。
+  bool _isTransformed = false;
+  double _swipeDy = 0;
+
   @override
   void initState() {
     super.initState();
     _position = widget.initialIndex;
     _focusNode.requestFocus();
+    _transformationController.addListener(_handleTransformChanged);
     _loadCurrent();
   }
 
   @override
   void dispose() {
     _focusNode.dispose();
+    _transformationController.removeListener(_handleTransformChanged);
     _transformationController.dispose();
     super.dispose();
+  }
+
+  /// 变换状态变化时刷新：只有回到原始尺寸才重新允许滑动翻页。
+  void _handleTransformChanged() {
+    final transformed =
+        (_transformationController.value.getMaxScaleOnAxis() - 1).abs() > 0.001;
+    if (!mounted || transformed == _isTransformed) return;
+    setState(() => _isTransformed = transformed);
   }
 
   void _resetZoom() {
@@ -126,6 +149,55 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
     widget.onPageChanged?.call(position);
   }
 
+  /// 翻到下一张；已到已知末尾且宿主还有更多数据时先请求加载。
+  void _goNext() {
+    if (_position + 1 < widget.itemCount()) {
+      _goTo(_position + 1);
+      return;
+    }
+    if (widget.hasMore?.call() ?? false) {
+      _goToNextWithLoadMore();
+    }
+  }
+
+  void _goPrev() {
+    _goTo(_position - 1);
+  }
+
+  void _handleSwipeStart(DragStartDetails details) {
+    _swipeDy = 0;
+  }
+
+  void _handleSwipeUpdate(DragUpdateDetails details) {
+    _swipeDy += details.primaryDelta ?? 0;
+  }
+
+  void _handleSwipeEnd(DragEndDetails details) {
+    final dy = _swipeDy;
+    _swipeDy = 0;
+    final velocity = details.primaryVelocity ?? 0;
+    if (dy.abs() <= _swipeDistanceThreshold &&
+        velocity.abs() <= _swipeVelocityThreshold) {
+      return;
+    }
+    // 方向以位移为主，位移过小时用结束速度兜底
+    final bool? goNext;
+    if (dy.abs() >= _swipeDirectionDeadZone) {
+      // 向上滑（dy < 0）为下一个，向下滑为上一个
+      goNext = dy < 0;
+    } else if (velocity != 0) {
+      goNext = velocity < 0;
+    } else {
+      goNext = null;
+    }
+    if (goNext == null) return;
+    if (goNext) {
+      _goNext();
+    } else {
+      _goPrev();
+    }
+  }
+
   /// 已翻到已知末尾但宿主可能还有下一页时，请求加载后继续前进。
   Future<void> _goToNextWithLoadMore() async {
     if (_isLoadingMore) return;
@@ -153,18 +225,14 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
   void _handleKey(KeyEvent event) {
     if (event is! KeyDownEvent) return;
     if (event.physicalKey == PhysicalKeyboardKey.arrowLeft) {
-      if (_position > 0) _goTo(_position - 1);
+      _goPrev();
     } else if (event.physicalKey == PhysicalKeyboardKey.arrowRight) {
-      if (_position + 1 < widget.itemCount()) {
-        _goTo(_position + 1);
-      } else if (widget.hasMore?.call() ?? false) {
-        _goToNextWithLoadMore();
-      }
+      _goNext();
     }
   }
 
   void _onDoubleTapAt(Offset position) {
-    if (_transformationController.value != Matrix4.identity()) {
+    if (_isTransformed) {
       _resetZoom();
     } else {
       const double scale = 2.0;
@@ -192,6 +260,11 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
       onKeyEvent: _handleKey,
       child: GestureDetector(
         onTap: () => Navigator.of(context).pop(),
+        // 未变换（原始尺寸）时接管上下滑动翻页；已放大时把拖拽让给
+        // InteractiveViewer，保证图片平移不被抢占。
+        onVerticalDragStart: _isTransformed ? null : _handleSwipeStart,
+        onVerticalDragUpdate: _isTransformed ? null : _handleSwipeUpdate,
+        onVerticalDragEnd: _isTransformed ? null : _handleSwipeEnd,
         child: Scaffold(
           backgroundColor: Colors.transparent,
           body: Stack(
@@ -219,7 +292,7 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
                   child: _NavButton(
                     icon: Icons.chevron_left,
                     tooltip: '上一个',
-                    onPressed: () => _goTo(_position - 1),
+                    onPressed: _goPrev,
                   ),
                 ),
               if (canNext)
@@ -240,13 +313,7 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
                       : _NavButton(
                           icon: Icons.chevron_right,
                           tooltip: '下一个',
-                          onPressed: () {
-                            if (_position + 1 < widget.itemCount()) {
-                              _goTo(_position + 1);
-                            } else {
-                              _goToNextWithLoadMore();
-                            }
-                          },
+                          onPressed: _goNext,
                         ),
                 ),
               Align(
