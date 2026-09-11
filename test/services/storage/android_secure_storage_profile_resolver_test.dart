@@ -65,7 +65,10 @@ void main() {
       ).probe();
 
       expect(result.profile, entry.profile);
-      expect(result.isReady, isTrue);
+      expect(
+        result.isReady,
+        entry.profile == AndroidSecureStorageProfile.oaepGcm,
+      );
       expect(result.hasEncryptedEntries, isTrue);
       expect(result.hasWrappedKeys, isTrue);
     }
@@ -92,6 +95,88 @@ void main() {
 
     expect(result.profile, AndroidSecureStorageProfile.fresh);
     expect(result.isReady, isTrue);
+  });
+
+  test('parses the permanent Android plaintext profile', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (_) async {
+          return <String, Object?>{
+            'status': 'ready',
+            'profile': 'plaintext',
+            'keyCipher': null,
+            'storageCipher': null,
+            'hasEncryptedEntries': false,
+            'hasWrappedKeys': false,
+            'failureCode': null,
+          };
+        });
+
+    final result = await AndroidSecureStorageProfileResolver(
+      channel: channel,
+      isAndroid: true,
+    ).probe();
+
+    expect(result.profile, AndroidSecureStorageProfile.plaintext);
+    expect(result.isReady, isTrue);
+  });
+
+  test(
+    'only explicit unsupported_algorithm permits plaintext fallback',
+    () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            expect(call.method, 'probeModernSecureStorageCapability');
+            return <String, Object?>{
+              'status': 'unsupported',
+              'failureCode': 'unsupported_algorithm',
+            };
+          });
+
+      final result = await AndroidSecureStorageProfileResolver(
+        channel: channel,
+        isAndroid: true,
+      ).probeModernCapability();
+
+      expect(result.isSupported, isFalse);
+      expect(result.isExplicitlyUnsupported, isTrue);
+      expect(result.failureCode, 'unsupported_algorithm');
+    },
+  );
+
+  test('capability probe transient errors remain fail-closed', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          expect(call.method, 'probeModernSecureStorageCapability');
+          return <String, Object?>{
+            'status': 'unavailable',
+            'failureCode': 'capability_probe_failed',
+          };
+        });
+
+    final result = await AndroidSecureStorageProfileResolver(
+      channel: channel,
+      isAndroid: true,
+    ).probeModernCapability();
+
+    expect(result.isSupported, isFalse);
+    expect(result.isExplicitlyUnsupported, isFalse);
+    expect(result.failureCode, 'capability_probe_failed');
+  });
+
+  test('legacy reset requires confirmation and native fresh result', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          expect(call.method, 'resetLegacyAndroidSecureStorage');
+          expect(call.arguments, <String, Object?>{'confirmed': true});
+          return <String, Object?>{'status': 'fresh', 'failureCode': null};
+        });
+    final resolver = AndroidSecureStorageProfileResolver(
+      channel: channel,
+      isAndroid: true,
+    );
+
+    expect(await resolver.resetLegacyStorage(confirmed: false), isFalse);
+    expect(await resolver.resetLegacyStorage(confirmed: true), isTrue);
   });
 
   test(

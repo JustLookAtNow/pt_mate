@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+
 import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/rendering.dart';
+
 import 'dart:math' as math;
+
 import '../models/app_models.dart';
 import '../models/batch_operation_models.dart';
 import '../services/storage/storage_service.dart';
@@ -28,7 +32,9 @@ import '../widgets/torrent_download_dialog.dart';
 import '../widgets/tag_filter_bar.dart';
 import '../widgets/aggregate_search_strategy_list.dart';
 import 'torrent_detail_page.dart';
+
 import 'package:pt_mate/utils/notification_helper.dart';
+
 import '../utils/screen_utils.dart';
 import '../utils/url_launcher_helper.dart';
 
@@ -237,9 +243,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                         icon: Icon(
                                           Icons.sort,
                                           color: provider.sortBy != 'none'
-                                              ? Theme.of(
-                                                  context,
-                                                ).colorScheme.secondary
+                                              ? Theme.of(context)
+                                                    .colorScheme
+                                                    .secondary
                                               : null,
                                         ),
                                         tooltip: '排序',
@@ -537,9 +543,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                     const SizedBox(width: 12),
                                     Text(
                                       '正在搜索...',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleSmall,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall,
                                     ),
                                     const Spacer(),
                                     TextButton.icon(
@@ -550,9 +556,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       label: const Text('停止'),
                                       style: TextButton.styleFrom(
                                         side: BorderSide(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.outline,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .outline,
                                           width: 1.0,
                                         ),
                                       ),
@@ -575,9 +581,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                   const SizedBox(height: 4),
                                   Text(
                                     '${provider.searchProgress!.completedSites}/${provider.searchProgress!.totalSites} 个站点',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
                                   ),
                                 ],
                               ],
@@ -599,9 +605,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                     Icon(
                                       Icons.search,
                                       size: 64,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.outline,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outline,
                                     ),
                                     const SizedBox(height: 16),
                                     Text(
@@ -610,9 +616,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                           .textTheme
                                           .bodyLarge
                                           ?.copyWith(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.outline,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .outline,
                                           ),
                                     ),
                                   ],
@@ -621,9 +627,8 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                             : Stack(
                                 children: [
                                   ScrollConfiguration(
-                                    behavior: ScrollConfiguration.of(
-                                      context,
-                                    ).copyWith(scrollbars: false),
+                                    behavior: ScrollConfiguration.of(context)
+                                        .copyWith(scrollbars: false),
                                     child: Listener(
                                       onPointerMove: _onPointerMove,
                                       onPointerUp: _onPointerUp,
@@ -796,9 +801,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                     ),
                                     textStyle: const TextStyle(fontSize: 13),
                                     side: BorderSide(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.outline,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outline,
                                       width: 1.0,
                                     ),
                                   ),
@@ -832,9 +837,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                     ),
                                     textStyle: const TextStyle(fontSize: 13),
                                     side: BorderSide(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.outline,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outline,
                                       width: 1.0,
                                     ),
                                   ),
@@ -859,12 +864,12 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                                       horizontal: 0,
                                     ),
                                     textStyle: const TextStyle(fontSize: 13),
-                                    backgroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                    foregroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.onPrimary,
+                                    backgroundColor: Theme.of(context)
+                                        .colorScheme
+                                        .primary,
+                                    foregroundColor: Theme.of(context)
+                                        .colorScheme
+                                        .onPrimary,
                                   ),
                                   child: Text('下载 (${_selectedItems.length})'),
                                 ),
@@ -1188,10 +1193,12 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     if (listIndex < 0 || listIndex >= items.length) return;
     if (items[listIndex].torrent.cover.isEmpty) return;
 
-    final coverIndices = <int>[
+    // 列表数据只追加，已有下标稳定，每次调用重算即可响应数据变化
+    List<int> computeCoverIndices() => [
       for (var i = 0; i < items.length; i++)
         if (items[i].torrent.cover.isNotEmpty) i,
     ];
+    final coverIndices = computeCoverIndices();
     final initialPosition = coverIndices.indexOf(listIndex);
     if (initialPosition == -1) return;
 
@@ -1200,17 +1207,19 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       barrierColor: Colors.black.withValues(alpha: 0.7),
       builder: (dialogContext) {
         return TorrentCoverGalleryViewer(
-          itemCount: coverIndices.length,
+          itemCount: () => computeCoverIndices().length,
           initialIndex: initialPosition,
           titleFor: (position) {
-            final i = (position >= 0 && position < coverIndices.length)
-                ? coverIndices[position]
+            final indices = computeCoverIndices();
+            final i = (position >= 0 && position < indices.length)
+                ? indices[position]
                 : null;
             return (i != null && i < items.length) ? items[i].torrent.name : '';
           },
           loadCover: (position) async {
-            final i = (position >= 0 && position < coverIndices.length)
-                ? coverIndices[position]
+            final indices = computeCoverIndices();
+            final i = (position >= 0 && position < indices.length)
+                ? indices[position]
                 : null;
             if (i == null || i >= items.length) return null;
             final item = items[i];
@@ -1243,8 +1252,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
             }
           },
           onPageChanged: (position) {
-            if (position < 0 || position >= coverIndices.length) return;
-            final i = coverIndices[position];
+            final indices = computeCoverIndices();
+            if (position < 0 || position >= indices.length) return;
+            final i = indices[position];
             if (i < items.length) {
               _listScroller.scrollToIndex(i);
             }
@@ -2170,9 +2180,8 @@ class _StrategySelectorButton extends StatelessWidget {
                     selectedConfig?.name ?? '选择搜索策略',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyLarge?.copyWith(color: foregroundColor),
+                    style: Theme.of(context).textTheme.bodyLarge
+                        ?.copyWith(color: foregroundColor),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.xs),
@@ -2253,9 +2262,8 @@ class _AggregateSearchErrorBanner extends StatelessWidget {
                         retrying ? '已保留当前搜索结果' : '其他站点结果已正常显示',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: colorScheme.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -2273,10 +2281,8 @@ class _AggregateSearchErrorBanner extends StatelessWidget {
                 else ...[
                   Text(
                     '查看',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: accent,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: Theme.of(context).textTheme.labelLarge
+                        ?.copyWith(color: accent, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(width: 2),
                   Icon(Icons.chevron_right_rounded, size: 20, color: accent),
@@ -2332,16 +2338,14 @@ class _AggregateSearchErrorSheet extends StatelessWidget {
           children: [
             Text(
               '未响应的站点',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               '请求超时，不影响其他搜索结果',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: AppSpacing.md),
             Expanded(
@@ -2761,9 +2765,8 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
                         ? Duration.zero
                         : const Duration(seconds: 1),
                     child: Container(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.scrim.withValues(alpha: 0.35),
+                      color: Theme.of(context).colorScheme.scrim
+                          .withValues(alpha: 0.35),
                       alignment: Alignment.center,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -2784,20 +2787,19 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
                         child: Text(
                           _overlaySiteName!,
                           style:
-                              Theme.of(
-                                context,
-                              ).textTheme.headlineSmall?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.w600,
-                              ) ??
+                              Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onPrimaryContainer,
+                                    fontWeight: FontWeight.w600,
+                                  ) ??
                               TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.w600,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimaryContainer,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
                               ),
                         ),
                       ),

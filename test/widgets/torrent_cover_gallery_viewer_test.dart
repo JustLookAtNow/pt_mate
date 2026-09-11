@@ -31,15 +31,23 @@ void main() {
     return images[position];
   }
 
-  Widget buildViewer({int initialIndex = 0, ValueChanged<int>? onPageChanged}) {
+  Widget buildViewer({
+    int initialIndex = 0,
+    ValueChanged<int>? onPageChanged,
+    int Function()? itemCount,
+    bool Function()? hasMore,
+    Future<void> Function()? onLoadMore,
+  }) {
     return MaterialApp(
       home: Scaffold(
         body: TorrentCoverGalleryViewer(
-          itemCount: images.length,
+          itemCount: itemCount ?? () => images.length,
           initialIndex: initialIndex,
           loadCover: loadCover,
           titleFor: (p) => 'Title $p',
           onPageChanged: onPageChanged,
+          hasMore: hasMore,
+          onLoadMore: onLoadMore,
         ),
       ),
     );
@@ -94,7 +102,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: TorrentCoverGalleryViewer(
-            itemCount: 2,
+            itemCount: () => 2,
             initialIndex: 0,
             loadCover: (p) async => p == 0 ? null : images[1],
             titleFor: (p) => 'T$p',
@@ -108,5 +116,58 @@ void main() {
     await tester.tap(find.byTooltip('下一个'));
     await tester.pumpAndSettle();
     expect(find.byType(Image), findsOneWidget);
+  });
+
+  testWidgets('末尾且 hasMore 为 true 时右侧按钮可见并触发加载', (tester) async {
+    var count = 2;
+    var loadMoreCalls = 0;
+    Future<void> loadMore() async {
+      loadMoreCalls++;
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      count = 3;
+    }
+
+    await tester.pumpWidget(
+      buildViewer(
+        initialIndex: 1,
+        itemCount: () => count,
+        hasMore: () => count < 3,
+        onLoadMore: loadMore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 已是已知末尾，但宿主还有更多数据，右侧按钮仍显示
+    expect(find.byTooltip('下一个'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('下一个'));
+    await tester.pumpAndSettle();
+
+    expect(loadMoreCalls, 1);
+    expect(find.text('Title 2  (3 / 3)'), findsOneWidget);
+    // 没有更多数据后按钮隐藏
+    expect(find.byTooltip('下一个'), findsNothing);
+  });
+
+  testWidgets('onLoadMore 完成后无新数据时停留在原位', (tester) async {
+    var loadMoreCalls = 0;
+    await tester.pumpWidget(
+      buildViewer(
+        initialIndex: 1,
+        itemCount: () => 2,
+        hasMore: () => loadMoreCalls == 0,
+        onLoadMore: () async {
+          loadMoreCalls++;
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('下一个'));
+    await tester.pumpAndSettle();
+
+    expect(loadMoreCalls, 1);
+    expect(find.text('Title 1  (2 / 2)'), findsOneWidget);
+    expect(find.byTooltip('下一个'), findsNothing);
   });
 }

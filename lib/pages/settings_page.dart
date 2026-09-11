@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
@@ -19,6 +20,7 @@ import 'network_settings_page.dart';
 import 'cookie_cloud_page.dart';
 import '../services/update_service.dart';
 import '../services/debug/web_debug_service.dart';
+
 import 'package:pt_mate/utils/notification_helper.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -65,6 +67,32 @@ class _SecureFallbackConflictWarning extends StatelessWidget {
   }
 }
 
+class _AndroidPlaintextStorageWarning extends StatelessWidget {
+  const _AndroidPlaintextStorageWarning();
+
+  @override
+  Widget build(BuildContext context) {
+    if (StorageService.instance.secureStorageProfile !=
+        SecureStorageProfile.androidPlaintextFallback) {
+      return const SizedBox.shrink();
+    }
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Card(
+        color: colors.errorContainer,
+        child: ListTile(
+          leading: Icon(Icons.warning_amber_rounded, color: colors.error),
+          title: const Text('Android 明文凭据存储'),
+          subtitle: const Text(
+            '此设备不支持 OAEP+GCM 安全存储。Cookie、API Key 和密码正以明文保存在仅限本应用的本地存储中，请勿导出或共享应用数据。',
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // 查询分类配置已移至站点配置中，请在服务器设置页面进行配置
 
 class _SettingsBody extends StatelessWidget {
@@ -75,6 +103,7 @@ class _SettingsBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        const _AndroidPlaintextStorageWarning(),
         const _SecureFallbackConflictWarning(),
         // 主题设置
         Text('主题设置', style: Theme.of(context).textTheme.titleMedium),

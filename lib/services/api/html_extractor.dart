@@ -47,10 +47,10 @@ class FieldConfig {
     this.defaultValue,
     this.required = false,
     this.value,
-    required Map<String, dynamic> json,
+    required this._json,
     this.regexpFilter,
     this.filterFormat,
-  }) : _json = json;
+  });
 
   /// 从 JSON/Map 构造，兼容现有配置格式
   factory FieldConfig.fromJson(Map<String, dynamic> json) {

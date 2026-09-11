@@ -119,6 +119,12 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Setup Android SDK API 37
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK API 37
+        run: sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0"
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:

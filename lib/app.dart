@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+
 import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter/rendering.dart';
+
 import 'dart:math' as math;
 
 import 'models/app_models.dart';
@@ -44,7 +47,9 @@ import 'widgets/list_index_scroller.dart';
 import 'widgets/tag_filter_bar.dart';
 import 'services/update_service.dart';
 import 'widgets/update_notification_dialog.dart';
+
 import 'package:pt_mate/utils/notification_helper.dart';
+
 import 'utils/screen_utils.dart';
 import 'utils/url_launcher_helper.dart';
 
@@ -1100,6 +1105,7 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
   bool _resumeCheckRunning = false;
   bool _backupRestoreOpen = false;
   bool _hasLeftForeground = false;
+  bool _showAndroidPlaintextStorageWarning = true;
 
   @override
   void initState() {
@@ -1189,9 +1195,19 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
     setState(() {
       _backupRestoreOpen = true;
     });
+    final isLegacyRecovery =
+        (StorageService.instance.secureStorageFailureCode ??
+            _secureStorageFailureCode) ==
+        'legacy_secure_storage_backup_restore_required';
     navigator
         .push(
-          MaterialPageRoute<void>(builder: (_) => const BackupRestorePage()),
+          MaterialPageRoute<void>(
+            builder: (_) => BackupRestorePage(
+              onBeforeRestore: isLegacyRecovery
+                  ? StorageService.instance.resetLegacyAndroidStorageForRestore
+                  : null,
+            ),
+          ),
         )
         .whenComplete(() {
           if (!mounted) return;
@@ -1200,6 +1216,11 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
           });
           _retrySecureStorage();
         });
+  }
+
+  Future<void> _discardLegacyAndroidStorage() async {
+    await StorageService.instance.resetLegacyAndroidStorageForRestore();
+    await _retrySecureStorage();
   }
 
   void _disableProxyForSecureStorageFailure() {
@@ -1391,7 +1412,60 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
                       SecureStorageState.unavailable &&
                   !storage.canAccessSensitiveStorage;
               final storageBlocked = !_secureStorageReady || storageUnavailable;
-              if (!storageBlocked || _backupRestoreOpen) return scaledChild;
+              if (!storageBlocked || _backupRestoreOpen) {
+                if (storage.secureStorageProfile !=
+                        SecureStorageProfile.androidPlaintextFallback ||
+                    !_showAndroidPlaintextStorageWarning) {
+                  return scaledChild;
+                }
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    scaledChild,
+                    SafeArea(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Material(
+                            color: Theme.of(context).colorScheme.errorContainer,
+                            borderRadius: BorderRadius.circular(12),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 640),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.warning_amber_rounded,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .error,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Expanded(
+                                      child: Text(
+                                        '此 Android 设备不支持 OAEP+GCM。凭据正使用明文本地存储；请勿导出或共享应用数据。',
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => setState(() {
+                                        _showAndroidPlaintextStorageWarning =
+                                            false;
+                                      }),
+                                      child: const Text('我已知晓'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
 
               return Stack(
                 fit: StackFit.expand,
@@ -1401,9 +1475,16 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
                     child: SecureStorageRecoveryPage(
                       onRetry: _retrySecureStorage,
                       onOpenBackupRestore: _openBackupRestore,
+                      onDiscardLegacyData: _discardLegacyAndroidStorage,
                       failureCode:
                           StorageService.instance.secureStorageFailureCode ??
                           _secureStorageFailureCode,
+                      failureStage: StorageService
+                          .instance
+                          .secureStorageFailureStage
+                          ?.name,
+                      failureType:
+                          StorageService.instance.secureStorageFailureType,
                       isRetrying: _isCheckingSecureStorage,
                     ),
                   ),
@@ -1944,12 +2025,12 @@ class _HomePageState extends State<HomePage> {
                         ),
                         style: TextButton.styleFrom(
                           alignment: Alignment.centerLeft,
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primaryContainer,
-                          foregroundColor: Theme.of(
-                            context,
-                          ).colorScheme.onPrimaryContainer,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .primaryContainer,
+                          foregroundColor: Theme.of(context)
+                              .colorScheme
+                              .onPrimaryContainer,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -2002,9 +2083,8 @@ class _HomePageState extends State<HomePage> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: _sortBy == 'none'
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
+                                ? Theme.of(context).colorScheme.primary
+                                      .withValues(alpha: 0.1)
                                 : null,
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -2031,9 +2111,8 @@ class _HomePageState extends State<HomePage> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: _sortBy == 'size'
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
+                                ? Theme.of(context).colorScheme.primary
+                                      .withValues(alpha: 0.1)
                                 : null,
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -2062,9 +2141,8 @@ class _HomePageState extends State<HomePage> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: _sortBy == 'upload'
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
+                                ? Theme.of(context).colorScheme.primary
+                                      .withValues(alpha: 0.1)
                                 : null,
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -2093,9 +2171,8 @@ class _HomePageState extends State<HomePage> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: _sortBy == 'download'
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
+                                ? Theme.of(context).colorScheme.primary
+                                      .withValues(alpha: 0.1)
                                 : null,
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -2320,11 +2397,14 @@ class _HomePageState extends State<HomePage> {
     if (listIndex < 0 || listIndex >= items.length) return;
     if (items[listIndex].cover.isEmpty) return;
 
-    // 有封面条目的下标列表（画廊 position ↔ 列表下标映射）
-    final coverIndices = <int>[
-      for (var i = 0; i < items.length; i++)
-        if (items[i].cover.isNotEmpty) i,
+    // 有封面条目的下标列表（画廊 position ↔ 列表下标映射）。
+    // 列表数据只追加且去重，已有下标稳定，因此每次调用重新计算即可
+    // 响应分页追加后的新条目。
+    List<int> computeCoverIndices() => [
+      for (var i = 0; i < _filteredItems.length; i++)
+        if (_filteredItems[i].cover.isNotEmpty) i,
     ];
+    final coverIndices = computeCoverIndices();
     final initialPosition = coverIndices.indexOf(listIndex);
     if (initialPosition == -1) return;
 
@@ -2333,19 +2413,21 @@ class _HomePageState extends State<HomePage> {
       barrierColor: Colors.black.withValues(alpha: 0.7),
       builder: (dialogContext) {
         return TorrentCoverGalleryViewer(
-          itemCount: coverIndices.length,
+          itemCount: () => computeCoverIndices().length,
           initialIndex: initialPosition,
           titleFor: (position) {
-            final i = (position >= 0 && position < coverIndices.length)
-                ? coverIndices[position]
+            final indices = computeCoverIndices();
+            final i = (position >= 0 && position < indices.length)
+                ? indices[position]
                 : null;
             return (i != null && i < _filteredItems.length)
                 ? _filteredItems[i].name
                 : '';
           },
           loadCover: (position) async {
-            final i = (position >= 0 && position < coverIndices.length)
-                ? coverIndices[position]
+            final indices = computeCoverIndices();
+            final i = (position >= 0 && position < indices.length)
+                ? indices[position]
                 : null;
             if (i == null || i >= _filteredItems.length) return null;
             final item = _filteredItems[i];
@@ -2364,12 +2446,15 @@ class _HomePageState extends State<HomePage> {
             }
           },
           onPageChanged: (position) {
-            if (position < 0 || position >= coverIndices.length) return;
-            final i = coverIndices[position];
+            final indices = computeCoverIndices();
+            if (position < 0 || position >= indices.length) return;
+            final i = indices[position];
             if (i < _filteredItems.length) {
               _listScroller.scrollToIndex(i);
             }
           },
+          hasMore: () => _hasMore,
+          onLoadMore: () => _loadMore(),
         );
       },
     );
@@ -3000,9 +3085,9 @@ class _HomePageState extends State<HomePage> {
                                       .textTheme
                                       .headlineSmall
                                       ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurface,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
                                       ),
                                 ),
                                 const SizedBox(height: 16),
@@ -3010,9 +3095,9 @@ class _HomePageState extends State<HomePage> {
                                   '请先配置站点信息以开始使用应用',
                                   style: Theme.of(context).textTheme.bodyLarge
                                       ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
                                       ),
                                   textAlign: TextAlign.center,
                                 ),
@@ -3062,9 +3147,9 @@ class _HomePageState extends State<HomePage> {
                                             Icon(
                                               Icons.search_off,
                                               size: 64,
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.outline,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .outline,
                                             ),
                                             const SizedBox(height: 16),
                                             Text(
@@ -3075,9 +3160,9 @@ class _HomePageState extends State<HomePage> {
                                                   .textTheme
                                                   .titleMedium
                                                   ?.copyWith(
-                                                    color: Theme.of(
-                                                      context,
-                                                    ).colorScheme.outline,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .outline,
                                                   ),
                                             ),
                                             const SizedBox(height: 8),
@@ -3087,9 +3172,9 @@ class _HomePageState extends State<HomePage> {
                                                   .textTheme
                                                   .bodySmall
                                                   ?.copyWith(
-                                                    color: Theme.of(
-                                                      context,
-                                                    ).colorScheme.outline,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .outline,
                                                   ),
                                             ),
                                           ],
@@ -3291,12 +3376,12 @@ class _HomePageState extends State<HomePage> {
                                   horizontal: 0,
                                 ),
                                 textStyle: const TextStyle(fontSize: 13),
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.primary,
-                                foregroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimary,
+                                backgroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .primary,
+                                foregroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimary,
                               ),
                               child: Text('下载 (${_selectedItems.length})'),
                             ),

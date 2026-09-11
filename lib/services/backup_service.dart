@@ -285,6 +285,7 @@ class BackupService {
   Future<BackupRestoreResult> restoreBackup(
     BackupData backup, {
     int? expectedSecureStorageEpoch,
+    Future<void> Function()? onBeforeRestore,
   }) async {
     try {
       final expected = expectedSecureStorageEpoch;
@@ -376,9 +377,17 @@ class BackupService {
         migratedData,
         sanitizedDownloaderConfigs: sanitizedDownloaderConfigs,
       );
+      _storageService.validateBackupRestorePayload(
+        siteConfigs: restoredSiteConfigs,
+        cookieCloudConfig: restoredCookieCloudConfig,
+        backupPreferences: backupPreferences,
+      );
       if (expected != null) {
         _storageService.requireSecureStorageOperationEpoch(expected);
       }
+
+      // Validate every backup payload before allowing destructive legacy reset.
+      await onBeforeRestore?.call();
 
       // 敏感字段与全部普通偏好共享一个 manifest/companion 提交边界。
       await _storageService.restoreSensitiveBackupData(

@@ -1,3 +1,6 @@
+// Constructor parameter names are part of this extractor's public API.
+// ignore_for_file: prefer_initializing_formals
+
 import '../../models/app_models.dart';
 import 'html_extractor.dart';
 

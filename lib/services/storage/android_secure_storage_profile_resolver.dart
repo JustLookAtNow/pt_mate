@@ -1,3 +1,6 @@
+// Public constructor names intentionally differ from the private fields.
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -7,6 +10,7 @@ enum AndroidSecureStorageProfile {
   oaepGcm,
   pkcs1Gcm,
   pkcs1Cbc,
+  plaintext,
   fresh,
   inconsistent,
   unsupported,
@@ -31,12 +35,25 @@ class AndroidSecureStorageProbeResult {
 
   bool get isReady => switch (profile) {
     AndroidSecureStorageProfile.oaepGcm ||
+    AndroidSecureStorageProfile.plaintext ||
+    AndroidSecureStorageProfile.fresh => true,
     AndroidSecureStorageProfile.pkcs1Gcm ||
     AndroidSecureStorageProfile.pkcs1Cbc ||
-    AndroidSecureStorageProfile.fresh => true,
     AndroidSecureStorageProfile.inconsistent ||
     AndroidSecureStorageProfile.unsupported => false,
   };
+}
+
+class AndroidSecureStorageCapabilityResult {
+  const AndroidSecureStorageCapabilityResult({
+    required this.isSupported,
+    required this.isExplicitlyUnsupported,
+    this.failureCode,
+  });
+
+  final bool isSupported;
+  final bool isExplicitlyUnsupported;
+  final String? failureCode;
 }
 
 class AndroidSecureStorageFlushResult {
@@ -63,6 +80,12 @@ class AndroidSecureStorageProfileResolver {
   static const _probeMethodName = 'probeAndroidSecureStorage';
   static const _initializeFreshMethodName =
       'initializeFreshAndroidSecureStorage';
+  static const _probeCapabilityMethodName =
+      'probeModernSecureStorageCapability';
+  static const _enablePlaintextMethodName = 'enableAndroidPlaintextFallback';
+  static const _readPlaintextMethodName = 'readAndroidPlaintextSensitive';
+  static const _commitPlaintextMethodName = 'commitAndroidPlaintextSensitive';
+  static const _resetLegacyMethodName = 'resetLegacyAndroidSecureStorage';
   static const _flushMethodName = 'flushAndroidSecureStorage';
   static const _oaepCipher = 'RSA_ECB_OAEPwithSHA_256andMGF1Padding';
   static const _pkcs1Cipher = 'RSA_ECB_PKCS1Padding';
@@ -87,6 +110,106 @@ class AndroidSecureStorageProfileResolver {
       timeoutFailureCode: 'native_fresh_initialization_timeout',
       genericFailureCode: 'fresh_initialization_failed',
     );
+  }
+
+  Future<AndroidSecureStorageCapabilityResult> probeModernCapability() async {
+    if (!_isAndroid) {
+      return const AndroidSecureStorageCapabilityResult(
+        isSupported: false,
+        isExplicitlyUnsupported: false,
+        failureCode: 'not_android',
+      );
+    }
+    try {
+      final response = await _channel
+          .invokeMapMethod<String, Object?>(_probeCapabilityMethodName)
+          .timeout(_probeTimeout);
+      final status = response?['status'];
+      final failureCode = response?['failureCode'];
+      if (status == 'supported' && failureCode == null) {
+        return const AndroidSecureStorageCapabilityResult(
+          isSupported: true,
+          isExplicitlyUnsupported: false,
+        );
+      }
+      if (status == 'unsupported' && failureCode == 'unsupported_algorithm') {
+        return const AndroidSecureStorageCapabilityResult(
+          isSupported: false,
+          isExplicitlyUnsupported: true,
+          failureCode: 'unsupported_algorithm',
+        );
+      }
+      return AndroidSecureStorageCapabilityResult(
+        isSupported: false,
+        isExplicitlyUnsupported: false,
+        failureCode: failureCode is String && failureCode.isNotEmpty
+            ? failureCode
+            : 'capability_probe_failed',
+      );
+    } on TimeoutException {
+      return const AndroidSecureStorageCapabilityResult(
+        isSupported: false,
+        isExplicitlyUnsupported: false,
+        failureCode: 'native_capability_probe_timeout',
+      );
+    } on PlatformException catch (error) {
+      return AndroidSecureStorageCapabilityResult(
+        isSupported: false,
+        isExplicitlyUnsupported: false,
+        failureCode: 'native_${error.code}',
+      );
+    } catch (_) {
+      return const AndroidSecureStorageCapabilityResult(
+        isSupported: false,
+        isExplicitlyUnsupported: false,
+        failureCode: 'capability_probe_failed',
+      );
+    }
+  }
+
+  Future<AndroidSecureStorageProbeResult> enablePlaintextFallback() {
+    return _invokeNative(
+      methodName: _enablePlaintextMethodName,
+      timeoutFailureCode: 'native_plaintext_enable_timeout',
+      genericFailureCode: 'plaintext_enable_failed',
+    );
+  }
+
+  Future<String?> readPlaintextSensitive(String key) async {
+    if (!_isAndroid) return null;
+    return _channel
+        .invokeMethod<String>(_readPlaintextMethodName, <String, Object?>{
+          'key': key,
+        })
+        .timeout(_probeTimeout);
+  }
+
+  Future<void> commitPlaintextSensitive(Map<String, String?> mutations) async {
+    if (!_isAndroid) {
+      throw const SecureStorageUnavailableExceptionForResolver('not_android');
+    }
+    final response = await _channel
+        .invokeMapMethod<String, Object?>(
+          _commitPlaintextMethodName,
+          <String, Object?>{'mutations': mutations},
+        )
+        .timeout(_probeTimeout);
+    if (response?['status'] != 'ready' || response?['failureCode'] != null) {
+      throw SecureStorageUnavailableExceptionForResolver(
+        response?['failureCode'] as String? ?? 'plaintext_commit_failed',
+      );
+    }
+  }
+
+  Future<bool> resetLegacyStorage({required bool confirmed}) async {
+    if (!_isAndroid || !confirmed) return false;
+    final response = await _channel
+        .invokeMapMethod<String, Object?>(
+          _resetLegacyMethodName,
+          <String, Object?>{'confirmed': confirmed},
+        )
+        .timeout(_probeTimeout);
+    return response?['status'] == 'fresh' && response?['failureCode'] == null;
   }
 
   Future<AndroidSecureStorageFlushResult> flush() async {
@@ -276,6 +399,12 @@ class AndroidSecureStorageProfileResolver {
         readyDetailsAreSafe &&
             keyCipher == _pkcs1Cipher &&
             storageCipher == _cbcCipher,
+      AndroidSecureStorageProfile.plaintext =>
+        keyCipher == null &&
+            storageCipher == null &&
+            !hasEncryptedEntries &&
+            !hasWrappedKeys &&
+            failureCode == null,
       AndroidSecureStorageProfile.fresh =>
         keyCipher == null &&
             storageCipher == null &&
@@ -295,10 +424,17 @@ class AndroidSecureStorageProfileResolver {
     return switch (profile) {
       AndroidSecureStorageProfile.oaepGcm ||
       AndroidSecureStorageProfile.pkcs1Gcm ||
-      AndroidSecureStorageProfile.pkcs1Cbc => status == 'ready',
+      AndroidSecureStorageProfile.pkcs1Cbc ||
+      AndroidSecureStorageProfile.plaintext => status == 'ready',
       AndroidSecureStorageProfile.fresh => status == 'fresh',
       AndroidSecureStorageProfile.inconsistent => status == 'inconsistent',
       AndroidSecureStorageProfile.unsupported => status == 'unsupported',
     };
   }
+}
+
+class SecureStorageUnavailableExceptionForResolver implements Exception {
+  const SecureStorageUnavailableExceptionForResolver(this.code);
+
+  final String code;
 }

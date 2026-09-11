@@ -1,6 +1,8 @@
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
+
 import '../../models/app_models.dart';
 import '../network/timeout_retry.dart';
 
