@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+
 import 'dart:ui';
+
 import 'package:html/dom.dart' as dom;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +10,7 @@ import 'package:flutter_bbcode/flutter_bbcode.dart';
 import 'package:bbob_dart/bbob_dart.dart' as bbob;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
+
 import '../utils/url_launcher_helper.dart';
 import '../services/api/api_service.dart';
 import '../services/storage/storage_service.dart';
@@ -17,9 +20,12 @@ import '../services/downloader/downloader_service.dart';
 import '../services/downloader/downloader_models.dart';
 import '../services/local_download_service.dart';
 import '../widgets/torrent_download_dialog.dart';
+import '../widgets/torrent_purchase_dialog.dart';
 import '../widgets/cached_network_image.dart';
 import '../widgets/full_screen_image_viewer.dart';
+
 import 'package:pt_mate/utils/notification_helper.dart';
+
 import '../utils/screen_utils.dart';
 
 // 自定义Quote标签处理器
@@ -72,9 +78,8 @@ class CustomQuoteDisplay extends StatelessWidget {
           width: 1,
         ),
         borderRadius: BorderRadius.circular(8),
-        color: Theme.of(
-          context,
-        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest
+            .withValues(alpha: 0.3),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,18 +89,16 @@ class CustomQuoteDisplay extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary
+                  .withValues(alpha: 0.1),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(7),
                 topRight: Radius.circular(7),
               ),
               border: Border(
                 bottom: BorderSide(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.outline.withValues(alpha: 0.3),
+                  color: Theme.of(context).colorScheme.outline
+                      .withValues(alpha: 0.3),
                   width: 0.5,
                 ),
               ),
@@ -264,9 +267,8 @@ class _CustomHideDisplayState extends State<CustomHideDisplay> {
                     filter: ImageFilter.blur(sigmaX: 3.0, sigmaY: 3.0),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surface.withValues(alpha: 0.7),
+                        color: Theme.of(context).colorScheme.surface
+                            .withValues(alpha: 0.7),
                         borderRadius: BorderRadius.circular(5),
                       ),
                       child: Center(
@@ -277,18 +279,16 @@ class _CustomHideDisplayState extends State<CustomHideDisplay> {
                             Icon(
                               Icons.visibility,
                               size: 16,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.7),
+                              color: Theme.of(context).colorScheme.onSurface
+                                  .withValues(alpha: 0.7),
                             ),
                             const SizedBox(width: 4),
                             Text(
                               '点击显示隐藏内容',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.7),
+                                color: Theme.of(context).colorScheme.onSurface
+                                    .withValues(alpha: 0.7),
                               ),
                             ),
                           ],
@@ -667,14 +667,103 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
     );
   }
 
+  /// 详情对象（`_detail` 为避免循环依赖而声明为 dynamic，这里做安全转换）
+  TorrentDetail? get _torrentDetail =>
+      _detail is TorrentDetail ? _detail as TorrentDetail : null;
+
+  /// 是否显示付费种子横幅：站点支持应用内购买且价格为非 0
+  bool get _shouldShowPurchaseBanner {
+    if (!ApiService.instance.supportsPurchase(widget.siteConfig)) return false;
+    final detail = _torrentDetail;
+    if (detail == null) return false;
+    return (detail.price ?? 0) > 0;
+  }
+
+  /// 付费种子横幅：展示价格与购买状态，并允许在应用内购买
+  Widget _buildPurchaseBanner() {
+    final detail = _torrentDetail!;
+    final price = detail.price ?? 0;
+    final purchased = detail.isPurchased ?? false;
+    final scheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: scheme.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            Icon(
+              Icons.sell_outlined,
+              size: 20,
+              color: scheme.onTertiaryContainer,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                purchased
+                    ? '付费种子 · $price 魔力值 · 已购买'
+                    : '付费种子 · $price 魔力值 · 尚未购买',
+                style: TextStyle(color: scheme.onTertiaryContainer),
+              ),
+            ),
+            if (!purchased)
+              FilledButton.tonal(
+                onPressed: _onPurchaseFromDetail,
+                child: const Text('购买'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 详情页购买入口：购买成功后仅刷新本地已购买状态
+  Future<void> _onPurchaseFromDetail() async {
+    final outcome = await showDialog<TorrentPurchaseOutcome>(
+      context: context,
+      builder: (_) => TorrentPurchaseDialog(
+        torrentId: widget.torrentItem.id,
+        torrentTitle: widget.torrentItem.name,
+        siteConfig: widget.siteConfig,
+      ),
+    );
+
+    if (!mounted || outcome == null || !outcome.canProceed) return;
+
+    final purchase = outcome.purchase;
+    if (purchase != null) {
+      NotificationHelper.showInfo(
+        context,
+        '购买成功，已扣除 ${purchase.price} 魔力值，余额 ${purchase.balanceAfter}',
+      );
+    }
+
+    final detail = _torrentDetail;
+    if (detail != null) {
+      setState(() {
+        _detail = TorrentDetail(
+          descr: detail.descr,
+          descrHtml: detail.descrHtml,
+          webviewUrl: detail.webviewUrl,
+          price: detail.price,
+          isPurchased: true,
+        );
+      });
+    }
+  }
+
   Future<void> _onDownload() async {
     try {
       // 1. 获取下载 URL
-      final url = await ApiService.instance.genDlToken(
-        id: widget.torrentItem.id,
+      final url = await resolveDownloadUrlWithPurchase(
+        context: context,
+        torrentId: widget.torrentItem.id,
         url: widget.torrentItem.downloadUrl,
+        torrentTitle: widget.torrentItem.name,
         siteConfig: widget.siteConfig, // 传入站点配置
       );
+      // 用户取消购买或购买失败：静默终止本次下载
+      if (url == null) return;
 
       // 2. 弹出对话框让用户选择下载器设置
       if (!mounted) return;
@@ -757,50 +846,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         // 添加短暂延迟，确保对话框完全关闭后再显示SnackBar
         await Future.delayed(const Duration(milliseconds: 100));
         if (mounted) {
-          if (e.toString().contains('NEED_PURCHASE')) {
-            showDialog(
-              context: context,
-              builder: (dialogContext) => AlertDialog(
-                title: const Text('需要购买'),
-                content: const Text('该种子为付费种子且您尚未购买，请先前往网页端购买后再下载。'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogContext),
-                    style: TextButton.styleFrom(
-                      side: BorderSide(
-                        color: Theme.of(dialogContext).colorScheme.outline,
-                        width: 1.0,
-                      ),
-                    ),
-                    child: const Text('取消'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () async {
-                      Navigator.pop(dialogContext);
-                      String purchaseUrl =
-                          'https://rousi.pro/torrent/${widget.torrentItem.id}';
-                      if (widget.siteConfig != null) {
-                        var base = widget.siteConfig!.baseUrl;
-                        if (!base.endsWith('/')) {
-                          base = '$base/';
-                        }
-                        purchaseUrl = '${base}torrent/${widget.torrentItem.id}';
-                      }
-                      if (mounted) {
-                        await UrlLauncherHelper.launchBrowser(
-                          context,
-                          purchaseUrl,
-                        );
-                      }
-                    },
-                    child: const Text('前往购买'),
-                  ),
-                ],
-              ),
-            );
-          } else {
-            NotificationHelper.showError(context, '下载失败：$e');
-          }
+          NotificationHelper.showError(context, '下载失败：$e');
         }
       }
     }
@@ -1669,14 +1715,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.outline.withValues(alpha: 0.3),
+                  color: Theme.of(context).colorScheme.outline
+                      .withValues(alpha: 0.3),
                   width: 1,
                 ),
               ),
@@ -1816,9 +1860,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: Theme.of(
-                context,
-              ).colorScheme.outline.withValues(alpha: 0.3),
+              color: Theme.of(context).colorScheme.outline
+                  .withValues(alpha: 0.3),
             ),
           ),
           child: Column(
@@ -1933,9 +1976,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
             margin: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               border: Border.all(
-                color: Theme.of(
-                  context,
-                ).colorScheme.outline.withValues(alpha: 0.3),
+                color: Theme.of(context).colorScheme.outline
+                    .withValues(alpha: 0.3),
               ),
               borderRadius: BorderRadius.circular(8),
             ),
@@ -2081,9 +2123,9 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                 children: [
                   CircleAvatar(
                     radius: 16,
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.primaryContainer,
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .primaryContainer,
                     child: Text(
                       comment.author.isNotEmpty
                           ? comment.author[0].toUpperCase()
@@ -2104,14 +2146,13 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          DateFormat(
-                            'yyyy-MM-dd HH:mm',
-                          ).format(comment.createdDate),
+                          DateFormat('yyyy-MM-dd HH:mm')
+                              .format(comment.createdDate),
                           style: TextStyle(
                             fontSize: 12,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -2216,120 +2257,134 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
               ? kToolbarHeight
               : 72,
         ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error, size: 64, color: Colors.red),
-                    const SizedBox(height: 16),
-                    Text('加载失败: $_error'),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _loadDetail,
-                      child: const Text('重试'),
-                    ),
-                  ],
-                ),
-              )
-            : _detail?.descrHtml != null && _detail!.descrHtml!.isNotEmpty
-            ? SingleChildScrollView(
-                padding: const EdgeInsets.all(4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.info, color: Colors.blue),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  '种子详情',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            buildHtmlContent(_detail!.descrHtml!),
-                          ],
-                        ),
+        body: Column(
+          children: [
+            if (_shouldShowPurchaseBanner) _buildPurchaseBanner(),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error, size: 64, color: Colors.red),
+                          const SizedBox(height: 16),
+                          Text('加载失败: $_error'),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _loadDetail,
+                            child: const Text('重试'),
+                          ),
+                        ],
                       ),
-                    ),
-                    if (_shouldShowInlineCommentsSection) ...[
-                      const SizedBox(height: 16),
-                      _buildCommentsCard(),
-                    ],
-                    // 底部留白，防止被FAB遮挡
-                    const SizedBox(height: 80),
-                  ],
-                ),
-              )
-            : _detail?.descr != null && _detail!.descr.toString().isNotEmpty
-            ? SingleChildScrollView(
-                padding: const EdgeInsets.all(4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.info, color: Colors.blue),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  '种子详情',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
+                    )
+                  : _detail?.descrHtml != null && _detail!.descrHtml!.isNotEmpty
+                  ? SingleChildScrollView(
+                      padding: const EdgeInsets.all(4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.info,
+                                        color: Colors.blue,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        '种子详情',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                const Spacer(),
-                                if (!_showImages)
-                                  TextButton.icon(
-                                    onPressed: () {
-                                      setState(() {
-                                        _showImages = true;
-                                      });
-                                    },
-                                    icon: const Icon(Icons.image),
-                                    label: const Text('显示图片'),
-                                  ),
-                              ],
+                                  const SizedBox(height: 16),
+                                  buildHtmlContent(_detail!.descrHtml!),
+                                ],
+                              ),
                             ),
+                          ),
+                          if (_shouldShowInlineCommentsSection) ...[
                             const SizedBox(height: 16),
-                            buildBBCodeContent(
-                              _detail?.descr?.toString() ?? '暂无描述',
-                            ),
+                            _buildCommentsCard(),
                           ],
-                        ),
+                          // 底部留白，防止被FAB遮挡
+                          const SizedBox(height: 80),
+                        ],
                       ),
-                    ),
-                    if (_shouldShowInlineCommentsSection) ...[
-                      const SizedBox(height: 16),
-                      _buildCommentsCard(),
-                    ],
-                    // 底部留白，防止被FAB遮挡
-                    const SizedBox(height: 160),
-                  ],
-                ),
-              )
-            : _detail?.webviewUrl != null
-            ? buildWebViewContent(_detail!.webviewUrl!)
-            : const Center(child: Text('暂无详情')),
+                    )
+                  : _detail?.descr != null &&
+                        _detail!.descr.toString().isNotEmpty
+                  ? SingleChildScrollView(
+                      padding: const EdgeInsets.all(4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.info,
+                                        color: Colors.blue,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        '种子详情',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      if (!_showImages)
+                                        TextButton.icon(
+                                          onPressed: () {
+                                            setState(() {
+                                              _showImages = true;
+                                            });
+                                          },
+                                          icon: const Icon(Icons.image),
+                                          label: const Text('显示图片'),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  buildBBCodeContent(
+                                    _detail?.descr?.toString() ?? '暂无描述',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (_shouldShowInlineCommentsSection) ...[
+                            const SizedBox(height: 16),
+                            _buildCommentsCard(),
+                          ],
+                          // 底部留白，防止被FAB遮挡
+                          const SizedBox(height: 160),
+                        ],
+                      ),
+                    )
+                  : _detail?.webviewUrl != null
+                  ? buildWebViewContent(_detail!.webviewUrl!)
+                  : const Center(child: Text('暂无详情')),
+            ),
+          ],
+        ),
         floatingActionButton: Builder(
           builder: (context) {
             final isDesktop = ScreenUtils.isLargeScreen(context);
