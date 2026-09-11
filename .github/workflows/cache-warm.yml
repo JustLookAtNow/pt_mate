@@ -64,10 +64,9 @@ jobs:
             ${{ runner.os }}-pub-cache-
 
       - name: Get dependencies
-        run: |
-          # 如果 pubspec.lock 未变化，actions/cache 会命中，跳过更新
-          # 但需要执行一次 pub get 以确保缓存目录结构存在
-          flutter pub get
+        # 如果 pubspec.lock 未变化，actions/cache 会命中，跳过更新
+        # 但需要执行一次 pub get 以确保缓存目录结构存在
+        uses: ./.github/actions/pub-get
 
       - name: Cache Gradle
         id: cache_gradle_linux
@@ -174,8 +173,7 @@ jobs:
             ${{ runner.os }}-pub-cache-
 
       - name: Get dependencies
-        run: |
-          flutter pub get
+        uses: ./.github/actions/pub-get
 
       - name: Cache Visual Studio
         id: cache_vs_windows
@@ -248,8 +246,7 @@ jobs:
             ${{ runner.os }}-pub-cache-
 
       - name: Get dependencies
-        run: |
-          flutter pub get
+        uses: ./.github/actions/pub-get
 
       - name: Cache CocoaPods
         id: cache_pods_macos

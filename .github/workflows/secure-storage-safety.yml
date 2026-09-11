@@ -59,7 +59,7 @@ jobs:
         run: sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0"
 
       - name: Get dependencies
-        run: flutter pub get
+        uses: ./.github/actions/pub-get
 
       - name: Analyze Dart sources
         run: flutter analyze
