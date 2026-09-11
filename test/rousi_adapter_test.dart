@@ -83,7 +83,6 @@ void main() {
             'torrents': [
               {
                 'id': 9830,
-                'uuid': '9830',
                 'title': 'Expired Free Torrent',
                 'size': 1024,
                 'seeders': 1,
@@ -119,7 +118,6 @@ void main() {
             'torrents': [
               {
                 'id': 9831,
-                'uuid': '9831',
                 'title': 'Active Free Torrent',
                 'size': 1024,
                 'seeders': 1,
@@ -140,7 +138,7 @@ void main() {
       expect(result.items.single.discount, DiscountType.free);
     });
 
-    test('种子标识优先使用数字 id 而不是 uuid', () async {
+    test('种子标识使用数字 id', () async {
       final fake = _FakeHttpClientAdapter(
         (_) => _jsonResponse({
           'code': 0,
@@ -149,7 +147,6 @@ void main() {
             'torrents': [
               {
                 'id': 9832,
-                'uuid': '9832',
                 'title': 'Numeric Id Torrent',
                 'size': 1024,
                 'seeders': 0,
@@ -166,6 +163,65 @@ void main() {
       final result = await adapter.searchTorrents();
 
       expect(result.items.single.id, '9832');
+    });
+
+    test('封面地址直接按数字 id 拼接公开封面端点', () async {
+      final fake = _FakeHttpClientAdapter(
+        (_) => _jsonResponse({
+          'code': 0,
+          'message': 'success',
+          'data': {
+            'torrents': [
+              {
+                'id': 9833,
+                'title': 'Cover Torrent',
+                'size': 1024,
+                'seeders': 0,
+                'leechers': 0,
+                'created_at': '2026-08-27T00:00:00Z',
+                // 响应里的 cover_image 不参与封面解析
+                'cover_image': 'https://cdn.example.com/legacy-cover.jpg',
+              },
+            ],
+            'total': 1,
+          },
+        }),
+      );
+      final adapter = await initAdapter(fake);
+
+      final result = await adapter.searchTorrents();
+
+      expect(
+        result.items.single.cover,
+        'https://rousi.pro/api/v1/torrents/9833/cover',
+      );
+    });
+
+    test('缺少数字 id 时标识与封面都为空', () async {
+      final fake = _FakeHttpClientAdapter(
+        (_) => _jsonResponse({
+          'code': 0,
+          'message': 'success',
+          'data': {
+            'torrents': [
+              {
+                'title': 'Missing Id Torrent',
+                'size': 1024,
+                'seeders': 0,
+                'leechers': 0,
+                'created_at': '2026-08-27T00:00:00Z',
+              },
+            ],
+            'total': 1,
+          },
+        }),
+      );
+      final adapter = await initAdapter(fake);
+
+      final result = await adapter.searchTorrents();
+
+      expect(result.items.single.id, isEmpty);
+      expect(result.items.single.cover, isEmpty);
     });
   });
 

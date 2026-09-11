@@ -39,7 +39,8 @@ class RousiAdapter implements SiteAdapter, PurchasableAdapter {
             receiveTimeout: const Duration(seconds: 10),
             sendTimeout: const Duration(seconds: 30),
             headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+              'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
             },
           ),
         );
@@ -199,11 +200,20 @@ class RousiAdapter implements SiteAdapter, PurchasableAdapter {
     );
   }
 
-  /// 解析种子标识：PeerGo 以数字 ID 为准，`uuid` 仅作为旧响应回退
-  String _resolveTorrentId(Map<String, dynamic> map) {
-    final numericId = map['id']?.toString().trim() ?? '';
-    if (numericId.isNotEmpty) return numericId;
-    return map['uuid']?.toString().trim() ?? '';
+  /// 拼接公开封面地址：`{baseUrl}/api/v1/torrents/{id}/cover`。
+  ///
+  /// 列表接口不返回封面字段，直接按端点拼接；该端点无需鉴权，
+  /// 种子未提供封面时返回 404，由图片组件展示加载失败占位。
+  String _buildCoverUrl(String torrentId) {
+    if (torrentId.isEmpty) return '';
+
+    var base = _siteConfig.baseUrl.trim();
+    while (base.endsWith('/')) {
+      base = base.substring(0, base.length - 1);
+    }
+    if (base.isEmpty) return '';
+
+    return '$base/api/v1/torrents/$torrentId/cover';
   }
 
   /// 宽容解析布尔值（服务端可能返回 bool / num / string）
@@ -271,16 +281,15 @@ class RousiAdapter implements SiteAdapter, PurchasableAdapter {
       }
     }
 
-    // 图片
-    final cover = map['cover_image'] as String? ?? '';
-
     // 标签: API 列表没直接返回tags字段，从标题匹配
     final name = map['title'] as String? ?? '';
     final tags = TagType.matchTags(name);
 
+    // 种子公开身份：PeerGo 只有数字 ID，封面地址由它拼接
+    final torrentId = map['id']?.toString().trim() ?? '';
+
     return TorrentItem(
-      // PeerGo 的种子公开身份是数字 ID，`uuid` 字段仅作为旧响应回退
-      id: _resolveTorrentId(map),
+      id: torrentId,
       name: name,
       smallDescr: map['subtitle'] as String? ?? '',
       discount: discount,
@@ -297,7 +306,7 @@ class RousiAdapter implements SiteAdapter, PurchasableAdapter {
         fieldName: 'createdDate',
       ),
       imageList: [],
-      cover: cover,
+      cover: _buildCoverUrl(torrentId),
       downloadStatus: DownloadStatus.none, // API 暂不支持返回当前用户下载状态
       collection: false, // API 列表数据未显示是否收藏
       tags: tags,
