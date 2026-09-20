@@ -1505,8 +1505,20 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
   }
 }
 
+typedef HomeTorrentSearchExecutor = Future<TorrentSearchResult> Function({
+  required SiteConfig siteConfig,
+  required String? keyword,
+  required int pageNumber,
+  required int pageSize,
+  required int? onlyFav,
+  required Map<String, dynamic>? additionalParams,
+});
+
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.searchExecutor});
+
+  @visibleForTesting
+  final HomeTorrentSearchExecutor? searchExecutor;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -1607,12 +1619,14 @@ class _HomePageState extends State<HomePage> {
   // 配置版本号跟踪
   int _lastConfigVersion = -1;
 
-  // 防止重复处理重新初始化的标志
-  bool _isProcessingReload = false;
+  // 首页内容请求代次。站点、分类、搜索或分页发生变化时递增，旧请求不得回写状态。
+  int _contentOperationGeneration = 0;
 
-  // didChangeDependencies中一次性预同步标志，避免首次构建时出现null/-1
-  bool _didSyncFromAppState = false; // 首帧前从AppState预同步，避免首次渲染null/-1
-  bool _didInitialLoad = false; // 首次进入页面后的初始化是否已完成
+  // AppState 驱动的重载调度状态，确保同一份站点快照只初始化一次。
+  String? _pendingReloadSiteId;
+  int? _pendingReloadConfigVersion;
+  int _reloadScheduleGeneration = 0;
+  bool _hasInitializedSiteContext = false;
 
   // 统一头部（用户信息 + 搜索栏）滚动进度控制
   double _headerProgress = 1.0; // 0.0=隐藏, 1.0=完全显示
@@ -1626,41 +1640,6 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _scrollCtrl.addListener(_onScroll);
-    // 首次加载改为在 didChangeDependencies 完成预同步后触发，避免在AppState尚未就绪时执行
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_didSyncFromAppState) {
-      final appState = Provider.of<AppState>(context, listen: false);
-      if (appState.site != null) {
-        _currentSite = appState.site;
-        _lastConfigVersion = appState.configVersion;
-        if (kDebugMode) {
-          _logger.d(
-            'HomePage: didChangeDependencies预同步 - 站点: ${_currentSite?.id}, 版本: $_lastConfigVersion',
-          );
-        }
-      }
-      _didSyncFromAppState = true;
-
-      // 预同步完成后触发一次初始化（仅一次）
-      if (!_didInitialLoad) {
-        _isProcessingReload = true;
-        final capturedSite = _currentSite; // 捕获当前站点，避免后续变化导致条件抖动
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          if (!_didInitialLoad && capturedSite != null) {
-            await _init();
-            _didInitialLoad = true;
-            _isProcessingReload = false;
-          } else {
-            // 即使未触发初始化，也要释放标志位
-            _isProcessingReload = false;
-          }
-        });
-      }
-    }
   }
 
   Future<String> _resolveLogoPath(SiteConfig site) async {
@@ -1786,64 +1765,100 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  Future<void> _init() async {
-    setState(() => _loading = true);
+  bool _isCurrentContentOperation(int generation) {
+    return mounted && generation == _contentOperationGeneration;
+  }
+
+  void _scheduleSiteReload(SiteConfig site, int configVersion) {
+    final isCurrentContext =
+        _hasInitializedSiteContext &&
+        _currentSite?.id == site.id &&
+        _lastConfigVersion == configVersion;
+    final isAlreadyPending =
+        _pendingReloadSiteId == site.id &&
+        _pendingReloadConfigVersion == configVersion;
+    if (isCurrentContext || isAlreadyPending) return;
+
+    // 在当前 build 周期立即让旧请求失效，避免它在下一帧重载前回写。
+    ++_contentOperationGeneration;
+    final scheduleGeneration = ++_reloadScheduleGeneration;
+    _pendingReloadSiteId = site.id;
+    _pendingReloadConfigVersion = configVersion;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || scheduleGeneration != _reloadScheduleGeneration) return;
+
+      _pendingReloadSiteId = null;
+      _pendingReloadConfigVersion = null;
+      _hasInitializedSiteContext = true;
+      _lastConfigVersion = configVersion;
+      final operationGeneration = ++_contentOperationGeneration;
+      await _init(site, operationGeneration: operationGeneration);
+    });
+  }
+
+  Future<void> _init(
+    SiteConfig activeSite, {
+    required int operationGeneration,
+  }) async {
+    if (!_isCurrentContentOperation(operationGeneration)) return;
+
+    final categories = activeSite.searchCategories.isNotEmpty
+        ? activeSite.searchCategories
+        : SearchCategoryConfig.getDefaultConfigs();
+    setState(() {
+      _currentSite = activeSite;
+      _categories = categories;
+      _selectedCategoryIndex = categories.isNotEmpty ? 0 : -1;
+      _pageNumber = 1;
+      _items.clear();
+      _hasMore = true;
+      _totalPages = 1;
+      _loading = true;
+      _error = null;
+      _sortBy = 'none';
+      _sortAscending = false;
+      _headerProgress = 1.0;
+      _fabVisible = true;
+      _lastScrollOffset = 0.0;
+    });
+
     try {
-      // 等待AppState初始化完成
-      final appState = Provider.of<AppState>(context, listen: false);
-
-      // 等待AppState完全初始化完成
-      await appState.waitForInitialization();
-
-      // 如果没有站点配置，说明确实没有配置
-      if (appState.site == null) {
-        if (mounted) {
-          setState(() {
-            _currentSite = null;
-            _categories = SearchCategoryConfig.getDefaultConfigs();
-            _selectedCategoryIndex = -1;
-            _loading = false;
-          });
-        }
-        return;
-      }
-
-      final activeSite = appState.site!;
-      final categories = activeSite.searchCategories.isNotEmpty
-          ? activeSite.searchCategories
-          : SearchCategoryConfig.getDefaultConfigs();
-      if (mounted) {
-        setState(() {
-          _currentSite = activeSite;
-          _categories = categories;
-          _selectedCategoryIndex = categories.isNotEmpty ? 0 : -1;
-        });
-      }
-
       // 加载下载器配置
       final downloaderConfigsData = await StorageService.instance
           .loadDownloaderConfigs();
       final downloaderConfigs = downloaderConfigsData
           .map((data) => DownloaderConfig.fromJson(data))
           .toList();
-      if (mounted) setState(() => _downloaderConfigs = downloaderConfigs);
+      if (_isCurrentContentOperation(operationGeneration)) {
+        setState(() => _downloaderConfigs = downloaderConfigs);
+      }
     } catch (e) {
+      if (!_isCurrentContentOperation(operationGeneration)) return;
       if (e.toString().contains('CookieExpiredException')) {
         _showCookieExpiredDialog();
       } else {
         // 初始化失败不阻塞首页使用，仅提示
-        if (mounted) setState(() => _error = _error ?? e.toString());
+        setState(() => _error = _error ?? e.toString());
       }
-    } finally {
-      if (mounted) setState(() => _loading = false);
     }
 
+    if (!_isCurrentContentOperation(operationGeneration)) return;
+
     // 检查应用更新（异步执行，不阻塞界面）
-    _checkForUpdates();
+    if (widget.searchExecutor == null) {
+      unawaited(_checkForUpdates());
+    }
 
     // 仅在站点支持种子搜索功能时执行默认搜索
-    if (_currentSite?.features.supportTorrentSearch ?? true) {
-      await _search(reset: true);
+    if (activeSite.features.supportTorrentSearch) {
+      await _search(
+        reset: true,
+        siteConfig: activeSite,
+        operationGeneration: operationGeneration,
+      );
+    } else if (_isCurrentContentOperation(operationGeneration)) {
+      setState(() => _loading = false);
     }
   }
 
@@ -2225,8 +2240,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadMore() async {
     if (_loading || !_hasMore) return;
-    _pageNumber += 1;
-    await _search();
+    await _search(pageNumber: _pageNumber + 1);
   }
 
   void _submitSearch() {
@@ -2237,39 +2251,57 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _search({bool reset = false}) async {
-    final supportTorrentSearch =
-        _currentSite?.features.supportTorrentSearch ?? true;
-    final supportTorrentBrowse =
-        _currentSite?.features.supportTorrentBrowse ?? true;
+  Future<void> _search({
+    bool reset = false,
+    int? pageNumber,
+    SiteConfig? siteConfig,
+    int? operationGeneration,
+  }) async {
+    final generation = operationGeneration ?? ++_contentOperationGeneration;
+    if (!_isCurrentContentOperation(generation)) return;
+
+    final requestSite = siteConfig ?? _currentSite;
+    if (requestSite == null) {
+      setState(() {
+        _loading = false;
+        _error = '尚未配置站点信息';
+      });
+      return;
+    }
+
+    final supportTorrentSearch = requestSite.features.supportTorrentSearch;
+    final supportTorrentBrowse = requestSite.features.supportTorrentBrowse;
     final trimmedKeyword = _keywordCtrl.text.trim();
+    final requestPageNumber = reset ? 1 : (pageNumber ?? _pageNumber);
+    final onlyFav = _onlyFavorites ? 1 : null;
+
+    // 分类筛选与高级搜索是两项独立能力。分类站点即使不支持高级搜索，
+    // 也需要把分类模板参数（例如 Jpopsuki 的 filter_cat）传给适配器。
+    Map<String, dynamic>? additionalParams;
+    if (requestSite.features.supportCategories &&
+        _categories.isNotEmpty &&
+        _selectedCategoryIndex >= 0 &&
+        _selectedCategoryIndex < _categories.length) {
+      final currentCategory = _categories[_selectedCategoryIndex];
+      if (currentCategory.parameters.isNotEmpty) {
+        additionalParams = currentCategory.parseParameters();
+      }
+    }
 
     if (reset) {
-      if (mounted) {
-        setState(() {
-          _pageNumber = 1;
-          _items.clear();
-          _hasMore = true;
-          _totalPages = 1;
-          // 重置排序状态
-          _sortBy = 'none';
-          _sortAscending = false;
-          // 重置显示状态
-          _headerProgress = 1.0;
-          _fabVisible = true;
-          _lastScrollOffset = 0.0;
-        });
-      } else {
+      setState(() {
         _pageNumber = 1;
         _items.clear();
         _hasMore = true;
         _totalPages = 1;
+        // 重置排序状态
         _sortBy = 'none';
         _sortAscending = false;
+        // 重置显示状态
         _headerProgress = 1.0;
         _fabVisible = true;
         _lastScrollOffset = 0.0;
-      }
+      });
 
       if (_scrollCtrl.hasClients) {
         _scrollCtrl.jumpTo(0);
@@ -2277,7 +2309,7 @@ class _HomePageState extends State<HomePage> {
     }
 
     if (!supportTorrentSearch) {
-      if (mounted) {
+      if (_isCurrentContentOperation(generation)) {
         setState(() {
           _loading = false;
           _error = '当前站点不支持搜索功能';
@@ -2287,7 +2319,7 @@ class _HomePageState extends State<HomePage> {
     }
 
     if (!supportTorrentBrowse && trimmedKeyword.isEmpty) {
-      if (mounted) {
+      if (_isCurrentContentOperation(generation)) {
         setState(() {
           _loading = false;
           _error = '当前站点不支持浏览功能，请输入关键字以搜索种子';
@@ -2299,37 +2331,35 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    if (mounted) {
+    if (_isCurrentContentOperation(generation)) {
       setState(() {
         _loading = true;
         _error = null;
       });
     }
     try {
-      // 分类筛选与高级搜索是两项独立能力。分类站点即使不支持高级搜索，
-      // 也需要把分类模板参数（例如 Jpopsuki 的 filter_cat）传给适配器。
-      Map<String, dynamic>? additionalParams;
-      if ((_currentSite?.features.supportCategories ?? true) &&
-          _categories.isNotEmpty &&
-          _selectedCategoryIndex >= 0 &&
-          _selectedCategoryIndex < _categories.length) {
-        final currentCategory = _categories[_selectedCategoryIndex];
-        if (currentCategory.parameters.isNotEmpty) {
-          additionalParams = currentCategory.parseParameters();
-        }
-      }
-
-      final res = await ApiService.instance.searchTorrents(
-        keyword: trimmedKeyword.isEmpty ? null : trimmedKeyword,
-        pageNumber: _pageNumber,
-        pageSize: _pageSize,
-        onlyFav: _onlyFavorites ? 1 : null,
-        additionalParams: additionalParams,
-      );
-      if (mounted) {
+      final executor = widget.searchExecutor;
+      final res = executor != null
+          ? await executor(
+              siteConfig: requestSite,
+              keyword: trimmedKeyword.isEmpty ? null : trimmedKeyword,
+              pageNumber: requestPageNumber,
+              pageSize: _pageSize,
+              onlyFav: onlyFav,
+              additionalParams: additionalParams,
+            )
+          : await ApiService.instance.searchTorrentsWithSite(
+              siteConfig: requestSite,
+              keyword: trimmedKeyword.isEmpty ? null : trimmedKeyword,
+              pageNumber: requestPageNumber,
+              pageSize: _pageSize,
+              onlyFav: onlyFav,
+              additionalParams: additionalParams,
+            );
+      if (_isCurrentContentOperation(generation)) {
         setState(() {
           // 如果是重置搜索或第一页，清空现有数据
-          if (reset || _pageNumber == 1) {
+          if (reset || requestPageNumber == 1) {
             _items.clear();
           }
           // 去重处理：过滤掉已存在的项目ID
@@ -2338,14 +2368,19 @@ class _HomePageState extends State<HomePage> {
               .where((item) => !existingIds.contains(item.id))
               .toList();
           _items.addAll(newItems);
+          _pageNumber = requestPageNumber;
           _totalPages = res.totalPages;
-          _hasMore = _pageNumber < _totalPages;
+          _hasMore = requestPageNumber < _totalPages;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (_isCurrentContentOperation(generation)) {
+        setState(() => _error = e.toString());
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (_isCurrentContentOperation(generation)) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -2840,21 +2875,23 @@ class _HomePageState extends State<HomePage> {
     if (!mounted) return;
     final appState = context.read<AppState>();
 
+    // 站点切换开始后，当前请求即使先于 AppState 通知完成也不得再回写。
+    final switchGeneration = ++_contentOperationGeneration;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
     try {
       await appState.setActiveSite(siteId);
       if (mounted) {
-        setState(() {
-          _currentSite = appState.site;
-          _headerProgress = 1.0;
-          _fabVisible = true;
-        });
-        await _init(); // 加载新站点的数据
-        if (mounted) {
-          NotificationHelper.showInfo(context, '已切换活跃站点');
-        }
+        NotificationHelper.showInfo(context, '已切换活跃站点');
       }
     } catch (e) {
       if (mounted) {
+        if (switchGeneration == _contentOperationGeneration) {
+          setState(() => _loading = false);
+        }
         NotificationHelper.showError(context, '切换站点失败: $e');
       }
     }
@@ -2868,88 +2905,9 @@ class _HomePageState extends State<HomePage> {
 
     return Consumer<AppState>(
       builder: (context, appState, child) {
-        // 当AppState变化时，检查是否需要重新初始化
-        if (!_isProcessingReload) {
-          bool needsReload = false;
-          String reloadReason = '';
-
-          if (kDebugMode) {
-            _logger.d(
-              'HomePage Consumer: 当前站点=${_currentSite?.id}, AppState站点=${appState.site?.id}, 配置版本=${appState.configVersion}, 上次版本=$_lastConfigVersion',
-            );
-          }
-
-          if (appState.site != null) {
-            final isFirstSync =
-                (_currentSite == null && _lastConfigVersion == -1);
-            // 首次同步：仅同步站点与版本，不触发重新加载
-            if (isFirstSync) {
-              if (kDebugMode) {
-                _logger.d(
-                  'HomePage: 首次同步（不重载） - 同步站点: ${appState.site!.id}, 版本: ${appState.configVersion}',
-                );
-              }
-              final currentSite = appState.site;
-              final currentConfigVersion = appState.configVersion;
-              WidgetsBinding.instance.addPostFrameCallback((_) async {
-                // 先同步站点与版本
-                _currentSite = currentSite;
-                _lastConfigVersion = currentConfigVersion;
-                // 若尚未进行过首次初始化，则触发一次初始化
-                if (!_didInitialLoad &&
-                    !_isProcessingReload &&
-                    _currentSite != null) {
-                  _isProcessingReload = true;
-                  await _init();
-                  _didInitialLoad = true;
-                  _isProcessingReload = false;
-                }
-              });
-            }
-            // 站点变化（排除首次同步情形）
-            else if (_currentSite != null &&
-                _currentSite!.id != appState.site!.id) {
-              needsReload = true;
-              reloadReason = '站点变化';
-              if (kDebugMode) {
-                _logger.i(
-                  'HomePage: 站点变化检测 - 当前站点: ${_currentSite?.id}, 新站点: ${appState.site!.id}',
-                );
-              }
-            }
-            // 配置版本变化（排除首次同步情形）
-            else if (_lastConfigVersion != -1 &&
-                _lastConfigVersion != appState.configVersion) {
-              needsReload = true;
-              reloadReason = '配置更新';
-              if (kDebugMode) {
-                _logger.i(
-                  'HomePage: 配置更新检测 - 上次版本: $_lastConfigVersion, 当前版本: ${appState.configVersion}',
-                );
-              }
-            }
-          }
-
-          if (needsReload) {
-            if (kDebugMode) {
-              _logger.i(
-                'HomePage: 检测到$reloadReason，重新初始化 - 配置版本: ${appState.configVersion}, 上次版本: $_lastConfigVersion',
-              );
-            }
-            // 设置标志，防止重复处理
-            _isProcessingReload = true;
-            // 捕获当前值，避免异步执行时值发生变化
-            final currentSite = appState.site;
-            final currentConfigVersion = appState.configVersion;
-            WidgetsBinding.instance.addPostFrameCallback((_) async {
-              // 在PostFrameCallback中更新状态，避免在builder中触发重建
-              _currentSite = currentSite;
-              _lastConfigVersion = currentConfigVersion;
-              await _init();
-              // 重新初始化完成后重置标志
-              _isProcessingReload = false;
-            });
-          }
+        final activeSite = appState.site;
+        if (activeSite != null) {
+          _scheduleSiteReload(activeSite, appState.configVersion);
         }
 
         return PopScope(
