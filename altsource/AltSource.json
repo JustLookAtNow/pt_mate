@@ -1,10 +1,10 @@
 {
   "name": "PT Mate",
   "identifier": "com.github.justlookatnow.ptmate.source",
-  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.0/altsource/AltSource.json",
-  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.0/screenshots/1.png",
+  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.1-beta/altsource/AltSource.json",
+  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.1-beta/screenshots/1.png",
   "website": "https://github.com/JustLookAtNow/pt_mate",
-  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.0/mt.png",
+  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.1-beta/mt.png",
   "subtitle": "PT private tracker companion",
   "description": "This is the official source for PT Mate.\n\nFor full details, check the GitHub repository:\nhttps://github.com/JustLookAtNow/pt_mate",
   "tintColor": "1D4ED8",
@@ -20,14 +20,14 @@
       "versionDescription": "升级前必读：请先导出备份\n\n本版本升级了 Android 安全存储，旧版安全存储可能无法直接兼容。请在升级安装前使用应用内导出功能备份数据；备份文件是包含 Cookie、API Key 和密码等凭据的明文 JSON，请妥善保管，并在恢复成功后立即删除。\n\nChanges in this release\nrelease: 2.29.0\n\n🎉Highlights\n- Android 安全存储全面加固：设备不支持 OAEP+GCM 时自动降级为应用私有目录明文存储，并在设置页明确提示风险，同时提供旧数据恢复与重置入口，解决部分设备凭据完全无法读写的问题。\n\n✨新增功能\n- 封面查看器在原始尺寸下支持垂直滑动翻页：向上滑切换下一张、向下滑切换上一张（放大/平移状态下仍为拖动图片）。\n\n🐛修复问题\n- 修复封面画廊分页加载更多数据后，右翻按钮不显示的问题。\n- 修复从封面画廊查看大图返回后，列表封面小图未刷新的问题。\n- 修复 Android 安全存储事务读取异常、旧版数据恢复校验不通过，导致已保存的 Cookie/API Key/密码无法读取的问题。\n- 完善安全存储失败诊断，恢复页面可显示具体失败阶段与原因，便于定位问题。\n\n\nSecure-storage rollout\n\n- Phase: `phase1`\n- `ENABLE_SECURE_STORAGE_TRANSACTIONS`: `false`\n- Android versionCode: `188`\n- Source commit: `e9cd7fac343b0505d4deebc87b1c1f04881623b8`\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
       "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.29.0/pt_mate-2.29.0-unsigned.ipa",
       "localizedDescription": "PT Mate is a Flutter-based private tracker client for browsing, searching, and managing downloads across multiple PT sites.",
-      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.0/mt.png",
+      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.1-beta/mt.png",
       "tintColor": "1D4ED8",
       "category": "utilities",
       "size": 14013799,
       "screenshotURLs": [
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.0/screenshots/1.png",
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.0/screenshots/2.png",
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.0/screenshots/3.png"
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.1-beta/screenshots/1.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.1-beta/screenshots/2.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.1-beta/screenshots/3.png"
       ],
       "versions": [
         {
@@ -211,13 +211,6 @@
           "localizedDescription": "Changes in this release\nrelease: 2.20.15\n\n🐛修复问题\n- 修复部分 M-Team 种子详情页在 BBCode 内容命中缓存后递归嵌套自身的问题，避免详情页套娃、返回路由混乱以及可能出现的黑屏。\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
           "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.20.15/pt_mate-2.20.15-unsigned.ipa",
           "size": 16256922
-        },
-        {
-          "version": "2.20.14",
-          "date": "2026-04-09T12:46:50Z",
-          "localizedDescription": "Changes in this release\nrelease: 2.20.14\n\n重新发布 2.20.13 的内容，修复多平台发布流水线中的依赖解析问题。\n\n🎉Highlights\n- **图片 Cookie 支持**：支持在获取受保护图片时携带站点 Cookie，解决部分站点图片无法正常显示的问题。\n- **增强型图片查看器**：重构并引入全屏图片查看器（FullScreenImageViewer），支持网络图片加载，并允许直接在 HTML 内容中点击查看图片。\n\n✨新增功能\n- **站点支持**：新增 PTTime 站点配置及支持。\n\n🐛修复问题\n- **Linux 兼容性**：优化 Linux 平台下的安全存储（Secure Storage）回退机制，解决 Keyring 不可用时导致的运行异常。\n- **通知中心优化**：调整通知 UI 布局，大幅减小程序高度并优化文本居中对齐，提升交互体验。\n- **备份导出**：修复备份导出流程中的部分兼容性问题。\n- **发布流程**：修复 GitHub Actions 在发布阶段的依赖解析失败问题，恢复多平台构建。\n\n🔧性能优化\n- **渲染统一化**：统一种子详情页的图片渲染逻辑。\n- **依赖更新**：升级 Flutter 相关核心依赖包，提升应用稳定性。\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
-          "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.20.14/pt_mate-2.20.14-unsigned.ipa",
-          "size": 16256980
         }
       ],
       "appPermissions": {
