@@ -35,7 +35,7 @@ jobs:
         run: echo "JAVA_VERSION=$(java -XshowSettings:properties -version 2>&1 | grep 'java.runtime.version' | awk '{print $3}')" >> $GITHUB_ENV
 
       - name: Setup Android SDK API 37
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install Android SDK API 37
         run: sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0"
