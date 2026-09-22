@@ -7,8 +7,6 @@ abstract class BackupMigrator {
   Map<String, dynamic> migrate(Map<String, dynamic> backupData);
 }
 
-
-
 /// 1.0.0 迁移到 1.1.0 - 下载器配置重构
 class BackupMigratorV100To110 implements BackupMigrator {
   @override
@@ -33,18 +31,18 @@ class BackupMigratorV100To110 implements BackupMigrator {
         for (final oldConfig in oldConfigs) {
           if (oldConfig is Map<String, dynamic>) {
             // 转换为新的下载器配置格式
-             final newConfig = {
-               'id': oldConfig['id'] ?? '',
-               'name': oldConfig['name'] ?? '',
-               'type': 'qbittorrent', // 所有旧配置都是 qBittorrent
-               'config': {
-                 'host': oldConfig['host'] ?? '',
-                 'port': oldConfig['port'] ?? 8080,
-                 'username': oldConfig['username'] ?? '',
-                 'useLocalRelay': oldConfig['useLocalRelay'] ?? false,
-                 'version': oldConfig['version'] ?? '',
-               },
-             };
+            final newConfig = {
+              'id': oldConfig['id'] ?? '',
+              'name': oldConfig['name'] ?? '',
+              'type': 'qbittorrent', // 所有旧配置都是 qBittorrent
+              'config': {
+                'host': oldConfig['host'] ?? '',
+                'port': oldConfig['port'] ?? 8080,
+                'username': oldConfig['username'] ?? '',
+                'useLocalRelay': oldConfig['useLocalRelay'] ?? false,
+                'version': oldConfig['version'] ?? '',
+              },
+            };
             newConfigs.add(newConfig);
           }
         }
@@ -73,7 +71,8 @@ class BackupMigratorV100To110 implements BackupMigrator {
 
     // 迁移 qbCategoriesCache 到 downloaderCategoriesCache
     if (backupData.containsKey('qbCategoriesCache')) {
-      migratedData['downloaderCategoriesCache'] = backupData['qbCategoriesCache'];
+      migratedData['downloaderCategoriesCache'] =
+          backupData['qbCategoriesCache'];
       // 删除旧字段
       migratedData.remove('qbCategoriesCache');
     }
@@ -88,7 +87,6 @@ class BackupMigratorV100To110 implements BackupMigrator {
     return migratedData;
   }
 }
-
 
 /// 1.1.0 迁移到 1.2.0 - 多URL模板支持
 class BackupMigratorV110To120 implements BackupMigrator {
@@ -156,12 +154,39 @@ class BackupMigratorV120To130 implements BackupMigrator {
   }
 }
 
+/// 1.3.0 迁移到 1.4.0 - 补齐设备标识与 WebDAV 凭据备份。
+class BackupMigratorV130To140 implements BackupMigrator {
+  @override
+  String get fromVersion => '1.3.0';
+
+  @override
+  String get toVersion => '1.4.0';
+
+  @override
+  Map<String, dynamic> migrate(Map<String, dynamic> backupData) {
+    final migrated = Map<String, dynamic>.from(backupData)
+      ..['version'] = toVersion;
+    final envelopeData = migrated['data'];
+    final payload = envelopeData is Map<String, dynamic>
+        ? Map<String, dynamic>.from(envelopeData)
+        : migrated;
+    payload
+      ..putIfAbsent('deviceId', () => null)
+      ..putIfAbsent('webdavConfig', () => null)
+      ..putIfAbsent('webdavConfigHistory', () => <dynamic>[])
+      ..putIfAbsent('webdavPasswords', () => <String, dynamic>{});
+    if (!identical(payload, migrated)) migrated['data'] = payload;
+    return migrated;
+  }
+}
+
 /// 备份迁移管理器
 class BackupMigrationManager {
   static final List<BackupMigrator> _migrators = [
     BackupMigratorV100To110(),
     BackupMigratorV110To120(),
     BackupMigratorV120To130(),
+    BackupMigratorV130To140(),
   ];
 
   /// 注册迁移器
@@ -172,11 +197,14 @@ class BackupMigrationManager {
   /// 检查是否需要迁移
   static bool needsMigration(String currentVersion, String targetVersion) {
     return currentVersion != targetVersion &&
-           _getMigrationPath(currentVersion, targetVersion).isNotEmpty;
+        _getMigrationPath(currentVersion, targetVersion).isNotEmpty;
   }
 
   /// 执行迁移
-  static Map<String, dynamic> migrate(Map<String, dynamic> backupData, String targetVersion) {
+  static Map<String, dynamic> migrate(
+    Map<String, dynamic> backupData,
+    String targetVersion,
+  ) {
     final currentVersion = backupData['version'] as String? ?? '1.0.0';
 
     if (currentVersion == targetVersion) {
@@ -197,7 +225,10 @@ class BackupMigrationManager {
   }
 
   /// 获取迁移路径
-  static List<BackupMigrator> _getMigrationPath(String fromVersion, String toVersion) {
+  static List<BackupMigrator> _getMigrationPath(
+    String fromVersion,
+    String toVersion,
+  ) {
     final path = <BackupMigrator>[];
     var currentVersion = fromVersion;
 

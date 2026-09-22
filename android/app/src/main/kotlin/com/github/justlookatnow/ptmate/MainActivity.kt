@@ -105,6 +105,31 @@ class MainActivity : FlutterActivity() {
                     result.success(probeModernSecureStorageCapability())
                 }
 
+                "readLegacyAndroidSecureStorage" -> {
+                    result.success(readLegacyAndroidSecureStorage())
+                }
+
+                "getLegacyAndroidMigrationState" -> {
+                    result.success(getLegacyAndroidMigrationState())
+                }
+
+                "beginLegacyAndroidMigration" -> {
+                    result.success(
+                        beginLegacyAndroidMigration(
+                            target = call.argument<String>("target"),
+                            backupConfirmed = call.argument<Boolean>("backupConfirmed") == true,
+                        ),
+                    )
+                }
+
+                "markLegacyAndroidMigrationTargetInitialized" -> {
+                    result.success(markLegacyAndroidMigrationTargetInitialized())
+                }
+
+                "completeLegacyAndroidMigration" -> {
+                    result.success(completeLegacyAndroidMigration())
+                }
+
                 "enableAndroidPlaintextFallback" -> {
                     result.success(enableAndroidPlaintextFallback())
                 }
@@ -343,17 +368,8 @@ class MainActivity : FlutterActivity() {
 
     /** Tests OAEP wrapping and AES-GCM using a throwaway KeyStore alias. */
     private fun probeModernSecureStorageCapability(): Map<String, Any?> {
-        val input = readSecureStorageProbeInput()
-        val before = SecureStorageProbeClassifier.classify(input)
-        if ((!isLegacyResetAuthorized(input) && before.status != "fresh") ||
-            input.hasEncryptedEntries || input.hasWrappedKeys ||
-            input.namespacedConfig.isNotEmpty() || input.legacyConfig.isNotEmpty()
-        ) {
-            return mapOf(
-                "status" to "unavailable",
-                "failureCode" to "capability_probe_requires_fresh_storage",
-            )
-        }
+        // This uses a random, isolated alias and never opens the active secure
+        // storage namespace, so it is safe to run before a legacy migration.
         val alias = "$packageName.ptmate.oaep-capability.${UUID.randomUUID()}"
         return try {
             val generator = KeyPairGenerator.getInstance(
@@ -549,14 +565,87 @@ class MainActivity : FlutterActivity() {
             key.startsWith(SENSITIVE_REVISION_KEY_PREFIX) ||
             key == BACKUP_RESTORE_CHECKPOINT_KEY
 
-    private fun resetLegacyAndroidSecureStorage(confirmed: Boolean): Map<String, Any?> {
-        if (!confirmed) {
-            return mapOf("status" to "unavailable", "failureCode" to "confirmation_required")
+    private fun readLegacyAndroidSecureStorage(): Map<String, Any?> {
+        val probe = SecureStorageProbeClassifier.classify(readSecureStorageProbeInput())
+        if (probe.profile !in setOf("pkcs1Gcm", "pkcs1Cbc")) {
+            return LegacySecureStorageImportResult.failure(
+                if (probe.failureCode in setOf(
+                        "secure_storage_missing_requires_restore",
+                        "secure_storage_data_missing_requires_restore",
+                    )
+                ) {
+                    "legacy_data_missing_requires_backup"
+                } else {
+                    "legacy_profile_required"
+                },
+            ).toMethodChannelMap()
         }
+        return LegacySecureStorageImporter(this).readAll(probe.profile).toMethodChannelMap()
+    }
+
+    private fun beginLegacyAndroidMigration(
+        target: String?,
+        backupConfirmed: Boolean,
+    ): Map<String, Any?> {
+        if (!backupConfirmed || target == null) {
+            return mapOf("status" to "unavailable", "failureCode" to "backup_confirmation_required")
+        }
+        val state = LegacySecureStorageMigrationState(this)
         val before = SecureStorageProbeClassifier.classify(readSecureStorageProbeInput())
-        if (before.profile !in setOf("pkcs1Gcm", "pkcs1Cbc")) {
+        val eligible = before.profile in setOf("pkcs1Gcm", "pkcs1Cbc") ||
+            before.failureCode in setOf(
+                "secure_storage_missing_requires_restore",
+                "secure_storage_data_missing_requires_restore",
+            ) ||
+            state.hasPendingMigration()
+        if (!eligible) {
             return mapOf("status" to "unavailable", "failureCode" to "legacy_profile_required")
         }
+        if (!state.begin(target)) {
+            return mapOf("status" to "unavailable", "failureCode" to "migration_state_commit_failed")
+        }
+        if ((state.currentPhase()?.ordinal ?: 0) >= LegacyMigrationPhase.legacyCleared.ordinal) {
+            return mapOf<String, Any?>(
+                "status" to "fresh",
+                "target" to state.target(),
+                "failureCode" to null,
+            )
+        }
+        return clearLegacyAndroidSecureStorage(state)
+    }
+
+    private fun getLegacyAndroidMigrationState(): Map<String, Any?> {
+        val state = LegacySecureStorageMigrationState(this)
+        if (state.currentPhase() == LegacyMigrationPhase.restored && state.clear()) {
+            return state.read()
+        }
+        return state.read()
+    }
+
+    private fun markLegacyAndroidMigrationTargetInitialized(): Map<String, Any?> {
+        val state = LegacySecureStorageMigrationState(this)
+        return if (state.advance(LegacyMigrationPhase.targetInitialized)) {
+            mapOf<String, Any?>("status" to "ready", "failureCode" to null)
+        } else {
+            mapOf("status" to "unavailable", "failureCode" to "migration_state_commit_failed")
+        }
+    }
+
+    private fun completeLegacyAndroidMigration(): Map<String, Any?> {
+        val state = LegacySecureStorageMigrationState(this)
+        if (!state.advance(LegacyMigrationPhase.restored)) {
+            return mapOf("status" to "unavailable", "failureCode" to "migration_state_commit_failed")
+        }
+        return if (state.clear()) {
+            mapOf<String, Any?>("status" to "complete", "failureCode" to null)
+        } else {
+            mapOf("status" to "unavailable", "failureCode" to "migration_state_cleanup_failed")
+        }
+    }
+
+    private fun clearLegacyAndroidSecureStorage(
+        state: LegacySecureStorageMigrationState,
+    ): Map<String, Any?> {
         return try {
             val preferenceNames = listOf(
                 SECURE_STORAGE_LEGACY_CONFIG_PREFS,
@@ -565,22 +654,21 @@ class MainActivity : FlutterActivity() {
                 SECURE_STORAGE_DATA_PREFS,
                 ANDROID_PLAINTEXT_PREFS,
             )
-            if (preferenceNames.any {
-                    !getSharedPreferences(it, Context.MODE_PRIVATE).edit().clear().commit()
+            for (preferenceName in preferenceNames) {
+                if (!getSharedPreferences(preferenceName, Context.MODE_PRIVATE).edit().clear().commit()) {
+                    return mapOf(
+                        "status" to "unavailable",
+                        "failureCode" to "legacy_reset_commit_failed",
+                    )
                 }
-            ) {
-                return mapOf("status" to "unavailable", "failureCode" to "legacy_reset_commit_failed")
             }
             val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE_PROVIDER).apply { load(null) }
             for (alias in listOf(
                 "$packageName.FlutterSecureStoragePluginKey",
                 "$packageName.FlutterSecureStoragePluginKeyOAEP",
             )) {
-                keyStore.deleteEntry(alias)
+                if (keyStore.containsAlias(alias)) keyStore.deleteEntry(alias)
             }
-            // The deleted ciphertext must not remain referenced by a Dart
-            // transaction manifest or a pending companion recovery journal.
-            // Remove only secure-storage metadata, preserving user settings.
             val flutterPreferences = getSharedPreferences(
                 FLUTTER_SHARED_PREFERENCES,
                 Context.MODE_PRIVATE,
@@ -612,14 +700,41 @@ class MainActivity : FlutterActivity() {
                 ANDROID_PLAINTEXT_PREFS,
                 Context.MODE_PRIVATE,
             ).edit().putBoolean(LEGACY_RESET_AUTHORIZED_KEY, true).commit()
-            if (authorized && isLegacyResetAuthorized(readSecureStorageProbeInput())) {
-                mapOf<String, Any?>("status" to "fresh", "failureCode" to null)
-            } else {
-                mapOf("status" to "unavailable", "failureCode" to "legacy_reset_verification_failed")
+            if (!authorized || !isLegacyResetAuthorized(readSecureStorageProbeInput())) {
+                return mapOf(
+                    "status" to "unavailable",
+                    "failureCode" to "legacy_reset_verification_failed",
+                )
             }
-        } catch (_: Exception) {
+            if (!state.advance(LegacyMigrationPhase.legacyCleared)) {
+                return mapOf(
+                    "status" to "unavailable",
+                    "failureCode" to "migration_state_commit_failed",
+                )
+            }
+            mapOf<String, Any?>(
+                "status" to "fresh",
+                "target" to state.target(),
+                "failureCode" to null,
+            )
+        } catch (_: Throwable) {
             mapOf("status" to "unavailable", "failureCode" to "legacy_reset_failed")
         }
+    }
+
+    private fun resetLegacyAndroidSecureStorage(confirmed: Boolean): Map<String, Any?> {
+        if (!confirmed) {
+            return mapOf("status" to "unavailable", "failureCode" to "confirmation_required")
+        }
+        val before = SecureStorageProbeClassifier.classify(readSecureStorageProbeInput())
+        if (before.profile !in setOf("pkcs1Gcm", "pkcs1Cbc")) {
+            return mapOf("status" to "unavailable", "failureCode" to "legacy_profile_required")
+        }
+        val state = LegacySecureStorageMigrationState(this)
+        if (!state.begin(LegacyMigrationTarget.oaepGcm.name)) {
+            return mapOf("status" to "unavailable", "failureCode" to "migration_state_commit_failed")
+        }
+        return clearLegacyAndroidSecureStorage(state)
     }
 
     /**

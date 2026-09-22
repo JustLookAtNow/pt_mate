@@ -92,6 +92,9 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(secureStorageProfileChannel, (call) async {
           calls.add(call.method);
+          if (call.method == 'getLegacyAndroidMigrationState') {
+            return <String, Object?>{'status': 'none', 'failureCode': null};
+          }
           if (call.method == 'probeModernSecureStorageCapability') {
             return <String, Object?>{
               'status': 'supported',
@@ -136,6 +139,7 @@ void main() {
     await storage.initializeSecureStorage();
 
     expect(calls, <String>[
+      'getLegacyAndroidMigrationState',
       'probeAndroidSecureStorage',
       'probeModernSecureStorageCapability',
       'initializeFreshAndroidSecureStorage',
@@ -222,6 +226,9 @@ void main() {
         });
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(secureStorageProfileChannel, (call) async {
+          if (call.method == 'getLegacyAndroidMigrationState') {
+            return <String, Object?>{'status': 'none', 'failureCode': null};
+          }
           if (call.method == 'probeModernSecureStorageCapability') {
             return <String, Object?>{
               'status': 'supported',
@@ -280,6 +287,8 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(secureStorageProfileChannel, (call) async {
           switch (call.method) {
+            case 'getLegacyAndroidMigrationState':
+              return <String, Object?>{'status': 'none', 'failureCode': null};
             case 'probeAndroidSecureStorage':
               probeCount++;
               return <String, Object?>{
@@ -324,6 +333,9 @@ void main() {
     var enabledPlaintext = false;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(secureStorageProfileChannel, (call) async {
+          if (call.method == 'getLegacyAndroidMigrationState') {
+            return <String, Object?>{'status': 'none', 'failureCode': null};
+          }
           if (call.method == 'probeAndroidSecureStorage') {
             return <String, Object?>{
               'status': 'fresh',
@@ -433,6 +445,9 @@ void main() {
     var reset = false;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(secureStorageProfileChannel, (call) async {
+          if (call.method == 'getLegacyAndroidMigrationState') {
+            return <String, Object?>{'status': 'none', 'failureCode': null};
+          }
           if (call.method == 'resetLegacyAndroidSecureStorage') {
             expect(call.arguments, {'confirmed': true});
             reset = true;
@@ -467,6 +482,25 @@ void main() {
     expect(prefs.getString('unrelated-setting'), 'keep');
     await storage.saveDownloaderPassword('restored', 'new-password');
     expect(await storage.loadDownloaderPassword('restored'), 'new-password');
+  });
+
+  test('旧数据读取上下文不会迁移或删除 Device ID fallback', () async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(StorageKeys.deviceIdFallback, 'fallback-device-id');
+
+    final direct = await storage.runWithLegacySecureValues(
+      const <String, String>{StorageKeys.deviceId: 'legacy-device-id'},
+      storage.loadDeviceId,
+    );
+    final fallback = await storage.runWithLegacySecureValues(
+      const <String, String>{},
+      storage.loadDeviceId,
+    );
+
+    expect(direct, 'legacy-device-id');
+    expect(fallback, 'fallback-device-id');
+    expect(prefs.getString(StorageKeys.deviceIdFallback), 'fallback-device-id');
+    expect(secureValues, isEmpty);
   });
 
   test('Android 明文存储 I/O 失败后立即锁定且不得表现为空值', () async {

@@ -15,6 +15,7 @@ import 'models/app_models.dart';
 import 'models/batch_operation_models.dart';
 import 'pages/torrent_detail_page.dart';
 import 'pages/backup_restore_page.dart';
+import 'pages/legacy_secure_storage_migration_page.dart';
 import 'pages/secure_storage_recovery_page.dart';
 import 'services/api/api_service.dart';
 import 'services/image_http_client.dart';
@@ -1196,15 +1197,24 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
       _backupRestoreOpen = true;
     });
     final isLegacyRecovery =
-        (StorageService.instance.secureStorageFailureCode ??
-            _secureStorageFailureCode) ==
-        'legacy_secure_storage_backup_restore_required';
+        {
+          'legacy_secure_storage_backup_restore_required',
+          'legacy_secure_storage_migration_resume_required',
+          'secure_storage_missing_requires_restore',
+          'secure_storage_data_missing_requires_restore',
+        }.contains(
+          StorageService.instance.secureStorageFailureCode ??
+              _secureStorageFailureCode,
+        );
     navigator
         .push(
           MaterialPageRoute<void>(
             builder: (_) => BackupRestorePage(
               onBeforeRestore: isLegacyRecovery
-                  ? StorageService.instance.resetLegacyAndroidStorageForRestore
+                  ? _prepareLegacyStorageForBackupRestore
+                  : null,
+              onAfterRestore: isLegacyRecovery
+                  ? StorageService.instance.completeLegacyAndroidMigration
                   : null,
             ),
           ),
@@ -1218,8 +1228,27 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
         });
   }
 
+  Future<void> _prepareLegacyStorageForBackupRestore() async {
+    final storage = StorageService.instance;
+    final state = await storage.getLegacyAndroidMigrationState();
+    if (state.requiresBackupRestore) {
+      await storage.resumeLegacyAndroidMigrationTarget();
+      return;
+    }
+    final target = await storage.probeLegacyMigrationTarget();
+    await storage.beginLegacyAndroidMigration(target);
+  }
+
   Future<void> _discardLegacyAndroidStorage() async {
-    await StorageService.instance.resetLegacyAndroidStorageForRestore();
+    final storage = StorageService.instance;
+    final state = await storage.getLegacyAndroidMigrationState();
+    if (state.requiresBackupRestore) {
+      await storage.resumeLegacyAndroidMigrationTarget();
+    } else {
+      final target = await storage.probeLegacyMigrationTarget();
+      await storage.beginLegacyAndroidMigration(target);
+    }
+    await storage.completeLegacyAndroidMigration();
     await _retrySecureStorage();
   }
 
@@ -1467,6 +1496,25 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
                 );
               }
 
+              final failureCode =
+                  StorageService.instance.secureStorageFailureCode ??
+                  _secureStorageFailureCode;
+              if ({
+                'legacy_secure_storage_backup_restore_required',
+                'legacy_secure_storage_migration_resume_required',
+                'secure_storage_missing_requires_restore',
+                'secure_storage_data_missing_requires_restore',
+              }.contains(failureCode)) {
+                return LegacySecureStorageMigrationPage(
+                  failureCode:
+                      failureCode ??
+                      'legacy_secure_storage_backup_restore_required',
+                  onOpenBackupRestore: _openBackupRestore,
+                  onMigrationCompleted: _retrySecureStorage,
+                  onDiscardLegacyData: _discardLegacyAndroidStorage,
+                );
+              }
+
               return Stack(
                 fit: StackFit.expand,
                 children: [
@@ -1476,9 +1524,7 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
                       onRetry: _retrySecureStorage,
                       onOpenBackupRestore: _openBackupRestore,
                       onDiscardLegacyData: _discardLegacyAndroidStorage,
-                      failureCode:
-                          StorageService.instance.secureStorageFailureCode ??
-                          _secureStorageFailureCode,
+                      failureCode: failureCode,
                       failureStage: StorageService
                           .instance
                           .secureStorageFailureStage

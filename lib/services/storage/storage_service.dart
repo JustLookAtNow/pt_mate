@@ -73,6 +73,8 @@ class StorageKeys {
   static const String legacySiteApiKeyFallback = 'site.apiKey.fallback';
 
   // WebDAV密码安全存储
+  static const String webdavConfig = 'webdav_config';
+  static const String webdavConfigHistory = 'webdav_config_history';
   static String webdavPassword(String configId) => 'webdav.password.$configId';
   static String webdavPasswordFallback(String configId) =>
       'webdav.password.fallback.$configId';
@@ -348,6 +350,7 @@ class StorageService {
   static final Object _secureStorageOperationEpochZoneKey = Object();
   static final Object _linuxPlaintextFallbackReplayZoneKey = Object();
   static final Object _secureStorageFailureStageZoneKey = Object();
+  static final Object _legacySecureValuesZoneKey = Object();
   static const Duration _secureStorageTimeout = Duration(milliseconds: 800);
   static const Duration _secureStorageInitializationTimeout = Duration(
     seconds: 5,
@@ -455,6 +458,9 @@ class StorageService {
   bool get _isPlaintextFallbackActive =>
       _isLinuxPlaintextFallbackActive || _isAndroidPlaintextFallbackActive;
 
+  Map<String, String>? get _legacySecureValues =>
+      Zone.current[_legacySecureValuesZoneKey] as Map<String, String>?;
+
   SecureStorageState get secureStorageState => _secureStorageState;
 
   SecureStorageProfile? get secureStorageProfile => _secureStorageProfile;
@@ -471,7 +477,31 @@ class StorageService {
   /// 敏感数据当前是否可安全访问。Linux 保留既有 keyring 失败后的本地降级；
   /// Android/iOS 的安全存储异常则必须阻断本次运行。
   bool get canAccessSensitiveStorage =>
-      isSecureStorageReady || _isPlaintextFallbackActive;
+      isSecureStorageReady ||
+      _isPlaintextFallbackActive ||
+      _legacySecureValues != null;
+
+  Future<T> runWithLegacySecureValues<T>(
+    Map<String, String> values,
+    Future<T> Function() operation,
+  ) async {
+    _siteConfigsCacheDirty = true;
+    _siteApiKeysCache.clear();
+    _siteCookiesCache.clear();
+    try {
+      return await runZoned(
+        operation,
+        zoneValues: <Object?, Object?>{
+          _legacySecureValuesZoneKey: Map<String, String>.unmodifiable(values),
+        },
+      );
+    } finally {
+      _siteConfigsCacheDirty = true;
+      _siteApiKeysCache.clear();
+      _siteCookiesCache.clear();
+      _sensitiveTransaction = null;
+    }
+  }
 
   String? get secureStorageFailureCode => _secureStorageFailureCode;
 
@@ -510,7 +540,105 @@ class StorageService {
     _siteConfigsCacheDirty = true;
     _siteApiKeysCache.clear();
     _siteCookiesCache.clear();
-    await initializeSecureStorage(force: true);
+    await initializeSecureStorage(
+      force: true,
+      allowPendingLegacyMigration: true,
+    );
+  }
+
+  Future<LegacyAndroidSecureStorageSnapshot> readLegacyAndroidSnapshot() async {
+    if (!_isAndroidPlatform) {
+      throw const SecureStorageUnavailableException('not_android');
+    }
+    try {
+      return await _androidProfileResolver.readLegacySnapshot();
+    } on SecureStorageUnavailableExceptionForResolver catch (error) {
+      throw SecureStorageUnavailableException(error.code, error);
+    }
+  }
+
+  Future<LegacyAndroidMigrationState> getLegacyAndroidMigrationState() async {
+    try {
+      return await _androidProfileResolver.getLegacyMigrationState();
+    } on SecureStorageUnavailableExceptionForResolver catch (error) {
+      throw SecureStorageUnavailableException(error.code, error);
+    }
+  }
+
+  Future<LegacyAndroidMigrationTarget> probeLegacyMigrationTarget() async {
+    final capability = await _androidProfileResolver.probeModernCapability();
+    if (capability.isSupported) return LegacyAndroidMigrationTarget.oaepGcm;
+    if (capability.isExplicitlyUnsupported) {
+      return LegacyAndroidMigrationTarget.plaintext;
+    }
+    throw SecureStorageUnavailableException(
+      capability.failureCode ?? 'android_capability_probe_failed',
+    );
+  }
+
+  Future<void> beginLegacyAndroidMigration(
+    LegacyAndroidMigrationTarget target,
+  ) async {
+    try {
+      await _androidProfileResolver.beginLegacyMigration(target);
+    } on SecureStorageUnavailableExceptionForResolver catch (error) {
+      throw SecureStorageUnavailableException(error.code, error);
+    }
+    _secureStorageProfile = null;
+    _androidSecureOptions = null;
+    _sensitiveTransaction = null;
+    _pendingSecureStorageCleanup = Future<void>.value();
+    await (await _prefs).reload();
+    _siteConfigsCacheDirty = true;
+    _siteApiKeysCache.clear();
+    _siteCookiesCache.clear();
+    await initializeSecureStorage(
+      force: true,
+      allowPendingLegacyMigration: true,
+    );
+    try {
+      await _androidProfileResolver.markLegacyMigrationTargetInitialized();
+    } on SecureStorageUnavailableExceptionForResolver catch (error) {
+      throw SecureStorageUnavailableException(error.code, error);
+    }
+  }
+
+  Future<void> resumeLegacyAndroidMigrationTarget() async {
+    final state = await getLegacyAndroidMigrationState();
+    final target = state.target;
+    if (!state.requiresBackupRestore || target == null) {
+      throw const SecureStorageUnavailableException(
+        'legacy_migration_resume_not_required',
+      );
+    }
+    if (state.phase == LegacyAndroidMigrationPhase.backupConfirmed) {
+      try {
+        await _androidProfileResolver.beginLegacyMigration(target);
+      } on SecureStorageUnavailableExceptionForResolver catch (error) {
+        throw SecureStorageUnavailableException(error.code, error);
+      }
+      await (await _prefs).reload();
+    }
+    await initializeSecureStorage(
+      force: true,
+      allowPendingLegacyMigration: true,
+    );
+    if (state.phase == LegacyAndroidMigrationPhase.backupConfirmed ||
+        state.phase == LegacyAndroidMigrationPhase.legacyCleared) {
+      try {
+        await _androidProfileResolver.markLegacyMigrationTargetInitialized();
+      } on SecureStorageUnavailableExceptionForResolver catch (error) {
+        throw SecureStorageUnavailableException(error.code, error);
+      }
+    }
+  }
+
+  Future<void> completeLegacyAndroidMigration() async {
+    try {
+      await _androidProfileResolver.completeLegacyMigration();
+    } on SecureStorageUnavailableExceptionForResolver catch (error) {
+      throw SecureStorageUnavailableException(error.code, error);
+    }
   }
 
   int? get _expectedSecureStorageOperationEpoch =>
@@ -1104,7 +1232,11 @@ class StorageService {
     }
   }
 
-  Future<void> initializeSecureStorage({bool force = false}) async {
+  Future<void> initializeSecureStorage({
+    bool force = false,
+    bool allowPendingLegacyMigration = false,
+  }) async {
+    if (_legacySecureValues != null) return;
     _requireExpectedSecureStorageOperationEpoch();
     if (!force && _secureStorageState == SecureStorageState.ready) return;
     if (!force && _secureStorageState == SecureStorageState.unavailable) {
@@ -1129,11 +1261,17 @@ class StorageService {
           _secureStorageFailureType,
         );
       }
-      await _initializeSecureStorageUnlocked(force: force);
+      await _initializeSecureStorageUnlocked(
+        force: force,
+        allowPendingLegacyMigration: allowPendingLegacyMigration,
+      );
     });
   }
 
-  Future<void> _initializeSecureStorageUnlocked({required bool force}) async {
+  Future<void> _initializeSecureStorageUnlocked({
+    required bool force,
+    bool allowPendingLegacyMigration = false,
+  }) async {
     if (force) {
       // Explicit retry starts a new generation. Any older operation that
       // completes afterwards is not allowed to unlock this run.
@@ -1153,6 +1291,14 @@ class StorageService {
             if (override != null) {
               profile = override;
             } else {
+              final migrationState = await _androidProfileResolver
+                  .getLegacyMigrationState();
+              if (migrationState.requiresBackupRestore &&
+                  !allowPendingLegacyMigration) {
+                throw const SecureStorageUnavailableException(
+                  'legacy_secure_storage_migration_resume_required',
+                );
+              }
               var probe = await _androidProfileResolver.probe();
               if (probe.profile == AndroidSecureStorageProfile.pkcs1Gcm ||
                   probe.profile == AndroidSecureStorageProfile.pkcs1Cbc) {
@@ -1161,9 +1307,14 @@ class StorageService {
                 );
               }
               if (probe.profile == AndroidSecureStorageProfile.fresh) {
-                final capability = await _androidProfileResolver
-                    .probeModernCapability();
-                if (capability.isSupported) {
+                final pendingTarget = allowPendingLegacyMigration
+                    ? migrationState.target
+                    : null;
+                final capability = pendingTarget == null
+                    ? await _androidProfileResolver.probeModernCapability()
+                    : null;
+                if (pendingTarget == LegacyAndroidMigrationTarget.oaepGcm ||
+                    capability?.isSupported == true) {
                   final initialized = await _androidProfileResolver
                       .initializeFreshOaepGcm();
                   if (!initialized.isReady ||
@@ -1174,7 +1325,9 @@ class StorageService {
                           'android_fresh_initialization_invalid',
                     );
                   }
-                } else if (capability.isExplicitlyUnsupported) {
+                } else if (pendingTarget ==
+                        LegacyAndroidMigrationTarget.plaintext ||
+                    capability?.isExplicitlyUnsupported == true) {
                   final initialized = await _androidProfileResolver
                       .enablePlaintextFallback();
                   if (!initialized.isReady ||
@@ -1187,7 +1340,8 @@ class StorageService {
                   }
                 } else {
                   throw SecureStorageUnavailableException(
-                    capability.failureCode ?? 'android_capability_probe_failed',
+                    capability?.failureCode ??
+                        'android_capability_probe_failed',
                   );
                 }
                 probe = await _androidProfileResolver.probe();
@@ -1366,6 +1520,7 @@ class StorageService {
   }
 
   Future<void> _ensureSecureStorageUnlocked() async {
+    if (_legacySecureValues != null) return;
     if (_secureStorageState == SecureStorageState.ready) return;
     if (_secureStorageState == SecureStorageState.unavailable) {
       if (_isPlaintextFallbackActive) return;
@@ -1388,6 +1543,13 @@ class StorageService {
   }
 
   Future<SecureReadResult<String>> _secureReadResult(String key) async {
+    final importedValues = _legacySecureValues;
+    if (importedValues != null) {
+      final value = importedValues[key];
+      return value == null
+          ? const SecureReadResult<String>.missing()
+          : SecureReadResult<String>.found(value);
+    }
     try {
       _requireExpectedSecureStorageOperationEpoch();
     } on SecureStorageUnavailableException catch (error) {
@@ -1478,6 +1640,11 @@ class StorageService {
     required String key,
     required String value,
   }) async {
+    if (_legacySecureValues != null) {
+      throw const SecureStorageUnavailableException(
+        'legacy_import_is_read_only',
+      );
+    }
     _requireExpectedSecureStorageOperationEpoch();
     if (_isAndroidPlaintextFallbackActive) {
       try {
@@ -1582,6 +1749,11 @@ class StorageService {
 
   /// 统一安全存储删除：从首选的 SharedPreferences 配置中删除（由于键名相同，只需删除一次）
   Future<bool> _secureDelete({required String key}) async {
+    if (_legacySecureValues != null) {
+      throw const SecureStorageUnavailableException(
+        'legacy_import_is_read_only',
+      );
+    }
     _requireExpectedSecureStorageOperationEpoch();
     if (_isAndroidPlaintextFallbackActive) {
       try {
@@ -1803,6 +1975,8 @@ class StorageService {
       'downloaderCategoriesCache',
       'downloaderTagsCache',
       'aggregateSearchSettings',
+      'webdavConfig',
+      'webdavConfigHistory',
     };
     if (decoded.keys.any((key) => !allowedKeys.contains(key)) ||
         (decoded.containsKey('activeSiteId') &&
@@ -1875,6 +2049,25 @@ class StorageService {
         throw const FormatException('Invalid backup preferences payload.');
       }
       AggregateSearchSettings.fromJson(aggregate);
+    }
+    final webdavConfig = decoded['webdavConfig'];
+    if (webdavConfig != null) {
+      if (webdavConfig is! Map<String, dynamic>) {
+        throw const FormatException('Invalid backup preferences payload.');
+      }
+      WebDAVConfig.fromJson(webdavConfig);
+    }
+    final webdavHistory = decoded['webdavConfigHistory'];
+    if (webdavHistory != null) {
+      if (webdavHistory is! List<dynamic>) {
+        throw const FormatException('Invalid backup preferences payload.');
+      }
+      for (final value in webdavHistory) {
+        if (value is! Map<String, dynamic>) {
+          throw const FormatException('Invalid backup preferences payload.');
+        }
+        WebDAVConfig.fromJson(value);
+      }
     }
     return decoded;
   }
@@ -2357,6 +2550,18 @@ class StorageService {
     required String key,
     required String fallbackKey,
   }) async {
+    if (_legacySecureValues != null) {
+      final secureValue = await _readLegacyImportedValue(key);
+      if (secureValue != null) return secureValue;
+      final prefs = await _prefs;
+      if (_fallbackConflictKeys(prefs).contains(fallbackKey)) return null;
+      final fallback = prefs.get(fallbackKey);
+      if (fallback == null) return null;
+      if (fallback is! String) {
+        throw const SecureStorageUnavailableException('fallback_value_invalid');
+      }
+      return fallback;
+    }
     return _runSensitiveStorageOperation(() async {
       await _ensureSecureStorageUnlocked();
       // Linux keeps its historic plaintext fallback only after the keyring has
@@ -2382,6 +2587,40 @@ class StorageService {
         _throwSensitiveTransactionUnavailable(error);
       }
     });
+  }
+
+  Future<String?> _readLegacyImportedValue(String logicalKey) async {
+    final values = _legacySecureValues;
+    if (values == null) return null;
+    final prefs = await _prefs;
+    final encodedManifest = prefs.getString(_sensitiveManifestKey);
+    if (encodedManifest == null) return values[logicalKey];
+    try {
+      final decoded = jsonDecode(encodedManifest);
+      if (decoded is! Map<String, dynamic> ||
+          decoded['entries'] is! Map<String, dynamic>) {
+        throw const FormatException('Invalid sensitive manifest.');
+      }
+      final entries = decoded['entries'] as Map<String, dynamic>;
+      final physicalKey = entries[logicalKey];
+      if (physicalKey == null) return null;
+      if (physicalKey is! String || physicalKey.isEmpty) {
+        throw const FormatException('Invalid sensitive manifest mapping.');
+      }
+      if (!values.containsKey(physicalKey)) {
+        throw const SecureStorageUnavailableException(
+          'legacy_import_manifest_value_missing',
+        );
+      }
+      return values[physicalKey];
+    } on SecureStorageUnavailableException {
+      rethrow;
+    } catch (error) {
+      throw SecureStorageUnavailableException(
+        'legacy_import_manifest_invalid',
+        error,
+      );
+    }
   }
 
   Future<String?> _loadTransactionValueWithFallback({
@@ -2731,6 +2970,18 @@ class StorageService {
     required String key,
     required String fallbackKey,
   }) async {
+    if (_legacySecureValues != null) {
+      final secureValue = await _readLegacyImportedValue(key);
+      if (secureValue != null) return secureValue;
+      final legacyPrefs = await _prefs;
+      if (_fallbackConflictKeys(legacyPrefs).contains(fallbackKey)) return null;
+      final fallback = legacyPrefs.get(fallbackKey);
+      if (fallback == null) return null;
+      if (fallback is! String) {
+        throw const SecureStorageUnavailableException('fallback_value_invalid');
+      }
+      return fallback;
+    }
     final prefs = await _prefs;
     final secureResult = await _secureReadResult(key);
     final hasFallback = prefs.containsKey(fallbackKey);
@@ -3423,6 +3674,9 @@ class StorageService {
   Future<List<SiteConfig>> _loadSiteConfigsUnlocked({
     bool includeApiKeys = false,
   }) async {
+    if (_legacySecureValues != null) {
+      return _loadLegacyImportedSiteConfigs(includeApiKeys: includeApiKeys);
+    }
     await initializeSecureStorage();
     if (!canAccessSensitiveStorage) {
       throw SecureStorageUnavailableException(
@@ -3634,6 +3888,50 @@ class StorageService {
     } catch (_) {
       throw StateError('site_config_load_failed');
     }
+  }
+
+  Future<List<SiteConfig>> _loadLegacyImportedSiteConfigs({
+    required bool includeApiKeys,
+  }) async {
+    final prefs = await _prefs;
+    final encoded = prefs.getString(StorageKeys.siteConfigs);
+    if (encoded == null) return <SiteConfig>[];
+    final decoded = jsonDecode(encoded);
+    if (decoded is! List<dynamic>) {
+      throw const SecureStorageUnavailableException(
+        'legacy_import_site_configs_invalid',
+      );
+    }
+    final result = <SiteConfig>[];
+    for (final raw in decoded) {
+      if (raw is! Map<String, dynamic>) {
+        throw const SecureStorageUnavailableException(
+          'legacy_import_site_configs_invalid',
+        );
+      }
+      final parsed = await SiteConfig.fromJsonAsync(raw);
+      final base = parsed.config;
+      final secureCookie = await _readSensitiveValue(
+        key: StorageKeys.siteCookie(base.id),
+        fallbackKey: StorageKeys.siteCookieFallback(base.id),
+      );
+      final cookie = secureCookie ?? base.cookie;
+      final apiKey = includeApiKeys
+          ? await _readSensitiveValue(
+              key: StorageKeys.siteApiKey(base.id),
+              fallbackKey: StorageKeys.siteApiKeyFallback(base.id),
+            )
+          : null;
+      result.add(
+        base.copyWith(
+          apiKey: apiKey,
+          cookie: cookie,
+          clearApiKey: apiKey == null,
+          clearCookie: cookie == null,
+        ),
+      );
+    }
+    return result;
   }
 
   Future<T> updateSiteConfigsAtomically<T>(
@@ -4563,6 +4861,32 @@ class StorageService {
         failureCode: 'backup_preferences_commit_failed',
       );
     }
+    if (snapshot.containsKey('webdavConfig')) {
+      final value = snapshot['webdavConfig'];
+      if (value == null) {
+        await _requirePreferenceMutation(
+          mutate: () => prefs.remove(StorageKeys.webdavConfig),
+          verify: () => !prefs.containsKey(StorageKeys.webdavConfig),
+          failureCode: 'backup_preferences_commit_failed',
+        );
+      } else {
+        final encoded = jsonEncode(value);
+        await _requirePreferenceMutation(
+          mutate: () => prefs.setString(StorageKeys.webdavConfig, encoded),
+          verify: () => prefs.getString(StorageKeys.webdavConfig) == encoded,
+          failureCode: 'backup_preferences_commit_failed',
+        );
+      }
+    }
+    if (snapshot.containsKey('webdavConfigHistory')) {
+      final encoded = jsonEncode(snapshot['webdavConfigHistory']);
+      await _requirePreferenceMutation(
+        mutate: () => prefs.setString(StorageKeys.webdavConfigHistory, encoded),
+        verify: () =>
+            prefs.getString(StorageKeys.webdavConfigHistory) == encoded,
+        failureCode: 'backup_preferences_commit_failed',
+      );
+    }
   }
 
   bool _sameStringList(List<String>? actual, List<String> expected) {
@@ -4582,6 +4906,9 @@ class StorageService {
     CookieCloudConfig? cookieCloudConfig,
     Map<String, String>? downloaderPasswords,
     Set<String>? downloaderIds,
+    String? deviceId,
+    Map<String, String>? webdavPasswords,
+    Set<String>? webdavIds,
     Map<String, dynamic>? backupPreferences,
     bool hasProxyPassword = false,
     String proxyPassword = '',
@@ -4593,6 +4920,9 @@ class StorageService {
         cookieCloudConfig: cookieCloudConfig,
         downloaderPasswords: downloaderPasswords,
         downloaderIds: downloaderIds,
+        deviceId: deviceId,
+        webdavPasswords: webdavPasswords,
+        webdavIds: webdavIds,
         backupPreferences: backupPreferences,
         hasProxyPassword: hasProxyPassword,
         proxyPassword: proxyPassword,
@@ -4610,6 +4940,9 @@ class StorageService {
     CookieCloudConfig? cookieCloudConfig,
     Map<String, String>? downloaderPasswords,
     Set<String>? downloaderIds,
+    String? deviceId,
+    Map<String, String>? webdavPasswords,
+    Set<String>? webdavIds,
     Map<String, dynamic>? backupPreferences,
     required bool hasProxyPassword,
     required String proxyPassword,
@@ -4619,6 +4952,9 @@ class StorageService {
       cookieCloudConfig: cookieCloudConfig,
       downloaderPasswords: downloaderPasswords,
       downloaderIds: downloaderIds,
+      deviceId: deviceId,
+      webdavPasswords: webdavPasswords,
+      webdavIds: webdavIds,
       backupPreferences: backupPreferences,
       hasProxyPassword: hasProxyPassword,
       proxyPassword: proxyPassword,
@@ -4630,6 +4966,9 @@ class StorageService {
     CookieCloudConfig? cookieCloudConfig,
     Map<String, String>? downloaderPasswords,
     Set<String>? downloaderIds,
+    String? deviceId,
+    Map<String, String>? webdavPasswords,
+    Set<String>? webdavIds,
     Map<String, dynamic>? backupPreferences,
     required bool hasProxyPassword,
     required String proxyPassword,
@@ -4667,6 +5006,10 @@ class StorageService {
         }
       }
       if (hasProxyPassword) await saveProxyPassword(proxyPassword);
+      if (deviceId != null) await saveDeviceId(deviceId);
+      for (final id in webdavIds ?? const <String>{}) {
+        await saveWebDAVPassword(id, webdavPasswords?[id]);
+      }
       if (validatedBackupPreferences != null) {
         await _persistBackupPreferenceSnapshot(validatedBackupPreferences);
       }
@@ -4801,6 +5144,26 @@ class StorageService {
       fallbackKeys.add(StorageKeys.proxyPasswordFallback);
     }
 
+    if (deviceId != null) {
+      mutations[StorageKeys.deviceId] = deviceId.isEmpty
+          ? const SecureStorageMutation.delete(StorageKeys.deviceId)
+          : SecureStorageMutation.upsert(StorageKeys.deviceId, deviceId);
+      fallbackKeys.add(StorageKeys.deviceIdFallback);
+    }
+
+    final restoredWebdavIds = <String>{
+      ...?webdavIds,
+      ...?webdavPasswords?.keys,
+    };
+    for (final id in restoredWebdavIds) {
+      final key = StorageKeys.webdavPassword(id);
+      final password = webdavPasswords?[id] ?? '';
+      mutations[key] = password.isEmpty
+          ? SecureStorageMutation.delete(key)
+          : SecureStorageMutation.upsert(key, password);
+      fallbackKeys.add(StorageKeys.webdavPasswordFallback(id));
+    }
+
     if (mutations.isNotEmpty ||
         encodedPlainSiteConfigs != null ||
         encodedCookieCloudPreferences != null ||
@@ -4857,7 +5220,9 @@ class StorageService {
   Future<CookieCloudConfig> loadCookieCloudConfig() async {
     final prefs = await _prefs;
     final lastSyncAtRaw = prefs.getString(StorageKeys.cookieCloudLastSyncAt);
-    final secrets = await _loadCookieCloudSecrets();
+    final secrets = _legacySecureValues == null
+        ? await _loadCookieCloudSecrets()
+        : await _loadLegacyImportedCookieCloudSecrets();
     return CookieCloudConfig(
       url: secrets.url,
       uuid: secrets.uuid,
@@ -4871,6 +5236,47 @@ class StorageService {
           : DateTime.tryParse(lastSyncAtRaw),
       lastSyncSummary:
           prefs.getString(StorageKeys.cookieCloudLastSyncSummary) ?? '',
+    );
+  }
+
+  Future<_CookieCloudSecrets> _loadLegacyImportedCookieCloudSecrets() async {
+    final bundled = await _readSensitiveValue(
+      key: StorageKeys.cookieCloudSecretsV2,
+      fallbackKey: StorageKeys.cookieCloudSecretsV2Fallback,
+    );
+    if (bundled != null) {
+      try {
+        final decoded = jsonDecode(bundled);
+        if (decoded is! Map<String, dynamic>) {
+          throw const FormatException('Invalid Cookie Cloud bundle.');
+        }
+        return _CookieCloudSecrets.fromJson(decoded);
+      } catch (error) {
+        throw SecureStorageUnavailableException(
+          'cookie_cloud_bundle_invalid',
+          error,
+        );
+      }
+    }
+    return _CookieCloudSecrets(
+      url:
+          await _readSensitiveValue(
+            key: StorageKeys.cookieCloudUrl,
+            fallbackKey: StorageKeys.cookieCloudUrlFallback,
+          ) ??
+          '',
+      uuid:
+          await _readSensitiveValue(
+            key: StorageKeys.cookieCloudUuid,
+            fallbackKey: StorageKeys.cookieCloudUuidFallback,
+          ) ??
+          '',
+      password:
+          await _readSensitiveValue(
+            key: StorageKeys.cookieCloudPassword,
+            fallbackKey: StorageKeys.cookieCloudPasswordFallback,
+          ) ??
+          '',
     );
   }
 
@@ -5282,29 +5688,50 @@ class StorageService {
   // 设备ID统一读写删除（使用安全存储，支持旧存储兼容与自动迁移；在桌面环境等不可用时降级到本地存储）
   Future<void> saveDeviceId(String deviceId) =>
       _runInCurrentSecureStorageOperationEpoch(
-        () => _runSensitiveStorageOperation(
-          () => _saveSecureWithFallback(
-            key: StorageKeys.deviceId,
-            fallbackKey: StorageKeys.deviceIdFallback,
-            value: deviceId,
-          ),
-        ),
+        () => _saveDeviceIdInCurrentEpoch(deviceId),
       );
 
-  Future<String?> loadDeviceId() => _runInCurrentSecureStorageOperationEpoch(
-    () => _runSensitiveStorageOperation(
-      () => _loadSecureWithFallback(
+  Future<void> _saveDeviceIdInCurrentEpoch(String deviceId) async {
+    if (isSecureStorageReady) {
+      await _commitSensitiveMutations([
+        deviceId.isEmpty
+            ? const SecureStorageMutation.delete(StorageKeys.deviceId)
+            : SecureStorageMutation.upsert(StorageKeys.deviceId, deviceId),
+      ]);
+      await _removeSensitiveFallback(
+        StorageKeys.deviceIdFallback,
+        resolveConflict: true,
+      );
+      return;
+    }
+    await _runSensitiveStorageOperation(
+      () => _saveSecureWithFallback(
         key: StorageKeys.deviceId,
         fallbackKey: StorageKeys.deviceIdFallback,
+        value: deviceId,
       ),
-    ),
+    );
+  }
+
+  Future<String?> loadDeviceId() => _readSensitiveValue(
+    key: StorageKeys.deviceId,
+    fallbackKey: StorageKeys.deviceIdFallback,
   );
 
-  Future<void> deleteDeviceId() => _runInCurrentSecureStorageOperationEpoch(
-    () => _runSensitiveStorageOperation(_deleteDeviceIdInCurrentEpoch),
-  );
+  Future<void> deleteDeviceId() =>
+      _runInCurrentSecureStorageOperationEpoch(_deleteDeviceIdInCurrentEpoch);
 
   Future<void> _deleteDeviceIdInCurrentEpoch() async {
+    if (isSecureStorageReady) {
+      await _commitSensitiveMutations([
+        const SecureStorageMutation.delete(StorageKeys.deviceId),
+      ]);
+      await _removeSensitiveFallback(
+        StorageKeys.deviceIdFallback,
+        resolveConflict: true,
+      );
+      return;
+    }
     await _stageSensitiveDeleteFallbackGuards([
       const SecureStorageMutation.delete(StorageKeys.deviceId),
     ]);

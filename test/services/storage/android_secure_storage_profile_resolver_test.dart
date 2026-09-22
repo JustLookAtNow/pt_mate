@@ -179,6 +179,118 @@ void main() {
     expect(await resolver.resetLegacyStorage(confirmed: true), isTrue);
   });
 
+  test('reads a complete legacy snapshot without changing it', () async {
+    final invoked = <String>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          invoked.add(call.method);
+          return <String, Object?>{
+            'status': 'ready',
+            'profile': 'pkcs1Gcm',
+            'values': <String, String>{
+              'site.cookie.demo': 'cookie-value',
+              'device_id': 'device-value',
+            },
+            'failureCode': null,
+          };
+        });
+
+    final snapshot = await AndroidSecureStorageProfileResolver(
+      channel: channel,
+      isAndroid: true,
+    ).readLegacySnapshot();
+
+    expect(invoked, <String>['readLegacyAndroidSecureStorage']);
+    expect(snapshot.profile, AndroidSecureStorageProfile.pkcs1Gcm);
+    expect(snapshot.values['site.cookie.demo'], 'cookie-value');
+    expect(
+      () => snapshot.values['new'] = 'not-allowed',
+      throwsUnsupportedError,
+    );
+  });
+
+  test('rejects an incomplete native legacy snapshot', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (_) async {
+          return <String, Object?>{
+            'status': 'unavailable',
+            'failureCode': 'legacy_decryption_failed',
+          };
+        });
+
+    await expectLater(
+      AndroidSecureStorageProfileResolver(
+        channel: channel,
+        isAndroid: true,
+      ).readLegacySnapshot(),
+      throwsA(
+        isA<SecureStorageUnavailableExceptionForResolver>().having(
+          (error) => error.code,
+          'code',
+          'legacy_decryption_failed',
+        ),
+      ),
+    );
+  });
+
+  test('parses resumable migration phases and target', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (_) async {
+          return <String, Object?>{
+            'status': 'pending',
+            'phase': 'backupConfirmed',
+            'target': 'plaintext',
+            'failureCode': null,
+          };
+        });
+
+    final state = await AndroidSecureStorageProfileResolver(
+      channel: channel,
+      isAndroid: true,
+    ).getLegacyMigrationState();
+
+    expect(state.phase, LegacyAndroidMigrationPhase.backupConfirmed);
+    expect(state.target, LegacyAndroidMigrationTarget.plaintext);
+    expect(state.requiresBackupRestore, isTrue);
+  });
+
+  test('begins, initializes and completes a journaled migration', () async {
+    final invoked = <String>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          invoked.add(call.method);
+          return switch (call.method) {
+            'beginLegacyAndroidMigration' => <String, Object?>{
+              'status': 'fresh',
+              'failureCode': null,
+            },
+            'markLegacyAndroidMigrationTargetInitialized' => <String, Object?>{
+              'status': 'ready',
+              'failureCode': null,
+            },
+            'completeLegacyAndroidMigration' => <String, Object?>{
+              'status': 'complete',
+              'failureCode': null,
+            },
+            _ => throw StateError('unexpected method'),
+          };
+        });
+    final resolver = AndroidSecureStorageProfileResolver(
+      channel: channel,
+      isAndroid: true,
+    );
+
+    await resolver.beginLegacyMigration(LegacyAndroidMigrationTarget.oaepGcm);
+    await resolver.markLegacyMigrationTargetInitialized();
+    await resolver.completeLegacyMigration();
+
+    expect(invoked, <String>[
+      'beginLegacyAndroidMigration',
+      'markLegacyAndroidMigrationTargetInitialized',
+      'completeLegacyAndroidMigration',
+    ]);
+  });
+
   test(
     'initializes a fresh namespace only through the dedicated method',
     () async {
