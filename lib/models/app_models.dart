@@ -1,7 +1,9 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
+
 import '../services/site_config_service.dart';
 import '../utils/format.dart';
 
@@ -121,8 +123,16 @@ class TorrentDetail {
   final String descr;
   final String? descrHtml; // 可选的HTML描述，用于原生HTML渲染
   final String? webviewUrl; // 可选的webview URL，用于嵌入式显示
+  final int? price; // 付费种子价格（魔力值），仅支持购买的站点提供
+  final bool? isPurchased; // 当前用户是否已购买该付费种子
 
-  TorrentDetail({required this.descr, this.descrHtml, this.webviewUrl});
+  TorrentDetail({
+    required this.descr,
+    this.descrHtml,
+    this.webviewUrl,
+    this.price,
+    this.isPurchased,
+  });
 }
 
 // 下载状态枚举
@@ -412,8 +422,8 @@ enum SiteType {
   rousi(
     'RousiPro',
     'Rousi pro',
-    'paaskey认证',
-    '可以在网站的「账户设置」页面查看和重置自己的 Passkey。',
+    'API Key',
+    '在网站的「账户设置 → API Key」创建并粘贴；应用内购买需勾选购买相关权限。',
   ),
   gazelle('Gazelle', 'Gazelle (Alpha)', 'Cookie认证', '通过网页登录获取认证信息'),
   unit3d('Unit3D', 'Unit3D (beta)', 'API Key', '安全设置 - API Token');

@@ -29,6 +29,7 @@ import '../widgets/torrent_list_item.dart';
 import '../widgets/torrent_cover_gallery_viewer.dart';
 import '../widgets/list_index_scroller.dart';
 import '../widgets/torrent_download_dialog.dart';
+import '../widgets/torrent_purchase_dialog.dart';
 import '../widgets/tag_filter_bar.dart';
 import '../widgets/aggregate_search_strategy_list.dart';
 import 'torrent_detail_page.dart';
@@ -36,7 +37,6 @@ import 'torrent_detail_page.dart';
 import 'package:pt_mate/utils/notification_helper.dart';
 
 import '../utils/screen_utils.dart';
-import '../utils/url_launcher_helper.dart';
 
 class AggregateSearchPage extends StatefulWidget {
   const AggregateSearchPage({super.key, this.searchService});
@@ -1315,12 +1315,17 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         orElse: () => throw Exception('找不到站点配置: ${item.siteId}'),
       );
 
+      if (!mounted) return;
       // 2. 获取下载 URL
-      final url = await ApiService.instance.genDlToken(
-        id: item.torrent.id,
+      final url = await resolveDownloadUrlWithPurchase(
+        context: context,
+        torrentId: item.torrent.id,
         url: item.torrent.downloadUrl,
+        torrentTitle: item.torrent.name,
         siteConfig: siteConfig, // 传入站点配置
       );
+      // 用户取消购买或购买失败：静默终止本次下载
+      if (url == null) return;
 
       // 3. 弹出对话框让用户选择下载器设置
       if (!mounted) return;
@@ -1367,50 +1372,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       );
     } catch (e) {
       if (mounted) {
-        if (e.toString().contains('NEED_PURCHASE')) {
-          showDialog(
-            context: context,
-            builder: (dialogContext) => AlertDialog(
-              title: const Text('需要购买'),
-              content: const Text('该种子为付费种子且您尚未购买，请先前往网页端购买后再下载。'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  style: TextButton.styleFrom(
-                    side: BorderSide(
-                      color: Theme.of(dialogContext).colorScheme.outline,
-                      width: 1.0,
-                    ),
-                  ),
-                  child: const Text('取消'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(dialogContext);
-                    String purchaseUrl =
-                        'https://rousi.pro/torrent/${item.torrent.id}';
-                    if (siteConfig != null) {
-                      var base = siteConfig.baseUrl;
-                      if (!base.endsWith('/')) {
-                        base = '$base/';
-                      }
-                      purchaseUrl = '${base}torrent/${item.torrent.id}';
-                    }
-                    if (mounted) {
-                      await UrlLauncherHelper.launchBrowser(
-                        context,
-                        purchaseUrl,
-                      );
-                    }
-                  },
-                  child: const Text('前往购买'),
-                ),
-              ],
-            ),
-          );
-        } else {
-          NotificationHelper.showError(context, '下载失败: $e');
-        }
+        NotificationHelper.showError(context, '下载失败: $e');
       }
     }
   }
@@ -1517,12 +1479,21 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     if (siteConfig == null) {
       throw Exception('找不到站点配置: ${item.siteId}');
     }
+    if (!mounted) {
+      throw Exception('页面已关闭，无法继续下载');
+    }
 
-    var url = await ApiService.instance.genDlToken(
-      id: item.torrent.id,
+    var url = await resolveDownloadUrlWithPurchase(
+      context: context,
+      torrentId: item.torrent.id,
       url: item.torrent.downloadUrl,
+      torrentTitle: item.torrent.name,
       siteConfig: siteConfig,
     );
+    if (url == null) {
+      // 批量场景下用户在购买确认中取消：标记该项失败，避免静默跳过
+      throw Exception('已取消购买付费种子');
+    }
 
     // 远程下载器模式
     if (siteConfig.siteType.supportsGazelleDownloadToken &&
@@ -1786,11 +1757,22 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       }
 
       try {
-        var url = await ApiService.instance.genDlToken(
-          id: item.torrent.id,
+        var url = await resolveDownloadUrlWithPurchase(
+          context: context,
+          torrentId: item.torrent.id,
           url: item.torrent.downloadUrl,
+          torrentTitle: item.torrent.name,
           siteConfig: siteConfig,
         );
+        if (url == null) {
+          if (mounted) {
+            setState(() {
+              _batchItemStates[item.torrent.id] = BatchItemState.failed;
+              _batchItemErrors[item.torrent.id] = '已取消购买付费种子';
+            });
+          }
+          continue;
+        }
         downloadItems.add(
           TorrentDownloadItem(
             id: item.torrent.id,

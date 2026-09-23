@@ -2,8 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
 import '../../models/app_models.dart';
+import '../../models/purchase_models.dart';
 import '../network/timeout_retry.dart';
 import '../storage/storage_service.dart';
+import 'api_exceptions.dart';
+import 'purchasable_adapter.dart';
 import 'site_adapter.dart';
 
 /// 统一的API服务管理器
@@ -279,5 +282,63 @@ class ApiService {
     } catch (e) {
       return false;
     }
+  }
+
+  // ==== 购买（魔力值购买付费种子）====
+
+  /// 站点是否支持应用内购买
+  bool supportsPurchase(SiteConfig? siteConfig) {
+    final target = siteConfig ?? _activeAdapter?.siteConfig;
+    return target?.siteType == SiteType.rousi;
+  }
+
+  /// 获取支持购买的适配器，站点不支持时抛出业务异常
+  Future<PurchasableAdapter> _requirePurchasableAdapter(
+    SiteConfig? siteConfig,
+  ) async {
+    final adapter = siteConfig != null
+        ? await getAdapter(siteConfig)
+        : _activeAdapter;
+    if (adapter == null) {
+      throw StateError('No active site adapter available');
+    }
+    if (adapter is! PurchasableAdapter) {
+      throw SiteApiException(message: '该站点不支持应用内购买');
+    }
+    return adapter as PurchasableAdapter;
+  }
+
+  /// 查询种子的购买状态。
+  ///
+  /// 适配器内部已用同一个幂等键完成超时重试，这里不再叠加隐式补偿。
+  Future<PurchaseStatus> fetchPurchaseStatus(
+    String torrentId, {
+    SiteConfig? siteConfig,
+  }) async {
+    final adapter = await _requirePurchasableAdapter(siteConfig);
+    return adapter.fetchPurchaseStatus(torrentId);
+  }
+
+  /// 购买种子，[expectedPrice] 为客户端确认过的价格
+  Future<PurchaseResult> purchaseTorrent(
+    String torrentId, {
+    int? expectedPrice,
+    SiteConfig? siteConfig,
+  }) async {
+    final adapter = await _requirePurchasableAdapter(siteConfig);
+    return adapter.purchaseTorrent(torrentId, expectedPrice: expectedPrice);
+  }
+
+  /// 查询当前用户的购买记录
+  Future<PurchaseHistoryPage> fetchPurchaseHistory({
+    int pageNumber = 1,
+    int pageSize = 20,
+    SiteConfig? siteConfig,
+  }) async {
+    final adapter = await _requirePurchasableAdapter(siteConfig);
+    return adapter.fetchPurchaseHistory(
+      pageNumber: pageNumber,
+      pageSize: pageSize,
+    );
   }
 }
