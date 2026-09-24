@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../services/storage/storage_service.dart';
 import '../services/downloader/downloader_config.dart';
 import '../services/downloader/downloader_service.dart';
@@ -374,9 +375,9 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                           '发送到下载器',
                           style: TextStyle(
                             color: !_downloadToLocal
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimaryContainer
+                                ? Theme.of(context)
+                                      .colorScheme
+                                      .onPrimaryContainer
                                 : Theme.of(context).colorScheme.onSurface,
                             fontWeight: !_downloadToLocal
                                 ? FontWeight.bold
@@ -424,9 +425,9 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
                           '下载到本地',
                           style: TextStyle(
                             color: _downloadToLocal
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimaryContainer
+                                ? Theme.of(context)
+                                      .colorScheme
+                                      .onPrimaryContainer
                                 : Theme.of(context).colorScheme.onSurface,
                             fontWeight: _downloadToLocal
                                 ? FontWeight.bold
@@ -449,9 +450,8 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest
+                  .withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -606,6 +606,10 @@ class _TorrentDownloadDialogState extends State<TorrentDownloadDialog> {
               hintText: '选择分类（可选）',
             ),
             isExpanded: true,
+            menuMaxHeight: (MediaQuery.sizeOf(context).height * 0.45).clamp(
+              160.0,
+              320.0,
+            ),
             items: [
               const DropdownMenuItem<String?>(
                 value: null,
