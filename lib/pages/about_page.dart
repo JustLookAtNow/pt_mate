@@ -306,6 +306,7 @@ class _UpdateCard extends StatelessWidget {
                   title: const Text('应用更新'),
                   subtitle: Text('当前安装版本：$version'),
                 ),
+                const _BetaUpdateTile(),
                 const SizedBox(height: 8),
                 if (useVerticalActions)
                   Column(
@@ -323,6 +324,65 @@ class _UpdateCard extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+class _BetaUpdateTile extends StatefulWidget {
+  const _BetaUpdateTile();
+
+  @override
+  State<_BetaUpdateTile> createState() => _BetaUpdateTileState();
+}
+
+class _BetaUpdateTileState extends State<_BetaUpdateTile> {
+  bool _enabled = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final enabled = await UpdateService.instance.isBetaOptInEnabled();
+    if (!mounted) return;
+    setState(() {
+      _enabled = enabled;
+      _loading = false;
+    });
+  }
+
+  Future<void> _set(bool value) async {
+    setState(() {
+      _enabled = value;
+    });
+    await UpdateService.instance.setBetaOptIn(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: SizedBox(
+          height: 24,
+          width: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        title: Text('尝鲜（接收 Beta 版本更新）'),
+        subtitle: Text('正在加载当前设置…'),
+      );
+    }
+
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      secondary: const Icon(Icons.new_releases),
+      title: const Text('尝鲜（接收 Beta 版本更新）'),
+      subtitle: const Text('默认仅接收稳定版本；开启后可接收 Beta/RC 等预发布版本更新'),
+      value: _enabled,
+      onChanged: _set,
     );
   }
 }
