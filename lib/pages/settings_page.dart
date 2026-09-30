@@ -186,18 +186,24 @@ class _SettingsBody extends StatelessWidget {
         Text('下载器设置', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Card(
-          child: ListTile(
-            leading: const Icon(Icons.download_outlined),
-            title: const Text('下载器配置'),
-            subtitle: const Text('管理跟配置所有下载器'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const DownloaderSettingsPage(),
-                ),
-              );
-            },
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.download_outlined),
+                title: const Text('下载器配置'),
+                subtitle: const Text('管理跟配置所有下载器'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const DownloaderSettingsPage(),
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              const _AutoAddSiteTagTile(),
+            ],
           ),
         ),
         const SizedBox(height: 16),
@@ -995,6 +1001,72 @@ class _AutoLoadImagesTileState extends State<_AutoLoadImagesTile> {
       subtitle: const Text('在种子详情页面自动显示图片'),
       value: _autoLoad,
       onChanged: _saveSetting,
+    );
+  }
+}
+
+class _AutoAddSiteTagTile extends StatefulWidget {
+  const _AutoAddSiteTagTile();
+
+  @override
+  State<_AutoAddSiteTagTile> createState() => _AutoAddSiteTagTileState();
+}
+
+class _AutoAddSiteTagTileState extends State<_AutoAddSiteTagTile> {
+  bool _enabled = false;
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSetting();
+  }
+
+  Future<void> _loadSetting() async {
+    try {
+      final storage = Provider.of<StorageService>(context, listen: false);
+      final enabled = await storage.loadAutoAddSiteTag();
+      if (mounted) {
+        setState(() {
+          _enabled = enabled;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        NotificationHelper.showError(context, '加载自动站点标签设置失败：$e');
+      }
+    }
+  }
+
+  Future<void> _saveSetting(bool enabled) async {
+    setState(() => _saving = true);
+    try {
+      final storage = Provider.of<StorageService>(context, listen: false);
+      await storage.saveAutoAddSiteTag(enabled);
+      if (mounted) {
+        setState(() => _enabled = enabled);
+      }
+    } catch (e) {
+      if (mounted) {
+        NotificationHelper.showError(context, '保存自动站点标签设置失败：$e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.sell_outlined),
+      title: const Text('自动添加站点标签'),
+      subtitle: const Text('添加下载任务时自动附加“站点/站点名称”标签，不支持标签的下载器会忽略此设置。'),
+      value: _enabled,
+      onChanged: _loading || _saving ? null : _saveSetting,
     );
   }
 }

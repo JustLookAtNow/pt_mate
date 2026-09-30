@@ -50,6 +50,7 @@ class StorageKeys {
   // 默认下载设置
   static const String defaultDownloadCategory = 'download.defaultCategory';
   static const String defaultDownloadTags = 'download.defaultTags';
+  static const String autoAddSiteTag = 'download.autoAddSiteTag';
   static const String defaultDownloadSavePath = 'download.defaultSavePath';
   static const String localDownloadLastDirectory =
       'download.localLastDirectory';
@@ -1965,6 +1966,7 @@ class StorageService {
       'autoLoadImages',
       'defaultDownloadCategory',
       'defaultDownloadTags',
+      'autoAddSiteTag',
       'defaultDownloadSavePath',
       'proxyEnabled',
       'proxyHost',
@@ -1990,6 +1992,8 @@ class StorageService {
         (decoded.containsKey('seedColor') && decoded['seedColor'] is! int) ||
         (decoded.containsKey('autoLoadImages') &&
             decoded['autoLoadImages'] is! bool) ||
+        (decoded.containsKey('autoAddSiteTag') &&
+            decoded['autoAddSiteTag'] is! bool) ||
         (decoded.containsKey('defaultDownloadCategory') &&
             decoded['defaultDownloadCategory'] is! String) ||
         (decoded.containsKey('defaultDownloadSavePath') &&
@@ -4806,6 +4810,7 @@ class StorageService {
     await persistBool('dynamicColor', StorageKeys.themeUseDynamic);
     await persistInt('seedColor', StorageKeys.themeSeedColor);
     await persistBool('autoLoadImages', StorageKeys.autoLoadImages);
+    await persistBool('autoAddSiteTag', StorageKeys.autoAddSiteTag);
     await persistString(
       'defaultDownloadCategory',
       StorageKeys.defaultDownloadCategory,
@@ -5357,6 +5362,20 @@ class StorageService {
   Future<List<String>> loadDefaultDownloadTags() async {
     final prefs = await _prefs;
     return prefs.getStringList(StorageKeys.defaultDownloadTags) ?? <String>[];
+  }
+
+  /// 保存添加下载任务时自动附加站点标签的总开关。
+  Future<void> saveAutoAddSiteTag(bool enabled) async {
+    final prefs = await _prefs;
+    if (!await prefs.setBool(StorageKeys.autoAddSiteTag, enabled)) {
+      throw StateError('auto_add_site_tag_save_failed');
+    }
+  }
+
+  /// 读取自动站点标签总开关，默认关闭。
+  Future<bool> loadAutoAddSiteTag() async {
+    final prefs = await _prefs;
+    return prefs.getBool(StorageKeys.autoAddSiteTag) ?? false;
   }
 
   Future<void> saveDefaultDownloadSavePath(String? savePath) async {

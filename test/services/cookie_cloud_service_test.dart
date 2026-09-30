@@ -585,6 +585,70 @@ void main() {
     },
   );
 
+  test('自动站点标签开关默认关闭，重新读取时保留保存值', () async {
+    final storage = StorageService.instance;
+    expect(await storage.loadAutoAddSiteTag(), isFalse);
+    await storage.saveAutoAddSiteTag(true);
+    storage.resetForTest();
+    expect(await storage.loadAutoAddSiteTag(), isTrue);
+    await storage.saveAutoAddSiteTag(false);
+    expect(await storage.loadAutoAddSiteTag(), isFalse);
+  });
+
+  for (final enabled in [false, true]) {
+    test('备份和恢复自动站点标签开关：$enabled', () async {
+      final storage = StorageService.instance;
+      final backupService = BackupService(storage);
+      await storage.saveAutoAddSiteTag(enabled);
+      final backup = await backupService.createBackup();
+      final preferences =
+          backup.data['userPreferences'] as Map<String, dynamic>;
+      final downloadSettings =
+          preferences['defaultDownloadSettings'] as Map<String, dynamic>;
+      expect(downloadSettings['autoAddSiteTag'], enabled);
+
+      await storage.saveAutoAddSiteTag(!enabled);
+      final result = await backupService.restoreBackup(backup);
+      expect(result.success, isTrue, reason: result.message);
+      expect(await storage.loadAutoAddSiteTag(), enabled);
+    });
+  }
+
+  test('恢复缺少自动站点标签字段的旧备份时默认关闭', () async {
+    final storage = StorageService.instance;
+    final backupService = BackupService(storage);
+    final backup = await backupService.createBackup();
+    final preferences = backup.data['userPreferences'] as Map<String, dynamic>;
+    final downloadSettings =
+        preferences['defaultDownloadSettings'] as Map<String, dynamic>;
+    downloadSettings.remove('autoAddSiteTag');
+
+    await storage.saveAutoAddSiteTag(true);
+    final result = await backupService.restoreBackup(backup);
+    expect(result.success, isTrue, reason: result.message);
+    expect(await storage.loadAutoAddSiteTag(), isFalse);
+  });
+
+  test('自动站点标签备份字段类型错误时在恢复前拒绝并保留现有值', () async {
+    final storage = StorageService.instance;
+    final backupService = BackupService(storage);
+    await storage.saveAutoAddSiteTag(true);
+    final backup = await backupService.createBackup();
+    final preferences = backup.data['userPreferences'] as Map<String, dynamic>;
+    final downloadSettings =
+        preferences['defaultDownloadSettings'] as Map<String, dynamic>;
+    downloadSettings['autoAddSiteTag'] = 'true';
+    var resetCalled = false;
+
+    final result = await backupService.restoreBackup(
+      backup,
+      onBeforeRestore: () async => resetCalled = true,
+    );
+    expect(result.success, isFalse);
+    expect(resetCalled, isFalse);
+    expect(await storage.loadAutoAddSiteTag(), isTrue);
+  });
+
   test('BackupService refuses to generate an empty backup from corrupt downloader JSON', () async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(StorageKeys.downloaderConfigs, '{corrupt-json');
