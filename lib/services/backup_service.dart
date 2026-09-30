@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../models/app_models.dart';
 import '../utils/backup_migrators.dart';
+import '../utils/file_picker_utils.dart';
 import 'downloader/downloader_config.dart';
 import 'storage/storage_service.dart';
 import 'webdav_service.dart';
@@ -228,7 +229,7 @@ class BackupService {
         prepared.secureStorageEpoch,
       );
 
-      String? result;
+      Uri? result;
       if (defaultTargetPlatform == TargetPlatform.linux) {
         onProgress?.call('请选择导出位置...');
         final initialDirectory =
@@ -248,7 +249,7 @@ class BackupService {
           _storageService.requireSecureStorageOperationEpoch(
             prepared.secureStorageEpoch,
           );
-          final file = File(result);
+          final file = File.fromUri(result);
           await file.writeAsString(prepared.content);
         }
       } else {
@@ -262,7 +263,7 @@ class BackupService {
         );
       }
 
-      return result;
+      return result == null ? null : filePickerLocation(result);
     } on SecureStorageUnavailableException {
       rethrow;
     } catch (e) {
@@ -296,7 +297,10 @@ class BackupService {
         bytes: utf8.encode(content),
       );
       if (path == null) return null;
-      return LegacyMigrationBackupExport(path: path, backup: backup);
+      return LegacyMigrationBackupExport(
+        path: filePickerLocation(path),
+        backup: backup,
+      );
     } on SecureStorageUnavailableException {
       rethrow;
     } catch (error) {
@@ -307,15 +311,14 @@ class BackupService {
   // 从文件导入备份
   Future<BackupData?> importBackup() async {
     try {
-      final result = await FilePicker.pickFiles(
+      final result = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['json'],
         dialogTitle: '选择备份文件',
       );
 
-      if (result != null && result.files.single.path != null) {
-        final file = File(result.files.single.path!);
-        final content = await file.readAsString();
+      if (result != null) {
+        final content = utf8.decode(await result.readAsBytes());
         var json = jsonDecode(content) as Map<String, dynamic>;
 
         // 检查是否需要数据迁移
@@ -646,20 +649,21 @@ class BackupService {
             _storageService.requireSecureStorageOperationEpoch(
               prepared.secureStorageEpoch,
             );
-            final file = File(result);
+            final file = File.fromUri(result);
             await file.writeAsString(prepared.content);
           }
-          return result;
+          return result == null ? null : filePickerLocation(result);
         }
 
         onProgress?.call('正在导出备份...');
-        return await FilePicker.saveFile(
+        final result = await FilePicker.saveFile(
           dialogTitle: '导出备份文件',
           fileName: prepared.fileName,
           type: FileType.custom,
           allowedExtensions: ['json'],
           bytes: utf8.encode(prepared.content),
         );
+        return result == null ? null : filePickerLocation(result);
       }
     } on SecureStorageUnavailableException {
       rethrow;

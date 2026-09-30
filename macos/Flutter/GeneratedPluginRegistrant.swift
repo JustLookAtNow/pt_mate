@@ -7,7 +7,7 @@ import Foundation
 
 import device_info_plus
 import dynamic_color
-import file_picker
+import file_picker_darwin
 import flutter_inappwebview_macos
 import flutter_local_notifications
 import flutter_secure_storage_darwin
