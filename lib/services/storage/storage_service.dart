@@ -5567,9 +5567,12 @@ class StorageService {
   List<String> get visibleTags => _visibleTagsCache ?? [];
 
   Future<void> saveVisibleTags(List<String> tags) async {
+    final savedTags = List<String>.of(tags);
     final prefs = await _prefs;
-    await prefs.setStringList(StorageKeys.visibleTags, tags);
-    _visibleTagsCache = tags;
+    if (!await prefs.setStringList(StorageKeys.visibleTags, savedTags)) {
+      throw StateError('保存标签展示设置失败');
+    }
+    _visibleTagsCache = savedTags;
   }
 
   Future<void> loadVisibleTags() async {

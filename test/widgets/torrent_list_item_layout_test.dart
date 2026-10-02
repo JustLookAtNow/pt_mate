@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:pt_mate/models/app_models.dart';
+import 'package:pt_mate/services/settings/display_settings_manager.dart';
 import 'package:pt_mate/services/storage/storage_service.dart';
 import 'package:pt_mate/widgets/torrent_list_item.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FakeStorageService implements StorageService {
   final List<SiteConfig> sites;
@@ -18,6 +20,11 @@ class FakeStorageService implements StorageService {
 }
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    StorageService.instance.resetForTest();
+  });
+
   Widget createWidgetUnderTest({
     required double width,
     required TorrentItem torrent,
@@ -30,8 +37,16 @@ void main() {
         body: Center(
           child: SizedBox(
             width: width,
-            child: Provider<StorageService>(
-              create: (_) => FakeStorageService(sites: siteConfigs),
+            child: MultiProvider(
+              providers: [
+                Provider<StorageService>(
+                  create: (_) => FakeStorageService(sites: siteConfigs),
+                ),
+                ChangeNotifierProvider(
+                  create: (_) =>
+                      DisplaySettingsManager(StorageService.instance),
+                ),
+              ],
               child: TorrentListItem(
                 torrent: torrent,
                 isSelected: false,

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/app_models.dart';
+import '../services/settings/display_settings_manager.dart';
 import '../services/storage/storage_service.dart';
 import '../services/theme/app_tokens.dart';
 
@@ -635,12 +636,18 @@ class TorrentInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final batchStatus = _buildBatchStatus(context);
+    final visibleTagNames = context.select<DisplaySettingsManager, Set<String>>(
+      (settings) => settings.visibleTags,
+    );
+    final visibleTags = torrent.tags
+        .where((tag) => visibleTagNames.contains(tag.name))
+        .toList();
     final isCompactDesktopNoCover = !isMobile && !showCover;
     final showInlineRatings = !showCover && hasAnyRating;
     final showInlineDiscount = torrent.discount != DiscountType.normal;
     final hasHeaderRow =
         torrent.isTop ||
-        torrent.tags.isNotEmpty ||
+        visibleTags.isNotEmpty ||
         showInlineRatings ||
         showInlineDiscount;
 
@@ -660,7 +667,7 @@ class TorrentInfo extends StatelessWidget {
             Padding(
               padding: EdgeInsets.only(bottom: isCompactDesktopNoCover ? 1 : 2),
               child: _TagsRatingRow(
-                tags: torrent.tags,
+                tags: visibleTags,
                 isTop: torrent.isTop,
                 discountBadge: showInlineDiscount
                     ? _DiscountBadge(torrent: torrent)

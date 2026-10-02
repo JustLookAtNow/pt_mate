@@ -1120,31 +1120,39 @@ class _DisplayTagSettingsTile extends StatefulWidget {
 
 class _DisplayTagSettingsTileState extends State<_DisplayTagSettingsTile> {
   bool _expanded = false;
-  List<String> _visibleTags = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _visibleTags = List.from(StorageService.instance.visibleTags);
-  }
+  bool _saving = false;
 
   Future<void> _toggleTag(String tagName) async {
+    final settings = context.read<DisplaySettingsManager>();
+    final visibleTags = Set<String>.of(settings.visibleTags);
+    if (!visibleTags.remove(tagName)) {
+      visibleTags.add(tagName);
+    }
     setState(() {
-      if (_visibleTags.contains(tagName)) {
-        _visibleTags.remove(tagName);
-      } else {
-        _visibleTags.add(tagName);
-      }
+      _saving = true;
     });
-    await StorageService.instance.saveVisibleTags(_visibleTags);
+    try {
+      await settings.setVisibleTags(visibleTags);
+    } catch (e) {
+      if (mounted) {
+        NotificationHelper.showError(context, '保存标签展示设置失败：$e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<DisplaySettingsManager>();
     return ExpansionTile(
       leading: const Icon(Icons.label_outline),
       title: const Text('过滤标签设置'),
-      subtitle: const Text('设置显示在顶部的快捷过滤标签'),
+      subtitle: const Text('设置顶部快捷过滤和列表项中显示的标签'),
       initiallyExpanded: _expanded,
       onExpansionChanged: (value) {
         setState(() {
@@ -1158,13 +1166,15 @@ class _DisplayTagSettingsTileState extends State<_DisplayTagSettingsTile> {
             spacing: 8,
             runSpacing: 8,
             children: TagType.values.map((tag) {
-              final isSelected = _visibleTags.contains(tag.name);
+              final isSelected = settings.visibleTags.contains(tag.name);
               return FilterChip(
                 label: Text(tag.content),
                 selected: isSelected,
-                onSelected: (bool selected) {
-                  _toggleTag(tag.name);
-                },
+                onSelected: settings.isLoading || _saving
+                    ? null
+                    : (bool selected) {
+                        _toggleTag(tag.name);
+                      },
                 backgroundColor: tag.color.withValues(alpha: 0.1),
                 selectedColor: tag.color.withValues(alpha: 0.3),
                 labelStyle: TextStyle(
