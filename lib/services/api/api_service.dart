@@ -251,15 +251,20 @@ class ApiService {
   }
 
   /// 切换种子收藏状态
+  /// 指定 [siteConfig] 时使用种子来源站点，否则使用当前活跃站点。
   Future<void> toggleCollection({
     required String id,
     required bool make,
+    SiteConfig? siteConfig,
   }) async {
-    if (_activeAdapter == null) {
+    final adapter = siteConfig != null
+        ? await getAdapter(siteConfig)
+        : _activeAdapter;
+    if (adapter == null) {
       throw StateError('No active site adapter available');
     }
     return retryOnTimeout(
-      () => _activeAdapter!.toggleCollection(torrentId: id, make: make),
+      () => adapter.toggleCollection(torrentId: id, make: make),
     );
   }
 

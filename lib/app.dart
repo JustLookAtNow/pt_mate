@@ -13,6 +13,9 @@ import 'dart:math' as math;
 
 import 'models/app_models.dart';
 import 'models/batch_operation_models.dart';
+import 'models/home_search_request.dart';
+import 'pages/aggregate_search_page.dart';
+import 'pages/aggregate_search_settings_page.dart';
 import 'pages/torrent_detail_page.dart';
 import 'pages/backup_restore_page.dart';
 import 'pages/legacy_secure_storage_migration_page.dart';
@@ -38,7 +41,7 @@ import 'services/local_download_service.dart';
 import 'pages/server_settings_page.dart';
 import 'widgets/qb_speed_indicator.dart';
 import 'widgets/batch_progress_card.dart';
-import 'widgets/category_filter_dialog.dart';
+import 'widgets/home_search_dialog.dart';
 import 'widgets/responsive_layout.dart';
 import 'widgets/torrent_download_dialog.dart';
 import 'widgets/torrent_list_item.dart';
@@ -47,6 +50,7 @@ import 'widgets/torrent_cover_gallery_viewer.dart';
 import 'widgets/list_index_scroller.dart';
 import 'widgets/tag_filter_bar.dart';
 import 'services/update_service.dart';
+import 'services/aggregate_search_service.dart';
 import 'widgets/update_notification_dialog.dart';
 
 import 'package:pt_mate/utils/notification_helper.dart';
@@ -1561,16 +1565,29 @@ typedef HomeTorrentSearchExecutor = Future<TorrentSearchResult> Function({
 });
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, this.searchExecutor});
+  const HomePage({super.key, this.searchExecutor, this.aggregateSearchService});
 
   @visibleForTesting
   final HomeTorrentSearchExecutor? searchExecutor;
+
+  @visibleForTesting
+  final AggregateSearchService? aggregateSearchService;
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
+  final _aggregateViewKey = GlobalKey<AggregateSearchViewState>();
+  HomeSearchMode _searchMode = HomeSearchMode.currentSite;
+  HomeSearchRequest? _aggregateRequest;
+  int _aggregateSearchSequence = 0;
+  bool _aggregateSelectionMode = false;
+  bool _aggregateSearchAvailable = true;
+  bool _openingSearchDialog = false;
+
+  bool get _isAggregateMode => _searchMode == HomeSearchMode.aggregate;
+
   final _keywordCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   late final ListIndexScroller _listScroller = ListIndexScroller(
@@ -2004,7 +2021,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onScroll() {
-    if (!mounted) return;
+    if (!mounted || _isAggregateMode) return;
 
     final currentOffset = _scrollCtrl.position.pixels;
     final delta = currentOffset - _lastScrollOffset;
@@ -2078,7 +2095,7 @@ class _HomePageState extends State<HomePage> {
                   if (supportsCategories)
                     Expanded(
                       child: TextButton.icon(
-                        onPressed: _showCategoryFilterDialog,
+                        onPressed: _showSearchDialog,
                         icon: const Icon(Icons.category, size: 18),
                         label: Text(
                           _selectedCategoryDisplayName,
@@ -2285,7 +2302,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadMore() async {
-    if (_loading || !_hasMore) return;
+    if (_isAggregateMode || _loading || !_hasMore) return;
     await _search(pageNumber: _pageNumber + 1);
   }
 
@@ -2684,41 +2701,100 @@ class _HomePageState extends State<HomePage> {
     await _toggleCollectionWithOptimisticUpdate(item);
   }
 
-  Future<void> _showCategoryFilterDialog() async {
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => CategoryFilterDialog(
-        categories: _categories,
-        selectedCategoryIndex: _selectedCategoryIndex,
-        keyword: _keywordCtrl.text,
-      ),
-    );
+  Future<List<AggregateSearchConfig>> _loadActiveSearchConfigs() async {
+    final settings = await StorageService.instance
+        .loadAggregateSearchSettings();
+    return settings.searchConfigs.where((config) => config.isActive).toList();
+  }
 
-    if (result != null) {
-      final newCategoryIndex = result['categoryIndex'] as int?;
-      final newKeyword = result['keyword'] as String?;
-
-      if (mounted) {
-        setState(() {
-          if (newCategoryIndex != null &&
-              newCategoryIndex >= 0 &&
-              newCategoryIndex < _categories.length) {
-            _selectedCategoryIndex = newCategoryIndex;
-          }
-          if (newKeyword != null) {
-            _keywordCtrl.text = newKeyword;
-          }
-        });
-      }
-
-      if (_currentSite?.features.supportTorrentSearch ?? true) {
-        _search(reset: true);
-      } else {
-        if (mounted) {
-          NotificationHelper.showError(context, '当前站点不支持搜索功能');
-        }
-      }
+  Future<void> _showSearchDialog() async {
+    if (_openingSearchDialog ||
+        (_isAggregateMode && !_aggregateSearchAvailable)) {
+      return;
     }
+    _openingSearchDialog = true;
+    try {
+      var configs = await _loadActiveSearchConfigs();
+      if (!mounted) return;
+      final provider = context.read<AggregateSearchProvider>();
+      final result = await showDialog<HomeSearchRequest>(
+        context: context,
+        builder: (context) => HomeSearchDialog(
+          categories: _categories,
+          selectedCategoryIndex: _selectedCategoryIndex,
+          keyword: _isAggregateMode
+              ? _aggregateRequest!.keyword
+              : _keywordCtrl.text,
+          initialMode: _searchMode,
+          searchConfigs: configs,
+          selectedStrategy: provider.selectedStrategy,
+          supportsCurrentSiteSearch:
+              _currentSite?.features.supportTorrentSearch ?? false,
+          supportsCategories: _currentSite?.features.supportCategories ?? false,
+          onConfigureAggregate: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const AggregateSearchSettingsPage(),
+              ),
+            );
+            configs = await _loadActiveSearchConfigs();
+            return configs;
+          },
+        ),
+      );
+      if (!mounted || result == null) return;
+
+      if (result.mode == HomeSearchMode.aggregate) {
+        if (!configs.any((config) => config.id == result.strategyId)) {
+          NotificationHelper.showError(context, '请选择可用的搜索策略');
+          return;
+        }
+        provider.setSearchConfigs(configs);
+        provider.setSelectedStrategy(result.strategyId!);
+        provider.setLoading(false);
+        if (_isSelectionMode) _onCancelSelection();
+        setState(() {
+          _searchMode = HomeSearchMode.aggregate;
+          _aggregateSelectionMode = false;
+          _aggregateRequest = HomeSearchRequest(
+            mode: HomeSearchMode.aggregate,
+            keyword: result.keyword,
+            strategyId: result.strategyId,
+            sequence: ++_aggregateSearchSequence,
+          );
+          _lastPressedAt = null;
+        });
+      } else {
+        _returnToCurrentSite();
+        setState(() {
+          final categoryIndex = result.categoryIndex;
+          if (categoryIndex != null &&
+              categoryIndex >= 0 &&
+              categoryIndex < _categories.length) {
+            _selectedCategoryIndex = categoryIndex;
+          }
+          _keywordCtrl.text = result.keyword;
+        });
+        unawaited(_search(reset: true));
+      }
+    } catch (e) {
+      if (mounted) {
+        NotificationHelper.showError(context, '加载搜索配置失败：$e');
+      }
+    } finally {
+      _openingSearchDialog = false;
+    }
+  }
+
+  void _returnToCurrentSite() {
+    if (!_isAggregateMode) return;
+    _aggregateViewKey.currentState?.leaveAggregate();
+    setState(() {
+      _searchMode = HomeSearchMode.currentSite;
+      _aggregateSelectionMode = false;
+      _aggregateSearchAvailable = true;
+      _lastPressedAt = null;
+    });
   }
 
   BatchItemState _batchItemStateFor(String itemId) {
@@ -2961,6 +3037,15 @@ class _HomePageState extends State<HomePage> {
           onPopInvokedWithResult: (didPop, result) async {
             if (didPop) return;
 
+            if (_isAggregateMode) {
+              if (_aggregateSelectionMode) {
+                _aggregateViewKey.currentState?.cancelSelection();
+              } else {
+                _returnToCurrentSite();
+              }
+              return;
+            }
+
             // 如果处于选中模式，先退出选中模式
             if (_isSelectionMode) {
               _onCancelSelection();
@@ -3003,469 +3088,466 @@ class _HomePageState extends State<HomePage> {
                   },
                 ),
               ),
-              title: InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const ServerSettingsPage(),
-                    ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.only(
-                    left: 4.0,
-                    right: 8.0,
-                    top: 4.0,
-                    bottom: 4.0,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_currentSite != null) ...[
-                        _buildAppBarLogo(_currentSite!),
-                        const SizedBox(width: 8),
-                      ],
-                      Flexible(
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(text: appState.site?.name ?? 'PT Mate'),
-                              TextSpan(
-                                text: ' - PT Mate',
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                            ],
+              title: _isAggregateMode
+                  ? const Text('聚合搜索 - PT Mate')
+                  : InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const ServerSettingsPage(),
                           ),
-                          overflow: TextOverflow.ellipsis,
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          left: 4.0,
+                          right: 8.0,
+                          top: 4.0,
+                          bottom: 4.0,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: const [QbSpeedIndicator()],
-            ),
-            body: Column(
-              children: [
-                // 统一头部（用户信息 + 搜索栏），使用进度控制：向下滚动逐步隐藏，向上滚动逐步显示
-                ClipRect(
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    heightFactor: _headerProgress,
-                    child: Opacity(
-                      opacity: _headerProgress,
-                      child: _buildHeaderPanel(context, appState),
-                    ),
-                  ),
-                ),
-                if (_loading) const LinearProgressIndicator(),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ),
-                if (_batchProgress != null) _buildBatchProgressCard(),
-                Expanded(
-                  child: _currentSite == null
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32.0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.settings_outlined,
-                                  size: 64,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                                const SizedBox(height: 24),
-                                Text(
-                                  '尚未配置站点信息',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface,
-                                      ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  '请先配置站点信息以开始使用应用',
-                                  style: Theme.of(context).textTheme.bodyLarge
-                                      ?.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                      ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 32),
-                                FilledButton.icon(
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const ServerSettingsPage(),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('配置站点'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : Builder(
-                          builder: (context) {
-                            final filteredItems = _filteredItems;
-                            if (filteredItems.isEmpty) {
-                              // 首屏加载中显示骨架屏
-                              if (_loading) {
-                                return const TorrentListSkeleton();
-                              }
-                              // 空状态也支持下拉刷新
-                              return RefreshIndicator(
-                                onRefresh: () => _search(reset: true),
-                                child: ListView(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  keyboardDismissBehavior:
-                                      ScrollViewKeyboardDismissBehavior.onDrag,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_currentSite != null) ...[
+                              _buildAppBarLogo(_currentSite!),
+                              const SizedBox(width: 8),
+                            ],
+                            Flexible(
+                              child: Text.rich(
+                                TextSpan(
                                   children: [
-                                    SizedBox(
-                                      height:
-                                          MediaQuery.of(context).size.height *
-                                          0.5,
-                                      child: Center(
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.search_off,
-                                              size: 64,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .outline,
-                                            ),
-                                            const SizedBox(height: 16),
-                                            Text(
-                                              _items.isEmpty
-                                                  ? '未找到相关种子'
-                                                  : '没有符合筛选条件的种子',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .titleMedium
-                                                  ?.copyWith(
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .outline,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              '下拉刷新',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .outline,
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                    TextSpan(
+                                      text: appState.site?.name ?? 'PT Mate',
+                                    ),
+                                    TextSpan(
+                                      text: ' - PT Mate',
+                                      style: const TextStyle(fontSize: 14),
                                     ),
                                   ],
                                 ),
-                              );
-                            }
-                            return RefreshIndicator(
-                              onRefresh: () => _search(reset: true),
-                              child: Listener(
-                                onPointerMove: _onPointerMove,
-                                onPointerUp: _onPointerUp,
-                                child: ListView.builder(
-                                  key: _listKey,
-                                  controller: _scrollCtrl,
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  keyboardDismissBehavior:
-                                      ScrollViewKeyboardDismissBehavior.onDrag,
-                                  padding: const EdgeInsets.fromLTRB(
-                                    0,
-                                    0,
-                                    0,
-                                    16,
-                                  ),
-                                  itemCount:
-                                      filteredItems.length + (_hasMore ? 1 : 0),
-                                  itemBuilder: (context, index) {
-                                    if (index == filteredItems.length) {
-                                      return const Padding(
-                                        padding: EdgeInsets.all(16.0),
-                                        child: Center(
-                                          child: SizedBox(
-                                            width: 24,
-                                            height: 24,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                    final item = filteredItems[index];
-                                    final isSelected = _selectedItems.contains(
-                                      item.id,
-                                    );
-                                    return MetaData(
-                                      metaData: index,
-                                      behavior: HitTestBehavior.translucent,
-                                      child: TorrentListItem(
-                                        torrent: item,
-                                        isSelected: isSelected,
-                                        isSelectionMode: _isSelectionMode,
-                                        currentSite: _currentSite,
-                                        showCoverSetting: showCoverSetting,
-                                        batchOperationType:
-                                            _batchProgress?.actionType,
-                                        batchItemState: _batchItemStateFor(
-                                          item.id,
-                                        ),
-                                        batchErrorMessage: _batchItemErrorFor(
-                                          item.id,
-                                        ),
-                                        onRetryBatchAction:
-                                            _buildRetryCallbackForItem(item),
-                                        onCoverTap: () =>
-                                            _openCoverGallery(index),
-                                        onTap: () => _isSelectionMode
-                                            ? _onToggleSelection(item, index)
-                                            : _onTorrentTap(item),
-                                        onLongPress: () =>
-                                            _onLongPress(item, index),
-                                        onToggleCollection:
-                                            _isBatchActionRunning(
-                                              BatchOperationType.favorite,
-                                            )
-                                            ? null
-                                            : () => _onToggleCollection(item),
-                                        onDownload:
-                                            _isBatchActionRunning(
-                                              BatchOperationType.download,
-                                            )
-                                            ? null
-                                            : () => _onDownload(item),
-                                      ),
-                                    );
-                                  },
-                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            );
-                          },
-                        ),
-                ),
-                // 选中模式下的操作栏
-                if (_isSelectionMode)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      border: Border(
-                        top: BorderSide(
-                          color: Theme.of(context).dividerColor,
-                          width: 1,
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: _isBatchRunning
-                                ? null
-                                : _onCancelSelection,
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 0,
-                              ),
-                              textStyle: const TextStyle(fontSize: 13),
-                              side: BorderSide(
-                                color: Theme.of(context).colorScheme.outline,
-                                width: 1.0,
-                              ),
-                            ),
-                            child: const Text('取消'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // 全选按钮
-                        Expanded(
-                          child: TextButton(
-                            onPressed: _isBatchRunning
-                                ? null
-                                : () {
-                                    if (_selectedItems.length ==
-                                        _filteredItems.length) {
-                                      setState(() => _selectedItems.clear());
-                                    } else {
-                                      setState(() {
-                                        _selectedItems.addAll(
-                                          _filteredItems.map((e) => e.id),
-                                        );
-                                      });
-                                    }
-                                  },
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 0,
-                              ),
-                              textStyle: const TextStyle(fontSize: 13),
-                              side: BorderSide(
-                                color: Theme.of(context).colorScheme.outline,
-                                width: 1.0,
-                              ),
-                            ),
-                            child: Text(
-                              _selectedItems.length == _filteredItems.length
-                                  ? '全不选'
-                                  : '全选',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // 批量收藏按钮 - 仅在站点支持收藏功能时显示
-                        if (_currentSite?.features.supportCollection ??
-                            true) ...[
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed:
-                                  !_isBatchRunning && _selectedItems.isNotEmpty
-                                  ? _onBatchFavorite
-                                  : null,
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 0,
-                                ),
-                                textStyle: const TextStyle(fontSize: 13),
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                              ),
-                              child: Text('收藏 (${_selectedItems.length})'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                        ],
-                        // 批量下载按钮 - 仅在站点支持下载功能时显示
-                        if (_currentSite?.features.supportDownload ?? true)
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed:
-                                  !_isBatchRunning && _selectedItems.isNotEmpty
-                                  ? _onBatchDownload
-                                  : null,
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 0,
-                                ),
-                                textStyle: const TextStyle(fontSize: 13),
-                                backgroundColor: Theme.of(context)
-                                    .colorScheme
-                                    .primary,
-                                foregroundColor: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimary,
-                              ),
-                              child: Text('下载 (${_selectedItems.length})'),
-                            ),
-                          ),
-                      ],
-                    ),
+              actions: const [QbSpeedIndicator()],
+            ),
+            body: IndexedStack(
+              index: _isAggregateMode ? 1 : 0,
+              children: [
+                _buildCurrentSiteBody(context, appState, showCoverSetting),
+                if (_aggregateRequest != null)
+                  AggregateSearchView(
+                    key: _aggregateViewKey,
+                    request: _aggregateRequest!,
+                    active: _isAggregateMode,
+                    searchService: widget.aggregateSearchService,
+                    onSearchRequested: _showSearchDialog,
+                    onExitRequested: _returnToCurrentSite,
+                    onSelectionModeChanged: (selected) {
+                      if (!mounted || _aggregateSelectionMode == selected) {
+                        return;
+                      }
+                      setState(() => _aggregateSelectionMode = selected);
+                    },
+                    onSearchAvailabilityChanged: (available) {
+                      if (!mounted || _aggregateSearchAvailable == available) {
+                        return;
+                      }
+                      setState(() => _aggregateSearchAvailable = available);
+                    },
                   ),
               ],
             ),
-            floatingActionButton: !_isSelectionMode
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      AnimatedSlide(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        offset: _fabVisible ? Offset.zero : const Offset(0, 2),
-                        child: AnimatedOpacity(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                          opacity: _fabVisible ? 1.0 : 0.0,
-                          child: Builder(
-                            builder: (context) {
-                              final isDesktop = ScreenUtils.isLargeScreen(
-                                context,
-                              );
-                              return isDesktop
-                                  ? FloatingActionButton.extended(
-                                      heroTag: 'home-site-switch-fab',
-                                      onPressed: _fabVisible
-                                          ? _showSiteSelectionDialog
-                                          : null,
-                                      icon: const Icon(Icons.swap_horiz),
-                                      label: const Text('切换'),
-                                    )
-                                  : FloatingActionButton(
-                                      heroTag: 'home-site-switch-fab',
-                                      onPressed: _fabVisible
-                                          ? _showSiteSelectionDialog
-                                          : null,
-                                      child: const Icon(Icons.swap_horiz),
-                                    );
-                            },
-                          ),
-                        ),
-                      ),
-                      if (_currentSite?.features.supportTorrentSearch ??
-                          true) ...[
-                        const SizedBox(height: 12),
-                        Builder(
-                          builder: (context) {
-                            final isDesktop = ScreenUtils.isLargeScreen(
-                              context,
-                            );
-                            return isDesktop
-                                ? FloatingActionButton.extended(
-                                    key: const ValueKey('home-search-fab'),
-                                    heroTag: 'home-search-fab',
-                                    onPressed: _showCategoryFilterDialog,
-                                    icon: const Icon(Icons.search),
-                                    label: const Text('搜索'),
-                                  )
-                                : FloatingActionButton(
-                                    key: const ValueKey('home-search-fab'),
-                                    heroTag: 'home-search-fab',
-                                    onPressed: _showCategoryFilterDialog,
-                                    tooltip: '搜索',
-                                    child: const Icon(Icons.search),
-                                  );
-                          },
-                        ),
-                      ],
-                    ],
-                  )
-                : null,
+            floatingActionButton: _buildFloatingActions(context),
             floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSearchButton(BuildContext context, {bool enabled = true}) {
+    return ScreenUtils.isLargeScreen(context)
+        ? FloatingActionButton.extended(
+            key: const ValueKey('home-search-fab'),
+            heroTag: 'home-search-fab',
+            onPressed: enabled ? _showSearchDialog : null,
+            icon: const Icon(Icons.search),
+            label: const Text('搜索'),
+          )
+        : FloatingActionButton(
+            key: const ValueKey('home-search-fab'),
+            heroTag: 'home-search-fab',
+            onPressed: enabled ? _showSearchDialog : null,
+            tooltip: '搜索',
+            child: const Icon(Icons.search),
+          );
+  }
+
+  Widget? _buildFloatingActions(BuildContext context) {
+    if (_isAggregateMode) {
+      return _aggregateSelectionMode
+          ? null
+          : _buildSearchButton(context, enabled: _aggregateSearchAvailable);
+    }
+    if (_isSelectionMode) return null;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        AnimatedSlide(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            opacity: _fabVisible ? 1.0 : 0.0,
+            child: Builder(
+              builder: (context) {
+                final isDesktop = ScreenUtils.isLargeScreen(context);
+                return isDesktop
+                    ? FloatingActionButton.extended(
+                        heroTag: 'home-site-switch-fab',
+                        onPressed: _fabVisible
+                            ? _showSiteSelectionDialog
+                            : null,
+                        icon: const Icon(Icons.swap_horiz),
+                        label: const Text('切换'),
+                      )
+                    : FloatingActionButton(
+                        heroTag: 'home-site-switch-fab',
+                        onPressed: _fabVisible
+                            ? _showSiteSelectionDialog
+                            : null,
+                        child: const Icon(Icons.swap_horiz),
+                      );
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSearchButton(context),
+      ],
+    );
+  }
+
+  Widget _buildCurrentSiteBody(
+    BuildContext context,
+    AppState appState,
+    bool showCoverSetting,
+  ) {
+    return Column(
+      children: [
+        // 统一头部（用户信息 + 搜索栏），使用进度控制：向下滚动逐步隐藏，向上滚动逐步显示
+        ClipRect(
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            heightFactor: _headerProgress,
+            child: Opacity(
+              opacity: _headerProgress,
+              child: _buildHeaderPanel(context, appState),
+            ),
+          ),
+        ),
+        if (_loading) const LinearProgressIndicator(),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(_error!, style: const TextStyle(color: Colors.red)),
+          ),
+        if (_batchProgress != null) _buildBatchProgressCard(),
+        Expanded(
+          child: _currentSite == null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.settings_outlined,
+                          size: 64,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          '尚未配置站点信息',
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '请先配置站点信息以开始使用应用',
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 32),
+                        FilledButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const ServerSettingsPage(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('配置站点'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : Builder(
+                  builder: (context) {
+                    final filteredItems = _filteredItems;
+                    if (filteredItems.isEmpty) {
+                      // 首屏加载中显示骨架屏
+                      if (_loading) {
+                        return const TorrentListSkeleton();
+                      }
+                      // 空状态也支持下拉刷新
+                      return RefreshIndicator(
+                        onRefresh: () => _search(reset: true),
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.of(context).size.height * 0.5,
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.search_off,
+                                      size: 64,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outline,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      _items.isEmpty
+                                          ? '未找到相关种子'
+                                          : '没有符合筛选条件的种子',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .outline,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '下拉刷新',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .outline,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return RefreshIndicator(
+                      onRefresh: () => _search(reset: true),
+                      child: Listener(
+                        onPointerMove: _onPointerMove,
+                        onPointerUp: _onPointerUp,
+                        child: ListView.builder(
+                          key: _listKey,
+                          controller: _scrollCtrl,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
+                          itemCount: filteredItems.length + (_hasMore ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == filteredItems.length) {
+                              return const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            final item = filteredItems[index];
+                            final isSelected = _selectedItems.contains(item.id);
+                            return MetaData(
+                              metaData: index,
+                              behavior: HitTestBehavior.translucent,
+                              child: TorrentListItem(
+                                torrent: item,
+                                isSelected: isSelected,
+                                isSelectionMode: _isSelectionMode,
+                                currentSite: _currentSite,
+                                showCoverSetting: showCoverSetting,
+                                batchOperationType: _batchProgress?.actionType,
+                                batchItemState: _batchItemStateFor(item.id),
+                                batchErrorMessage: _batchItemErrorFor(item.id),
+                                onRetryBatchAction: _buildRetryCallbackForItem(
+                                  item,
+                                ),
+                                onCoverTap: () => _openCoverGallery(index),
+                                onTap: () => _isSelectionMode
+                                    ? _onToggleSelection(item, index)
+                                    : _onTorrentTap(item),
+                                onLongPress: () => _onLongPress(item, index),
+                                onToggleCollection:
+                                    _isBatchActionRunning(
+                                      BatchOperationType.favorite,
+                                    )
+                                    ? null
+                                    : () => _onToggleCollection(item),
+                                onDownload:
+                                    _isBatchActionRunning(
+                                      BatchOperationType.download,
+                                    )
+                                    ? null
+                                    : () => _onDownload(item),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        // 选中模式下的操作栏
+        if (_isSelectionMode)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border(
+                top: BorderSide(
+                  color: Theme.of(context).dividerColor,
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: _isBatchRunning ? null : _onCancelSelection,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                      textStyle: const TextStyle(fontSize: 13),
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.outline,
+                        width: 1.0,
+                      ),
+                    ),
+                    child: const Text('取消'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // 全选按钮
+                Expanded(
+                  child: TextButton(
+                    onPressed: _isBatchRunning
+                        ? null
+                        : () {
+                            if (_selectedItems.length ==
+                                _filteredItems.length) {
+                              setState(() => _selectedItems.clear());
+                            } else {
+                              setState(() {
+                                _selectedItems.addAll(
+                                  _filteredItems.map((e) => e.id),
+                                );
+                              });
+                            }
+                          },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                      textStyle: const TextStyle(fontSize: 13),
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.outline,
+                        width: 1.0,
+                      ),
+                    ),
+                    child: Text(
+                      _selectedItems.length == _filteredItems.length
+                          ? '全不选'
+                          : '全选',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // 批量收藏按钮 - 仅在站点支持收藏功能时显示
+                if (_currentSite?.features.supportCollection ?? true) ...[
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: !_isBatchRunning && _selectedItems.isNotEmpty
+                          ? _onBatchFavorite
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 0),
+                        textStyle: const TextStyle(fontSize: 13),
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text('收藏 (${_selectedItems.length})'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                // 批量下载按钮 - 仅在站点支持下载功能时显示
+                if (_currentSite?.features.supportDownload ?? true)
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: !_isBatchRunning && _selectedItems.isNotEmpty
+                          ? _onBatchDownload
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 0),
+                        textStyle: const TextStyle(fontSize: 13),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Theme.of(context)
+                            .colorScheme
+                            .onPrimary,
+                      ),
+                      child: Text('下载 (${_selectedItems.length})'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 

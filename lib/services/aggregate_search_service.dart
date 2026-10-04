@@ -17,6 +17,9 @@ class AggregateSearchResultItem {
     required this.siteName,
     required this.siteId,
   });
+
+  /// A torrent ID is only unique within its source site.
+  String get identity => '$siteId:${torrent.id}';
 }
 
 /// 聚合搜索结果
@@ -34,8 +37,9 @@ class AggregateSearchResult {
   });
 }
 
-typedef AggregateSearchSiteResultsCallback =
-    void Function(List<AggregateSearchResultItem> items);
+typedef AggregateSearchSiteResultsCallback = void Function(
+  List<AggregateSearchResultItem> items,
+);
 
 /// 聚合搜索进度
 class AggregateSearchProgress {

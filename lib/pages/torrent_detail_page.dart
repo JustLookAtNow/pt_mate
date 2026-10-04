@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+
 import 'dart:ui';
+
 import 'package:html/dom.dart' as dom;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +10,7 @@ import 'package:flutter_bbcode/flutter_bbcode.dart';
 import 'package:bbob_dart/bbob_dart.dart' as bbob;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
+
 import '../utils/url_launcher_helper.dart';
 import '../services/api/api_service.dart';
 import '../services/storage/storage_service.dart';
@@ -19,7 +22,9 @@ import '../services/local_download_service.dart';
 import '../widgets/torrent_download_dialog.dart';
 import '../widgets/cached_network_image.dart';
 import '../widgets/full_screen_image_viewer.dart';
+
 import 'package:pt_mate/utils/notification_helper.dart';
+
 import '../utils/screen_utils.dart';
 
 // 自定义Quote标签处理器
@@ -72,9 +77,8 @@ class CustomQuoteDisplay extends StatelessWidget {
           width: 1,
         ),
         borderRadius: BorderRadius.circular(8),
-        color: Theme.of(
-          context,
-        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest
+            .withValues(alpha: 0.3),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,18 +88,16 @@ class CustomQuoteDisplay extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary
+                  .withValues(alpha: 0.1),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(7),
                 topRight: Radius.circular(7),
               ),
               border: Border(
                 bottom: BorderSide(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.outline.withValues(alpha: 0.3),
+                  color: Theme.of(context).colorScheme.outline
+                      .withValues(alpha: 0.3),
                   width: 0.5,
                 ),
               ),
@@ -264,9 +266,8 @@ class _CustomHideDisplayState extends State<CustomHideDisplay> {
                     filter: ImageFilter.blur(sigmaX: 3.0, sigmaY: 3.0),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surface.withValues(alpha: 0.7),
+                        color: Theme.of(context).colorScheme.surface
+                            .withValues(alpha: 0.7),
                         borderRadius: BorderRadius.circular(5),
                       ),
                       child: Center(
@@ -277,18 +278,16 @@ class _CustomHideDisplayState extends State<CustomHideDisplay> {
                             Icon(
                               Icons.visibility,
                               size: 16,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.7),
+                              color: Theme.of(context).colorScheme.onSurface
+                                  .withValues(alpha: 0.7),
                             ),
                             const SizedBox(width: 4),
                             Text(
                               '点击显示隐藏内容',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.7),
+                                color: Theme.of(context).colorScheme.onSurface
+                                    .withValues(alpha: 0.7),
                               ),
                             ),
                           ],
@@ -822,6 +821,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
       await ApiService.instance.toggleCollection(
         id: widget.torrentItem.id,
         make: newCollectionState,
+        siteConfig: widget.siteConfig,
       );
     } catch (e) {
       // 请求失败，恢复原状态 - 恢复收藏状态变量和torrentItem对象
@@ -1669,14 +1669,12 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.outline.withValues(alpha: 0.3),
+                  color: Theme.of(context).colorScheme.outline
+                      .withValues(alpha: 0.3),
                   width: 1,
                 ),
               ),
@@ -1816,9 +1814,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: Theme.of(
-                context,
-              ).colorScheme.outline.withValues(alpha: 0.3),
+              color: Theme.of(context).colorScheme.outline
+                  .withValues(alpha: 0.3),
             ),
           ),
           child: Column(
@@ -1933,9 +1930,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
             margin: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               border: Border.all(
-                color: Theme.of(
-                  context,
-                ).colorScheme.outline.withValues(alpha: 0.3),
+                color: Theme.of(context).colorScheme.outline
+                    .withValues(alpha: 0.3),
               ),
               borderRadius: BorderRadius.circular(8),
             ),
@@ -2081,9 +2077,9 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                 children: [
                   CircleAvatar(
                     radius: 16,
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.primaryContainer,
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .primaryContainer,
                     child: Text(
                       comment.author.isNotEmpty
                           ? comment.author[0].toUpperCase()
@@ -2104,14 +2100,13 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          DateFormat(
-                            'yyyy-MM-dd HH:mm',
-                          ).format(comment.createdDate),
+                          DateFormat('yyyy-MM-dd HH:mm')
+                              .format(comment.createdDate),
                           style: TextStyle(
                             fontSize: 12,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
                           ),
                         ),
                       ],

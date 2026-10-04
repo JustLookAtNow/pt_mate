@@ -95,9 +95,9 @@ class AggregateSearchProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setSearching(bool searching) {
+  void setSearching(bool searching, {bool notify = true}) {
     _searching = searching;
-    notifyListeners();
+    if (notify) notifyListeners();
   }
 
   void setSearchResults(List<AggregateSearchResultItem> results) {
@@ -137,17 +137,20 @@ class AggregateSearchProvider extends ChangeNotifier {
   ) {
     final mergedItems = <String, AggregateSearchResultItem>{};
     for (final item in _searchResults) {
-      mergedItems['${item.siteId}:${item.torrent.id}'] = item;
+      mergedItems[item.identity] = item;
     }
     for (final item in items) {
-      mergedItems['${item.siteId}:${item.torrent.id}'] = item;
+      mergedItems[item.identity] = item;
     }
     return mergedItems.values.toList();
   }
 
-  void setSearchProgress(AggregateSearchProgress? progress) {
+  void setSearchProgress(
+    AggregateSearchProgress? progress, {
+    bool notify = true,
+  }) {
     _searchProgress = progress;
-    notifyListeners();
+    if (notify) notifyListeners();
   }
 
   void createCancelToken() {
