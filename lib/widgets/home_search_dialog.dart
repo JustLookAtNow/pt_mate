@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/app_models.dart';
 import '../models/home_search_request.dart';
-import 'aggregate_search_strategy_list.dart';
 
 class HomeSearchDialog extends StatefulWidget {
   const HomeSearchDialog({
@@ -35,25 +35,17 @@ class HomeSearchDialog extends StatefulWidget {
 }
 
 class _HomeSearchDialogState extends State<HomeSearchDialog> {
-  static const double _categoryTileExtent = 56;
-
   late final TextEditingController _keywordController;
-  late final ScrollController _categoryScrollController;
   late HomeSearchMode _mode;
   late int _selectedCategoryIndex;
   late List<AggregateSearchConfig> _searchConfigs;
   String? _selectedStrategy;
   bool _isConfiguringAggregate = false;
-  bool _initialAlignmentScheduled = false;
-  bool _didAlignInitialSelection = false;
-  bool _hasInteractedWithCategories = false;
-  double? _lastAlignedViewportHeight;
 
   @override
   void initState() {
     super.initState();
     _keywordController = TextEditingController(text: widget.keyword);
-    _categoryScrollController = ScrollController();
     _mode = widget.initialMode;
     _selectedCategoryIndex = widget.selectedCategoryIndex;
     _updateSearchConfigs(widget.searchConfigs, widget.selectedStrategy);
@@ -73,10 +65,6 @@ class _HomeSearchDialogState extends State<HomeSearchDialog> {
                   _searchConfigs.firstOrNull)
               ?.id;
   }
-
-  bool get _hasValidCategorySelection =>
-      _selectedCategoryIndex >= 0 &&
-      _selectedCategoryIndex < widget.categories.length;
 
   bool get _canSubmit =>
       !_isConfiguringAggregate &&
@@ -125,103 +113,151 @@ class _HomeSearchDialogState extends State<HomeSearchDialog> {
     }
   }
 
-  void _scheduleCategoryAlignment(double expectedViewportHeight) {
-    if (_hasInteractedWithCategories || !_hasValidCategorySelection) return;
-    final viewportUnchanged =
-        _lastAlignedViewportHeight != null &&
-        (_lastAlignedViewportHeight! - expectedViewportHeight).abs() < 0.5;
-    if (_initialAlignmentScheduled ||
-        (_didAlignInitialSelection && viewportUnchanged)) {
-      return;
-    }
-    _initialAlignmentScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initialAlignmentScheduled = false;
-      if (!mounted ||
-          _hasInteractedWithCategories ||
-          !_hasValidCategorySelection ||
-          !_categoryScrollController.hasClients) {
-        return;
-      }
-      final position = _categoryScrollController.position;
-      final selectedItemCenter =
-          (_selectedCategoryIndex + 0.5) * _categoryTileExtent;
-      _categoryScrollController.jumpTo(
-        (selectedItemCenter - position.viewportDimension / 2).clamp(
-          position.minScrollExtent,
-          position.maxScrollExtent,
+  Widget _buildScopeOption({
+    required HomeSearchMode mode,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+  }) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final selected = _mode == mode;
+    final foreground = selected ? colors.primary : colors.onSurface;
+    return Expanded(
+      child: Semantics(
+        key: ValueKey('home-search-mode-${mode.name}'),
+        button: true,
+        selected: selected,
+        inMutuallyExclusiveGroup: true,
+        child: Material(
+          color: selected
+              ? colors.primary.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => setState(() => _mode = mode),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        selected ? Icons.radio_button_checked : icon,
+                        size: 20,
+                        color: foreground,
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: foreground,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: selected
+                          ? colors.primary
+                          : colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
-      );
-      _didAlignInitialSelection = true;
-      _lastAlignedViewportHeight = position.viewportDimension;
-    });
-  }
-
-  void _selectCategory(int index) {
-    _hasInteractedWithCategories = true;
-    setState(() => _selectedCategoryIndex = index);
-  }
-
-  Widget _buildCategories(BuildContext context) {
-    final availableHeight =
-        MediaQuery.sizeOf(context).height -
-        MediaQuery.viewInsetsOf(context).bottom;
-    final listHeight = math.min(
-      widget.categories.length * _categoryTileExtent,
-      (availableHeight * 0.32).clamp(96.0, 200.0),
+      ),
     );
-    _scheduleCategoryAlignment(listHeight);
+  }
+
+  Widget _buildChoices() {
+    final theme = Theme.of(context);
+    final currentSite = _mode == HomeSearchMode.currentSite;
+    if (currentSite && !widget.supportsCurrentSiteSearch) {
+      return const Text('当前站点不支持搜索，可切换到聚合搜索');
+    }
+    if (currentSite && !widget.supportsCategories) {
+      return const SizedBox.shrink();
+    }
+    final labels = currentSite
+        ? widget.categories.map((category) => category.displayName).toList()
+        : _searchConfigs.map((config) => config.name).toList();
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('选择分类', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        if (widget.categories.isEmpty)
-          const Text('暂无可用分类')
+        Text(currentSite ? '选择分类' : '搜索策略', style: theme.textTheme.titleSmall),
+        const SizedBox(height: 6),
+        Text(
+          currentSite ? '选择要搜索的资源分类' : '选择已配置的搜索策略',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (labels.isEmpty)
+          Text(currentSite ? '暂无可用分类' : '暂无可用策略')
         else
-          SizedBox(
-            height: listHeight,
-            child: Material(
-              key: const ValueKey('category-list-viewport'),
-              type: MaterialType.transparency,
-              clipBehavior: Clip.hardEdge,
-              child: NotificationListener<ScrollStartNotification>(
-                onNotification: (notification) {
-                  if (notification.dragDetails != null) {
-                    _hasInteractedWithCategories = true;
-                  }
-                  return false;
-                },
-                child: RadioGroup<int>(
-                  groupValue: _selectedCategoryIndex,
-                  onChanged: (value) {
-                    if (value != null) _selectCategory(value);
-                  },
-                  child: ListView.builder(
-                    controller: _categoryScrollController,
-                    itemExtent: _categoryTileExtent,
-                    itemCount: widget.categories.length,
-                    itemBuilder: (context, index) => ListTile(
-                      key: ValueKey('category-item-$index'),
-                      title: Text(
-                        widget.categories[index].displayName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      leading: Radio<int>(value: index),
-                      selected: index == _selectedCategoryIndex,
-                      selectedTileColor: Theme.of(context)
-                          .colorScheme
-                          .primaryContainer
-                          .withValues(alpha: 0.3),
-                      onTap: () => _selectCategory(index),
-                    ),
+          _SearchOptionGrid(
+            key: ValueKey(_mode),
+            labels: labels,
+            selectedIndex: currentSite
+                ? _selectedCategoryIndex
+                : _searchConfigs.indexWhere(
+                    (config) => config.id == _selectedStrategy,
                   ),
+            viewportKey: ValueKey(
+              currentSite
+                  ? 'category-list-viewport'
+                  : 'aggregate-search-strategy-list',
+            ),
+            itemKeys: [
+              for (var index = 0; index < labels.length; index++)
+                ValueKey(
+                  currentSite
+                      ? 'category-item-$index'
+                      : 'aggregate-search-strategy-${_searchConfigs[index].id}',
                 ),
-              ),
+            ],
+            onChanged: (index) => setState(() {
+              if (currentSite) {
+                _selectedCategoryIndex = index;
+              } else {
+                _selectedStrategy = _searchConfigs[index].id;
+              }
+            }),
+          ),
+        if (!currentSite) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              key: const ValueKey('aggregate-search-settings-button'),
+              onPressed:
+                  widget.onConfigureAggregate == null || _isConfiguringAggregate
+                  ? null
+                  : _configureAggregate,
+              icon: _isConfiguringAggregate
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.settings_outlined, size: 18),
+              label: const Text('聚合搜索设置'),
             ),
           ),
+        ],
       ],
     );
   }
@@ -229,115 +265,361 @@ class _HomeSearchDialogState extends State<HomeSearchDialog> {
   @override
   void dispose() {
     _keywordController.dispose();
-    _categoryScrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final dialogWidth = math.min(MediaQuery.sizeOf(context).width * 0.8, 440.0);
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final dialogWidth = math.min(MediaQuery.sizeOf(context).width - 48, 640.0);
     return AlertDialog(
       key: const ValueKey('home-search-dialog'),
       scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       constraints: BoxConstraints(minWidth: dialogWidth, maxWidth: dialogWidth),
-      title: const Text('搜索'),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      title: const Text('分类筛选'),
       content: SizedBox(
-        width: double.maxFinite,
+        width: dialogWidth - 48,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('搜索关键词', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
+            Text('搜索范围', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 10),
+            Container(
+              key: const ValueKey('home-search-mode-selector'),
+              decoration: BoxDecoration(
+                border: Border.all(color: colors.outlineVariant),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildScopeOption(
+                      mode: HomeSearchMode.currentSite,
+                      title: '当前站点',
+                      subtitle: '仅在当前站点搜索',
+                      icon: Icons.dns_outlined,
+                    ),
+                    _buildScopeOption(
+                      mode: HomeSearchMode.aggregate,
+                      title: '全站搜索',
+                      subtitle: '按所选策略跨站搜索',
+                      icon: Icons.public_outlined,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildChoices(),
+            const SizedBox(height: 24),
+            Text('搜索关键词', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 10),
             TextField(
               key: const ValueKey('search-keyword-field'),
               controller: _keywordController,
-              autofocus: true,
               textInputAction: TextInputAction.search,
               onTapOutside: (_) => FocusScope.of(context).unfocus(),
               onSubmitted: (_) => _submit(),
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 hintText: '输入关键词（可选）',
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<HomeSearchMode>(
-                key: const ValueKey('home-search-mode-selector'),
-                segments: const [
-                  ButtonSegment(
-                    value: HomeSearchMode.currentSite,
-                    label: Text('当前站点'),
-                  ),
-                  ButtonSegment(
-                    value: HomeSearchMode.aggregate,
-                    label: Text('聚合搜索'),
-                  ),
-                ],
-                selected: {_mode},
-                showSelectedIcon: false,
-                onSelectionChanged: (selection) {
-                  setState(() {
-                    _mode = selection.single;
-                    _didAlignInitialSelection = false;
-                  });
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (_mode == HomeSearchMode.currentSite) ...[
-              if (!widget.supportsCurrentSiteSearch)
-                const Text('当前站点不支持搜索，可切换到聚合搜索')
-              else if (widget.supportsCategories)
-                _buildCategories(context),
-            ] else ...[
-              Text('搜索策略', style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
-              AggregateSearchStrategyList(
-                configs: _searchConfigs,
-                selectedStrategy: _selectedStrategy,
-                onChanged: (strategy) {
-                  setState(() => _selectedStrategy = strategy);
-                },
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  key: const ValueKey('aggregate-search-settings-button'),
-                  onPressed:
-                      widget.onConfigureAggregate == null ||
-                          _isConfiguringAggregate
-                      ? null
-                      : _configureAggregate,
-                  icon: _isConfiguringAggregate
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.settings_outlined, size: 18),
-                  label: const Text('聚合搜索设置'),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 18,
                 ),
               ),
-            ],
+            ),
           ],
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(
+            side: BorderSide(color: colors.outline),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
           child: const Text('取消'),
         ),
         FilledButton(
           key: const ValueKey('home-search-submit-button'),
           onPressed: _canSubmit ? _submit : null,
-          child: const Text('搜索'),
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
+          child: const Text('确定'),
         ),
       ],
+    );
+  }
+}
+
+/// The home dialog has its own grid so other search pages keep their layout.
+class _SearchOptionGrid extends StatefulWidget {
+  const _SearchOptionGrid({
+    super.key,
+    required this.labels,
+    required this.itemKeys,
+    required this.selectedIndex,
+    required this.viewportKey,
+    required this.onChanged,
+  });
+
+  final List<String> labels;
+  final List<Key> itemKeys;
+  final int selectedIndex;
+  final Key viewportKey;
+  final ValueChanged<int> onChanged;
+
+  @override
+  State<_SearchOptionGrid> createState() => _SearchOptionGridState();
+}
+
+class _SearchOptionGridState extends State<_SearchOptionGrid> {
+  final _scrollController = ScrollController();
+  bool _alignmentScheduled = false;
+  bool _hasInteracted = false;
+  (int, double, double)? _alignedLayout;
+
+  void _scheduleAlignment(int columns, double tileHeight, double height) {
+    final layout = (columns, tileHeight, height);
+    if (_hasInteracted || _alignmentScheduled || _alignedLayout == layout) {
+      return;
+    }
+    _alignmentScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _alignmentScheduled = false;
+      if (!mounted ||
+          _hasInteracted ||
+          !_scrollController.hasClients ||
+          widget.selectedIndex < 0 ||
+          widget.selectedIndex >= widget.labels.length) {
+        return;
+      }
+      final position = _scrollController.position;
+      final row = widget.selectedIndex ~/ columns;
+      final itemCenter = 4 + row * (tileHeight + 10) + tileHeight / 2;
+      _scrollController.jumpTo(
+        (itemCenter - position.viewportDimension / 2).clamp(
+          position.minScrollExtent,
+          position.maxScrollExtent,
+        ),
+      );
+      _alignedLayout = layout;
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _SearchOptionGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!listEquals(oldWidget.itemKeys, widget.itemKeys)) {
+      _hasInteracted = false;
+      _alignedLayout = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final fontSize = theme.textTheme.bodyMedium?.fontSize ?? 14;
+    final scaledFontSize = MediaQuery.textScalerOf(context).scale(fontSize);
+    final tileHeight = math.max(56.0, scaledFontSize * 2.8 + 16);
+    final availableHeight =
+        MediaQuery.sizeOf(context).height -
+        MediaQuery.viewInsetsOf(context).bottom;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns =
+            ((constraints.maxWidth - 8 + 10) /
+                    (86 * (scaledFontSize / fontSize) + 10))
+                .floor()
+                .clamp(2, 6);
+        final rows = (widget.labels.length / columns).ceil();
+        final height = math.min(
+          rows * (tileHeight + 10) - 10 + 8,
+          (availableHeight * 0.32)
+              .clamp(tileHeight + 8, math.max(200.0, tileHeight + 8))
+              .toDouble(),
+        );
+        _scheduleAlignment(columns, tileHeight, height);
+        return SizedBox(
+          height: height,
+          child: Material(
+            key: widget.viewportKey,
+            type: MaterialType.transparency,
+            clipBehavior: Clip.hardEdge,
+            child: NotificationListener<ScrollStartNotification>(
+              onNotification: (notification) {
+                if (notification.dragDetails != null) _hasInteracted = true;
+                return false;
+              },
+              child: GridView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.all(4),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  mainAxisExtent: tileHeight,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                itemCount: widget.labels.length,
+                itemBuilder: (context, index) {
+                  final selected = index == widget.selectedIndex;
+                  final borderRadius = BorderRadius.circular(12);
+                  return Tooltip(
+                    message: widget.labels[index],
+                    excludeFromSemantics: true,
+                    child: Semantics(
+                      key: widget.itemKeys[index],
+                      button: true,
+                      selected: selected,
+                      inMutuallyExclusiveGroup: true,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        clipBehavior: Clip.none,
+                        children: [
+                          Material(
+                            color: selected
+                                ? colors.primary.withValues(alpha: 0.12)
+                                : Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: borderRadius,
+                              side: BorderSide(
+                                color: selected
+                                    ? colors.primary.withValues(alpha: 0.35)
+                                    : colors.outlineVariant,
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              borderRadius: borderRadius,
+                              onTap: () {
+                                _hasInteracted = true;
+                                widget.onChanged(index);
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(8),
+                                child: _SearchOptionLabel(
+                                  label: widget.labels[index],
+                                  style: theme.textTheme.bodyMedium!.copyWith(
+                                    color: selected
+                                        ? colors.primary
+                                        : colors.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (selected)
+                            Positioned(
+                              top: -4,
+                              right: -4,
+                              child: IgnorePointer(
+                                child: ExcludeSemantics(
+                                  child: DecoratedBox(
+                                    key: const ValueKey(
+                                      'home-search-selection-marker',
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: colors.primary,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: colors.surface,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(2),
+                                      child: Icon(
+                                        Icons.check_rounded,
+                                        size: 10,
+                                        color: colors.onPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Fit names into two lines without taking space away for the selection marker.
+class _SearchOptionLabel extends StatelessWidget {
+  const _SearchOptionLabel({required this.label, required this.style});
+
+  final String label;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    final textScaler = MediaQuery.textScalerOf(context);
+    final textDirection = Directionality.of(context);
+    final locale = Localizations.maybeLocaleOf(context);
+    final baseFontSize = style.fontSize ?? 14;
+    final minFontSize = math.max(10.0, baseFontSize * 0.75);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        var fontSize = baseFontSize;
+        final painter = TextPainter(
+          maxLines: 2,
+          textDirection: textDirection,
+          textScaler: textScaler,
+          locale: locale,
+        );
+        while (true) {
+          painter.text = TextSpan(
+            text: label,
+            style: style.copyWith(fontSize: fontSize, height: 1.25),
+          );
+          painter.layout(maxWidth: constraints.maxWidth);
+          if ((!painter.didExceedMaxLines &&
+                  painter.height <= constraints.maxHeight) ||
+              fontSize <= minFontSize) {
+            break;
+          }
+          fontSize = math.max(minFontSize, fontSize - 0.5);
+        }
+        painter.dispose();
+        return Center(
+          child: Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            textScaler: textScaler,
+            locale: locale,
+            style: style.copyWith(fontSize: fontSize, height: 1.25),
+          ),
+        );
+      },
     );
   }
 }

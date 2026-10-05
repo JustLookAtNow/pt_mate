@@ -1,10 +1,64 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pt_mate/models/app_models.dart';
 import 'package:pt_mate/models/home_search_request.dart';
 import 'package:pt_mate/widgets/home_search_dialog.dart';
 
 void main() {
+  testWidgets(
+    'opens with the current site selected on the left without focusing keyword',
+    (tester) async {
+      await _openDialog(tester);
+
+      expect(find.text('分类筛选'), findsOneWidget);
+      expect(find.text('确定'), findsOneWidget);
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(
+        tester.getTopLeft(find.text('当前站点')).dx,
+        lessThan(tester.getTopLeft(find.text('全站搜索')).dx),
+      );
+      final scope = tester.getRect(
+        find.byKey(const ValueKey('home-search-mode-selector')),
+      );
+      final categories = tester.getRect(
+        find.byKey(const ValueKey('category-list-viewport')),
+      );
+      final keyword = tester.getRect(
+        find.byKey(const ValueKey('search-keyword-field')),
+      );
+      expect(scope.bottom, lessThan(categories.top));
+      expect(categories.bottom, lessThan(keyword.top));
+      expect(
+        tester
+            .widget<Semantics>(find.byKey(const ValueKey('category-item-0')))
+            .properties
+            .selected,
+        isTrue,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('category-item-2')));
+      await tester.pump();
+      expect(
+        tester
+            .widget<Semantics>(find.byKey(const ValueKey('category-item-0')))
+            .properties
+            .selected,
+        isFalse,
+      );
+      expect(
+        tester
+            .widget<Semantics>(find.byKey(const ValueKey('category-item-2')))
+            .properties
+            .selected,
+        isTrue,
+      );
+      await tester.tap(find.byKey(const ValueKey('search-keyword-field')));
+      await tester.pump();
+      expect(tester.testTextInput.isVisible, isTrue);
+    },
+  );
+
   testWidgets('submits the current site category and keyword', (tester) async {
     HomeSearchRequest? result;
     await _openDialog(tester, onResult: (value) => result = value);
@@ -41,8 +95,8 @@ void main() {
       find.byKey(const ValueKey('search-keyword-field')),
       '新关键词',
     );
-    await tester.tap(find.text('聚合搜索'));
-    await tester.pump();
+    await tester.tap(find.text('全站搜索'));
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('aggregate-search-strategy-movies')),
     );
@@ -75,8 +129,8 @@ void main() {
       },
     );
     await tester.tap(find.byKey(const ValueKey('category-item-2')));
-    await tester.tap(find.text('聚合搜索'));
-    await tester.pump();
+    await tester.tap(find.text('全站搜索'));
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('aggregate-search-strategy-movies')),
     );
@@ -93,8 +147,8 @@ void main() {
     HomeSearchRequest? result;
     await _openDialog(tester, onResult: (value) => result = value);
     await tester.tap(find.byKey(const ValueKey('category-item-2')));
-    await tester.tap(find.text('聚合搜索'));
-    await tester.pump();
+    await tester.tap(find.text('全站搜索'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('当前站点'));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('home-search-submit-button')));
@@ -113,6 +167,8 @@ void main() {
       initialMode: HomeSearchMode.aggregate,
       onResult: (value) => result = value,
     );
+    await tester.tap(find.byKey(const ValueKey('search-keyword-field')));
+    await tester.pump();
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
 
@@ -131,9 +187,10 @@ void main() {
     );
     expect(
       tester
-          .widget<ListTile>(
+          .widget<Semantics>(
             find.byKey(const ValueKey('aggregate-search-strategy-movies')),
           )
+          .properties
           .selected,
       isTrue,
     );
@@ -168,6 +225,8 @@ void main() {
             .onPressed,
         isNull,
       );
+      await tester.tap(find.byKey(const ValueKey('search-keyword-field')));
+      await tester.pump();
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pump();
       expect(find.byKey(const ValueKey('home-search-dialog')), findsOneWidget);
@@ -180,9 +239,10 @@ void main() {
       expect(find.text('暂无可用策略'), findsNothing);
       expect(
         tester
-            .widget<ListTile>(
+            .widget<Semantics>(
               find.byKey(const ValueKey('aggregate-search-strategy-all-sites')),
             )
+            .properties
             .selected,
         isTrue,
       );
@@ -210,8 +270,8 @@ void main() {
           .onPressed,
       isNull,
     );
-    await tester.tap(find.text('聚合搜索'));
-    await tester.pump();
+    await tester.tap(find.text('全站搜索'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('home-search-submit-button')));
     await tester.pumpAndSettle();
     expect(result?.mode, HomeSearchMode.aggregate);
@@ -231,6 +291,286 @@ void main() {
     await tester.pumpAndSettle();
     expect(result?.categoryIndex, isNull);
   });
+
+  testWidgets('preserves the selected strategy when switching modes', (
+    tester,
+  ) async {
+    HomeSearchRequest? result;
+    await _openDialog(
+      tester,
+      initialMode: HomeSearchMode.aggregate,
+      onResult: (value) => result = value,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('aggregate-search-strategy-movies')),
+    );
+    await tester.tap(find.text('当前站点'));
+    await tester.pump();
+    await tester.tap(find.text('全站搜索'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<Semantics>(
+            find.byKey(const ValueKey('aggregate-search-strategy-movies')),
+          )
+          .properties
+          .selected,
+      isTrue,
+    );
+    await tester.tap(find.byKey(const ValueKey('home-search-submit-button')));
+    await tester.pumpAndSettle();
+    expect(result?.strategyId, 'movies');
+  });
+
+  testWidgets('empty categories still allow searching the current site', (
+    tester,
+  ) async {
+    HomeSearchRequest? result;
+    await _openDialog(
+      tester,
+      categories: const [],
+      onResult: (value) => result = value,
+    );
+    expect(find.text('暂无可用分类'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('home-search-submit-button')));
+    await tester.pumpAndSettle();
+    expect(result?.mode, HomeSearchMode.currentSite);
+  });
+
+  for (final mode in HomeSearchMode.values) {
+    for (final scenario in [
+      (name: 'mobile', size: const Size(393, 852), scale: 1.0, columns: 3),
+      (name: 'narrow', size: const Size(320, 640), scale: 1.0, columns: 2),
+      (name: 'desktop', size: const Size(1280, 720), scale: 1.0, columns: 6),
+      (name: 'landscape', size: const Size(640, 360), scale: 1.0, columns: 5),
+      (name: 'large text', size: const Size(393, 852), scale: 2.0, columns: 2),
+    ]) {
+      testWidgets('${mode.name} grid adapts to ${scenario.name}', (
+        tester,
+      ) async {
+        tester.view.physicalSize = scenario.size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await _openDialog(
+          tester,
+          initialMode: mode,
+          textScale: scenario.scale,
+          categories: List.generate(
+            20,
+            (index) => SearchCategoryConfig(
+              id: '$index',
+              displayName: '这是一个很长的分类名称 $index',
+              parameters: '{}',
+            ),
+          ),
+          selectedCategoryIndex: 12,
+          searchConfigs: List.generate(
+            20,
+            (index) => AggregateSearchConfig(
+              id: 'strategy-$index',
+              name: '这是一个很长的搜索策略名称 $index',
+            ),
+          ),
+          selectedStrategy: 'strategy-12',
+        );
+        expect(tester.takeException(), isNull);
+        final grid = tester.widget<GridView>(find.byType(GridView));
+        expect(
+          (grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount)
+              .crossAxisCount,
+          scenario.columns,
+        );
+        final selected = find.byKey(
+          ValueKey(
+            mode == HomeSearchMode.currentSite
+                ? 'category-item-12'
+                : 'aggregate-search-strategy-strategy-12',
+          ),
+        );
+        final viewportFinder = find.byKey(
+          ValueKey(
+            mode == HomeSearchMode.currentSite
+                ? 'category-list-viewport'
+                : 'aggregate-search-strategy-list',
+          ),
+        );
+        final viewport = tester.getRect(viewportFinder);
+        expect(viewport.contains(tester.getCenter(selected)), isTrue);
+        // Scroll the dialog to the grid without moving the grid's own selection.
+        await tester.ensureVisible(viewportFinder);
+        await tester.pumpAndSettle();
+        expect(selected.hitTestable(), findsOneWidget);
+        final submit = find.byKey(const ValueKey('home-search-submit-button'));
+        expect(submit.hitTestable(), findsOneWidget);
+        expect(
+          tester.getRect(submit).bottom,
+          lessThanOrEqualTo(scenario.size.height),
+        );
+      });
+    }
+  }
+
+  for (final mode in HomeSearchMode.values) {
+    for (final scenario in [
+      (name: 'mobile', size: const Size(393, 852), scale: 1.0),
+      (name: 'desktop', size: const Size(1280, 720), scale: 1.0),
+      (name: 'large text', size: const Size(393, 852), scale: 2.0),
+    ]) {
+      testWidgets(
+        '${mode.name} fits names and keeps a compact corner marker on ${scenario.name}',
+        (tester) async {
+          tester.view.physicalSize = scenario.size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          const names = ['电影', '高清电影库', '高清电影资源', '电影电视剧合集', 'M-Team高清资源'];
+          await _openDialog(
+            tester,
+            initialMode: mode,
+            textScale: scenario.scale,
+            categories: [
+              for (var index = 0; index < names.length; index++)
+                SearchCategoryConfig(
+                  id: '$index',
+                  displayName: names[index],
+                  parameters: '{}',
+                ),
+            ],
+            selectedCategoryIndex: 3,
+            searchConfigs: [
+              for (var index = 0; index < names.length; index++)
+                AggregateSearchConfig(
+                  id: 'strategy-$index',
+                  name: names[index],
+                ),
+            ],
+            selectedStrategy: 'strategy-3',
+          );
+          final shortSize = tester
+              .widget<Text>(find.text(names.first))
+              .style!
+              .fontSize!;
+          for (var index = 0; index < names.length; index++) {
+            final name = names[index];
+            final text = find.text(name);
+            final item = find.byKey(
+              ValueKey(
+                mode == HomeSearchMode.currentSite
+                    ? 'category-item-$index'
+                    : 'aggregate-search-strategy-strategy-$index',
+              ),
+            );
+            expect(
+              tester.getCenter(text).dy,
+              closeTo(tester.getCenter(item).dy, 0.1),
+              reason:
+                  'The single or two line label must be vertically centered: $name',
+            );
+            final paragraph = tester.renderObject<RenderParagraph>(text);
+            expect(paragraph.didExceedMaxLines, isFalse, reason: name);
+            expect(tester.widget<Text>(text).maxLines, 2);
+            expect(
+              tester.widget<Text>(text).style!.fontSize!,
+              lessThanOrEqualTo(shortSize),
+            );
+          }
+          final longText = find.text(names[3]);
+          final beforeSize = tester.widget<Text>(longText).style!.fontSize!;
+          expect(
+            tester.widget<Text>(find.text(names.last)).style!.fontSize!,
+            lessThan(shortSize),
+          );
+          final selected = find.byKey(
+            ValueKey(
+              mode == HomeSearchMode.currentSite
+                  ? 'category-item-3'
+                  : 'aggregate-search-strategy-strategy-3',
+            ),
+          );
+          final tileRect = tester.getRect(selected);
+          final marker = find.byKey(
+            const ValueKey('home-search-selection-marker'),
+          );
+          final markerRect = tester.getRect(marker);
+          expect(markerRect.width, lessThanOrEqualTo(14));
+          expect(tileRect.right - markerRect.right, closeTo(-4, 0.1));
+          expect(markerRect.top - tileRect.top, closeTo(-4, 0.1));
+          // The marker floats on the border without shifting the text.
+          expect(
+            tester.getCenter(longText).dy,
+            closeTo(tester.getCenter(selected).dy, 0.1),
+          );
+          // Bring both the first row and the selected row into view before tapping.
+          tester.widget<GridView>(find.byType(GridView)).controller!.jumpTo(0);
+          final viewportFinder = find.byKey(
+            ValueKey(
+              mode == HomeSearchMode.currentSite
+                  ? 'category-list-viewport'
+                  : 'aggregate-search-strategy-list',
+            ),
+          );
+          await tester.ensureVisible(viewportFinder);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(names.first));
+          await tester.pump();
+          expect(tester.widget<Text>(longText).style!.fontSize, beforeSize);
+          expect(
+            tester.getCenter(longText).dy,
+            closeTo(tester.getCenter(selected).dy, 0.1),
+          );
+          final shortItem = find.byKey(
+            ValueKey(
+              mode == HomeSearchMode.currentSite
+                  ? 'category-item-0'
+                  : 'aggregate-search-strategy-strategy-0',
+            ),
+          );
+          expect(
+            tester.widget<Semantics>(shortItem).properties.selected,
+            isTrue,
+          );
+          expect(
+            tester.getCenter(find.text(names.first)).dy,
+            closeTo(tester.getCenter(shortItem).dy, 0.1),
+          );
+          expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  for (final brightness in Brightness.values) {
+    for (final mode in HomeSearchMode.values) {
+      testWidgets('${mode.name} uses the ${brightness.name} theme', (
+        tester,
+      ) async {
+        final theme = ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.deepPurple,
+            brightness: brightness,
+          ),
+        );
+        await _openDialog(tester, initialMode: mode, theme: theme);
+        final selected = find.byKey(
+          ValueKey(
+            mode == HomeSearchMode.currentSite
+                ? 'category-item-0'
+                : 'aggregate-search-strategy-all-sites',
+          ),
+        );
+        final material = tester.widget<Material>(
+          find.descendant(of: selected, matching: find.byType(Material)).first,
+        );
+        expect(
+          material.color,
+          theme.colorScheme.primary.withValues(alpha: 0.12),
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   testWidgets(
     'keeps a long selection visible on a narrow screen with keyboard',
@@ -292,6 +632,8 @@ Future<void> _openDialog(
   HomeSearchMode initialMode = HomeSearchMode.currentSite,
   List<AggregateSearchConfig> searchConfigs = _configs,
   String? selectedStrategy,
+  double textScale = 1,
+  ThemeData? theme,
   bool supportsCurrentSiteSearch = true,
   bool supportsCategories = true,
   Future<List<AggregateSearchConfig>?> Function()? onConfigureAggregate,
@@ -299,6 +641,12 @@ Future<void> _openDialog(
 }) async {
   await tester.pumpWidget(
     MaterialApp(
+      theme: theme,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       home: Scaffold(
         body: Builder(
           builder: (context) => TextButton(

@@ -76,7 +76,7 @@ void main() {
           .isNotEmpty,
     );
     await tester.tap(find.byKey(const ValueKey('category-item-1')));
-    await tester.tap(find.widgetWithText(FilledButton, '搜索'));
+    await tester.tap(find.byKey(const ValueKey('home-search-submit-button')));
     await _pumpUntil(tester, () => search.invocations.length == 2);
 
     expect(search.invocations.last.additionalParams, {'category': 'second'});
@@ -220,6 +220,32 @@ void main() {
       findsNothing,
     );
 
+    await tester.tap(find.byKey(const ValueKey('home-search-fab')));
+    await tester.pumpAndSettle();
+    expect(find.text('选择分类'), findsOneWidget);
+    expect(
+      tester
+          .widget<Semantics>(
+            find.byKey(const ValueKey('home-search-mode-currentSite')),
+          )
+          .properties
+          .selected,
+      isTrue,
+    );
+    expect(
+      tester
+          .widget<Semantics>(
+            find.byKey(const ValueKey('home-search-mode-aggregate')),
+          )
+          .properties
+          .selected,
+      isFalse,
+    );
+    await tester.tap(find.widgetWithText(TextButton, '取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('聚合结果'), findsOneWidget);
+    expect(aggregate.invocations, hasLength(1));
+
     await tester.tap(find.text('返回当前站点'));
     await tester.pumpAndSettle();
     expect(find.text('聚合搜索 - PT Mate'), findsNothing);
@@ -320,7 +346,7 @@ void main() {
           .isNotEmpty,
     );
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('聚合搜索'));
+    await tester.tap(find.text('全站搜索'));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('home-search-submit-button')));
     await _pumpUntil(tester, () => aggregate.invocations.isNotEmpty);
@@ -372,7 +398,7 @@ Future<void> _finishNotifications(WidgetTester tester) async {
 Future<void> _openAggregateDialog(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('home-search-fab')));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('聚合搜索'));
+  await tester.tap(find.text('全站搜索'));
   await tester.pumpAndSettle();
 }
 

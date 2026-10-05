@@ -2725,7 +2725,7 @@ class _HomePageState extends State<HomePage> {
           keyword: _isAggregateMode
               ? _aggregateRequest!.keyword
               : _keywordCtrl.text,
-          initialMode: _searchMode,
+          initialMode: HomeSearchMode.currentSite,
           searchConfigs: configs,
           selectedStrategy: provider.selectedStrategy,
           supportsCurrentSiteSearch:
