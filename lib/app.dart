@@ -2149,9 +2149,9 @@ class _HomePageState extends State<HomePage> {
                   PopupMenuButton<String>(
                     onSelected: _onSortSelected,
                     icon: Icon(
-                      _sortBy == 'none' ? Icons.sort : Icons.sort,
+                      Icons.sort,
                       color: _sortBy == 'none'
-                          ? null
+                          ? Theme.of(context).colorScheme.primary
                           : Theme.of(context).colorScheme.secondary,
                     ),
                     tooltip: '排序',
