@@ -34,6 +34,12 @@ jobs:
       - name: Get Java Version
         run: echo "JAVA_VERSION=$(java -XshowSettings:properties -version 2>&1 | grep 'java.runtime.version' | awk '{print $3}')" >> $GITHUB_ENV
 
+      - name: Setup Android SDK API 37
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK API 37
+        run: sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0"
+
       - name: Setup Flutter (cached)
         id: cache_flutter_linux
         uses: subosito/flutter-action@v2
@@ -58,10 +64,9 @@ jobs:
             ${{ runner.os }}-pub-cache-
 
       - name: Get dependencies
-        run: |
-          # 如果 pubspec.lock 未变化，actions/cache 会命中，跳过更新
-          # 但需要执行一次 pub get 以确保缓存目录结构存在
-          flutter pub get
+        # 如果 pubspec.lock 未变化，actions/cache 会命中，跳过更新
+        # 但需要执行一次 pub get 以确保缓存目录结构存在
+        uses: ./.github/actions/pub-get
 
       - name: Cache Gradle
         id: cache_gradle_linux
@@ -168,8 +173,7 @@ jobs:
             ${{ runner.os }}-pub-cache-
 
       - name: Get dependencies
-        run: |
-          flutter pub get
+        uses: ./.github/actions/pub-get
 
       - name: Cache Visual Studio
         id: cache_vs_windows
@@ -194,7 +198,7 @@ jobs:
 
   warm-caches-macos:
     name: Warm caches (macOS)
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -206,6 +210,17 @@ jobs:
           version="$(tr -d '[:space:]' < .flutter-version)"
           test -n "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Select and verify Xcode 26 with iOS SDK 26
+        shell: bash
+        run: |
+          xcode_app="$(find /Applications -maxdepth 1 -type d -name 'Xcode_26*.app' -print | sort -V | tail -1)"
+          test -n "$xcode_app"
+          sudo xcode-select --switch "$xcode_app/Contents/Developer"
+          xcode_version="$(xcodebuild -version | awk '/^Xcode / { print $2 }')"
+          ios_sdk_version="$(xcrun --sdk iphoneos --show-sdk-version)"
+          case "$xcode_version" in 26.*) ;; *) exit 1 ;; esac
+          case "$ios_sdk_version" in 26.*) ;; *) exit 1 ;; esac
 
       - name: Setup Flutter (cached)
         id: cache_flutter_macos
@@ -231,8 +246,7 @@ jobs:
             ${{ runner.os }}-pub-cache-
 
       - name: Get dependencies
-        run: |
-          flutter pub get
+        uses: ./.github/actions/pub-get
 
       - name: Cache CocoaPods
         id: cache_pods_macos

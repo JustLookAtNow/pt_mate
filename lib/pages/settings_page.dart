@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
@@ -17,8 +18,8 @@ import 'aggregate_search_settings_page.dart';
 import 'downloader_settings_page.dart';
 import 'network_settings_page.dart';
 import 'cookie_cloud_page.dart';
-import '../services/update_service.dart';
 import '../services/debug/web_debug_service.dart';
+
 import 'package:pt_mate/utils/notification_helper.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -65,6 +66,32 @@ class _SecureFallbackConflictWarning extends StatelessWidget {
   }
 }
 
+class _AndroidPlaintextStorageWarning extends StatelessWidget {
+  const _AndroidPlaintextStorageWarning();
+
+  @override
+  Widget build(BuildContext context) {
+    if (StorageService.instance.secureStorageProfile !=
+        SecureStorageProfile.androidPlaintextFallback) {
+      return const SizedBox.shrink();
+    }
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Card(
+        color: colors.errorContainer,
+        child: ListTile(
+          leading: Icon(Icons.warning_amber_rounded, color: colors.error),
+          title: const Text('Android 明文凭据存储'),
+          subtitle: const Text(
+            '此设备不支持 OAEP+GCM 安全存储。Cookie、API Key 和密码正以明文保存在仅限本应用的本地存储中，请勿导出或共享应用数据。',
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // 查询分类配置已移至站点配置中，请在服务器设置页面进行配置
 
 class _SettingsBody extends StatelessWidget {
@@ -75,6 +102,7 @@ class _SettingsBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        const _AndroidPlaintextStorageWarning(),
         const _SecureFallbackConflictWarning(),
         // 主题设置
         Text('主题设置', style: Theme.of(context).textTheme.titleMedium),
@@ -158,18 +186,24 @@ class _SettingsBody extends StatelessWidget {
         Text('下载器设置', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Card(
-          child: ListTile(
-            leading: const Icon(Icons.download_outlined),
-            title: const Text('下载器配置'),
-            subtitle: const Text('管理跟配置所有下载器'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const DownloaderSettingsPage(),
-                ),
-              );
-            },
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.download_outlined),
+                title: const Text('下载器配置'),
+                subtitle: const Text('管理跟配置所有下载器'),
+                trailing: const Icon(Icons.arrow_forward_ios),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const DownloaderSettingsPage(),
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              const _AutoAddSiteTagTile(),
+            ],
           ),
         ),
         const SizedBox(height: 16),
@@ -294,12 +328,6 @@ class _SettingsBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        // 更新设置
-        Text('更新设置', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        const _BetaUpdateTile(),
-        const SizedBox(height: 16),
-
         // 查询条件配置已移至站点配置中，可在站点配置页面管理
         // 日志与诊断（底部）
         const SizedBox(height: 8),
@@ -419,67 +447,6 @@ class _WebDebugToggleTileState extends State<_WebDebugToggleTile> {
           : const Text('启用后在局域网使用浏览器访问来调试网站配置'),
       value: _enabled && WebDebugService.instance.isRunning,
       onChanged: _toggle,
-    );
-  }
-}
-
-class _BetaUpdateTile extends StatefulWidget {
-  const _BetaUpdateTile();
-
-  @override
-  State<_BetaUpdateTile> createState() => _BetaUpdateTileState();
-}
-
-class _BetaUpdateTileState extends State<_BetaUpdateTile> {
-  bool _enabled = false;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final v = await UpdateService.instance.isBetaOptInEnabled();
-    if (!mounted) return;
-    setState(() {
-      _enabled = v;
-      _loading = false;
-    });
-  }
-
-  Future<void> _set(bool value) async {
-    setState(() {
-      _enabled = value;
-    });
-    await UpdateService.instance.setBetaOptIn(value);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const Card(
-        child: ListTile(
-          leading: SizedBox(
-            height: 24,
-            width: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          title: Text('尝鲜（接收 Beta 版本更新）'),
-          subtitle: Text('正在加载当前设置…'),
-        ),
-      );
-    }
-
-    return Card(
-      child: SwitchListTile(
-        secondary: const Icon(Icons.new_releases),
-        title: const Text('尝鲜（接收 Beta 版本更新）'),
-        subtitle: const Text('默认仅接收稳定版本；开启后可接收 Beta/RC 等预发布版本更新'),
-        value: _enabled,
-        onChanged: _set,
-      ),
     );
   }
 }
@@ -1038,6 +1005,72 @@ class _AutoLoadImagesTileState extends State<_AutoLoadImagesTile> {
   }
 }
 
+class _AutoAddSiteTagTile extends StatefulWidget {
+  const _AutoAddSiteTagTile();
+
+  @override
+  State<_AutoAddSiteTagTile> createState() => _AutoAddSiteTagTileState();
+}
+
+class _AutoAddSiteTagTileState extends State<_AutoAddSiteTagTile> {
+  bool _enabled = false;
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSetting();
+  }
+
+  Future<void> _loadSetting() async {
+    try {
+      final storage = Provider.of<StorageService>(context, listen: false);
+      final enabled = await storage.loadAutoAddSiteTag();
+      if (mounted) {
+        setState(() {
+          _enabled = enabled;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        NotificationHelper.showError(context, '加载自动站点标签设置失败：$e');
+      }
+    }
+  }
+
+  Future<void> _saveSetting(bool enabled) async {
+    setState(() => _saving = true);
+    try {
+      final storage = Provider.of<StorageService>(context, listen: false);
+      await storage.saveAutoAddSiteTag(enabled);
+      if (mounted) {
+        setState(() => _enabled = enabled);
+      }
+    } catch (e) {
+      if (mounted) {
+        NotificationHelper.showError(context, '保存自动站点标签设置失败：$e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.sell_outlined),
+      title: const Text('自动添加站点标签'),
+      subtitle: const Text('添加下载任务时自动附加“站点/站点名称”标签，不支持标签的下载器会忽略此设置。'),
+      value: _enabled,
+      onChanged: _loading || _saving ? null : _saveSetting,
+    );
+  }
+}
+
 class _ShowCoverImagesTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -1087,31 +1120,39 @@ class _DisplayTagSettingsTile extends StatefulWidget {
 
 class _DisplayTagSettingsTileState extends State<_DisplayTagSettingsTile> {
   bool _expanded = false;
-  List<String> _visibleTags = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _visibleTags = List.from(StorageService.instance.visibleTags);
-  }
+  bool _saving = false;
 
   Future<void> _toggleTag(String tagName) async {
+    final settings = context.read<DisplaySettingsManager>();
+    final visibleTags = Set<String>.of(settings.visibleTags);
+    if (!visibleTags.remove(tagName)) {
+      visibleTags.add(tagName);
+    }
     setState(() {
-      if (_visibleTags.contains(tagName)) {
-        _visibleTags.remove(tagName);
-      } else {
-        _visibleTags.add(tagName);
-      }
+      _saving = true;
     });
-    await StorageService.instance.saveVisibleTags(_visibleTags);
+    try {
+      await settings.setVisibleTags(visibleTags);
+    } catch (e) {
+      if (mounted) {
+        NotificationHelper.showError(context, '保存标签展示设置失败：$e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<DisplaySettingsManager>();
     return ExpansionTile(
       leading: const Icon(Icons.label_outline),
       title: const Text('过滤标签设置'),
-      subtitle: const Text('设置显示在顶部的快捷过滤标签'),
+      subtitle: const Text('设置顶部快捷过滤和列表项中显示的标签'),
       initiallyExpanded: _expanded,
       onExpansionChanged: (value) {
         setState(() {
@@ -1125,13 +1166,15 @@ class _DisplayTagSettingsTileState extends State<_DisplayTagSettingsTile> {
             spacing: 8,
             runSpacing: 8,
             children: TagType.values.map((tag) {
-              final isSelected = _visibleTags.contains(tag.name);
+              final isSelected = settings.visibleTags.contains(tag.name);
               return FilterChip(
                 label: Text(tag.content),
                 selected: isSelected,
-                onSelected: (bool selected) {
-                  _toggleTag(tag.name);
-                },
+                onSelected: settings.isLoading || _saving
+                    ? null
+                    : (bool selected) {
+                        _toggleTag(tag.name);
+                      },
                 backgroundColor: tag.color.withValues(alpha: 0.1),
                 selectedColor: tag.color.withValues(alpha: 0.3),
                 labelStyle: TextStyle(

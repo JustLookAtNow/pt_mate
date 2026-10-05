@@ -4,6 +4,8 @@ import 'package:pt_mate/widgets/torrent_list_item.dart';
 import 'package:pt_mate/models/app_models.dart';
 import 'package:provider/provider.dart';
 import 'package:pt_mate/services/storage/storage_service.dart';
+import 'package:pt_mate/services/settings/display_settings_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Fake StorageService
 class FakeStorageService implements StorageService {
@@ -15,6 +17,11 @@ class FakeStorageService implements StorageService {
 }
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    StorageService.instance.resetForTest();
+  });
+
   Widget createWidgetUnderTest({
     required TorrentItem torrent,
     bool? showCoverSetting,
@@ -24,10 +31,15 @@ void main() {
       home: Scaffold(
         body: Center(
           child: SizedBox(
-            width:
-                800, // Increased width to avoid overflow during tests with long text
-            child: Provider<StorageService>(
-              create: (_) => FakeStorageService(),
+            width: 800, // Increased width to avoid overflow during tests with long text
+            child: MultiProvider(
+              providers: [
+                Provider<StorageService>(create: (_) => FakeStorageService()),
+                ChangeNotifierProvider(
+                  create: (_) =>
+                      DisplaySettingsManager(StorageService.instance),
+                ),
+              ],
               child: TorrentListItem(
                 torrent: torrent,
                 isSelected: false,

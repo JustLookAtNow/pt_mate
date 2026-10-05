@@ -52,8 +52,14 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Setup Android SDK API 37
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK API 37
+        run: sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0"
+
       - name: Get dependencies
-        run: flutter pub get
+        uses: ./.github/actions/pub-get
 
       - name: Analyze Dart sources
         run: flutter analyze

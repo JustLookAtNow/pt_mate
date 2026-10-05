@@ -65,7 +65,10 @@ void main() {
       ).probe();
 
       expect(result.profile, entry.profile);
-      expect(result.isReady, isTrue);
+      expect(
+        result.isReady,
+        entry.profile == AndroidSecureStorageProfile.oaepGcm,
+      );
       expect(result.hasEncryptedEntries, isTrue);
       expect(result.hasWrappedKeys, isTrue);
     }
@@ -92,6 +95,200 @@ void main() {
 
     expect(result.profile, AndroidSecureStorageProfile.fresh);
     expect(result.isReady, isTrue);
+  });
+
+  test('parses the permanent Android plaintext profile', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (_) async {
+          return <String, Object?>{
+            'status': 'ready',
+            'profile': 'plaintext',
+            'keyCipher': null,
+            'storageCipher': null,
+            'hasEncryptedEntries': false,
+            'hasWrappedKeys': false,
+            'failureCode': null,
+          };
+        });
+
+    final result = await AndroidSecureStorageProfileResolver(
+      channel: channel,
+      isAndroid: true,
+    ).probe();
+
+    expect(result.profile, AndroidSecureStorageProfile.plaintext);
+    expect(result.isReady, isTrue);
+  });
+
+  test(
+    'only explicit unsupported_algorithm permits plaintext fallback',
+    () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            expect(call.method, 'probeModernSecureStorageCapability');
+            return <String, Object?>{
+              'status': 'unsupported',
+              'failureCode': 'unsupported_algorithm',
+            };
+          });
+
+      final result = await AndroidSecureStorageProfileResolver(
+        channel: channel,
+        isAndroid: true,
+      ).probeModernCapability();
+
+      expect(result.isSupported, isFalse);
+      expect(result.isExplicitlyUnsupported, isTrue);
+      expect(result.failureCode, 'unsupported_algorithm');
+    },
+  );
+
+  test('capability probe transient errors remain fail-closed', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          expect(call.method, 'probeModernSecureStorageCapability');
+          return <String, Object?>{
+            'status': 'unavailable',
+            'failureCode': 'capability_probe_failed',
+          };
+        });
+
+    final result = await AndroidSecureStorageProfileResolver(
+      channel: channel,
+      isAndroid: true,
+    ).probeModernCapability();
+
+    expect(result.isSupported, isFalse);
+    expect(result.isExplicitlyUnsupported, isFalse);
+    expect(result.failureCode, 'capability_probe_failed');
+  });
+
+  test('legacy reset requires confirmation and native fresh result', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          expect(call.method, 'resetLegacyAndroidSecureStorage');
+          expect(call.arguments, <String, Object?>{'confirmed': true});
+          return <String, Object?>{'status': 'fresh', 'failureCode': null};
+        });
+    final resolver = AndroidSecureStorageProfileResolver(
+      channel: channel,
+      isAndroid: true,
+    );
+
+    expect(await resolver.resetLegacyStorage(confirmed: false), isFalse);
+    expect(await resolver.resetLegacyStorage(confirmed: true), isTrue);
+  });
+
+  test('reads a complete legacy snapshot without changing it', () async {
+    final invoked = <String>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          invoked.add(call.method);
+          return <String, Object?>{
+            'status': 'ready',
+            'profile': 'pkcs1Gcm',
+            'values': <String, String>{
+              'site.cookie.demo': 'cookie-value',
+              'device_id': 'device-value',
+            },
+            'failureCode': null,
+          };
+        });
+
+    final snapshot = await AndroidSecureStorageProfileResolver(
+      channel: channel,
+      isAndroid: true,
+    ).readLegacySnapshot();
+
+    expect(invoked, <String>['readLegacyAndroidSecureStorage']);
+    expect(snapshot.profile, AndroidSecureStorageProfile.pkcs1Gcm);
+    expect(snapshot.values['site.cookie.demo'], 'cookie-value');
+    expect(
+      () => snapshot.values['new'] = 'not-allowed',
+      throwsUnsupportedError,
+    );
+  });
+
+  test('rejects an incomplete native legacy snapshot', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (_) async {
+          return <String, Object?>{
+            'status': 'unavailable',
+            'failureCode': 'legacy_decryption_failed',
+          };
+        });
+
+    await expectLater(
+      AndroidSecureStorageProfileResolver(
+        channel: channel,
+        isAndroid: true,
+      ).readLegacySnapshot(),
+      throwsA(
+        isA<SecureStorageUnavailableExceptionForResolver>().having(
+          (error) => error.code,
+          'code',
+          'legacy_decryption_failed',
+        ),
+      ),
+    );
+  });
+
+  test('parses resumable migration phases and target', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (_) async {
+          return <String, Object?>{
+            'status': 'pending',
+            'phase': 'backupConfirmed',
+            'target': 'plaintext',
+            'failureCode': null,
+          };
+        });
+
+    final state = await AndroidSecureStorageProfileResolver(
+      channel: channel,
+      isAndroid: true,
+    ).getLegacyMigrationState();
+
+    expect(state.phase, LegacyAndroidMigrationPhase.backupConfirmed);
+    expect(state.target, LegacyAndroidMigrationTarget.plaintext);
+    expect(state.requiresBackupRestore, isTrue);
+  });
+
+  test('begins, initializes and completes a journaled migration', () async {
+    final invoked = <String>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          invoked.add(call.method);
+          return switch (call.method) {
+            'beginLegacyAndroidMigration' => <String, Object?>{
+              'status': 'fresh',
+              'failureCode': null,
+            },
+            'markLegacyAndroidMigrationTargetInitialized' => <String, Object?>{
+              'status': 'ready',
+              'failureCode': null,
+            },
+            'completeLegacyAndroidMigration' => <String, Object?>{
+              'status': 'complete',
+              'failureCode': null,
+            },
+            _ => throw StateError('unexpected method'),
+          };
+        });
+    final resolver = AndroidSecureStorageProfileResolver(
+      channel: channel,
+      isAndroid: true,
+    );
+
+    await resolver.beginLegacyMigration(LegacyAndroidMigrationTarget.oaepGcm);
+    await resolver.markLegacyMigrationTargetInitialized();
+    await resolver.completeLegacyMigration();
+
+    expect(invoked, <String>[
+      'beginLegacyAndroidMigration',
+      'markLegacyAndroidMigrationTargetInitialized',
+      'completeLegacyAndroidMigration',
+    ]);
   });
 
   test(

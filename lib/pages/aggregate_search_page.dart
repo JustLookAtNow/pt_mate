@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+
 import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/rendering.dart';
+
 import 'dart:math' as math;
+
 import '../models/app_models.dart';
 import '../models/batch_operation_models.dart';
+import '../models/home_search_request.dart';
 import '../services/storage/storage_service.dart';
 import '../services/api/api_service.dart';
 import '../services/image_http_client.dart';
@@ -19,30 +24,47 @@ import '../services/local_download_service.dart';
 
 import '../providers/aggregate_search_provider.dart';
 import '../widgets/batch_progress_card.dart';
-import '../widgets/responsive_layout.dart';
-import '../widgets/qb_speed_indicator.dart';
 import '../widgets/torrent_list_item.dart';
 import '../widgets/torrent_cover_gallery_viewer.dart';
 import '../widgets/list_index_scroller.dart';
 import '../widgets/torrent_download_dialog.dart';
 import '../widgets/torrent_purchase_dialog.dart';
 import '../widgets/tag_filter_bar.dart';
-import '../widgets/aggregate_search_strategy_list.dart';
 import 'torrent_detail_page.dart';
+
 import 'package:pt_mate/utils/notification_helper.dart';
-import '../utils/screen_utils.dart';
 
-class AggregateSearchPage extends StatefulWidget {
-  const AggregateSearchPage({super.key, this.searchService});
+class AggregateSearchView extends StatefulWidget {
+  const AggregateSearchView({
+    super.key,
+    required this.request,
+    required this.active,
+    required this.onSearchRequested,
+    required this.onExitRequested,
+    this.onSelectionModeChanged,
+    this.onSearchAvailabilityChanged,
+    this.searchService,
+  });
 
+  final HomeSearchRequest request;
+  final bool active;
+  final VoidCallback onSearchRequested;
+  final VoidCallback onExitRequested;
+  final ValueChanged<bool>? onSelectionModeChanged;
+  final ValueChanged<bool>? onSearchAvailabilityChanged;
   final AggregateSearchService? searchService;
 
   @override
-  State<AggregateSearchPage> createState() => _AggregateSearchPageState();
+  AggregateSearchViewState createState() => AggregateSearchViewState();
 }
 
-class _AggregateSearchPageState extends State<AggregateSearchPage> {
-  final TextEditingController _searchController = TextEditingController();
+class AggregateSearchViewState extends State<AggregateSearchView> {
+  late final AggregateSearchProvider _provider;
+  AggregateSearchCancelToken? _operationCancelToken;
+  bool _active = false;
+  String _committedKeyword = '';
+  String _committedStrategy = '';
+  String _strategyName = '';
 
   // 选择模式相关状态
   bool _isSelectionMode = false;
@@ -61,18 +83,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     listViewKey: _listKey,
   );
 
-  // String? _overlaySiteName; // Moved to _AggregateSearchScrollbar
-  // double _overlayOpacity = 0.0; // Moved to _AggregateSearchScrollbar
-  // Timer? _overlayTimer; // Moved to _AggregateSearchScrollbar
   final Map<String, Color> _siteColors = {};
   bool _isFastScrolling = false;
   bool _retryingFailedSites = false;
   int _searchOperationGeneration = 0;
-
-  // 头部隐藏动画相关
-  double _headerProgress = 1.0; // 1.0=完全显示, 0.0=完全隐藏
-  double _lastScrollOffset = 0.0;
-  final double _maxHideDistance = 200.0; // 滚动多少距离完全隐藏
+  double _headerProgress = 1;
+  double _lastScrollOffset = 0;
+  static const double _maxHideDistance = 200;
 
   BatchProgressState<AggregateSearchResultItem>? _batchProgress;
   final Map<String, BatchItemState> _batchItemStates =
@@ -108,75 +125,90 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
   @override
   void initState() {
     super.initState();
-    _loadSearchConfigs();
-    _listController.addListener(() {
-      if (!_listController.hasClients) return;
+    _provider = context.read<AggregateSearchProvider>();
+    _active = widget.active;
+    _listController.addListener(_handleListScroll);
+    _scheduleRequest();
+  }
 
-      final currentOffset = _listController.offset;
-      final delta = currentOffset - _lastScrollOffset;
-
-      // 计算头部显示进度
-      double newProgress = _headerProgress;
-
-      // 快速滚动时强制隐藏头部
-      if (_isFastScrolling) {
-        newProgress = 0.0;
-      } else {
-        if (delta > 0) {
-          // 向下滚动:隐藏
-          newProgress = (_headerProgress - delta / _maxHideDistance).clamp(
-            0.0,
-            1.0,
-          );
-        } else if (delta < 0) {
-          // 向上滚动:显示
-          newProgress = (_headerProgress + (-delta) / _maxHideDistance).clamp(
-            0.0,
-            1.0,
-          );
-        }
-      }
-
-      if (newProgress != _headerProgress) {
-        setState(() {
-          _headerProgress = newProgress;
-        });
-      }
-      _lastScrollOffset = currentOffset;
-    });
+  void _handleListScroll() {
+    if (!_listController.hasClients) return;
+    final offset = _listController.offset;
+    final delta = offset - _lastScrollOffset;
+    final progress = _isFastScrolling
+        ? 0.0
+        : (_headerProgress - delta / _maxHideDistance).clamp(0.0, 1.0);
+    if (progress != _headerProgress) {
+      setState(() => _headerProgress = progress);
+    }
+    _lastScrollOffset = offset;
   }
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    _listController.dispose();
-    // _overlayTimer?.cancel(); // Moved to _AggregateSearchScrollbar
-    super.dispose();
+  void didUpdateWidget(AggregateSearchView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.active && _active) {
+      _invalidateSearch(notify: false);
+      _isSelectionMode = false;
+      _selectedItems.clear();
+      _isDraggingSelection = false;
+      _dragStartIndex = null;
+      _lastSelectedIndex = null;
+      _preDragSelectedItems.clear();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || widget.active) return;
+        _provider.setSearching(false);
+        _provider.setSearchProgress(null);
+        widget.onSelectionModeChanged?.call(false);
+        widget.onSearchAvailabilityChanged?.call(true);
+      });
+    }
+    if (widget.request.sequence != oldWidget.request.sequence) {
+      _scheduleRequest();
+    }
   }
 
-  Future<void> _loadSearchConfigs() async {
-    final provider = Provider.of<AggregateSearchProvider>(
-      context,
-      listen: false,
-    );
+  void _scheduleRequest() {
+    _operationCancelToken?.cancel();
+    final generation = ++_searchOperationGeneration;
+    final request = widget.request;
+    _active = widget.active;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_isCurrentOperation(generation)) return;
+      widget.onSearchAvailabilityChanged?.call(true);
+      _performSearch(request);
+    });
+  }
 
-    try {
-      final storage = Provider.of<StorageService>(context, listen: false);
-      final settings = await storage.loadAggregateSearchSettings();
+  bool _isCurrentOperation(int generation) =>
+      mounted &&
+      _active &&
+      widget.active &&
+      generation == _searchOperationGeneration;
 
-      if (mounted) {
-        provider.setSearchConfigs(
-          settings.searchConfigs.where((config) => config.isActive).toList(),
-        );
-        provider.setLoading(false);
-        provider.initializeDefaultStrategy();
-      }
-    } catch (e) {
-      if (mounted) {
-        provider.setLoading(false);
-        NotificationHelper.showError(context, '加载搜索配置失败: $e');
-      }
-    }
+  void _invalidateSearch({required bool notify}) {
+    _active = false;
+    ++_searchOperationGeneration;
+    _operationCancelToken?.cancel();
+    _retryingFailedSites = false;
+    _provider.setSearching(false, notify: notify);
+    _provider.setSearchProgress(null, notify: notify);
+  }
+
+  /// Leave aggregate results while allowing an existing download batch to finish.
+  void leaveAggregate() {
+    _invalidateSearch(notify: true);
+    cancelSelection();
+    widget.onSearchAvailabilityChanged?.call(true);
+  }
+
+  void cancelSelection() => _onCancelSelection();
+
+  @override
+  void dispose() {
+    _invalidateSearch(notify: false);
+    _listController.dispose();
+    super.dispose();
   }
 
   @override
@@ -184,726 +216,404 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     final showCoverSetting = context.select<DisplaySettingsManager, bool>(
       (settings) => settings.showCoverImages,
     );
-
     return Consumer<AggregateSearchProvider>(
-      builder: (context, provider, child) {
-        // 同步搜索框内容
-        if (_searchController.text != provider.searchKeyword) {
-          _searchController.text = provider.searchKeyword;
-        }
-
-        return ResponsiveLayout(
-          currentRoute: '/aggregate_search',
-          appBar: AppBar(
-            title: const Text('聚合搜索'),
-            actions: [const QbSpeedIndicator()],
-          ),
-          body: provider.loading
-              ? const Center(child: CircularProgressIndicator())
-              : Padding(
-                  padding: const EdgeInsets.all(4.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (context, provider, child) => Padding(
+        padding: const EdgeInsets.all(4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      key: const ValueKey('aggregate-search-summary'),
+                      onTap: _retryingFailedSites
+                          ? null
+                          : widget.onSearchRequested,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$_strategyName · ${_committedKeyword.isEmpty ? '最新种子' : _committedKeyword}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                            Text(
+                              '${provider.filteredResults.length} 条结果',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    key: const ValueKey('aggregate-search-exit'),
+                    onPressed: widget.onExitRequested,
+                    icon: const Icon(Icons.arrow_back, size: 16),
+                    label: const Text('返回当前站点'),
+                  ),
+                ],
+              ),
+            ),
+            ClipRect(
+              child: Align(
+                key: const ValueKey('aggregate-search-filter-visibility'),
+                alignment: Alignment.bottomCenter,
+                heightFactor: _headerProgress,
+                child: Opacity(
+                  opacity: _headerProgress,
+                  child: Row(
+                    key: const ValueKey('aggregate-search-filters'),
                     children: [
-                      // 搜索区域 - 带滚动隐藏动画
-                      ClipRect(
-                        child: Align(
-                          alignment: Alignment.bottomCenter,
-                          heightFactor: _headerProgress,
-                          child: Opacity(
-                            opacity: _headerProgress,
-                            child: Padding(
-                              padding: const EdgeInsets.all(2.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // 紧凑的搜索控件行
-                                  Row(
-                                    children: [
-                                      // 搜索策略选择
-                                      Expanded(
-                                        flex: 1,
-                                        child: _StrategySelectorButton(
-                                          configs: provider.searchConfigs,
-                                          selectedStrategy:
-                                              provider.selectedStrategy,
-                                          enabled: !_retryingFailedSites,
-                                          onTap: _showSearchDialog,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      // 排序选择
-                                      PopupMenuButton<String>(
-                                        icon: Icon(
-                                          Icons.sort,
-                                          color: provider.sortBy != 'none'
-                                              ? Theme.of(
-                                                  context,
-                                                ).colorScheme.secondary
-                                              : null,
-                                        ),
-                                        tooltip: '排序',
-                                        enabled:
-                                            !provider.searching &&
-                                            !_retryingFailedSites,
-                                        onSelected: (value) {
-                                          // 与 app.dart 的行为保持一致：
-                                          // 选择相同的排序类型时切换升降序；选择新的类型时默认降序
-                                          if (value == provider.sortBy) {
-                                            provider.setSortAscending(
-                                              !provider.sortAscending,
-                                            );
-                                          } else {
-                                            provider.setSortBy(value);
-                                            provider.setSortAscending(false);
-                                          }
-                                          _resortCurrentResults();
-                                        },
-                                        itemBuilder: (context) => [
-                                          PopupMenuItem(
-                                            value: 'none',
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color: provider.sortBy == 'none'
-                                                    ? Theme.of(context)
-                                                          .colorScheme
-                                                          .primary
-                                                          .withValues(
-                                                            alpha: 0.1,
-                                                          )
-                                                    : null,
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
-                                              child: Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.clear,
-                                                    color:
-                                                        provider.sortBy ==
-                                                            'none'
-                                                        ? Theme.of(context)
-                                                              .colorScheme
-                                                              .secondary
-                                                        : null,
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  const Text('默认排序'),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-
-                                          PopupMenuItem(
-                                            value: 'time',
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color: provider.sortBy == 'time'
-                                                    ? Theme.of(context)
-                                                          .colorScheme
-                                                          .primary
-                                                          .withValues(
-                                                            alpha: 0.1,
-                                                          )
-                                                    : null,
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
-                                              child: Row(
-                                                children: [
-                                                  Icon(
-                                                    provider.sortBy == 'time' &&
-                                                            provider
-                                                                .sortAscending
-                                                        ? Icons.arrow_upward
-                                                        : Icons.arrow_downward,
-                                                    color:
-                                                        provider.sortBy ==
-                                                            'time'
-                                                        ? Theme.of(context)
-                                                              .colorScheme
-                                                              .secondary
-                                                        : null,
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  const Text('按时间排序'),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-
-                                          PopupMenuItem(
-                                            value: 'size',
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color: provider.sortBy == 'size'
-                                                    ? Theme.of(context)
-                                                          .colorScheme
-                                                          .primary
-                                                          .withValues(
-                                                            alpha: 0.1,
-                                                          )
-                                                    : null,
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
-                                              child: Row(
-                                                children: [
-                                                  Icon(
-                                                    provider.sortBy == 'size' &&
-                                                            provider
-                                                                .sortAscending
-                                                        ? Icons.arrow_upward
-                                                        : Icons.arrow_downward,
-                                                    color:
-                                                        provider.sortBy ==
-                                                            'size'
-                                                        ? Theme.of(context)
-                                                              .colorScheme
-                                                              .secondary
-                                                        : null,
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  const Text('按大小排序'),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-
-                                          PopupMenuItem(
-                                            value: 'upload',
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color:
-                                                    provider.sortBy == 'upload'
-                                                    ? Theme.of(context)
-                                                          .colorScheme
-                                                          .primary
-                                                          .withValues(
-                                                            alpha: 0.1,
-                                                          )
-                                                    : null,
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
-                                              child: Row(
-                                                children: [
-                                                  Icon(
-                                                    provider.sortBy ==
-                                                                'upload' &&
-                                                            provider
-                                                                .sortAscending
-                                                        ? Icons.arrow_upward
-                                                        : Icons.arrow_downward,
-                                                    color:
-                                                        provider.sortBy ==
-                                                            'upload'
-                                                        ? Theme.of(context)
-                                                              .colorScheme
-                                                              .secondary
-                                                        : null,
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  const Text('按上传量排序'),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-
-                                          PopupMenuItem(
-                                            value: 'download',
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color:
-                                                    provider.sortBy ==
-                                                        'download'
-                                                    ? Theme.of(context)
-                                                          .colorScheme
-                                                          .primary
-                                                          .withValues(
-                                                            alpha: 0.1,
-                                                          )
-                                                    : null,
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
-                                              child: Row(
-                                                children: [
-                                                  Icon(
-                                                    provider.sortBy ==
-                                                                'download' &&
-                                                            provider
-                                                                .sortAscending
-                                                        ? Icons.arrow_upward
-                                                        : Icons.arrow_downward,
-                                                    color:
-                                                        provider.sortBy ==
-                                                            'download'
-                                                        ? Theme.of(context)
-                                                              .colorScheme
-                                                              .secondary
-                                                        : null,
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  const Text('按下载量排序'),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  // 标签筛选栏
-                                  TagFilterBar(
-                                    includedTags: provider.includedTags,
-                                    excludedTags: provider.excludedTags,
-                                    onIncludedChanged: provider.setIncludedTags,
-                                    onExcludedChanged: provider.setExcludedTags,
-                                    padding: const EdgeInsets.fromLTRB(
-                                      8.0,
-                                      8.0,
-                                      8.0,
-                                      4.0,
-                                    ),
-                                  ),
-                                  if (provider.searchErrors.isNotEmpty) ...[
-                                    const SizedBox(height: AppSpacing.xs),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.sm,
-                                      ),
-                                      child: _AggregateSearchErrorBanner(
-                                        errorCount:
-                                            provider.searchErrors.length,
-                                        retrying: _retryingFailedSites,
-                                        onTap: _retryingFailedSites
-                                            ? null
-                                            : _showSearchErrorsSheet,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // 搜索进度指示器
-                      if (provider.searching) ...[
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      '正在搜索...',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleSmall,
-                                    ),
-                                    const Spacer(),
-                                    TextButton.icon(
-                                      onPressed: () {
-                                        provider.cancelSearch();
-                                      },
-                                      icon: const Icon(Icons.stop, size: 16),
-                                      label: const Text('停止'),
-                                      style: TextButton.styleFrom(
-                                        side: BorderSide(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.outline,
-                                          width: 1.0,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                if (provider.searchProgress != null) ...[
-                                  const SizedBox(height: 8),
-                                  LinearProgressIndicator(
-                                    value:
-                                        provider.searchProgress!.totalSites > 0
-                                        ? provider
-                                                  .searchProgress!
-                                                  .completedSites /
-                                              provider
-                                                  .searchProgress!
-                                                  .totalSites
-                                        : 0.0,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${provider.searchProgress!.completedSites}/${provider.searchProgress!.totalSites} 个站点',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      if (_batchProgress != null) _buildBatchProgressCard(),
                       Expanded(
-                        child:
-                            provider.searchResults.isEmpty &&
-                                !provider.searching
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.search,
-                                      size: 64,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.outline,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      '输入关键词开始搜索',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.copyWith(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.outline,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : Stack(
-                                children: [
-                                  ScrollConfiguration(
-                                    behavior: ScrollConfiguration.of(
-                                      context,
-                                    ).copyWith(scrollbars: false),
-                                    child: Listener(
-                                      onPointerMove: _onPointerMove,
-                                      onPointerUp: _onPointerUp,
-                                      child: ListView.builder(
-                                        key: _listKey,
-                                        controller: _listController,
-                                        padding: const EdgeInsets.only(
-                                          bottom: 88,
-                                        ),
-                                        itemCount:
-                                            provider.filteredResults.length,
-                                        itemBuilder: (context, index) {
-                                          final item =
-                                              provider.filteredResults[index];
-                                          // final Color siteColor = _colorForSite(item.siteId);
-                                          return Container(
-                                            key: ValueKey(item.torrent.id),
-                                            padding: EdgeInsets.zero,
-                                            child: MetaData(
-                                              metaData: index,
-                                              behavior:
-                                                  HitTestBehavior.translucent,
-                                              child: RepaintBoundary(
-                                                child: TorrentListItem(
-                                                  torrent: item.torrent,
-                                                  isSelected: _selectedItems
-                                                      .contains(
-                                                        item.torrent.id,
-                                                      ),
-                                                  isSelectionMode:
-                                                      _isSelectionMode,
-                                                  isAggregateMode: true,
-                                                  siteName: item.siteName,
-                                                  showCoverSetting:
-                                                      showCoverSetting,
-                                                  batchOperationType:
-                                                      _batchProgress
-                                                          ?.actionType,
-                                                  batchItemState:
-                                                      _batchItemStateFor(
-                                                        item.torrent.id,
-                                                      ),
-                                                  batchErrorMessage:
-                                                      _batchItemErrorFor(
-                                                        item.torrent.id,
-                                                      ),
-                                                  onRetryBatchAction:
-                                                      _buildRetryCallbackForItem(
-                                                        item,
-                                                      ),
-                                                  onCoverTap: () =>
-                                                      _openCoverGallery(index),
-                                                  suspendImageLoading:
-                                                      _isFastScrolling,
-                                                  onTap: _isSelectionMode
-                                                      ? () =>
-                                                            _onToggleSelection(
-                                                              item,
-                                                              index,
-                                                            )
-                                                      : () =>
-                                                            _onTorrentTap(item),
-                                                  onLongPress: () =>
-                                                      _onLongPress(item, index),
-                                                  onDownload:
-                                                      _isBatchActionRunning(
-                                                        BatchOperationType
-                                                            .download,
-                                                      )
-                                                      ? null
-                                                      : () =>
-                                                            _showDownloadDialog(
-                                                              item,
-                                                            ),
-                                                  onToggleCollection: () =>
-                                                      _onToggleCollection(item),
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                  if (provider.filteredResults.isNotEmpty)
-                                    Positioned.fill(
-                                      child: LayoutBuilder(
-                                        builder: (context, constraints) {
-                                          final totalHeight =
-                                              constraints.maxHeight;
-                                          final results =
-                                              provider.filteredResults;
-                                          final counts = <String, int>{};
-                                          final names = <String, String>{};
-                                          for (
-                                            var i = 0;
-                                            i < results.length;
-                                            i++
-                                          ) {
-                                            final id = results[i].siteId;
-                                            counts[id] = (counts[id] ?? 0) + 1;
-                                            names[id] = results[i].siteName;
-                                          }
-                                          final siteIds = counts.keys.toList();
-                                          final totalCount = results.length;
-                                          double acc = 0;
-                                          final sections = <_SiteSection>[];
-                                          final firstIndex = <String, int>{};
-                                          for (
-                                            var i = 0;
-                                            i < results.length;
-                                            i++
-                                          ) {
-                                            final id = results[i].siteId;
-                                            firstIndex[id] ??= i;
-                                          }
-                                          for (final id in siteIds) {
-                                            final ratio =
-                                                (counts[id]! / totalCount);
-                                            final extent = totalHeight * ratio;
-                                            sections.add(
-                                              _SiteSection(
-                                                siteId: id,
-                                                siteName: names[id] ?? id,
-                                                color: _colorForSite(id),
-                                                start: acc,
-                                                extent: extent,
-                                                firstIndex: firstIndex[id] ?? 0,
-                                              ),
-                                            );
-                                            acc += extent;
-                                          }
-                                          return _AggregateSearchScrollbar(
-                                            controller: _listController,
-                                            sections: sections,
-                                            onFastScrollingChanged:
-                                                _setFastScrolling,
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                ],
-                              ),
-                      ),
-
-                      // 选择模式下的操作栏
-                      if (_isSelectionMode)
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface,
-                            border: Border(
-                              top: BorderSide(
-                                color: Theme.of(context).dividerColor,
-                                width: 1,
-                              ),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              Expanded(
-                                child: TextButton(
-                                  onPressed: _isBatchRunning
-                                      ? null
-                                      : _onCancelSelection,
-                                  style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 0,
-                                    ),
-                                    textStyle: const TextStyle(fontSize: 13),
-                                    side: BorderSide(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.outline,
-                                      width: 1.0,
-                                    ),
-                                  ),
-                                  child: const Text('取消'),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: TextButton(
-                                  onPressed: _isBatchRunning
-                                      ? null
-                                      : () {
-                                          if (_selectedItems.length ==
-                                              provider.filteredResults.length) {
-                                            setState(
-                                              () => _selectedItems.clear(),
-                                            );
-                                          } else {
-                                            setState(() {
-                                              _selectedItems.addAll(
-                                                provider.filteredResults.map(
-                                                  (e) => e.torrent.id,
-                                                ),
-                                              );
-                                            });
-                                          }
-                                        },
-                                  style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 0,
-                                    ),
-                                    textStyle: const TextStyle(fontSize: 13),
-                                    side: BorderSide(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.outline,
-                                      width: 1.0,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    _selectedItems.length ==
-                                            provider.filteredResults.length
-                                        ? '全不选'
-                                        : '全选',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed:
-                                      !_isBatchRunning &&
-                                          _selectedItems.isNotEmpty
-                                      ? _onBatchDownload
-                                      : null,
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 0,
-                                    ),
-                                    textStyle: const TextStyle(fontSize: 13),
-                                    backgroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                    foregroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.onPrimary,
-                                  ),
-                                  child: Text('下载 (${_selectedItems.length})'),
-                                ),
-                              ),
-                            ],
-                          ),
+                        child: TagFilterBar(
+                          includedTags: provider.includedTags,
+                          excludedTags: provider.excludedTags,
+                          onIncludedChanged: provider.setIncludedTags,
+                          onExcludedChanged: provider.setExcludedTags,
+                          padding: const EdgeInsets.fromLTRB(8, 4, 0, 4),
                         ),
+                      ),
+                      _buildSortButton(provider),
                     ],
                   ),
                 ),
-          floatingActionButton: _isSelectionMode
-              ? null
-              : Builder(
-                  builder: (context) {
-                    final isDesktop = ScreenUtils.isLargeScreen(context);
-                    return isDesktop
-                        ? FloatingActionButton.extended(
-                            key: const ValueKey('aggregate-search-fab'),
-                            heroTag: 'aggregate-search-fab',
-                            onPressed: _retryingFailedSites
-                                ? null
-                                : _showSearchDialog,
-                            icon: const Icon(Icons.search),
-                            label: const Text('搜索'),
-                          )
-                        : FloatingActionButton(
-                            key: const ValueKey('aggregate-search-fab'),
-                            heroTag: 'aggregate-search-fab',
-                            onPressed: _retryingFailedSites
-                                ? null
-                                : _showSearchDialog,
-                            tooltip: '搜索',
-                            child: const Icon(Icons.search),
-                          );
-                  },
+              ),
+            ),
+            if (provider.searchErrors.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: _AggregateSearchErrorBanner(
+                  errorCount: provider.searchErrors.length,
+                  retrying: _retryingFailedSites,
+                  onTap: _retryingFailedSites ? null : _showSearchErrorsSheet,
                 ),
-          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-        );
+              ),
+            if (provider.searching)
+              Padding(
+                key: const ValueKey('aggregate-search-progress'),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            provider.searchProgress == null
+                                ? '正在搜索...'
+                                : '正在搜索 ${provider.searchProgress!.completedSites}/${provider.searchProgress!.totalSites} 个站点',
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: provider.cancelSearch,
+                          icon: const Icon(Icons.stop, size: 16),
+                          label: const Text('停止'),
+                        ),
+                      ],
+                    ),
+                    LinearProgressIndicator(
+                      value: provider.searchProgress?.progress,
+                    ),
+                  ],
+                ),
+              ),
+            if (_batchProgress != null) _buildBatchProgressCard(),
+            Expanded(
+              child: provider.filteredResults.isEmpty && !provider.searching
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.search,
+                            size: 64,
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            provider.searchResults.isEmpty
+                                ? '没有找到符合条件的种子'
+                                : '当前筛选下暂无结果',
+                            style: Theme.of(context).textTheme.bodyLarge
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.outline,
+                                ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Stack(
+                      children: [
+                        ScrollConfiguration(
+                          behavior: ScrollConfiguration.of(context)
+                              .copyWith(scrollbars: false),
+                          child: Listener(
+                            onPointerMove: _onPointerMove,
+                            onPointerUp: _onPointerUp,
+                            child: ListView.builder(
+                              key: _listKey,
+                              controller: _listController,
+                              padding: const EdgeInsets.only(bottom: 88),
+                              itemCount: provider.filteredResults.length,
+                              itemBuilder: (context, index) {
+                                final item = provider.filteredResults[index];
+                                // final Color siteColor = _colorForSite(item.siteId);
+                                return Container(
+                                  key: ValueKey(item.identity),
+                                  padding: EdgeInsets.zero,
+                                  child: MetaData(
+                                    metaData: index,
+                                    behavior: HitTestBehavior.translucent,
+                                    child: RepaintBoundary(
+                                      child: TorrentListItem(
+                                        torrent: item.torrent,
+                                        isSelected: _selectedItems.contains(
+                                          item.identity,
+                                        ),
+                                        isSelectionMode: _isSelectionMode,
+                                        isAggregateMode: true,
+                                        siteName: item.siteName,
+                                        showCoverSetting: showCoverSetting,
+                                        batchOperationType:
+                                            _batchProgress?.actionType,
+                                        batchItemState: _batchItemStateFor(
+                                          item.identity,
+                                        ),
+                                        batchErrorMessage: _batchItemErrorFor(
+                                          item.identity,
+                                        ),
+                                        onRetryBatchAction:
+                                            _buildRetryCallbackForItem(item),
+                                        onCoverTap: () =>
+                                            _openCoverGallery(index),
+                                        suspendImageLoading: _isFastScrolling,
+                                        onTap: _isSelectionMode
+                                            ? () => _onToggleSelection(
+                                                item,
+                                                index,
+                                              )
+                                            : () => _onTorrentTap(item),
+                                        onLongPress: () =>
+                                            _onLongPress(item, index),
+                                        onDownload:
+                                            _isBatchActionRunning(
+                                              BatchOperationType.download,
+                                            )
+                                            ? null
+                                            : () => _showDownloadDialog(item),
+                                        onToggleCollection: () =>
+                                            _onToggleCollection(item),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        if (provider.filteredResults.isNotEmpty)
+                          Positioned.fill(
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final totalHeight = constraints.maxHeight;
+                                final results = provider.filteredResults;
+                                final counts = <String, int>{};
+                                final names = <String, String>{};
+                                for (var i = 0; i < results.length; i++) {
+                                  final id = results[i].siteId;
+                                  counts[id] = (counts[id] ?? 0) + 1;
+                                  names[id] = results[i].siteName;
+                                }
+                                final siteIds = counts.keys.toList();
+                                final totalCount = results.length;
+                                double acc = 0;
+                                final sections = <_SiteSection>[];
+                                final firstIndex = <String, int>{};
+                                for (var i = 0; i < results.length; i++) {
+                                  final id = results[i].siteId;
+                                  firstIndex[id] ??= i;
+                                }
+                                for (final id in siteIds) {
+                                  final ratio = (counts[id]! / totalCount);
+                                  final extent = totalHeight * ratio;
+                                  sections.add(
+                                    _SiteSection(
+                                      siteId: id,
+                                      siteName: names[id] ?? id,
+                                      color: _colorForSite(id),
+                                      start: acc,
+                                      extent: extent,
+                                      firstIndex: firstIndex[id] ?? 0,
+                                    ),
+                                  );
+                                  acc += extent;
+                                }
+                                return _AggregateSearchScrollbar(
+                                  controller: _listController,
+                                  sections: sections,
+                                  onFastScrollingChanged: _setFastScrolling,
+                                );
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+
+            // 选择模式下的操作栏
+            if (_isSelectionMode)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  border: Border(
+                    top: BorderSide(
+                      color: Theme.of(context).dividerColor,
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: _isBatchRunning ? null : _onCancelSelection,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 0),
+                          textStyle: const TextStyle(fontSize: 13),
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.outline,
+                            width: 1.0,
+                          ),
+                        ),
+                        child: const Text('取消'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: _isBatchRunning
+                            ? null
+                            : () {
+                                if (_selectedItems.length ==
+                                    provider.filteredResults.length) {
+                                  setState(() => _selectedItems.clear());
+                                } else {
+                                  setState(() {
+                                    _selectedItems.addAll(
+                                      provider.filteredResults.map(
+                                        (e) => e.identity,
+                                      ),
+                                    );
+                                  });
+                                }
+                              },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 0),
+                          textStyle: const TextStyle(fontSize: 13),
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.outline,
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Text(
+                          _selectedItems.length ==
+                                  provider.filteredResults.length
+                              ? '全不选'
+                              : '全选',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: !_isBatchRunning && _selectedItems.isNotEmpty
+                            ? _onBatchDownload
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 0),
+                          textStyle: const TextStyle(fontSize: 13),
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .primary,
+                          foregroundColor: Theme.of(context)
+                              .colorScheme
+                              .onPrimary,
+                        ),
+                        child: Text('下载 (${_selectedItems.length})'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSortButton(AggregateSearchProvider provider) {
+    const labels = {
+      'none': '默认排序',
+      'time': '按时间排序',
+      'size': '按大小排序',
+      'upload': '按上传量排序',
+      'download': '按下载量排序',
+    };
+    return PopupMenuButton<String>(
+      tooltip: '排序',
+      icon: Icon(
+        Icons.sort,
+        color: provider.sortBy == 'none'
+            ? null
+            : Theme.of(context).colorScheme.primary,
+      ),
+      enabled: !provider.searching && !_retryingFailedSites,
+      onSelected: (value) {
+        if (value == provider.sortBy) {
+          provider.setSortAscending(!provider.sortAscending);
+        } else {
+          provider.setSortBy(value);
+          provider.setSortAscending(false);
+        }
+        _resortCurrentResults();
       },
+      itemBuilder: (context) => [
+        for (final entry in labels.entries)
+          PopupMenuItem(
+            value: entry.key,
+            child: Row(
+              children: [
+                Icon(
+                  entry.key == 'none'
+                      ? Icons.clear
+                      : provider.sortBy == entry.key && provider.sortAscending
+                      ? Icons.arrow_upward
+                      : Icons.arrow_downward,
+                  color: provider.sortBy == entry.key
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+                const SizedBox(width: 8),
+                Text(entry.value),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
@@ -971,26 +681,6 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     }
   }
 
-  Future<void> _showSearchDialog() async {
-    final provider = Provider.of<AggregateSearchProvider>(
-      context,
-      listen: false,
-    );
-    final result = await showDialog<_AggregateSearchDialogResult>(
-      context: context,
-      builder: (context) => _AggregateSearchDialog(
-        configs: provider.searchConfigs,
-        selectedStrategy: provider.selectedStrategy,
-        keyword: _searchController.text,
-      ),
-    );
-    if (!mounted || result == null) return;
-
-    provider.setSelectedStrategy(result.strategy);
-    _searchController.text = result.keyword;
-    _performSearch(result.keyword);
-  }
-
   Future<void> _showSearchErrorsSheet() async {
     if (_retryingFailedSites) return;
 
@@ -1016,46 +706,52 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           _AggregateSearchErrorSheet(errors: errors, siteConfigs: siteConfigs),
     );
 
-    if (shouldRetry == true && mounted) {
+    if (shouldRetry == true && mounted && _active && widget.active) {
       await _retryFailedSites(errors.keys.toSet());
     }
   }
 
   Future<void> _retryFailedSites(Set<String> siteIds) async {
-    if (_retryingFailedSites || siteIds.isEmpty) return;
+    if (_retryingFailedSites || siteIds.isEmpty || !_active || !widget.active) {
+      return;
+    }
 
     final provider = Provider.of<AggregateSearchProvider>(
       context,
       listen: false,
     );
+    _operationCancelToken?.cancel();
     final operationGeneration = ++_searchOperationGeneration;
+    _operationCancelToken = AggregateSearchCancelToken();
     final sortBy = provider.sortBy;
     final sortAscending = provider.sortAscending;
     final streamResults = sortBy == 'none';
     setState(() {
       _retryingFailedSites = true;
     });
+    widget.onSearchAvailabilityChanged?.call(false);
 
     try {
       final result =
           await (widget.searchService ?? AggregateSearchService.instance)
               .performAggregateSearch(
-                keyword: provider.searchKeyword.trim(),
-                configId: provider.selectedStrategy,
+                keyword: _committedKeyword,
+                configId: _committedStrategy,
                 maxResultsPerSite: 50,
                 targetSiteIds: siteIds,
+                cancelToken: _operationCancelToken,
                 onProgress: (_) {},
                 onSiteResults: streamResults
                     ? (items) {
                         if (!mounted ||
-                            operationGeneration != _searchOperationGeneration) {
+                            !_isCurrentOperation(operationGeneration)) {
                           return;
                         }
                         provider.mergeSearchResults(items);
                       }
                     : null,
               );
-      if (!mounted || operationGeneration != _searchOperationGeneration) {
+      if (!mounted || !_isCurrentOperation(operationGeneration)) {
         return;
       }
 
@@ -1074,14 +770,15 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           : '重试完成：$recoveredCount 个站点恢复，${result.errors.length} 个仍未响应';
       NotificationHelper.showInfo(context, message);
     } catch (e) {
-      if (mounted && operationGeneration == _searchOperationGeneration) {
+      if (mounted && _isCurrentOperation(operationGeneration)) {
         NotificationHelper.showError(context, '重试失败站点失败：$e');
       }
     } finally {
-      if (mounted && operationGeneration == _searchOperationGeneration) {
+      if (mounted && _isCurrentOperation(operationGeneration)) {
         setState(() {
           _retryingFailedSites = false;
         });
+        widget.onSearchAvailabilityChanged?.call(true);
       }
     }
   }
@@ -1098,20 +795,27 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     return normalized.isEmpty ? '搜索失败' : normalized;
   }
 
-  void _performSearch(String query) async {
-    // 允许空关键字搜索，用于获取站点最新种子
-    if (_retryingFailedSites) return;
-
-    final provider = Provider.of<AggregateSearchProvider>(
-      context,
-      listen: false,
-    );
-    provider.setSearchKeyword(query);
-
-    if (provider.selectedStrategy.isEmpty) {
+  void _performSearch(HomeSearchRequest request) async {
+    if (!_active || !widget.active) return;
+    final provider = _provider;
+    final strategyId = request.strategyId;
+    if (strategyId == null || strategyId.isEmpty) {
       NotificationHelper.showError(context, '请选择搜索策略');
       return;
     }
+    _committedKeyword = request.keyword.trim();
+    _committedStrategy = strategyId;
+    _strategyName =
+        provider.searchConfigs
+            .where((config) => config.id == strategyId)
+            .firstOrNull
+            ?.name ??
+        strategyId;
+    _retryingFailedSites = false;
+    cancelSelection();
+    widget.onSearchAvailabilityChanged?.call(true);
+    provider.setSelectedStrategy(strategyId);
+    provider.setSearchKeyword(_committedKeyword);
 
     if (provider.searching) {
       provider.cancelSearch();
@@ -1122,6 +826,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     final streamResults = sortBy == 'none';
 
     provider.createCancelToken();
+    _operationCancelToken = provider.cancelToken;
     provider.setSearching(true);
     provider.setSearchResults([]);
     provider.setSearchErrors({});
@@ -1131,12 +836,11 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       final result =
           await (widget.searchService ?? AggregateSearchService.instance)
               .performAggregateSearch(
-                keyword: query.trim().isEmpty ? '' : query.trim(),
-                configId: provider.selectedStrategy,
+                keyword: _committedKeyword,
+                configId: _committedStrategy,
                 maxResultsPerSite: 50,
                 onProgress: (progress) {
-                  if (mounted &&
-                      operationGeneration == _searchOperationGeneration) {
+                  if (mounted && _isCurrentOperation(operationGeneration)) {
                     provider.setSearchProgress(progress);
                   }
                 },
@@ -1144,7 +848,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                 onSiteResults: streamResults
                     ? (items) {
                         if (!mounted ||
-                            operationGeneration != _searchOperationGeneration) {
+                            !_isCurrentOperation(operationGeneration)) {
                           return;
                         }
                         provider.mergeSearchResults(items);
@@ -1152,7 +856,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
                     : null,
               );
 
-      if (mounted && operationGeneration == _searchOperationGeneration) {
+      if (mounted && _isCurrentOperation(operationGeneration)) {
         final sortedResults = _applySorting(
           result.items,
           sortBy,
@@ -1170,7 +874,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         NotificationHelper.showInfo(context, message);
       }
     } catch (e) {
-      if (mounted && operationGeneration == _searchOperationGeneration) {
+      if (mounted && _isCurrentOperation(operationGeneration)) {
         provider.setSearching(false);
         provider.setSearchProgress(null);
         NotificationHelper.showError(context, '搜索失败：$e');
@@ -1188,10 +892,12 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     if (listIndex < 0 || listIndex >= items.length) return;
     if (items[listIndex].torrent.cover.isEmpty) return;
 
-    final coverIndices = <int>[
+    // 列表数据只追加，已有下标稳定，每次调用重算即可响应数据变化
+    List<int> computeCoverIndices() => [
       for (var i = 0; i < items.length; i++)
         if (items[i].torrent.cover.isNotEmpty) i,
     ];
+    final coverIndices = computeCoverIndices();
     final initialPosition = coverIndices.indexOf(listIndex);
     if (initialPosition == -1) return;
 
@@ -1200,17 +906,19 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       barrierColor: Colors.black.withValues(alpha: 0.7),
       builder: (dialogContext) {
         return TorrentCoverGalleryViewer(
-          itemCount: coverIndices.length,
+          itemCount: () => computeCoverIndices().length,
           initialIndex: initialPosition,
           titleFor: (position) {
-            final i = (position >= 0 && position < coverIndices.length)
-                ? coverIndices[position]
+            final indices = computeCoverIndices();
+            final i = (position >= 0 && position < indices.length)
+                ? indices[position]
                 : null;
             return (i != null && i < items.length) ? items[i].torrent.name : '';
           },
           loadCover: (position) async {
-            final i = (position >= 0 && position < coverIndices.length)
-                ? coverIndices[position]
+            final indices = computeCoverIndices();
+            final i = (position >= 0 && position < indices.length)
+                ? indices[position]
                 : null;
             if (i == null || i >= items.length) return null;
             final item = items[i];
@@ -1243,8 +951,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
             }
           },
           onPageChanged: (position) {
-            if (position < 0 || position >= coverIndices.length) return;
-            final i = coverIndices[position];
+            final indices = computeCoverIndices();
+            if (position < 0 || position >= indices.length) return;
+            final i = indices[position];
             if (i < items.length) {
               _listScroller.scrollToIndex(i);
             }
@@ -1258,7 +967,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     try {
       // 1. 获取种子所属站点的配置
       final storage = Provider.of<StorageService>(context, listen: false);
-      final allSites = await storage.loadSiteConfigs();
+      final allSites = await storage.loadSiteConfigs(includeApiKeys: true);
       final siteConfig = allSites.firstWhere(
         (site) => site.id == item.siteId,
         orElse: () => throw Exception('找不到站点配置: ${item.siteId}'),
@@ -1299,7 +1008,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     try {
       // 1. 获取种子所属站点的配置
       final storage = Provider.of<StorageService>(context, listen: false);
-      final allSites = await storage.loadSiteConfigs();
+      final allSites = await storage.loadSiteConfigs(includeApiKeys: true);
       siteConfig = allSites.firstWhere(
         (site) => site.id == item.siteId,
         orElse: () => throw Exception('找不到站点配置: ${item.siteId}'),
@@ -1456,7 +1165,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
   Future<Map<String, SiteConfig>> _loadSitesById() async {
     final storage = Provider.of<StorageService>(context, listen: false);
-    final allSites = await storage.loadSiteConfigs();
+    final allSites = await storage.loadSiteConfigs(includeApiKeys: true);
     return {for (final site in allSites) site.id: site};
   }
 
@@ -1549,7 +1258,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       final filteredResults = provider.filteredResults;
       for (int i = minIndex; i <= maxIndex; i++) {
         if (i >= 0 && i < filteredResults.length) {
-          newSelection.add(filteredResults[i].torrent.id);
+          newSelection.add(filteredResults[i].identity);
         }
       }
 
@@ -1579,12 +1288,13 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       setState(() {
         if (!_isSelectionMode) {
           _isSelectionMode = true;
-          _selectedItems.add(item.torrent.id);
+          _selectedItems.add(item.identity);
         }
         _isDraggingSelection = true;
         _dragStartIndex = index;
         _preDragSelectedItems = Set<String>.from(_selectedItems);
       });
+      widget.onSelectionModeChanged?.call(_isSelectionMode);
     }
   }
 
@@ -1604,7 +1314,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           final minIndex = math.min(_lastSelectedIndex!, index);
           final maxIndex = math.max(_lastSelectedIndex!, index);
 
-          final isSelecting = !_selectedItems.contains(item.torrent.id);
+          final isSelecting = !_selectedItems.contains(item.identity);
           final provider = Provider.of<AggregateSearchProvider>(
             context,
             listen: false,
@@ -1615,24 +1325,25 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
             if (i >= 0 && i < filteredResults.length) {
               final targetItem = filteredResults[i];
               if (isSelecting) {
-                _selectedItems.add(targetItem.torrent.id);
+                _selectedItems.add(targetItem.identity);
               } else {
-                _selectedItems.remove(targetItem.torrent.id);
+                _selectedItems.remove(targetItem.identity);
               }
             }
           }
         } else {
-          if (_selectedItems.contains(item.torrent.id)) {
-            _selectedItems.remove(item.torrent.id);
+          if (_selectedItems.contains(item.identity)) {
+            _selectedItems.remove(item.identity);
             if (_selectedItems.isEmpty) {
               _isSelectionMode = false;
             }
           } else {
-            _selectedItems.add(item.torrent.id);
+            _selectedItems.add(item.identity);
           }
         }
         _lastSelectedIndex = index;
       });
+      widget.onSelectionModeChanged?.call(_isSelectionMode);
     }
   }
 
@@ -1645,11 +1356,11 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       listen: false,
     );
     final selectedItems = provider.searchResults
-        .where((item) => _selectedItems.contains(item.torrent.id))
+        .where((item) => _selectedItems.contains(item.identity))
         .toList();
 
     final storage = Provider.of<StorageService>(context, listen: false);
-    final allSites = await storage.loadSiteConfigs();
+    final allSites = await storage.loadSiteConfigs(includeApiKeys: true);
     if (!mounted) return;
 
     final sitesById = {for (final site in allSites) site.id: site};
@@ -1719,9 +1430,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         _batchItemStates.clear();
         _batchItemErrors.clear();
         for (final item in items) {
-          _batchTrackedItems[item.torrent.id] = item;
-          _batchItemStates[item.torrent.id] = BatchItemState.idle;
-          _batchItemErrors.remove(item.torrent.id);
+          _batchTrackedItems[item.identity] = item;
+          _batchItemStates[item.identity] = BatchItemState.idle;
+          _batchItemErrors.remove(item.identity);
         }
         _batchProgress = _buildBatchProgressState(
           actionType: BatchOperationType.download,
@@ -1739,8 +1450,8 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       if (siteConfig == null) {
         if (mounted) {
           setState(() {
-            _batchItemStates[item.torrent.id] = BatchItemState.failed;
-            _batchItemErrors[item.torrent.id] = '找不到站点配置';
+            _batchItemStates[item.identity] = BatchItemState.failed;
+            _batchItemErrors[item.identity] = '找不到站点配置';
           });
         }
         continue;
@@ -1757,15 +1468,15 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         if (url == null) {
           if (mounted) {
             setState(() {
-              _batchItemStates[item.torrent.id] = BatchItemState.failed;
-              _batchItemErrors[item.torrent.id] = '已取消购买付费种子';
+              _batchItemStates[item.identity] = BatchItemState.failed;
+              _batchItemErrors[item.identity] = '已取消购买付费种子';
             });
           }
           continue;
         }
         downloadItems.add(
           TorrentDownloadItem(
-            id: item.torrent.id,
+            id: item.identity,
             downloadUrl: url,
             torrentName: item.torrent.name,
             siteConfig: siteConfig,
@@ -1774,8 +1485,8 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
       } catch (e) {
         if (mounted) {
           setState(() {
-            _batchItemStates[item.torrent.id] = BatchItemState.failed;
-            _batchItemErrors[item.torrent.id] = '获取下载链接失败: $e';
+            _batchItemStates[item.identity] = BatchItemState.failed;
+            _batchItemErrors[item.identity] = '获取下载链接失败: $e';
           });
         }
       }
@@ -1864,9 +1575,9 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
           _batchItemErrors.clear();
         }
         for (final item in items) {
-          _batchTrackedItems[item.torrent.id] = item;
-          _batchItemStates[item.torrent.id] = BatchItemState.idle;
-          _batchItemErrors.remove(item.torrent.id);
+          _batchTrackedItems[item.identity] = item;
+          _batchItemStates[item.identity] = BatchItemState.idle;
+          _batchItemErrors.remove(item.identity);
         }
         _batchProgress = _buildBatchProgressState(
           actionType: BatchOperationType.download,
@@ -1883,8 +1594,8 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
       if (mounted) {
         setState(() {
-          _batchItemStates[item.torrent.id] = BatchItemState.running;
-          _batchItemErrors.remove(item.torrent.id);
+          _batchItemStates[item.identity] = BatchItemState.running;
+          _batchItemErrors.remove(item.identity);
           _batchProgress = _buildBatchProgressState(
             actionType: BatchOperationType.download,
             isRunning: true,
@@ -1900,16 +1611,16 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
         await _enqueueAggregateDownload(item, effectiveContext);
         if (mounted) {
           setState(() {
-            _batchItemStates[item.torrent.id] = BatchItemState.success;
-            _batchItemErrors.remove(item.torrent.id);
+            _batchItemStates[item.identity] = BatchItemState.success;
+            _batchItemErrors.remove(item.identity);
           });
         }
       } catch (e) {
         final errorMessage = formatBatchError(e);
         if (mounted) {
           setState(() {
-            _batchItemStates[item.torrent.id] = BatchItemState.failed;
-            _batchItemErrors[item.torrent.id] = errorMessage;
+            _batchItemStates[item.identity] = BatchItemState.failed;
+            _batchItemErrors[item.identity] = errorMessage;
           });
         }
       }
@@ -1998,7 +1709,7 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     final batchProgress = _batchProgress;
     if (batchProgress == null ||
         batchProgress.isRunning ||
-        _batchItemStateFor(item.torrent.id) != BatchItemState.failed) {
+        _batchItemStateFor(item.identity) != BatchItemState.failed) {
       return;
     }
 
@@ -2016,12 +1727,12 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     final batchProgress = _batchProgress;
     if (batchProgress == null ||
         batchProgress.isRunning ||
-        _batchItemStateFor(item.torrent.id) != BatchItemState.failed) {
+        _batchItemStateFor(item.identity) != BatchItemState.failed) {
       return null;
     }
 
     final isTrackedFailure = batchProgress.failedItems.any(
-      (failure) => failure.itemId == item.torrent.id,
+      (failure) => failure.itemId == item.identity,
     );
     if (!isTrackedFailure) {
       return null;
@@ -2046,11 +1757,17 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
   // 取消选中模式
   void _onCancelSelection() {
+    final wasSelecting = _isSelectionMode;
     if (mounted) {
       setState(() {
         _isSelectionMode = false;
         _selectedItems.clear();
+        _isDraggingSelection = false;
+        _dragStartIndex = null;
+        _lastSelectedIndex = null;
+        _preDragSelectedItems.clear();
       });
+      if (wasSelecting) widget.onSelectionModeChanged?.call(false);
     }
   }
 
@@ -2067,10 +1784,14 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
 
     // 异步后台请求
     try {
-      // 调用收藏API
+      final sites = await context.read<StorageService>().loadSiteConfigs(
+        includeApiKeys: true,
+      );
+      final siteConfig = sites.firstWhere((site) => site.id == item.siteId);
       await ApiService.instance.toggleCollection(
         id: item.torrent.id,
         make: newCollectionState,
+        siteConfig: siteConfig,
       );
 
       // 显示成功提示
@@ -2097,78 +1818,6 @@ class _AggregateSearchPageState extends State<AggregateSearchPage> {
     setState(() {
       _isFastScrolling = v;
     });
-  }
-}
-
-class _StrategySelectorButton extends StatelessWidget {
-  const _StrategySelectorButton({
-    required this.configs,
-    required this.selectedStrategy,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final List<AggregateSearchConfig> configs;
-  final String selectedStrategy;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final selectedConfig = configs
-        .where((config) => config.id == selectedStrategy)
-        .firstOrNull;
-    final canOpen = enabled && configs.isNotEmpty;
-    final foregroundColor = canOpen
-        ? colorScheme.onSurface
-        : colorScheme.onSurface.withValues(alpha: 0.38);
-
-    return Material(
-      color: colorScheme.surfaceContainer,
-      borderRadius: BorderRadius.circular(AppRadius.pill),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        key: const ValueKey('aggregate-search-strategy-selector'),
-        onTap: canOpen ? onTap : null,
-        child: SizedBox(
-          height: 48,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: Row(
-              children: [
-                Icon(
-                  selectedConfig?.isAllSitesType == true
-                      ? Icons.public
-                      : Icons.group,
-                  size: 18,
-                  color: canOpen
-                      ? colorScheme.primary
-                      : colorScheme.onSurface.withValues(alpha: 0.38),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    selectedConfig?.name ?? '选择搜索策略',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyLarge?.copyWith(color: foregroundColor),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 20,
-                  color: foregroundColor,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -2235,9 +1884,8 @@ class _AggregateSearchErrorBanner extends StatelessWidget {
                         retrying ? '已保留当前搜索结果' : '其他站点结果已正常显示',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: colorScheme.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -2255,10 +1903,8 @@ class _AggregateSearchErrorBanner extends StatelessWidget {
                 else ...[
                   Text(
                     '查看',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: accent,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: Theme.of(context).textTheme.labelLarge
+                        ?.copyWith(color: accent, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(width: 2),
                   Icon(Icons.chevron_right_rounded, size: 20, color: accent),
@@ -2314,16 +1960,14 @@ class _AggregateSearchErrorSheet extends StatelessWidget {
           children: [
             Text(
               '未响应的站点',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               '请求超时，不影响其他搜索结果',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: AppSpacing.md),
             Expanded(
@@ -2339,7 +1983,7 @@ class _AggregateSearchErrorSheet extends StatelessWidget {
                         (entry) => _AggregateSearchErrorEntry(
                           siteId: entry.key,
                           siteName: siteNames[entry.key] ?? entry.key,
-                          reason: _AggregateSearchPageState._shortErrorReason(
+                          reason: AggregateSearchViewState._shortErrorReason(
                             entry.value,
                           ),
                         ),
@@ -2422,125 +2066,6 @@ class _AggregateSearchErrorSheet extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _AggregateSearchDialogResult {
-  const _AggregateSearchDialogResult({
-    required this.strategy,
-    required this.keyword,
-  });
-
-  final String strategy;
-  final String keyword;
-}
-
-class _AggregateSearchDialog extends StatefulWidget {
-  const _AggregateSearchDialog({
-    required this.configs,
-    required this.selectedStrategy,
-    required this.keyword,
-  });
-
-  final List<AggregateSearchConfig> configs;
-  final String selectedStrategy;
-  final String keyword;
-
-  @override
-  State<_AggregateSearchDialog> createState() => _AggregateSearchDialogState();
-}
-
-class _AggregateSearchDialogState extends State<_AggregateSearchDialog> {
-  late final TextEditingController _keywordController;
-  String? _selectedStrategy;
-
-  @override
-  void initState() {
-    super.initState();
-    _keywordController = TextEditingController(text: widget.keyword);
-    _selectedStrategy =
-        widget.configs.any((config) => config.id == widget.selectedStrategy)
-        ? widget.selectedStrategy
-        : widget.configs.firstOrNull?.id;
-  }
-
-  @override
-  void dispose() {
-    _keywordController.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final strategy = _selectedStrategy;
-    if (strategy == null) return;
-    Navigator.of(context).pop(
-      _AggregateSearchDialogResult(
-        strategy: strategy,
-        keyword: _keywordController.text,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final dialogWidth = ScreenUtils.isLargeScreen(context)
-        ? math.min(screenWidth * 0.5, 440.0)
-        : screenWidth * 0.8;
-
-    return AlertDialog(
-      key: const ValueKey('aggregate-search-dialog'),
-      scrollable: true,
-      constraints: BoxConstraints(minWidth: dialogWidth, maxWidth: dialogWidth),
-      title: const Text('聚合搜索'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('搜索关键词', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            TextField(
-              key: const ValueKey('search-keyword-field'),
-              controller: _keywordController,
-              autofocus: true,
-              textInputAction: TextInputAction.search,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: '输入关键词（可选）',
-                isDense: true,
-              ),
-              onSubmitted: (_) => _submit(),
-            ),
-            const SizedBox(height: 16),
-            Text('搜索策略', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            AggregateSearchStrategyList(
-              configs: widget.configs,
-              selectedStrategy: _selectedStrategy,
-              maximumHeight: 200,
-              availableHeightFactor: 0.32,
-              onChanged: (value) {
-                setState(() {
-                  _selectedStrategy = value;
-                });
-              },
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          onPressed: _selectedStrategy == null ? null : _submit,
-          child: const Text('搜索'),
-        ),
-      ],
     );
   }
 }
@@ -2743,9 +2268,8 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
                         ? Duration.zero
                         : const Duration(seconds: 1),
                     child: Container(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.scrim.withValues(alpha: 0.35),
+                      color: Theme.of(context).colorScheme.scrim
+                          .withValues(alpha: 0.35),
                       alignment: Alignment.center,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -2766,20 +2290,19 @@ class _AggregateSearchScrollbarState extends State<_AggregateSearchScrollbar> {
                         child: Text(
                           _overlaySiteName!,
                           style:
-                              Theme.of(
-                                context,
-                              ).textTheme.headlineSmall?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.w600,
-                              ) ??
+                              Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onPrimaryContainer,
+                                    fontWeight: FontWeight.w600,
+                                  ) ??
                               TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.w600,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimaryContainer,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
                               ),
                         ),
                       ),

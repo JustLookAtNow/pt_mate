@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../models/app_models.dart';
+import '../utils/file_picker_utils.dart';
 import 'downloader/torrent_file_downloader_mixin.dart';
 import 'storage/storage_service.dart';
 
@@ -242,14 +243,16 @@ class LocalDownloadService with TorrentFileDownloaderMixin {
     List<int> data,
   ) async {
     try {
-      return await _androidDownloadsChannel
-              .invokeMethod<String>('saveToDownloads', {
-                'fileName': fileName,
-                'bytes': Uint8List.fromList(data),
-                'mimeType': fileName.toLowerCase().endsWith('.zip')
-                    ? 'application/zip'
-                    : 'application/x-bittorrent',
-              }) ??
+      return await _androidDownloadsChannel.invokeMethod<String>(
+            'saveToDownloads',
+            {
+              'fileName': fileName,
+              'bytes': Uint8List.fromList(data),
+              'mimeType': fileName.toLowerCase().endsWith('.zip')
+                  ? 'application/zip'
+                  : 'application/x-bittorrent',
+            },
+          ) ??
           '$downloadsDisplayPath/$fileName';
     } on MissingPluginException catch (e) {
       if (kDebugMode) {
@@ -314,14 +317,15 @@ class LocalDownloadService with TorrentFileDownloaderMixin {
       return null;
     }
 
-    await _rememberSaveDirectory(result);
+    final path = filePickerLocation(result);
+    await _rememberSaveDirectory(path);
 
     if (Platform.isLinux) {
-      final file = File(result);
+      final file = File.fromUri(result);
       await file.writeAsBytes(data);
     }
 
-    return result;
+    return path;
   }
 
   Future<String?> _resolveInitialDirectory() async {

@@ -1,3 +1,6 @@
+// Public constructor names intentionally differ from the private fields.
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -7,6 +10,7 @@ enum AndroidSecureStorageProfile {
   oaepGcm,
   pkcs1Gcm,
   pkcs1Cbc,
+  plaintext,
   fresh,
   inconsistent,
   unsupported,
@@ -31,12 +35,25 @@ class AndroidSecureStorageProbeResult {
 
   bool get isReady => switch (profile) {
     AndroidSecureStorageProfile.oaepGcm ||
+    AndroidSecureStorageProfile.plaintext ||
+    AndroidSecureStorageProfile.fresh => true,
     AndroidSecureStorageProfile.pkcs1Gcm ||
     AndroidSecureStorageProfile.pkcs1Cbc ||
-    AndroidSecureStorageProfile.fresh => true,
     AndroidSecureStorageProfile.inconsistent ||
     AndroidSecureStorageProfile.unsupported => false,
   };
+}
+
+class AndroidSecureStorageCapabilityResult {
+  const AndroidSecureStorageCapabilityResult({
+    required this.isSupported,
+    required this.isExplicitlyUnsupported,
+    this.failureCode,
+  });
+
+  final bool isSupported;
+  final bool isExplicitlyUnsupported;
+  final String? failureCode;
 }
 
 class AndroidSecureStorageFlushResult {
@@ -47,6 +64,38 @@ class AndroidSecureStorageFlushResult {
 
   final bool isSuccessful;
   final String? failureCode;
+}
+
+enum LegacyAndroidMigrationPhase {
+  backupConfirmed,
+  legacyCleared,
+  targetInitialized,
+  restored,
+}
+
+enum LegacyAndroidMigrationTarget { oaepGcm, plaintext }
+
+class LegacyAndroidSecureStorageSnapshot {
+  const LegacyAndroidSecureStorageSnapshot({
+    required this.profile,
+    required this.values,
+  });
+
+  final AndroidSecureStorageProfile profile;
+  final Map<String, String> values;
+}
+
+class LegacyAndroidMigrationState {
+  const LegacyAndroidMigrationState({this.phase, this.target});
+
+  final LegacyAndroidMigrationPhase? phase;
+  final LegacyAndroidMigrationTarget? target;
+
+  bool get isPending => phase != null;
+  bool get requiresBackupRestore =>
+      phase == LegacyAndroidMigrationPhase.backupConfirmed ||
+      phase == LegacyAndroidMigrationPhase.legacyCleared ||
+      phase == LegacyAndroidMigrationPhase.targetInitialized;
 }
 
 class AndroidSecureStorageProfileResolver {
@@ -63,6 +112,18 @@ class AndroidSecureStorageProfileResolver {
   static const _probeMethodName = 'probeAndroidSecureStorage';
   static const _initializeFreshMethodName =
       'initializeFreshAndroidSecureStorage';
+  static const _probeCapabilityMethodName =
+      'probeModernSecureStorageCapability';
+  static const _readLegacyMethodName = 'readLegacyAndroidSecureStorage';
+  static const _migrationStateMethodName = 'getLegacyAndroidMigrationState';
+  static const _beginMigrationMethodName = 'beginLegacyAndroidMigration';
+  static const _markTargetInitializedMethodName =
+      'markLegacyAndroidMigrationTargetInitialized';
+  static const _completeMigrationMethodName = 'completeLegacyAndroidMigration';
+  static const _enablePlaintextMethodName = 'enableAndroidPlaintextFallback';
+  static const _readPlaintextMethodName = 'readAndroidPlaintextSensitive';
+  static const _commitPlaintextMethodName = 'commitAndroidPlaintextSensitive';
+  static const _resetLegacyMethodName = 'resetLegacyAndroidSecureStorage';
   static const _flushMethodName = 'flushAndroidSecureStorage';
   static const _oaepCipher = 'RSA_ECB_OAEPwithSHA_256andMGF1Padding';
   static const _pkcs1Cipher = 'RSA_ECB_PKCS1Padding';
@@ -87,6 +148,209 @@ class AndroidSecureStorageProfileResolver {
       timeoutFailureCode: 'native_fresh_initialization_timeout',
       genericFailureCode: 'fresh_initialization_failed',
     );
+  }
+
+  Future<AndroidSecureStorageCapabilityResult> probeModernCapability() async {
+    if (!_isAndroid) {
+      return const AndroidSecureStorageCapabilityResult(
+        isSupported: false,
+        isExplicitlyUnsupported: false,
+        failureCode: 'not_android',
+      );
+    }
+    try {
+      final response = await _channel
+          .invokeMapMethod<String, Object?>(_probeCapabilityMethodName)
+          .timeout(_probeTimeout);
+      final status = response?['status'];
+      final failureCode = response?['failureCode'];
+      if (status == 'supported' && failureCode == null) {
+        return const AndroidSecureStorageCapabilityResult(
+          isSupported: true,
+          isExplicitlyUnsupported: false,
+        );
+      }
+      if (status == 'unsupported' && failureCode == 'unsupported_algorithm') {
+        return const AndroidSecureStorageCapabilityResult(
+          isSupported: false,
+          isExplicitlyUnsupported: true,
+          failureCode: 'unsupported_algorithm',
+        );
+      }
+      return AndroidSecureStorageCapabilityResult(
+        isSupported: false,
+        isExplicitlyUnsupported: false,
+        failureCode: failureCode is String && failureCode.isNotEmpty
+            ? failureCode
+            : 'capability_probe_failed',
+      );
+    } on TimeoutException {
+      return const AndroidSecureStorageCapabilityResult(
+        isSupported: false,
+        isExplicitlyUnsupported: false,
+        failureCode: 'native_capability_probe_timeout',
+      );
+    } on PlatformException catch (error) {
+      return AndroidSecureStorageCapabilityResult(
+        isSupported: false,
+        isExplicitlyUnsupported: false,
+        failureCode: 'native_${error.code}',
+      );
+    } catch (_) {
+      return const AndroidSecureStorageCapabilityResult(
+        isSupported: false,
+        isExplicitlyUnsupported: false,
+        failureCode: 'capability_probe_failed',
+      );
+    }
+  }
+
+  Future<LegacyAndroidSecureStorageSnapshot> readLegacySnapshot() async {
+    if (!_isAndroid) {
+      throw const SecureStorageUnavailableExceptionForResolver('not_android');
+    }
+    final response = await _channel
+        .invokeMapMethod<String, Object?>(_readLegacyMethodName)
+        .timeout(_probeTimeout);
+    if (response?['status'] != 'ready' || response?['failureCode'] != null) {
+      throw SecureStorageUnavailableExceptionForResolver(
+        response?['failureCode'] as String? ?? 'legacy_import_failed',
+      );
+    }
+    final profile = AndroidSecureStorageProfile.values
+        .asNameMap()[response?['profile'] as String?];
+    final rawValues = response?['values'];
+    if ((profile != AndroidSecureStorageProfile.pkcs1Gcm &&
+            profile != AndroidSecureStorageProfile.pkcs1Cbc) ||
+        rawValues is! Map) {
+      throw const SecureStorageUnavailableExceptionForResolver(
+        'legacy_import_result_invalid',
+      );
+    }
+    final values = <String, String>{};
+    for (final entry in rawValues.entries) {
+      if (entry.key is! String || entry.value is! String) {
+        throw const SecureStorageUnavailableExceptionForResolver(
+          'legacy_import_result_invalid',
+        );
+      }
+      values[entry.key as String] = entry.value as String;
+    }
+    return LegacyAndroidSecureStorageSnapshot(
+      profile: profile!,
+      values: Map<String, String>.unmodifiable(values),
+    );
+  }
+
+  Future<LegacyAndroidMigrationState> getLegacyMigrationState() async {
+    if (!_isAndroid) return const LegacyAndroidMigrationState();
+    final response = await _channel
+        .invokeMapMethod<String, Object?>(_migrationStateMethodName)
+        .timeout(_probeTimeout);
+    if (response?['status'] == 'none') {
+      return const LegacyAndroidMigrationState();
+    }
+    if (response?['status'] != 'pending') {
+      throw const SecureStorageUnavailableExceptionForResolver(
+        'legacy_migration_state_invalid',
+      );
+    }
+    final phase = LegacyAndroidMigrationPhase.values
+        .asNameMap()[response?['phase'] as String?];
+    final target = LegacyAndroidMigrationTarget.values
+        .asNameMap()[response?['target'] as String?];
+    if (phase == null || target == null) {
+      throw const SecureStorageUnavailableExceptionForResolver(
+        'legacy_migration_state_invalid',
+      );
+    }
+    return LegacyAndroidMigrationState(phase: phase, target: target);
+  }
+
+  Future<void> beginLegacyMigration(LegacyAndroidMigrationTarget target) =>
+      _requireReadyResult(
+        _beginMigrationMethodName,
+        arguments: <String, Object?>{
+          'target': target.name,
+          'backupConfirmed': true,
+        },
+        acceptedStatuses: const {'fresh'},
+      );
+
+  Future<void> markLegacyMigrationTargetInitialized() => _requireReadyResult(
+    _markTargetInitializedMethodName,
+    acceptedStatuses: const {'ready'},
+  );
+
+  Future<void> completeLegacyMigration() => _requireReadyResult(
+    _completeMigrationMethodName,
+    acceptedStatuses: const {'complete'},
+  );
+
+  Future<void> _requireReadyResult(
+    String methodName, {
+    Map<String, Object?>? arguments,
+    required Set<String> acceptedStatuses,
+  }) async {
+    if (!_isAndroid) {
+      throw const SecureStorageUnavailableExceptionForResolver('not_android');
+    }
+    final response = await _channel
+        .invokeMapMethod<String, Object?>(methodName, arguments)
+        .timeout(_probeTimeout);
+    if (response == null ||
+        !acceptedStatuses.contains(response['status']) ||
+        response['failureCode'] != null) {
+      throw SecureStorageUnavailableExceptionForResolver(
+        response?['failureCode'] as String? ??
+            'legacy_migration_operation_failed',
+      );
+    }
+  }
+
+  Future<AndroidSecureStorageProbeResult> enablePlaintextFallback() {
+    return _invokeNative(
+      methodName: _enablePlaintextMethodName,
+      timeoutFailureCode: 'native_plaintext_enable_timeout',
+      genericFailureCode: 'plaintext_enable_failed',
+    );
+  }
+
+  Future<String?> readPlaintextSensitive(String key) async {
+    if (!_isAndroid) return null;
+    return _channel
+        .invokeMethod<String>(_readPlaintextMethodName, <String, Object?>{
+          'key': key,
+        })
+        .timeout(_probeTimeout);
+  }
+
+  Future<void> commitPlaintextSensitive(Map<String, String?> mutations) async {
+    if (!_isAndroid) {
+      throw const SecureStorageUnavailableExceptionForResolver('not_android');
+    }
+    final response = await _channel
+        .invokeMapMethod<String, Object?>(
+          _commitPlaintextMethodName,
+          <String, Object?>{'mutations': mutations},
+        )
+        .timeout(_probeTimeout);
+    if (response?['status'] != 'ready' || response?['failureCode'] != null) {
+      throw SecureStorageUnavailableExceptionForResolver(
+        response?['failureCode'] as String? ?? 'plaintext_commit_failed',
+      );
+    }
+  }
+
+  Future<bool> resetLegacyStorage({required bool confirmed}) async {
+    if (!_isAndroid || !confirmed) return false;
+    final response = await _channel
+        .invokeMapMethod<String, Object?>(
+          _resetLegacyMethodName,
+          <String, Object?>{'confirmed': confirmed},
+        )
+        .timeout(_probeTimeout);
+    return response?['status'] == 'fresh' && response?['failureCode'] == null;
   }
 
   Future<AndroidSecureStorageFlushResult> flush() async {
@@ -276,6 +540,12 @@ class AndroidSecureStorageProfileResolver {
         readyDetailsAreSafe &&
             keyCipher == _pkcs1Cipher &&
             storageCipher == _cbcCipher,
+      AndroidSecureStorageProfile.plaintext =>
+        keyCipher == null &&
+            storageCipher == null &&
+            !hasEncryptedEntries &&
+            !hasWrappedKeys &&
+            failureCode == null,
       AndroidSecureStorageProfile.fresh =>
         keyCipher == null &&
             storageCipher == null &&
@@ -295,10 +565,17 @@ class AndroidSecureStorageProfileResolver {
     return switch (profile) {
       AndroidSecureStorageProfile.oaepGcm ||
       AndroidSecureStorageProfile.pkcs1Gcm ||
-      AndroidSecureStorageProfile.pkcs1Cbc => status == 'ready',
+      AndroidSecureStorageProfile.pkcs1Cbc ||
+      AndroidSecureStorageProfile.plaintext => status == 'ready',
       AndroidSecureStorageProfile.fresh => status == 'fresh',
       AndroidSecureStorageProfile.inconsistent => status == 'inconsistent',
       AndroidSecureStorageProfile.unsupported => status == 'unsupported',
     };
   }
+}
+
+class SecureStorageUnavailableExceptionForResolver implements Exception {
+  const SecureStorageUnavailableExceptionForResolver(this.code);
+
+  final String code;
 }

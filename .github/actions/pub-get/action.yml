@@ -1,0 +1,26 @@
+name: Flutter pub get
+description: Run "flutter pub get" with retries to tolerate transient pub.dev failures (for example HTTP 401/403 "authorization failed").
+
+runs:
+  using: composite
+  steps:
+    - name: flutter pub get
+      shell: bash
+      run: |
+        attempts=3
+        delay=10
+        attempt=1
+        while [ "$attempt" -le "$attempts" ]; do
+          if flutter pub get; then
+            echo "flutter pub get succeeded on attempt $attempt."
+            exit 0
+          fi
+          if [ "$attempt" -eq "$attempts" ]; then
+            echo "::error::flutter pub get failed after $attempts attempts."
+            exit 1
+          fi
+          echo "::warning::flutter pub get failed on attempt $attempt/$attempts; retrying in ${delay}s."
+          sleep "$delay"
+          delay=$((delay * 2))
+          attempt=$((attempt + 1))
+        done

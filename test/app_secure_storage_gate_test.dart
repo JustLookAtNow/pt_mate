@@ -52,6 +52,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('暂时无法读取安全存储'), findsOneWidget);
+    expect(find.text('失败阶段：cipherInitialization'), findsOneWidget);
+    expect(find.text('异常类别：InvalidKeyException'), findsOneWidget);
     expect(find.text('错误代码：invalid_key'), findsOneWidget);
     expect(find.text('进入备份恢复'), findsOneWidget);
 
@@ -225,10 +227,8 @@ void main() {
       appState.loadInitial(forceReload: true),
     );
 
-    final failures = await Future.wait([
-      first,
-      second,
-    ]).timeout(const Duration(seconds: 2));
+    final failures = await Future.wait([first, second])
+        .timeout(const Duration(seconds: 2));
 
     expect(failures, ['invalid_key', 'invalid_key']);
     appState.dispose();

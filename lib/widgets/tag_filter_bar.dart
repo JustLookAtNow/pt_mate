@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import '../models/app_models.dart';
-import '../services/storage/storage_service.dart';
+import '../services/settings/display_settings_manager.dart';
 
 /// 标签过滤栏 Widget
 ///
@@ -36,7 +37,9 @@ class TagFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visibleTagNames = StorageService.instance.visibleTags;
+    final visibleTagNames = context.select<DisplaySettingsManager, Set<String>>(
+      (settings) => settings.visibleTags,
+    );
     final allTags = TagType.values
         .where((tag) => visibleTagNames.contains(tag.name))
         .toList();
@@ -63,9 +66,11 @@ class TagFilterBar extends StatelessWidget {
             icon = Icons.check_circle_outline;
           } else if (isExcluded) {
             // 排除状态: 红色背景
-            backgroundColor = Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.5);
+            backgroundColor = Theme.of(context).colorScheme.errorContainer
+                .withValues(alpha: 0.5);
             foregroundColor = Theme.of(context).colorScheme.error;
-            borderColor = Theme.of(context).colorScheme.error.withValues(alpha: 0.6);
+            borderColor = Theme.of(context).colorScheme.error
+                .withValues(alpha: 0.6);
             icon = Icons.cancel_outlined;
           } else {
             // 未选中状态: 使用标签原本的颜色
@@ -126,14 +131,14 @@ class TagFilterBar extends StatelessWidget {
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: backgroundColor,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: borderColor,
-                    width: 1.5,
-                  ),
+                  border: Border.all(color: borderColor, width: 1.5),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -147,7 +152,9 @@ class TagFilterBar extends StatelessWidget {
                       style: TextStyle(
                         color: foregroundColor,
                         fontSize: 13,
-                        fontWeight: (isIncluded || isExcluded) ? FontWeight.bold : FontWeight.w500,
+                        fontWeight: (isIncluded || isExcluded)
+                            ? FontWeight.bold
+                            : FontWeight.w500,
                       ),
                     ),
                   ],

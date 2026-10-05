@@ -1,7 +1,11 @@
+// Keep the public `onConfigUpdated` named parameter stable.
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+
 import '../../models/app_models.dart';
 import '../network/timeout_retry.dart';
 
@@ -38,8 +42,7 @@ class TransmissionClient
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 30),
         headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
           'Content-Type': 'application/json',
         },
         followRedirects: true,

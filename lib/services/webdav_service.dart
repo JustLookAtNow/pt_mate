@@ -26,6 +26,11 @@ class WebDAVService {
   WebDAVConfig? _currentConfig;
   final StorageService _storageService = StorageService.instance;
 
+  void resetForTest() {
+    _client = null;
+    _currentConfig = null;
+  }
+
   // 配置管理
   Future<void> saveConfig(WebDAVConfig config, {String? password}) async {
     // 敏感值必须先写入并读回；失败时不能留下新的普通配置。

@@ -8,17 +8,18 @@ import 'package:path_provider/path_provider.dart';
 
 import '../models/app_models.dart';
 import '../utils/backup_migrators.dart';
+import '../utils/file_picker_utils.dart';
 import 'downloader/downloader_config.dart';
 import 'storage/storage_service.dart';
 import 'webdav_service.dart';
 
 // 备份版本管理
 class BackupVersion {
-  static const String current = '1.3.0';
+  static const String current = '1.4.0';
 
   static bool isCompatible(String version) {
     // 支持的版本列表
-    const supportedVersions = ['1.0.0', '1.1.0', '1.2.0', '1.3.0'];
+    const supportedVersions = ['1.0.0', '1.1.0', '1.2.0', '1.3.0', '1.4.0'];
     return supportedVersions.contains(version);
   }
 
@@ -155,6 +156,7 @@ class BackupService {
       'defaultDownloadSettings': {
         'category': await _storageService.loadDefaultDownloadCategory(),
         'tags': await _storageService.loadDefaultDownloadTags(),
+        'autoAddSiteTag': await _storageService.loadAutoAddSiteTag(),
         'savePath': await _storageService.loadDefaultDownloadSavePath(),
       },
       'proxy': {
@@ -192,6 +194,22 @@ class BackupService {
     final cookieCloudConfig = await _storageService.loadCookieCloudConfig();
     data['cookieCloudConfig'] = cookieCloudConfig.toJson();
 
+    data['deviceId'] = await _storageService.loadDeviceId();
+    final webdavConfig = await _webdavService.loadConfig();
+    final webdavHistory = await _webdavService.loadConfigHistory();
+    data['webdavConfig'] = webdavConfig?.toJson();
+    data['webdavConfigHistory'] = webdavHistory
+        .map((config) => config.toJson())
+        .toList();
+    final webdavPasswords = <String, String>{};
+    for (final config in <WebDAVConfig>{?webdavConfig, ...webdavHistory}) {
+      final password = await _storageService.loadWebDAVPassword(config.id);
+      if (password != null && password.isNotEmpty) {
+        webdavPasswords[config.id] = password;
+      }
+    }
+    data['webdavPasswords'] = webdavPasswords;
+
     return BackupData(
       version: BackupVersion.current,
       timestamp: DateTime.now(),
@@ -211,7 +229,7 @@ class BackupService {
         prepared.secureStorageEpoch,
       );
 
-      String? result;
+      Uri? result;
       if (defaultTargetPlatform == TargetPlatform.linux) {
         onProgress?.call('请选择导出位置...');
         final initialDirectory =
@@ -231,7 +249,7 @@ class BackupService {
           _storageService.requireSecureStorageOperationEpoch(
             prepared.secureStorageEpoch,
           );
-          final file = File(result);
+          final file = File.fromUri(result);
           await file.writeAsString(prepared.content);
         }
       } else {
@@ -245,7 +263,7 @@ class BackupService {
         );
       }
 
-      return result;
+      return result == null ? null : filePickerLocation(result);
     } on SecureStorageUnavailableException {
       rethrow;
     } catch (e) {
@@ -253,18 +271,54 @@ class BackupService {
     }
   }
 
+  Future<LegacyMigrationBackupExport?> exportLegacyMigrationBackup(
+    Map<String, String> legacyValues, {
+    void Function(String message)? onProgress,
+  }) async {
+    try {
+      onProgress?.call('正在读取并校验旧安全数据...');
+      final backup = await _storageService.runWithLegacySecureValues(
+        legacyValues,
+        _createBackupInCurrentEpoch,
+      );
+      final timestamp = backup.timestamp.toIso8601String().replaceAll(':', '-');
+      final fileName =
+          '$_backupFilePrefix${backup.version}_$timestamp$_backupFileExtension';
+      final content = jsonEncode(backup.toJson());
+      // Serialize and parse once before showing the destructive migration
+      // action. This rejects incomplete or structurally invalid snapshots.
+      BackupData.fromJson(jsonDecode(content) as Map<String, dynamic>);
+      onProgress?.call('请选择本地备份保存位置...');
+      final path = await FilePicker.saveFile(
+        dialogTitle: '迁移前导出安全备份',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        bytes: utf8.encode(content),
+      );
+      if (path == null) return null;
+      return LegacyMigrationBackupExport(
+        path: filePickerLocation(path),
+        backup: backup,
+      );
+    } on SecureStorageUnavailableException {
+      rethrow;
+    } catch (error) {
+      throw BackupException('迁移备份导出失败: $error');
+    }
+  }
+
   // 从文件导入备份
   Future<BackupData?> importBackup() async {
     try {
-      final result = await FilePicker.pickFiles(
+      final result = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['json'],
         dialogTitle: '选择备份文件',
       );
 
-      if (result != null && result.files.single.path != null) {
-        final file = File(result.files.single.path!);
-        final content = await file.readAsString();
+      if (result != null) {
+        final content = utf8.decode(await result.readAsBytes());
         var json = jsonDecode(content) as Map<String, dynamic>;
 
         // 检查是否需要数据迁移
@@ -285,6 +339,8 @@ class BackupService {
   Future<BackupRestoreResult> restoreBackup(
     BackupData backup, {
     int? expectedSecureStorageEpoch,
+    Future<void> Function()? onBeforeRestore,
+    Future<void> Function()? onAfterRestore,
   }) async {
     try {
       final expected = expectedSecureStorageEpoch;
@@ -333,6 +389,25 @@ class BackupService {
             (id, value) => MapEntry(id, value as String),
           ),
       };
+      final restoredWebdavPasswords = <String, String>{
+        if (migratedData['webdavPasswords'] != null)
+          ...(migratedData['webdavPasswords'] as Map<String, dynamic>).map(
+            (id, value) => MapEntry(id, value as String),
+          ),
+      };
+      final restoredWebdavIds = <String>{};
+      final restoredWebdavConfig = migratedData['webdavConfig'];
+      if (restoredWebdavConfig is Map<String, dynamic>) {
+        restoredWebdavIds.add(WebDAVConfig.fromJson(restoredWebdavConfig).id);
+      }
+      final restoredWebdavHistory = migratedData['webdavConfigHistory'];
+      if (restoredWebdavHistory is List<dynamic>) {
+        for (final value in restoredWebdavHistory) {
+          restoredWebdavIds.add(
+            WebDAVConfig.fromJson(value as Map<String, dynamic>).id,
+          );
+        }
+      }
       List<Map<String, dynamic>>? sanitizedDownloaderConfigs;
       Set<String>? restoredDownloaderIds;
       if (migratedData['downloaderConfigs'] != null) {
@@ -376,9 +451,17 @@ class BackupService {
         migratedData,
         sanitizedDownloaderConfigs: sanitizedDownloaderConfigs,
       );
+      _storageService.validateBackupRestorePayload(
+        siteConfigs: restoredSiteConfigs,
+        cookieCloudConfig: restoredCookieCloudConfig,
+        backupPreferences: backupPreferences,
+      );
       if (expected != null) {
         _storageService.requireSecureStorageOperationEpoch(expected);
       }
+
+      // Validate every backup payload before allowing destructive legacy reset.
+      await onBeforeRestore?.call();
 
       // 敏感字段与全部普通偏好共享一个 manifest/companion 提交边界。
       await _storageService.restoreSensitiveBackupData(
@@ -388,11 +471,18 @@ class BackupService {
             ? null
             : restoredDownloaderPasswords,
         downloaderIds: restoredDownloaderIds,
+        deviceId: migratedData['deviceId'] as String?,
+        webdavPasswords: restoredWebdavPasswords.isEmpty
+            ? null
+            : restoredWebdavPasswords,
+        webdavIds: restoredWebdavIds.isEmpty ? null : restoredWebdavIds,
         backupPreferences: backupPreferences.isEmpty ? null : backupPreferences,
         hasProxyPassword: hasProxyPassword,
         proxyPassword: restoredProxyPassword,
         expectedSecureStorageEpoch: expected,
       );
+
+      await onAfterRestore?.call();
 
       return BackupRestoreResult(success: true, message: '数据恢复成功');
     } catch (e) {
@@ -404,7 +494,8 @@ class BackupService {
     Map<String, dynamic> data, {
     required List<Map<String, dynamic>>? sanitizedDownloaderConfigs,
   }) {
-    final snapshot = <String, dynamic>{};
+    // 旧备份没有此字段时恢复为默认关闭，避免保留当前的开启状态。
+    final snapshot = <String, dynamic>{'autoAddSiteTag': false};
     final activeSiteId = data['activeSiteId'];
     if (activeSiteId != null) snapshot['activeSiteId'] = activeSiteId as String;
 
@@ -429,6 +520,9 @@ class BackupService {
       final downloadSettings =
           preferences['defaultDownloadSettings'] as Map<String, dynamic>?;
       if (downloadSettings != null) {
+        if (downloadSettings.containsKey('autoAddSiteTag')) {
+          snapshot['autoAddSiteTag'] = downloadSettings['autoAddSiteTag'];
+        }
         if (downloadSettings['category'] != null) {
           snapshot['defaultDownloadCategory'] =
               downloadSettings['category'] as String;
@@ -485,6 +579,12 @@ class BackupService {
         // Preserve the historical behavior: an invalid optional search
         // preference does not invalidate the rest of a backup.
       }
+    }
+    if (data.containsKey('webdavConfig')) {
+      snapshot['webdavConfig'] = data['webdavConfig'];
+    }
+    if (data.containsKey('webdavConfigHistory')) {
+      snapshot['webdavConfigHistory'] = data['webdavConfigHistory'];
     }
     return snapshot;
   }
@@ -549,20 +649,21 @@ class BackupService {
             _storageService.requireSecureStorageOperationEpoch(
               prepared.secureStorageEpoch,
             );
-            final file = File(result);
+            final file = File.fromUri(result);
             await file.writeAsString(prepared.content);
           }
-          return result;
+          return result == null ? null : filePickerLocation(result);
         }
 
         onProgress?.call('正在导出备份...');
-        return await FilePicker.saveFile(
+        final result = await FilePicker.saveFile(
           dialogTitle: '导出备份文件',
           fileName: prepared.fileName,
           type: FileType.custom,
           allowedExtensions: ['json'],
           bytes: utf8.encode(prepared.content),
         );
+        return result == null ? null : filePickerLocation(result);
       }
     } on SecureStorageUnavailableException {
       rethrow;
@@ -677,6 +778,13 @@ class BackupRestoreResult {
   final String message;
 
   BackupRestoreResult({required this.success, required this.message});
+}
+
+class LegacyMigrationBackupExport {
+  const LegacyMigrationBackupExport({required this.path, required this.backup});
+
+  final String path;
+  final BackupData backup;
 }
 
 class _PreparedBackupFile {

@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
@@ -164,12 +165,23 @@ class DownloaderService {
     required AddTaskParams params,
     SiteConfig? siteConfig,
   }) async {
-    final client = DownloaderFactory.getClient(
-      config: config,
-      password: password,
-    );
+    var effectiveParams = params;
+    final siteName = siteConfig?.name.trim();
+    if (config.type.supportsTags &&
+        siteName != null &&
+        siteName.isNotEmpty &&
+        await _storageService.loadAutoAddSiteTag()) {
+      final siteTag = '站点/$siteName';
+      final tags = [...?params.tags];
+      if (!tags.contains(siteTag)) {
+        tags.add(siteTag);
+      }
+      effectiveParams = params.copyWith(tags: tags);
+    }
+
+    final client = getClient(config: config, password: password);
     await retryOnTimeout<void>(
-      () => client.addTask(params, siteConfig: siteConfig),
+      () => client.addTask(effectiveParams, siteConfig: siteConfig),
     );
   }
 

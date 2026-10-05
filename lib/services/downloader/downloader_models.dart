@@ -2,6 +2,7 @@
 ///
 /// 这些模型提供了统一的接口，用于不同下载器实现之间的数据交换
 library;
+
 import '../../utils/format.dart';
 
 /// 下载器类型枚举
@@ -14,6 +15,12 @@ enum DownloaderType {
 
   final String value;
   final String displayName;
+
+  /// 是否支持独立于分类的任务标签。
+  bool get supportsTags => switch (this) {
+    DownloaderType.qbittorrent || DownloaderType.transmission => true,
+    DownloaderType.rutorrent => false,
+  };
 
   static DownloaderType fromString(String value) {
     for (final type in DownloaderType.values) {
@@ -62,20 +69,14 @@ class TransferInfo {
 class ServerState {
   final int freeSpaceOnDisk;
 
-  const ServerState({
-    required this.freeSpaceOnDisk,
-  });
+  const ServerState({required this.freeSpaceOnDisk});
 
   factory ServerState.fromJson(Map<String, dynamic> json) {
-    return ServerState(
-      freeSpaceOnDisk: json['freeSpaceOnDisk'] ?? 0,
-    );
+    return ServerState(freeSpaceOnDisk: json['freeSpaceOnDisk'] ?? 0);
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'freeSpaceOnDisk': freeSpaceOnDisk,
-    };
+    return {'freeSpaceOnDisk': freeSpaceOnDisk};
   }
 }
 
@@ -103,8 +104,10 @@ class DownloadTaskState {
   static const String unknown = 'unknown';
 
   static bool isDownloading(String state) {
-    return state == downloading || state == forcedDL ||
-           state == metaDL || state == stalledDL;
+    return state == downloading ||
+        state == forcedDL ||
+        state == metaDL ||
+        state == stalledDL;
   }
 
   static bool isPaused(String state) {
@@ -149,7 +152,7 @@ class DownloadTask {
     required this.amountLeft,
     required this.ratio,
     required this.timeActive,
-    required this.uploaded
+    required this.uploaded,
   });
 
   factory DownloadTask.fromJson(Map<String, dynamic> json) {
@@ -160,7 +163,9 @@ class DownloadTask {
       size: json['size'] is int
           ? json['size'] as int
           : FormatUtil.parseInt(json['size']) ?? 0,
-      progress: json['progress'] is double ? json['progress'] : double.tryParse('${json['progress'] ?? 0}') ?? 0,
+      progress: json['progress'] is double
+          ? json['progress']
+          : double.tryParse('${json['progress'] ?? 0}') ?? 0,
       dlspeed: json['dlspeed'] is int
           ? json['dlspeed'] as int
           : FormatUtil.parseInt(json['dlspeed']) ?? 0,
@@ -172,8 +177,14 @@ class DownloadTask {
           : FormatUtil.parseInt(json['eta']) ?? 0,
       category: json['category'] ?? '',
       tags: json['tags'] is String
-          ? (json['tags'] as String).split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
-          : (json['tags'] is List ? (json['tags'] as List).map((e) => e.toString()).toList() : <String>[]),
+          ? (json['tags'] as String)
+                .split(',')
+                .map((e) => e.trim())
+                .where((e) => e.isNotEmpty)
+                .toList()
+          : (json['tags'] is List
+                ? (json['tags'] as List).map((e) => e.toString()).toList()
+                : <String>[]),
       completionOn: json['completionOn'] is int
           ? json['completionOn'] as int
           : FormatUtil.parseInt(json['completionOn']) ?? 0,
@@ -184,7 +195,9 @@ class DownloadTask {
       amountLeft: json['amountLeft'] is int
           ? json['amountLeft'] as int
           : FormatUtil.parseInt(json['amountLeft']) ?? 0,
-      ratio: json['ratio'] is double ? json['ratio'] : double.tryParse('${json['ratio'] ?? 0}') ?? 0,
+      ratio: json['ratio'] is double
+          ? json['ratio']
+          : double.tryParse('${json['ratio'] ?? 0}') ?? 0,
       timeActive: json['timeActive'] is int
           ? json['timeActive'] as int
           : FormatUtil.parseInt(json['timeActive']) ?? 0,
@@ -227,6 +240,7 @@ class AddTaskParams {
   final List<String>? tags;
   final String? savePath;
   final bool? autoTMM;
+
   /// 是否添加后暂停（不立即开始），默认空表示遵循下载器默认行为
   final bool? startPaused;
 
@@ -239,14 +253,34 @@ class AddTaskParams {
     this.startPaused,
   });
 
+  AddTaskParams copyWith({
+    String? url,
+    String? category,
+    List<String>? tags,
+    String? savePath,
+    bool? autoTMM,
+    bool? startPaused,
+  }) => AddTaskParams(
+    url: url ?? this.url,
+    category: category ?? this.category,
+    tags: tags ?? this.tags,
+    savePath: savePath ?? this.savePath,
+    autoTMM: autoTMM ?? this.autoTMM,
+    startPaused: startPaused ?? this.startPaused,
+  );
+
   factory AddTaskParams.fromJson(Map<String, dynamic> json) {
     return AddTaskParams(
       url: json['url'] ?? '',
       category: json['category'],
-      tags: json['tags'] is List ? (json['tags'] as List).map((e) => e.toString()).toList() : null,
+      tags: json['tags'] is List
+          ? (json['tags'] as List).map((e) => e.toString()).toList()
+          : null,
       savePath: json['savePath'],
       autoTMM: json['autoTMM'],
-      startPaused: json['startPaused'] is bool ? json['startPaused'] : (json['startPaused']?.toString() == 'true' ? true : null),
+      startPaused: json['startPaused'] is bool
+          ? json['startPaused']
+          : (json['startPaused']?.toString() == 'true' ? true : null),
     );
   }
 

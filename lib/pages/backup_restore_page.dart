@@ -1,13 +1,28 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
+
 import '../services/backup_service.dart';
 import '../services/storage/storage_service.dart';
 import '../services/webdav_service.dart';
 import '../models/app_models.dart';
+
 import 'package:pt_mate/utils/notification_helper.dart';
 
 class BackupRestorePage extends StatefulWidget {
-  const BackupRestorePage({super.key});
+  const BackupRestorePage({
+    super.key,
+    this.onBeforeRestore,
+    this.onAfterRestore,
+  });
+
+  /// Runs after a backup has been selected and parsed, and after the user has
+  /// confirmed restoration, but before its data is written. Legacy Android
+  /// recovery uses this to reset incompatible secure-storage artifacts.
+  final Future<void> Function()? onBeforeRestore;
+  final Future<void> Function()? onAfterRestore;
+
+  bool get isLegacySecureStorageRecovery => onBeforeRestore != null;
 
   @override
   State<BackupRestorePage> createState() => _BackupRestorePageState();
@@ -122,35 +137,50 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
   }
 
   Future<void> _importBackup() async {
-    // 显示确认对话框
-    final confirmed = await _showRestoreConfirmDialog();
-    if (!confirmed) return;
-
     setState(() {
       _isLoading = true;
-      _statusMessage = '正在导入备份...';
+      _statusMessage = '正在选择并验证备份...';
       _isError = false;
     });
 
     try {
       final backup = await _backupService.importBackup();
-      if (backup != null) {
-        setState(() {
-          _statusMessage = '正在恢复数据...';
-        });
-
-        final result = await _backupService.restoreBackup(backup);
-        if (!result.success) {
-          _showMessage(result.message, isError: true);
-          return;
-        }
-
-        // 备份恢复完成，显示重启提示对话框
-        if (mounted) {
-          await _showRestartDialog();
-        }
-      } else {
+      if (backup == null) {
         _showMessage('备份导入已取消', isError: false);
+        return;
+      }
+
+      // Only a successfully selected and parsed backup may lead to destructive
+      // legacy-storage cleanup.
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _statusMessage = null;
+        });
+      }
+      final confirmed = await _showRestoreConfirmDialog();
+      if (!confirmed) return;
+
+      if (!mounted) return;
+      setState(() {
+        _isLoading = true;
+        _statusMessage = widget.isLegacySecureStorageRecovery
+            ? '正在重置旧安全存储...'
+            : '正在恢复数据...';
+      });
+      final result = await _backupService.restoreBackup(
+        backup,
+        onBeforeRestore: widget.onBeforeRestore,
+        onAfterRestore: widget.onAfterRestore,
+      );
+      if (!result.success) {
+        _showMessage(result.message, isError: true);
+        return;
+      }
+
+      // 备份恢复完成，显示重启提示对话框
+      if (mounted) {
+        await _showRestartDialog();
       }
     } catch (e) {
       _showMessage('备份恢复失败: $e', isError: true);
@@ -167,8 +197,8 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('确认恢复备份'),
-            content: const Text(
-              '恢复备份将会覆盖当前的所有应用数据，包括：\n\n'
+            content: Text(
+              '${widget.isLegacySecureStorageRecovery ? '已选择备份文件。确认后将完整校验备份；校验通过才会清理不兼容的旧安全存储。\n\n' : ''}恢复备份将会覆盖当前的所有应用数据，包括：\n\n'
               '• 站点配置\n'
               '• qBittorrent客户端配置\n'
               '• 用户偏好设置\n'
@@ -202,8 +232,9 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: const Text('备份恢复成功'),
-        content: const Text(
+        content: Text(
           '备份已成功恢复！\n\n'
+          '${widget.isLegacySecureStorageRecovery ? '迁移备份包含 Cookie、API Key 和密码等明文敏感信息；确认应用可正常使用后，请从设备中删除该备份文件。\n\n' : ''}'
           '为确保所有数据正确生效，建议您重启应用。\n\n'
           '您可以选择立即重启或稍后手动重启应用。',
         ),
@@ -323,9 +354,9 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                         children: [
                           Icon(
                             Icons.error_outline,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onErrorContainer,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onErrorContainer,
                             size: 20,
                           ),
                           const SizedBox(width: 8),
@@ -333,9 +364,9 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                             child: Text(
                               errorMessage!,
                               style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onErrorContainer,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onErrorContainer,
                               ),
                             ),
                           ),
@@ -614,9 +645,9 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                                           Navigator.of(context).pop(false),
                                       style: TextButton.styleFrom(
                                         side: BorderSide(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.outline,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .outline,
                                           width: 1.0,
                                         ),
                                       ),
@@ -626,12 +657,12 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                                       onPressed: () =>
                                           Navigator.of(context).pop(true),
                                       style: FilledButton.styleFrom(
-                                        backgroundColor: Theme.of(
-                                          context,
-                                        ).colorScheme.error,
-                                        foregroundColor: Theme.of(
-                                          context,
-                                        ).colorScheme.onError,
+                                        backgroundColor: Theme.of(context)
+                                            .colorScheme
+                                            .error,
+                                        foregroundColor: Theme.of(context)
+                                            .colorScheme
+                                            .onError,
                                       ),
                                       child: const Text('删除'),
                                     ),
@@ -725,9 +756,8 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                 children: [
                   Text(
                     title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -766,9 +796,8 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
             // 导出备份部分
             Text(
               '导出备份',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
 
@@ -795,9 +824,8 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
             // 导入备份部分
             Text(
               '导入备份',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
 
@@ -824,9 +852,8 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
             // WebDAV云同步部分
             Text(
               'WebDAV云同步',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
 
@@ -956,9 +983,9 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                           _isWebDAVError ? Icons.error : Icons.check_circle,
                           color: _isWebDAVError
                               ? Theme.of(context).colorScheme.onErrorContainer
-                              : Theme.of(
-                                  context,
-                                ).colorScheme.onPrimaryContainer,
+                              : Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
                         ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -967,12 +994,12 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: _isWebDAVError
-                                    ? Theme.of(
-                                        context,
-                                      ).colorScheme.onErrorContainer
-                                    : Theme.of(
-                                        context,
-                                      ).colorScheme.onPrimaryContainer,
+                                    ? Theme.of(context)
+                                          .colorScheme
+                                          .onErrorContainer
+                                    : Theme.of(context)
+                                          .colorScheme
+                                          .onPrimaryContainer,
                               ),
                         ),
                       ),
@@ -1054,9 +1081,9 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                           _isError ? Icons.error : Icons.check_circle,
                           color: _isError
                               ? Theme.of(context).colorScheme.onErrorContainer
-                              : Theme.of(
-                                  context,
-                                ).colorScheme.onPrimaryContainer,
+                              : Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
                         ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -1065,12 +1092,12 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
                                 color: _isError
-                                    ? Theme.of(
-                                        context,
-                                      ).colorScheme.onErrorContainer
-                                    : Theme.of(
-                                        context,
-                                      ).colorScheme.onPrimaryContainer,
+                                    ? Theme.of(context)
+                                          .colorScheme
+                                          .onErrorContainer
+                                    : Theme.of(context)
+                                          .colorScheme
+                                          .onPrimaryContainer,
                               ),
                         ),
                       ),

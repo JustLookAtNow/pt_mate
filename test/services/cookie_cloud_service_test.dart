@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:flutter/services.dart';
@@ -11,6 +12,7 @@ import 'package:pt_mate/services/downloader/downloader_config.dart';
 import 'package:pt_mate/services/network/cookie_cloud_service.dart';
 import 'package:pt_mate/services/site_config_service.dart';
 import 'package:pt_mate/services/storage/storage_service.dart';
+import 'package:pt_mate/services/webdav_service.dart';
 import 'package:pt_mate/utils/backup_migrators.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -36,6 +38,7 @@ void main() {
     secureStorage.clear();
     SiteConfigService.clearAllCache();
     StorageService.instance.resetForTest();
+    WebDAVService.instance.resetForTest();
     service = CookieCloudService();
 
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -337,7 +340,7 @@ void main() {
     final backupService = BackupService(storage);
     final backupData = await backupService.createBackup();
 
-    expect(backupData.version, '1.3.0');
+    expect(backupData.version, '1.4.0');
     expect(backupData.data.containsKey('cookieCloudConfig'), isTrue);
 
     final exportedJson =
@@ -366,6 +369,71 @@ void main() {
   });
 
   test(
+    'BackupService 1.4 exports and restores device and WebDAV secrets',
+    () async {
+      final storage = StorageService.instance;
+      const current = WebDAVConfig(
+        id: 'webdav-current',
+        name: 'Current',
+        serverUrl: 'https://dav.example/current',
+        username: 'current-user',
+        isEnabled: true,
+      );
+      const history = WebDAVConfig(
+        id: 'webdav-history',
+        name: 'History',
+        serverUrl: 'https://dav.example/history',
+        username: 'history-user',
+      );
+      await storage.saveDeviceId('device-migration-id');
+      await WebDAVService.instance.saveConfig(
+        current,
+        password: 'current-password',
+      );
+      await WebDAVService.instance.saveConfigHistory(const [history]);
+      await storage.saveWebDAVPassword(history.id, 'history-password');
+
+      final backup = await BackupService(storage).createBackup();
+
+      expect(backup.version, '1.4.0');
+      expect(backup.data['deviceId'], 'device-migration-id');
+      expect(
+        (backup.data['webdavConfig'] as Map<String, dynamic>)['id'],
+        current.id,
+      );
+      expect(
+        (backup.data['webdavConfigHistory'] as List).single['id'],
+        history.id,
+      );
+      expect(backup.data['webdavPasswords'], <String, String>{
+        current.id: 'current-password',
+        history.id: 'history-password',
+      });
+
+      SharedPreferences.setMockInitialValues({});
+      secureStorage.clear();
+      storage.resetForTest();
+      WebDAVService.instance.resetForTest();
+      final restored = await BackupService(storage).restoreBackup(backup);
+      expect(restored.success, isTrue);
+      expect(await storage.loadDeviceId(), 'device-migration-id');
+      expect(await storage.loadWebDAVPassword(current.id), 'current-password');
+      expect(await storage.loadWebDAVPassword(history.id), 'history-password');
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        jsonDecode(prefs.getString(StorageKeys.webdavConfig)!)['id'],
+        current.id,
+      );
+      expect(
+        (jsonDecode(
+          prefs.getString(StorageKeys.webdavConfigHistory)!,
+        ) as List).single['id'],
+        history.id,
+      );
+    },
+  );
+
+  test(
     'BackupService migrates an embedded downloader password on restore',
     () async {
       const downloaderId = 'legacy-backup-downloader';
@@ -388,15 +456,14 @@ void main() {
         },
       );
 
-      final result = await BackupService(
-        StorageService.instance,
-      ).restoreBackup(backupData);
+      final result = await BackupService(StorageService.instance)
+          .restoreBackup(backupData);
 
       expect(result.success, isTrue, reason: result.message);
       final prefs = await SharedPreferences.getInstance();
-      final stored =
-          jsonDecode(prefs.getString(StorageKeys.downloaderConfigs)!)
-              as List<dynamic>;
+      final stored = jsonDecode(
+        prefs.getString(StorageKeys.downloaderConfigs)!,
+      ) as List<dynamic>;
       final storedConfig = stored.single as Map<String, dynamic>;
       final nested = storedConfig['config'] as Map<String, dynamic>;
       expect(nested.containsKey('password'), isFalse);
@@ -411,63 +478,192 @@ void main() {
     },
   );
 
+  test('BackupService rejects conflicting downloader password sources before writing', () async {
+    const downloaderId = 'conflicting-backup-downloader';
+    const config = QbittorrentConfig(
+      id: downloaderId,
+      name: 'Conflicting Backup Downloader',
+      host: 'downloader.example.com',
+      port: 8080,
+      username: 'user',
+      password: 'embedded-password',
+    );
+    final backupData = BackupData(
+      version: BackupVersion.current,
+      timestamp: DateTime(2026, 7, 20),
+      appVersion: '2.27.0',
+      data: {
+        'downloaderConfigs': [config.toJson()],
+        'defaultDownloaderId': downloaderId,
+        'downloaderPasswords': const <String, String>{
+          downloaderId: 'separate-password',
+        },
+      },
+    );
+
+    var resetCalled = false;
+    final result = await BackupService(StorageService.instance).restoreBackup(
+      backupData,
+      onBeforeRestore: () async {
+        resetCalled = true;
+      },
+    );
+
+    expect(result.success, isFalse);
+    expect(resetCalled, isFalse);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.containsKey(StorageKeys.downloaderConfigs), isFalse);
+    expect(
+      await StorageService.instance.loadDownloaderPassword(downloaderId),
+      isNull,
+    );
+  });
+
+  for (final invalidData in <Map<String, dynamic>>[
+    {'siteConfigs': 'not-a-list'},
+    {
+      'userPreferences': {'dynamicColor': 'not-a-bool'},
+    },
+    {
+      'userPreferences': {
+        'proxy': {'port': 'not-an-int'},
+      },
+    },
+  ]) {
+    test(
+      'invalid backup $invalidData never invokes destructive reset',
+      () async {
+        var resetCalled = false;
+        final backup = BackupData(
+          version: BackupVersion.current,
+          timestamp: DateTime(2026),
+          appVersion: 'test',
+          data: invalidData,
+        );
+        final result = await BackupService(StorageService.instance)
+            .restoreBackup(
+              backup,
+              onBeforeRestore: () async {
+                resetCalled = true;
+              },
+            );
+        expect(result.success, isFalse);
+        expect(resetCalled, isFalse);
+        expect(secureStorage, isEmpty);
+      },
+    );
+  }
+
   test(
-    'BackupService rejects conflicting downloader password sources before writing',
+    'valid backup invokes reset before writing and restores passwords',
     () async {
-      const downloaderId = 'conflicting-backup-downloader';
-      const config = QbittorrentConfig(
-        id: downloaderId,
-        name: 'Conflicting Backup Downloader',
-        host: 'downloader.example.com',
-        port: 8080,
-        username: 'user',
-        password: 'embedded-password',
-      );
-      final backupData = BackupData(
+      var resetCalled = false;
+      final backup = BackupData(
         version: BackupVersion.current,
-        timestamp: DateTime(2026, 7, 20),
-        appVersion: '2.27.0',
+        timestamp: DateTime(2026),
+        appVersion: 'test',
         data: {
-          'downloaderConfigs': [config.toJson()],
-          'defaultDownloaderId': downloaderId,
-          'downloaderPasswords': const <String, String>{
-            downloaderId: 'separate-password',
+          'userPreferences': {
+            'proxy': {'password': 'restored-password'},
           },
         },
       );
-
-      final result = await BackupService(
-        StorageService.instance,
-      ).restoreBackup(backupData);
-
-      expect(result.success, isFalse);
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.containsKey(StorageKeys.downloaderConfigs), isFalse);
+      final result = await BackupService(StorageService.instance).restoreBackup(
+        backup,
+        onBeforeRestore: () async {
+          expect(secureStorage, isEmpty);
+          resetCalled = true;
+          await StorageService.instance.initializeSecureStorage();
+        },
+      );
+      expect(resetCalled, isTrue);
+      expect(result.success, isTrue);
       expect(
-        await StorageService.instance.loadDownloaderPassword(downloaderId),
-        isNull,
+        await StorageService.instance.loadProxyPassword(),
+        'restored-password',
       );
     },
   );
 
-  test(
-    'BackupService refuses to generate an empty backup from corrupt downloader JSON',
-    () async {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(StorageKeys.downloaderConfigs, '{corrupt-json');
+  test('自动站点标签开关默认关闭，重新读取时保留保存值', () async {
+    final storage = StorageService.instance;
+    expect(await storage.loadAutoAddSiteTag(), isFalse);
+    await storage.saveAutoAddSiteTag(true);
+    storage.resetForTest();
+    expect(await storage.loadAutoAddSiteTag(), isTrue);
+    await storage.saveAutoAddSiteTag(false);
+    expect(await storage.loadAutoAddSiteTag(), isFalse);
+  });
 
-      await expectLater(
-        BackupService(StorageService.instance).createBackup(),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            'downloader_config_load_failed',
-          ),
+  for (final enabled in [false, true]) {
+    test('备份和恢复自动站点标签开关：$enabled', () async {
+      final storage = StorageService.instance;
+      final backupService = BackupService(storage);
+      await storage.saveAutoAddSiteTag(enabled);
+      final backup = await backupService.createBackup();
+      final preferences =
+          backup.data['userPreferences'] as Map<String, dynamic>;
+      final downloadSettings =
+          preferences['defaultDownloadSettings'] as Map<String, dynamic>;
+      expect(downloadSettings['autoAddSiteTag'], enabled);
+
+      await storage.saveAutoAddSiteTag(!enabled);
+      final result = await backupService.restoreBackup(backup);
+      expect(result.success, isTrue, reason: result.message);
+      expect(await storage.loadAutoAddSiteTag(), enabled);
+    });
+  }
+
+  test('恢复缺少自动站点标签字段的旧备份时默认关闭', () async {
+    final storage = StorageService.instance;
+    final backupService = BackupService(storage);
+    final backup = await backupService.createBackup();
+    final preferences = backup.data['userPreferences'] as Map<String, dynamic>;
+    final downloadSettings =
+        preferences['defaultDownloadSettings'] as Map<String, dynamic>;
+    downloadSettings.remove('autoAddSiteTag');
+
+    await storage.saveAutoAddSiteTag(true);
+    final result = await backupService.restoreBackup(backup);
+    expect(result.success, isTrue, reason: result.message);
+    expect(await storage.loadAutoAddSiteTag(), isFalse);
+  });
+
+  test('自动站点标签备份字段类型错误时在恢复前拒绝并保留现有值', () async {
+    final storage = StorageService.instance;
+    final backupService = BackupService(storage);
+    await storage.saveAutoAddSiteTag(true);
+    final backup = await backupService.createBackup();
+    final preferences = backup.data['userPreferences'] as Map<String, dynamic>;
+    final downloadSettings =
+        preferences['defaultDownloadSettings'] as Map<String, dynamic>;
+    downloadSettings['autoAddSiteTag'] = 'true';
+    var resetCalled = false;
+
+    final result = await backupService.restoreBackup(
+      backup,
+      onBeforeRestore: () async => resetCalled = true,
+    );
+    expect(result.success, isFalse);
+    expect(resetCalled, isFalse);
+    expect(await storage.loadAutoAddSiteTag(), isTrue);
+  });
+
+  test('BackupService refuses to generate an empty backup from corrupt downloader JSON', () async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(StorageKeys.downloaderConfigs, '{corrupt-json');
+
+    await expectLater(
+      BackupService(StorageService.instance).createBackup(),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'downloader_config_load_failed',
         ),
-      );
-    },
-  );
+      ),
+    );
+  });
 
   test(
     'BackupMigrationManager should migrate v1.2.0 to v1.3.0 gracefully',
@@ -499,6 +695,26 @@ void main() {
         migrated['data']['cookieCloudConfig'],
         isNull,
       ); // 1.2.0 备份中不包含此字段，完美兼容
+    },
+  );
+
+  test(
+    'BackupMigrationManager should migrate v1.3.0 to v1.4.0 with safe defaults',
+    () async {
+      final legacyBackup = {
+        'version': '1.3.0',
+        'timestamp': DateTime.now().toIso8601String(),
+        'appVersion': '2.28.0',
+        'data': {'siteConfigs': <dynamic>[], 'cookieCloudConfig': null},
+      };
+
+      final migrated = BackupMigrationManager.migrate(legacyBackup, '1.4.0');
+      final migratedData = migrated['data'] as Map<String, dynamic>;
+      expect(migrated['version'], '1.4.0');
+      expect(migratedData['deviceId'], isNull);
+      expect(migratedData['webdavConfig'], isNull);
+      expect(migratedData['webdavConfigHistory'], isEmpty);
+      expect(migratedData['webdavPasswords'], isEmpty);
     },
   );
 }

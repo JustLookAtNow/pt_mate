@@ -2,16 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+
 import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter/rendering.dart';
+
 import 'dart:math' as math;
 
 import 'models/app_models.dart';
 import 'models/batch_operation_models.dart';
+import 'models/home_search_request.dart';
+import 'pages/aggregate_search_page.dart';
+import 'pages/aggregate_search_settings_page.dart';
 import 'pages/torrent_detail_page.dart';
 import 'pages/backup_restore_page.dart';
+import 'pages/legacy_secure_storage_migration_page.dart';
 import 'pages/secure_storage_recovery_page.dart';
 import 'services/api/api_service.dart';
 import 'services/image_http_client.dart';
@@ -34,7 +41,7 @@ import 'services/local_download_service.dart';
 import 'pages/server_settings_page.dart';
 import 'widgets/qb_speed_indicator.dart';
 import 'widgets/batch_progress_card.dart';
-import 'widgets/category_filter_dialog.dart';
+import 'widgets/home_search_dialog.dart';
 import 'widgets/responsive_layout.dart';
 import 'widgets/torrent_download_dialog.dart';
 import 'widgets/torrent_purchase_dialog.dart';
@@ -44,8 +51,11 @@ import 'widgets/torrent_cover_gallery_viewer.dart';
 import 'widgets/list_index_scroller.dart';
 import 'widgets/tag_filter_bar.dart';
 import 'services/update_service.dart';
+import 'services/aggregate_search_service.dart';
 import 'widgets/update_notification_dialog.dart';
+
 import 'package:pt_mate/utils/notification_helper.dart';
+
 import 'utils/screen_utils.dart';
 
 // 全局日志实例，供本文件内多个类使用
@@ -1100,6 +1110,7 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
   bool _resumeCheckRunning = false;
   bool _backupRestoreOpen = false;
   bool _hasLeftForeground = false;
+  bool _showAndroidPlaintextStorageWarning = true;
 
   @override
   void initState() {
@@ -1189,9 +1200,28 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
     setState(() {
       _backupRestoreOpen = true;
     });
+    final isLegacyRecovery =
+        {
+          'legacy_secure_storage_backup_restore_required',
+          'legacy_secure_storage_migration_resume_required',
+          'secure_storage_missing_requires_restore',
+          'secure_storage_data_missing_requires_restore',
+        }.contains(
+          StorageService.instance.secureStorageFailureCode ??
+              _secureStorageFailureCode,
+        );
     navigator
         .push(
-          MaterialPageRoute<void>(builder: (_) => const BackupRestorePage()),
+          MaterialPageRoute<void>(
+            builder: (_) => BackupRestorePage(
+              onBeforeRestore: isLegacyRecovery
+                  ? _prepareLegacyStorageForBackupRestore
+                  : null,
+              onAfterRestore: isLegacyRecovery
+                  ? StorageService.instance.completeLegacyAndroidMigration
+                  : null,
+            ),
+          ),
         )
         .whenComplete(() {
           if (!mounted) return;
@@ -1200,6 +1230,30 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
           });
           _retrySecureStorage();
         });
+  }
+
+  Future<void> _prepareLegacyStorageForBackupRestore() async {
+    final storage = StorageService.instance;
+    final state = await storage.getLegacyAndroidMigrationState();
+    if (state.requiresBackupRestore) {
+      await storage.resumeLegacyAndroidMigrationTarget();
+      return;
+    }
+    final target = await storage.probeLegacyMigrationTarget();
+    await storage.beginLegacyAndroidMigration(target);
+  }
+
+  Future<void> _discardLegacyAndroidStorage() async {
+    final storage = StorageService.instance;
+    final state = await storage.getLegacyAndroidMigrationState();
+    if (state.requiresBackupRestore) {
+      await storage.resumeLegacyAndroidMigrationTarget();
+    } else {
+      final target = await storage.probeLegacyMigrationTarget();
+      await storage.beginLegacyAndroidMigration(target);
+    }
+    await storage.completeLegacyAndroidMigration();
+    await _retrySecureStorage();
   }
 
   void _disableProxyForSecureStorageFailure() {
@@ -1391,7 +1445,79 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
                       SecureStorageState.unavailable &&
                   !storage.canAccessSensitiveStorage;
               final storageBlocked = !_secureStorageReady || storageUnavailable;
-              if (!storageBlocked || _backupRestoreOpen) return scaledChild;
+              if (!storageBlocked || _backupRestoreOpen) {
+                if (storage.secureStorageProfile !=
+                        SecureStorageProfile.androidPlaintextFallback ||
+                    !_showAndroidPlaintextStorageWarning) {
+                  return scaledChild;
+                }
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    scaledChild,
+                    SafeArea(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Material(
+                            color: Theme.of(context).colorScheme.errorContainer,
+                            borderRadius: BorderRadius.circular(12),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 640),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.warning_amber_rounded,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .error,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Expanded(
+                                      child: Text(
+                                        '此 Android 设备不支持 OAEP+GCM。凭据正使用明文本地存储；请勿导出或共享应用数据。',
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => setState(() {
+                                        _showAndroidPlaintextStorageWarning =
+                                            false;
+                                      }),
+                                      child: const Text('我已知晓'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              final failureCode =
+                  StorageService.instance.secureStorageFailureCode ??
+                  _secureStorageFailureCode;
+              if ({
+                'legacy_secure_storage_backup_restore_required',
+                'legacy_secure_storage_migration_resume_required',
+                'secure_storage_missing_requires_restore',
+                'secure_storage_data_missing_requires_restore',
+              }.contains(failureCode)) {
+                return LegacySecureStorageMigrationPage(
+                  failureCode:
+                      failureCode ??
+                      'legacy_secure_storage_backup_restore_required',
+                  onOpenBackupRestore: _openBackupRestore,
+                  onMigrationCompleted: _retrySecureStorage,
+                  onDiscardLegacyData: _discardLegacyAndroidStorage,
+                );
+              }
 
               return Stack(
                 fit: StackFit.expand,
@@ -1401,9 +1527,14 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
                     child: SecureStorageRecoveryPage(
                       onRetry: _retrySecureStorage,
                       onOpenBackupRestore: _openBackupRestore,
-                      failureCode:
-                          StorageService.instance.secureStorageFailureCode ??
-                          _secureStorageFailureCode,
+                      onDiscardLegacyData: _discardLegacyAndroidStorage,
+                      failureCode: failureCode,
+                      failureStage: StorageService
+                          .instance
+                          .secureStorageFailureStage
+                          ?.name,
+                      failureType:
+                          StorageService.instance.secureStorageFailureType,
                       isRetrying: _isCheckingSecureStorage,
                     ),
                   ),
@@ -1424,14 +1555,39 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
   }
 }
 
+typedef HomeTorrentSearchExecutor = Future<TorrentSearchResult> Function({
+  required SiteConfig siteConfig,
+  required String? keyword,
+  required int pageNumber,
+  required int pageSize,
+  required int? onlyFav,
+  required Map<String, dynamic>? additionalParams,
+});
+
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.searchExecutor, this.aggregateSearchService});
+
+  @visibleForTesting
+  final HomeTorrentSearchExecutor? searchExecutor;
+
+  @visibleForTesting
+  final AggregateSearchService? aggregateSearchService;
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
+  final _aggregateViewKey = GlobalKey<AggregateSearchViewState>();
+  HomeSearchMode _searchMode = HomeSearchMode.currentSite;
+  HomeSearchRequest? _aggregateRequest;
+  int _aggregateSearchSequence = 0;
+  bool _aggregateSelectionMode = false;
+  bool _aggregateSearchAvailable = true;
+  bool _openingSearchDialog = false;
+
+  bool get _isAggregateMode => _searchMode == HomeSearchMode.aggregate;
+
   final _keywordCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   late final ListIndexScroller _listScroller = ListIndexScroller(
@@ -1526,12 +1682,14 @@ class _HomePageState extends State<HomePage> {
   // 配置版本号跟踪
   int _lastConfigVersion = -1;
 
-  // 防止重复处理重新初始化的标志
-  bool _isProcessingReload = false;
+  // 首页内容请求代次。站点、分类、搜索或分页发生变化时递增，旧请求不得回写状态。
+  int _contentOperationGeneration = 0;
 
-  // didChangeDependencies中一次性预同步标志，避免首次构建时出现null/-1
-  bool _didSyncFromAppState = false; // 首帧前从AppState预同步，避免首次渲染null/-1
-  bool _didInitialLoad = false; // 首次进入页面后的初始化是否已完成
+  // AppState 驱动的重载调度状态，确保同一份站点快照只初始化一次。
+  String? _pendingReloadSiteId;
+  int? _pendingReloadConfigVersion;
+  int _reloadScheduleGeneration = 0;
+  bool _hasInitializedSiteContext = false;
 
   // 统一头部（用户信息 + 搜索栏）滚动进度控制
   double _headerProgress = 1.0; // 0.0=隐藏, 1.0=完全显示
@@ -1545,41 +1703,6 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _scrollCtrl.addListener(_onScroll);
-    // 首次加载改为在 didChangeDependencies 完成预同步后触发，避免在AppState尚未就绪时执行
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_didSyncFromAppState) {
-      final appState = Provider.of<AppState>(context, listen: false);
-      if (appState.site != null) {
-        _currentSite = appState.site;
-        _lastConfigVersion = appState.configVersion;
-        if (kDebugMode) {
-          _logger.d(
-            'HomePage: didChangeDependencies预同步 - 站点: ${_currentSite?.id}, 版本: $_lastConfigVersion',
-          );
-        }
-      }
-      _didSyncFromAppState = true;
-
-      // 预同步完成后触发一次初始化（仅一次）
-      if (!_didInitialLoad) {
-        _isProcessingReload = true;
-        final capturedSite = _currentSite; // 捕获当前站点，避免后续变化导致条件抖动
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          if (!_didInitialLoad && capturedSite != null) {
-            await _init();
-            _didInitialLoad = true;
-            _isProcessingReload = false;
-          } else {
-            // 即使未触发初始化，也要释放标志位
-            _isProcessingReload = false;
-          }
-        });
-      }
-    }
   }
 
   Future<String> _resolveLogoPath(SiteConfig site) async {
@@ -1705,64 +1828,100 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  Future<void> _init() async {
-    setState(() => _loading = true);
+  bool _isCurrentContentOperation(int generation) {
+    return mounted && generation == _contentOperationGeneration;
+  }
+
+  void _scheduleSiteReload(SiteConfig site, int configVersion) {
+    final isCurrentContext =
+        _hasInitializedSiteContext &&
+        _currentSite?.id == site.id &&
+        _lastConfigVersion == configVersion;
+    final isAlreadyPending =
+        _pendingReloadSiteId == site.id &&
+        _pendingReloadConfigVersion == configVersion;
+    if (isCurrentContext || isAlreadyPending) return;
+
+    // 在当前 build 周期立即让旧请求失效，避免它在下一帧重载前回写。
+    ++_contentOperationGeneration;
+    final scheduleGeneration = ++_reloadScheduleGeneration;
+    _pendingReloadSiteId = site.id;
+    _pendingReloadConfigVersion = configVersion;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || scheduleGeneration != _reloadScheduleGeneration) return;
+
+      _pendingReloadSiteId = null;
+      _pendingReloadConfigVersion = null;
+      _hasInitializedSiteContext = true;
+      _lastConfigVersion = configVersion;
+      final operationGeneration = ++_contentOperationGeneration;
+      await _init(site, operationGeneration: operationGeneration);
+    });
+  }
+
+  Future<void> _init(
+    SiteConfig activeSite, {
+    required int operationGeneration,
+  }) async {
+    if (!_isCurrentContentOperation(operationGeneration)) return;
+
+    final categories = activeSite.searchCategories.isNotEmpty
+        ? activeSite.searchCategories
+        : SearchCategoryConfig.getDefaultConfigs();
+    setState(() {
+      _currentSite = activeSite;
+      _categories = categories;
+      _selectedCategoryIndex = categories.isNotEmpty ? 0 : -1;
+      _pageNumber = 1;
+      _items.clear();
+      _hasMore = true;
+      _totalPages = 1;
+      _loading = true;
+      _error = null;
+      _sortBy = 'none';
+      _sortAscending = false;
+      _headerProgress = 1.0;
+      _fabVisible = true;
+      _lastScrollOffset = 0.0;
+    });
+
     try {
-      // 等待AppState初始化完成
-      final appState = Provider.of<AppState>(context, listen: false);
-
-      // 等待AppState完全初始化完成
-      await appState.waitForInitialization();
-
-      // 如果没有站点配置，说明确实没有配置
-      if (appState.site == null) {
-        if (mounted) {
-          setState(() {
-            _currentSite = null;
-            _categories = SearchCategoryConfig.getDefaultConfigs();
-            _selectedCategoryIndex = -1;
-            _loading = false;
-          });
-        }
-        return;
-      }
-
-      final activeSite = appState.site!;
-      final categories = activeSite.searchCategories.isNotEmpty
-          ? activeSite.searchCategories
-          : SearchCategoryConfig.getDefaultConfigs();
-      if (mounted) {
-        setState(() {
-          _currentSite = activeSite;
-          _categories = categories;
-          _selectedCategoryIndex = categories.isNotEmpty ? 0 : -1;
-        });
-      }
-
       // 加载下载器配置
       final downloaderConfigsData = await StorageService.instance
           .loadDownloaderConfigs();
       final downloaderConfigs = downloaderConfigsData
           .map((data) => DownloaderConfig.fromJson(data))
           .toList();
-      if (mounted) setState(() => _downloaderConfigs = downloaderConfigs);
+      if (_isCurrentContentOperation(operationGeneration)) {
+        setState(() => _downloaderConfigs = downloaderConfigs);
+      }
     } catch (e) {
+      if (!_isCurrentContentOperation(operationGeneration)) return;
       if (e.toString().contains('CookieExpiredException')) {
         _showCookieExpiredDialog();
       } else {
         // 初始化失败不阻塞首页使用，仅提示
-        if (mounted) setState(() => _error = _error ?? e.toString());
+        setState(() => _error = _error ?? e.toString());
       }
-    } finally {
-      if (mounted) setState(() => _loading = false);
     }
 
+    if (!_isCurrentContentOperation(operationGeneration)) return;
+
     // 检查应用更新（异步执行，不阻塞界面）
-    _checkForUpdates();
+    if (widget.searchExecutor == null) {
+      unawaited(_checkForUpdates());
+    }
 
     // 仅在站点支持种子搜索功能时执行默认搜索
-    if (_currentSite?.features.supportTorrentSearch ?? true) {
-      await _search(reset: true);
+    if (activeSite.features.supportTorrentSearch) {
+      await _search(
+        reset: true,
+        siteConfig: activeSite,
+        operationGeneration: operationGeneration,
+      );
+    } else if (_isCurrentContentOperation(operationGeneration)) {
+      setState(() => _loading = false);
     }
   }
 
@@ -1862,7 +2021,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onScroll() {
-    if (!mounted) return;
+    if (!mounted || _isAggregateMode) return;
 
     final currentOffset = _scrollCtrl.position.pixels;
     final delta = currentOffset - _lastScrollOffset;
@@ -1936,7 +2095,7 @@ class _HomePageState extends State<HomePage> {
                   if (supportsCategories)
                     Expanded(
                       child: TextButton.icon(
-                        onPressed: _showCategoryFilterDialog,
+                        onPressed: _showSearchDialog,
                         icon: const Icon(Icons.category, size: 18),
                         label: Text(
                           _selectedCategoryDisplayName,
@@ -1944,12 +2103,12 @@ class _HomePageState extends State<HomePage> {
                         ),
                         style: TextButton.styleFrom(
                           alignment: Alignment.centerLeft,
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primaryContainer,
-                          foregroundColor: Theme.of(
-                            context,
-                          ).colorScheme.onPrimaryContainer,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .primaryContainer,
+                          foregroundColor: Theme.of(context)
+                              .colorScheme
+                              .onPrimaryContainer,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -2002,9 +2161,8 @@ class _HomePageState extends State<HomePage> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: _sortBy == 'none'
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
+                                ? Theme.of(context).colorScheme.primary
+                                      .withValues(alpha: 0.1)
                                 : null,
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -2031,9 +2189,8 @@ class _HomePageState extends State<HomePage> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: _sortBy == 'size'
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
+                                ? Theme.of(context).colorScheme.primary
+                                      .withValues(alpha: 0.1)
                                 : null,
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -2062,9 +2219,8 @@ class _HomePageState extends State<HomePage> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: _sortBy == 'upload'
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
+                                ? Theme.of(context).colorScheme.primary
+                                      .withValues(alpha: 0.1)
                                 : null,
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -2093,9 +2249,8 @@ class _HomePageState extends State<HomePage> {
                         child: Container(
                           decoration: BoxDecoration(
                             color: _sortBy == 'download'
-                                ? Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1)
+                                ? Theme.of(context).colorScheme.primary
+                                      .withValues(alpha: 0.1)
                                 : null,
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -2147,9 +2302,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadMore() async {
-    if (_loading || !_hasMore) return;
-    _pageNumber += 1;
-    await _search();
+    if (_isAggregateMode || _loading || !_hasMore) return;
+    await _search(pageNumber: _pageNumber + 1);
   }
 
   void _submitSearch() {
@@ -2160,39 +2314,57 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _search({bool reset = false}) async {
-    final supportTorrentSearch =
-        _currentSite?.features.supportTorrentSearch ?? true;
-    final supportTorrentBrowse =
-        _currentSite?.features.supportTorrentBrowse ?? true;
+  Future<void> _search({
+    bool reset = false,
+    int? pageNumber,
+    SiteConfig? siteConfig,
+    int? operationGeneration,
+  }) async {
+    final generation = operationGeneration ?? ++_contentOperationGeneration;
+    if (!_isCurrentContentOperation(generation)) return;
+
+    final requestSite = siteConfig ?? _currentSite;
+    if (requestSite == null) {
+      setState(() {
+        _loading = false;
+        _error = '尚未配置站点信息';
+      });
+      return;
+    }
+
+    final supportTorrentSearch = requestSite.features.supportTorrentSearch;
+    final supportTorrentBrowse = requestSite.features.supportTorrentBrowse;
     final trimmedKeyword = _keywordCtrl.text.trim();
+    final requestPageNumber = reset ? 1 : (pageNumber ?? _pageNumber);
+    final onlyFav = _onlyFavorites ? 1 : null;
+
+    // 分类筛选与高级搜索是两项独立能力。分类站点即使不支持高级搜索，
+    // 也需要把分类模板参数（例如 Jpopsuki 的 filter_cat）传给适配器。
+    Map<String, dynamic>? additionalParams;
+    if (requestSite.features.supportCategories &&
+        _categories.isNotEmpty &&
+        _selectedCategoryIndex >= 0 &&
+        _selectedCategoryIndex < _categories.length) {
+      final currentCategory = _categories[_selectedCategoryIndex];
+      if (currentCategory.parameters.isNotEmpty) {
+        additionalParams = currentCategory.parseParameters();
+      }
+    }
 
     if (reset) {
-      if (mounted) {
-        setState(() {
-          _pageNumber = 1;
-          _items.clear();
-          _hasMore = true;
-          _totalPages = 1;
-          // 重置排序状态
-          _sortBy = 'none';
-          _sortAscending = false;
-          // 重置显示状态
-          _headerProgress = 1.0;
-          _fabVisible = true;
-          _lastScrollOffset = 0.0;
-        });
-      } else {
+      setState(() {
         _pageNumber = 1;
         _items.clear();
         _hasMore = true;
         _totalPages = 1;
+        // 重置排序状态
         _sortBy = 'none';
         _sortAscending = false;
+        // 重置显示状态
         _headerProgress = 1.0;
         _fabVisible = true;
         _lastScrollOffset = 0.0;
-      }
+      });
 
       if (_scrollCtrl.hasClients) {
         _scrollCtrl.jumpTo(0);
@@ -2200,7 +2372,7 @@ class _HomePageState extends State<HomePage> {
     }
 
     if (!supportTorrentSearch) {
-      if (mounted) {
+      if (_isCurrentContentOperation(generation)) {
         setState(() {
           _loading = false;
           _error = '当前站点不支持搜索功能';
@@ -2210,7 +2382,7 @@ class _HomePageState extends State<HomePage> {
     }
 
     if (!supportTorrentBrowse && trimmedKeyword.isEmpty) {
-      if (mounted) {
+      if (_isCurrentContentOperation(generation)) {
         setState(() {
           _loading = false;
           _error = '当前站点不支持浏览功能，请输入关键字以搜索种子';
@@ -2222,37 +2394,35 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    if (mounted) {
+    if (_isCurrentContentOperation(generation)) {
       setState(() {
         _loading = true;
         _error = null;
       });
     }
     try {
-      // 分类筛选与高级搜索是两项独立能力。分类站点即使不支持高级搜索，
-      // 也需要把分类模板参数（例如 Jpopsuki 的 filter_cat）传给适配器。
-      Map<String, dynamic>? additionalParams;
-      if ((_currentSite?.features.supportCategories ?? true) &&
-          _categories.isNotEmpty &&
-          _selectedCategoryIndex >= 0 &&
-          _selectedCategoryIndex < _categories.length) {
-        final currentCategory = _categories[_selectedCategoryIndex];
-        if (currentCategory.parameters.isNotEmpty) {
-          additionalParams = currentCategory.parseParameters();
-        }
-      }
-
-      final res = await ApiService.instance.searchTorrents(
-        keyword: trimmedKeyword.isEmpty ? null : trimmedKeyword,
-        pageNumber: _pageNumber,
-        pageSize: _pageSize,
-        onlyFav: _onlyFavorites ? 1 : null,
-        additionalParams: additionalParams,
-      );
-      if (mounted) {
+      final executor = widget.searchExecutor;
+      final res = executor != null
+          ? await executor(
+              siteConfig: requestSite,
+              keyword: trimmedKeyword.isEmpty ? null : trimmedKeyword,
+              pageNumber: requestPageNumber,
+              pageSize: _pageSize,
+              onlyFav: onlyFav,
+              additionalParams: additionalParams,
+            )
+          : await ApiService.instance.searchTorrentsWithSite(
+              siteConfig: requestSite,
+              keyword: trimmedKeyword.isEmpty ? null : trimmedKeyword,
+              pageNumber: requestPageNumber,
+              pageSize: _pageSize,
+              onlyFav: onlyFav,
+              additionalParams: additionalParams,
+            );
+      if (_isCurrentContentOperation(generation)) {
         setState(() {
           // 如果是重置搜索或第一页，清空现有数据
-          if (reset || _pageNumber == 1) {
+          if (reset || requestPageNumber == 1) {
             _items.clear();
           }
           // 去重处理：过滤掉已存在的项目ID
@@ -2261,14 +2431,19 @@ class _HomePageState extends State<HomePage> {
               .where((item) => !existingIds.contains(item.id))
               .toList();
           _items.addAll(newItems);
+          _pageNumber = requestPageNumber;
           _totalPages = res.totalPages;
-          _hasMore = _pageNumber < _totalPages;
+          _hasMore = requestPageNumber < _totalPages;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (_isCurrentContentOperation(generation)) {
+        setState(() => _error = e.toString());
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (_isCurrentContentOperation(generation)) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -2320,11 +2495,14 @@ class _HomePageState extends State<HomePage> {
     if (listIndex < 0 || listIndex >= items.length) return;
     if (items[listIndex].cover.isEmpty) return;
 
-    // 有封面条目的下标列表（画廊 position ↔ 列表下标映射）
-    final coverIndices = <int>[
-      for (var i = 0; i < items.length; i++)
-        if (items[i].cover.isNotEmpty) i,
+    // 有封面条目的下标列表（画廊 position ↔ 列表下标映射）。
+    // 列表数据只追加且去重，已有下标稳定，因此每次调用重新计算即可
+    // 响应分页追加后的新条目。
+    List<int> computeCoverIndices() => [
+      for (var i = 0; i < _filteredItems.length; i++)
+        if (_filteredItems[i].cover.isNotEmpty) i,
     ];
+    final coverIndices = computeCoverIndices();
     final initialPosition = coverIndices.indexOf(listIndex);
     if (initialPosition == -1) return;
 
@@ -2333,19 +2511,21 @@ class _HomePageState extends State<HomePage> {
       barrierColor: Colors.black.withValues(alpha: 0.7),
       builder: (dialogContext) {
         return TorrentCoverGalleryViewer(
-          itemCount: coverIndices.length,
+          itemCount: () => computeCoverIndices().length,
           initialIndex: initialPosition,
           titleFor: (position) {
-            final i = (position >= 0 && position < coverIndices.length)
-                ? coverIndices[position]
+            final indices = computeCoverIndices();
+            final i = (position >= 0 && position < indices.length)
+                ? indices[position]
                 : null;
             return (i != null && i < _filteredItems.length)
                 ? _filteredItems[i].name
                 : '';
           },
           loadCover: (position) async {
-            final i = (position >= 0 && position < coverIndices.length)
-                ? coverIndices[position]
+            final indices = computeCoverIndices();
+            final i = (position >= 0 && position < indices.length)
+                ? indices[position]
                 : null;
             if (i == null || i >= _filteredItems.length) return null;
             final item = _filteredItems[i];
@@ -2364,12 +2544,15 @@ class _HomePageState extends State<HomePage> {
             }
           },
           onPageChanged: (position) {
-            if (position < 0 || position >= coverIndices.length) return;
-            final i = coverIndices[position];
+            final indices = computeCoverIndices();
+            if (position < 0 || position >= indices.length) return;
+            final i = indices[position];
             if (i < _filteredItems.length) {
               _listScroller.scrollToIndex(i);
             }
           },
+          hasMore: () => _hasMore,
+          onLoadMore: () => _loadMore(),
         );
       },
     );
@@ -2481,41 +2664,100 @@ class _HomePageState extends State<HomePage> {
     await _toggleCollectionWithOptimisticUpdate(item);
   }
 
-  Future<void> _showCategoryFilterDialog() async {
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => CategoryFilterDialog(
-        categories: _categories,
-        selectedCategoryIndex: _selectedCategoryIndex,
-        keyword: _keywordCtrl.text,
-      ),
-    );
+  Future<List<AggregateSearchConfig>> _loadActiveSearchConfigs() async {
+    final settings = await StorageService.instance
+        .loadAggregateSearchSettings();
+    return settings.searchConfigs.where((config) => config.isActive).toList();
+  }
 
-    if (result != null) {
-      final newCategoryIndex = result['categoryIndex'] as int?;
-      final newKeyword = result['keyword'] as String?;
-
-      if (mounted) {
-        setState(() {
-          if (newCategoryIndex != null &&
-              newCategoryIndex >= 0 &&
-              newCategoryIndex < _categories.length) {
-            _selectedCategoryIndex = newCategoryIndex;
-          }
-          if (newKeyword != null) {
-            _keywordCtrl.text = newKeyword;
-          }
-        });
-      }
-
-      if (_currentSite?.features.supportTorrentSearch ?? true) {
-        _search(reset: true);
-      } else {
-        if (mounted) {
-          NotificationHelper.showError(context, '当前站点不支持搜索功能');
-        }
-      }
+  Future<void> _showSearchDialog() async {
+    if (_openingSearchDialog ||
+        (_isAggregateMode && !_aggregateSearchAvailable)) {
+      return;
     }
+    _openingSearchDialog = true;
+    try {
+      var configs = await _loadActiveSearchConfigs();
+      if (!mounted) return;
+      final provider = context.read<AggregateSearchProvider>();
+      final result = await showDialog<HomeSearchRequest>(
+        context: context,
+        builder: (context) => HomeSearchDialog(
+          categories: _categories,
+          selectedCategoryIndex: _selectedCategoryIndex,
+          keyword: _isAggregateMode
+              ? _aggregateRequest!.keyword
+              : _keywordCtrl.text,
+          initialMode: _searchMode,
+          searchConfigs: configs,
+          selectedStrategy: provider.selectedStrategy,
+          supportsCurrentSiteSearch:
+              _currentSite?.features.supportTorrentSearch ?? false,
+          supportsCategories: _currentSite?.features.supportCategories ?? false,
+          onConfigureAggregate: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const AggregateSearchSettingsPage(),
+              ),
+            );
+            configs = await _loadActiveSearchConfigs();
+            return configs;
+          },
+        ),
+      );
+      if (!mounted || result == null) return;
+
+      if (result.mode == HomeSearchMode.aggregate) {
+        if (!configs.any((config) => config.id == result.strategyId)) {
+          NotificationHelper.showError(context, '请选择可用的搜索策略');
+          return;
+        }
+        provider.setSearchConfigs(configs);
+        provider.setSelectedStrategy(result.strategyId!);
+        provider.setLoading(false);
+        if (_isSelectionMode) _onCancelSelection();
+        setState(() {
+          _searchMode = HomeSearchMode.aggregate;
+          _aggregateSelectionMode = false;
+          _aggregateRequest = HomeSearchRequest(
+            mode: HomeSearchMode.aggregate,
+            keyword: result.keyword,
+            strategyId: result.strategyId,
+            sequence: ++_aggregateSearchSequence,
+          );
+          _lastPressedAt = null;
+        });
+      } else {
+        _returnToCurrentSite();
+        setState(() {
+          final categoryIndex = result.categoryIndex;
+          if (categoryIndex != null &&
+              categoryIndex >= 0 &&
+              categoryIndex < _categories.length) {
+            _selectedCategoryIndex = categoryIndex;
+          }
+          _keywordCtrl.text = result.keyword;
+        });
+        unawaited(_search(reset: true));
+      }
+    } catch (e) {
+      if (mounted) {
+        NotificationHelper.showError(context, '加载搜索配置失败：$e');
+      }
+    } finally {
+      _openingSearchDialog = false;
+    }
+  }
+
+  void _returnToCurrentSite() {
+    if (!_isAggregateMode) return;
+    _aggregateViewKey.currentState?.leaveAggregate();
+    setState(() {
+      _searchMode = HomeSearchMode.currentSite;
+      _aggregateSelectionMode = false;
+      _aggregateSearchAvailable = true;
+      _lastPressedAt = null;
+    });
   }
 
   BatchItemState _batchItemStateFor(String itemId) {
@@ -2725,21 +2967,23 @@ class _HomePageState extends State<HomePage> {
     if (!mounted) return;
     final appState = context.read<AppState>();
 
+    // 站点切换开始后，当前请求即使先于 AppState 通知完成也不得再回写。
+    final switchGeneration = ++_contentOperationGeneration;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
     try {
       await appState.setActiveSite(siteId);
       if (mounted) {
-        setState(() {
-          _currentSite = appState.site;
-          _headerProgress = 1.0;
-          _fabVisible = true;
-        });
-        await _init(); // 加载新站点的数据
-        if (mounted) {
-          NotificationHelper.showInfo(context, '已切换活跃站点');
-        }
+        NotificationHelper.showInfo(context, '已切换活跃站点');
       }
     } catch (e) {
       if (mounted) {
+        if (switchGeneration == _contentOperationGeneration) {
+          setState(() => _loading = false);
+        }
         NotificationHelper.showError(context, '切换站点失败: $e');
       }
     }
@@ -2753,94 +2997,24 @@ class _HomePageState extends State<HomePage> {
 
     return Consumer<AppState>(
       builder: (context, appState, child) {
-        // 当AppState变化时，检查是否需要重新初始化
-        if (!_isProcessingReload) {
-          bool needsReload = false;
-          String reloadReason = '';
-
-          if (kDebugMode) {
-            _logger.d(
-              'HomePage Consumer: 当前站点=${_currentSite?.id}, AppState站点=${appState.site?.id}, 配置版本=${appState.configVersion}, 上次版本=$_lastConfigVersion',
-            );
-          }
-
-          if (appState.site != null) {
-            final isFirstSync =
-                (_currentSite == null && _lastConfigVersion == -1);
-            // 首次同步：仅同步站点与版本，不触发重新加载
-            if (isFirstSync) {
-              if (kDebugMode) {
-                _logger.d(
-                  'HomePage: 首次同步（不重载） - 同步站点: ${appState.site!.id}, 版本: ${appState.configVersion}',
-                );
-              }
-              final currentSite = appState.site;
-              final currentConfigVersion = appState.configVersion;
-              WidgetsBinding.instance.addPostFrameCallback((_) async {
-                // 先同步站点与版本
-                _currentSite = currentSite;
-                _lastConfigVersion = currentConfigVersion;
-                // 若尚未进行过首次初始化，则触发一次初始化
-                if (!_didInitialLoad &&
-                    !_isProcessingReload &&
-                    _currentSite != null) {
-                  _isProcessingReload = true;
-                  await _init();
-                  _didInitialLoad = true;
-                  _isProcessingReload = false;
-                }
-              });
-            }
-            // 站点变化（排除首次同步情形）
-            else if (_currentSite != null &&
-                _currentSite!.id != appState.site!.id) {
-              needsReload = true;
-              reloadReason = '站点变化';
-              if (kDebugMode) {
-                _logger.i(
-                  'HomePage: 站点变化检测 - 当前站点: ${_currentSite?.id}, 新站点: ${appState.site!.id}',
-                );
-              }
-            }
-            // 配置版本变化（排除首次同步情形）
-            else if (_lastConfigVersion != -1 &&
-                _lastConfigVersion != appState.configVersion) {
-              needsReload = true;
-              reloadReason = '配置更新';
-              if (kDebugMode) {
-                _logger.i(
-                  'HomePage: 配置更新检测 - 上次版本: $_lastConfigVersion, 当前版本: ${appState.configVersion}',
-                );
-              }
-            }
-          }
-
-          if (needsReload) {
-            if (kDebugMode) {
-              _logger.i(
-                'HomePage: 检测到$reloadReason，重新初始化 - 配置版本: ${appState.configVersion}, 上次版本: $_lastConfigVersion',
-              );
-            }
-            // 设置标志，防止重复处理
-            _isProcessingReload = true;
-            // 捕获当前值，避免异步执行时值发生变化
-            final currentSite = appState.site;
-            final currentConfigVersion = appState.configVersion;
-            WidgetsBinding.instance.addPostFrameCallback((_) async {
-              // 在PostFrameCallback中更新状态，避免在builder中触发重建
-              _currentSite = currentSite;
-              _lastConfigVersion = currentConfigVersion;
-              await _init();
-              // 重新初始化完成后重置标志
-              _isProcessingReload = false;
-            });
-          }
+        final activeSite = appState.site;
+        if (activeSite != null) {
+          _scheduleSiteReload(activeSite, appState.configVersion);
         }
 
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, result) async {
             if (didPop) return;
+
+            if (_isAggregateMode) {
+              if (_aggregateSelectionMode) {
+                _aggregateViewKey.currentState?.cancelSelection();
+              } else {
+                _returnToCurrentSite();
+              }
+              return;
+            }
 
             // 如果处于选中模式，先退出选中模式
             if (_isSelectionMode) {
@@ -2884,469 +3058,466 @@ class _HomePageState extends State<HomePage> {
                   },
                 ),
               ),
-              title: InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const ServerSettingsPage(),
-                    ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.only(
-                    left: 4.0,
-                    right: 8.0,
-                    top: 4.0,
-                    bottom: 4.0,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_currentSite != null) ...[
-                        _buildAppBarLogo(_currentSite!),
-                        const SizedBox(width: 8),
-                      ],
-                      Flexible(
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(text: appState.site?.name ?? 'PT Mate'),
-                              TextSpan(
-                                text: ' - PT Mate',
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                            ],
+              title: _isAggregateMode
+                  ? const Text('聚合搜索 - PT Mate')
+                  : InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const ServerSettingsPage(),
                           ),
-                          overflow: TextOverflow.ellipsis,
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          left: 4.0,
+                          right: 8.0,
+                          top: 4.0,
+                          bottom: 4.0,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: const [QbSpeedIndicator()],
-            ),
-            body: Column(
-              children: [
-                // 统一头部（用户信息 + 搜索栏），使用进度控制：向下滚动逐步隐藏，向上滚动逐步显示
-                ClipRect(
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    heightFactor: _headerProgress,
-                    child: Opacity(
-                      opacity: _headerProgress,
-                      child: _buildHeaderPanel(context, appState),
-                    ),
-                  ),
-                ),
-                if (_loading) const LinearProgressIndicator(),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ),
-                if (_batchProgress != null) _buildBatchProgressCard(),
-                Expanded(
-                  child: _currentSite == null
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32.0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.settings_outlined,
-                                  size: 64,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                                const SizedBox(height: 24),
-                                Text(
-                                  '尚未配置站点信息',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurface,
-                                      ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  '请先配置站点信息以开始使用应用',
-                                  style: Theme.of(context).textTheme.bodyLarge
-                                      ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
-                                      ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 32),
-                                FilledButton.icon(
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const ServerSettingsPage(),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('配置站点'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : Builder(
-                          builder: (context) {
-                            final filteredItems = _filteredItems;
-                            if (filteredItems.isEmpty) {
-                              // 首屏加载中显示骨架屏
-                              if (_loading) {
-                                return const TorrentListSkeleton();
-                              }
-                              // 空状态也支持下拉刷新
-                              return RefreshIndicator(
-                                onRefresh: () => _search(reset: true),
-                                child: ListView(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  keyboardDismissBehavior:
-                                      ScrollViewKeyboardDismissBehavior.onDrag,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_currentSite != null) ...[
+                              _buildAppBarLogo(_currentSite!),
+                              const SizedBox(width: 8),
+                            ],
+                            Flexible(
+                              child: Text.rich(
+                                TextSpan(
                                   children: [
-                                    SizedBox(
-                                      height:
-                                          MediaQuery.of(context).size.height *
-                                          0.5,
-                                      child: Center(
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.search_off,
-                                              size: 64,
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.outline,
-                                            ),
-                                            const SizedBox(height: 16),
-                                            Text(
-                                              _items.isEmpty
-                                                  ? '未找到相关种子'
-                                                  : '没有符合筛选条件的种子',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .titleMedium
-                                                  ?.copyWith(
-                                                    color: Theme.of(
-                                                      context,
-                                                    ).colorScheme.outline,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              '下拉刷新',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: Theme.of(
-                                                      context,
-                                                    ).colorScheme.outline,
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                    TextSpan(
+                                      text: appState.site?.name ?? 'PT Mate',
+                                    ),
+                                    TextSpan(
+                                      text: ' - PT Mate',
+                                      style: const TextStyle(fontSize: 14),
                                     ),
                                   ],
                                 ),
-                              );
-                            }
-                            return RefreshIndicator(
-                              onRefresh: () => _search(reset: true),
-                              child: Listener(
-                                onPointerMove: _onPointerMove,
-                                onPointerUp: _onPointerUp,
-                                child: ListView.builder(
-                                  key: _listKey,
-                                  controller: _scrollCtrl,
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  keyboardDismissBehavior:
-                                      ScrollViewKeyboardDismissBehavior.onDrag,
-                                  padding: const EdgeInsets.fromLTRB(
-                                    0,
-                                    0,
-                                    0,
-                                    16,
-                                  ),
-                                  itemCount:
-                                      filteredItems.length + (_hasMore ? 1 : 0),
-                                  itemBuilder: (context, index) {
-                                    if (index == filteredItems.length) {
-                                      return const Padding(
-                                        padding: EdgeInsets.all(16.0),
-                                        child: Center(
-                                          child: SizedBox(
-                                            width: 24,
-                                            height: 24,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                    final item = filteredItems[index];
-                                    final isSelected = _selectedItems.contains(
-                                      item.id,
-                                    );
-                                    return MetaData(
-                                      metaData: index,
-                                      behavior: HitTestBehavior.translucent,
-                                      child: TorrentListItem(
-                                        torrent: item,
-                                        isSelected: isSelected,
-                                        isSelectionMode: _isSelectionMode,
-                                        currentSite: _currentSite,
-                                        showCoverSetting: showCoverSetting,
-                                        batchOperationType:
-                                            _batchProgress?.actionType,
-                                        batchItemState: _batchItemStateFor(
-                                          item.id,
-                                        ),
-                                        batchErrorMessage: _batchItemErrorFor(
-                                          item.id,
-                                        ),
-                                        onRetryBatchAction:
-                                            _buildRetryCallbackForItem(item),
-                                        onCoverTap: () =>
-                                            _openCoverGallery(index),
-                                        onTap: () => _isSelectionMode
-                                            ? _onToggleSelection(item, index)
-                                            : _onTorrentTap(item),
-                                        onLongPress: () =>
-                                            _onLongPress(item, index),
-                                        onToggleCollection:
-                                            _isBatchActionRunning(
-                                              BatchOperationType.favorite,
-                                            )
-                                            ? null
-                                            : () => _onToggleCollection(item),
-                                        onDownload:
-                                            _isBatchActionRunning(
-                                              BatchOperationType.download,
-                                            )
-                                            ? null
-                                            : () => _onDownload(item),
-                                      ),
-                                    );
-                                  },
-                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            );
-                          },
-                        ),
-                ),
-                // 选中模式下的操作栏
-                if (_isSelectionMode)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      border: Border(
-                        top: BorderSide(
-                          color: Theme.of(context).dividerColor,
-                          width: 1,
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: _isBatchRunning
-                                ? null
-                                : _onCancelSelection,
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 0,
-                              ),
-                              textStyle: const TextStyle(fontSize: 13),
-                              side: BorderSide(
-                                color: Theme.of(context).colorScheme.outline,
-                                width: 1.0,
-                              ),
-                            ),
-                            child: const Text('取消'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // 全选按钮
-                        Expanded(
-                          child: TextButton(
-                            onPressed: _isBatchRunning
-                                ? null
-                                : () {
-                                    if (_selectedItems.length ==
-                                        _filteredItems.length) {
-                                      setState(() => _selectedItems.clear());
-                                    } else {
-                                      setState(() {
-                                        _selectedItems.addAll(
-                                          _filteredItems.map((e) => e.id),
-                                        );
-                                      });
-                                    }
-                                  },
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 0,
-                              ),
-                              textStyle: const TextStyle(fontSize: 13),
-                              side: BorderSide(
-                                color: Theme.of(context).colorScheme.outline,
-                                width: 1.0,
-                              ),
-                            ),
-                            child: Text(
-                              _selectedItems.length == _filteredItems.length
-                                  ? '全不选'
-                                  : '全选',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // 批量收藏按钮 - 仅在站点支持收藏功能时显示
-                        if (_currentSite?.features.supportCollection ??
-                            true) ...[
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed:
-                                  !_isBatchRunning && _selectedItems.isNotEmpty
-                                  ? _onBatchFavorite
-                                  : null,
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 0,
-                                ),
-                                textStyle: const TextStyle(fontSize: 13),
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                              ),
-                              child: Text('收藏 (${_selectedItems.length})'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                        ],
-                        // 批量下载按钮 - 仅在站点支持下载功能时显示
-                        if (_currentSite?.features.supportDownload ?? true)
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed:
-                                  !_isBatchRunning && _selectedItems.isNotEmpty
-                                  ? _onBatchDownload
-                                  : null,
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 0,
-                                ),
-                                textStyle: const TextStyle(fontSize: 13),
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.primary,
-                                foregroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimary,
-                              ),
-                              child: Text('下载 (${_selectedItems.length})'),
-                            ),
-                          ),
-                      ],
-                    ),
+              actions: const [QbSpeedIndicator()],
+            ),
+            body: IndexedStack(
+              index: _isAggregateMode ? 1 : 0,
+              children: [
+                _buildCurrentSiteBody(context, appState, showCoverSetting),
+                if (_aggregateRequest != null)
+                  AggregateSearchView(
+                    key: _aggregateViewKey,
+                    request: _aggregateRequest!,
+                    active: _isAggregateMode,
+                    searchService: widget.aggregateSearchService,
+                    onSearchRequested: _showSearchDialog,
+                    onExitRequested: _returnToCurrentSite,
+                    onSelectionModeChanged: (selected) {
+                      if (!mounted || _aggregateSelectionMode == selected) {
+                        return;
+                      }
+                      setState(() => _aggregateSelectionMode = selected);
+                    },
+                    onSearchAvailabilityChanged: (available) {
+                      if (!mounted || _aggregateSearchAvailable == available) {
+                        return;
+                      }
+                      setState(() => _aggregateSearchAvailable = available);
+                    },
                   ),
               ],
             ),
-            floatingActionButton: !_isSelectionMode
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      AnimatedSlide(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        offset: _fabVisible ? Offset.zero : const Offset(0, 2),
-                        child: AnimatedOpacity(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                          opacity: _fabVisible ? 1.0 : 0.0,
-                          child: Builder(
-                            builder: (context) {
-                              final isDesktop = ScreenUtils.isLargeScreen(
-                                context,
-                              );
-                              return isDesktop
-                                  ? FloatingActionButton.extended(
-                                      heroTag: 'home-site-switch-fab',
-                                      onPressed: _fabVisible
-                                          ? _showSiteSelectionDialog
-                                          : null,
-                                      icon: const Icon(Icons.swap_horiz),
-                                      label: const Text('切换'),
-                                    )
-                                  : FloatingActionButton(
-                                      heroTag: 'home-site-switch-fab',
-                                      onPressed: _fabVisible
-                                          ? _showSiteSelectionDialog
-                                          : null,
-                                      child: const Icon(Icons.swap_horiz),
-                                    );
-                            },
-                          ),
-                        ),
-                      ),
-                      if (_currentSite?.features.supportTorrentSearch ??
-                          true) ...[
-                        const SizedBox(height: 12),
-                        Builder(
-                          builder: (context) {
-                            final isDesktop = ScreenUtils.isLargeScreen(
-                              context,
-                            );
-                            return isDesktop
-                                ? FloatingActionButton.extended(
-                                    key: const ValueKey('home-search-fab'),
-                                    heroTag: 'home-search-fab',
-                                    onPressed: _showCategoryFilterDialog,
-                                    icon: const Icon(Icons.search),
-                                    label: const Text('搜索'),
-                                  )
-                                : FloatingActionButton(
-                                    key: const ValueKey('home-search-fab'),
-                                    heroTag: 'home-search-fab',
-                                    onPressed: _showCategoryFilterDialog,
-                                    tooltip: '搜索',
-                                    child: const Icon(Icons.search),
-                                  );
-                          },
-                        ),
-                      ],
-                    ],
-                  )
-                : null,
+            floatingActionButton: _buildFloatingActions(context),
             floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSearchButton(BuildContext context, {bool enabled = true}) {
+    return ScreenUtils.isLargeScreen(context)
+        ? FloatingActionButton.extended(
+            key: const ValueKey('home-search-fab'),
+            heroTag: 'home-search-fab',
+            onPressed: enabled ? _showSearchDialog : null,
+            icon: const Icon(Icons.search),
+            label: const Text('搜索'),
+          )
+        : FloatingActionButton(
+            key: const ValueKey('home-search-fab'),
+            heroTag: 'home-search-fab',
+            onPressed: enabled ? _showSearchDialog : null,
+            tooltip: '搜索',
+            child: const Icon(Icons.search),
+          );
+  }
+
+  Widget? _buildFloatingActions(BuildContext context) {
+    if (_isAggregateMode) {
+      return _aggregateSelectionMode
+          ? null
+          : _buildSearchButton(context, enabled: _aggregateSearchAvailable);
+    }
+    if (_isSelectionMode) return null;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        AnimatedSlide(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          offset: _fabVisible ? Offset.zero : const Offset(0, 2),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            opacity: _fabVisible ? 1.0 : 0.0,
+            child: Builder(
+              builder: (context) {
+                final isDesktop = ScreenUtils.isLargeScreen(context);
+                return isDesktop
+                    ? FloatingActionButton.extended(
+                        heroTag: 'home-site-switch-fab',
+                        onPressed: _fabVisible
+                            ? _showSiteSelectionDialog
+                            : null,
+                        icon: const Icon(Icons.swap_horiz),
+                        label: const Text('切换'),
+                      )
+                    : FloatingActionButton(
+                        heroTag: 'home-site-switch-fab',
+                        onPressed: _fabVisible
+                            ? _showSiteSelectionDialog
+                            : null,
+                        child: const Icon(Icons.swap_horiz),
+                      );
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSearchButton(context),
+      ],
+    );
+  }
+
+  Widget _buildCurrentSiteBody(
+    BuildContext context,
+    AppState appState,
+    bool showCoverSetting,
+  ) {
+    return Column(
+      children: [
+        // 统一头部（用户信息 + 搜索栏），使用进度控制：向下滚动逐步隐藏，向上滚动逐步显示
+        ClipRect(
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            heightFactor: _headerProgress,
+            child: Opacity(
+              opacity: _headerProgress,
+              child: _buildHeaderPanel(context, appState),
+            ),
+          ),
+        ),
+        if (_loading) const LinearProgressIndicator(),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(_error!, style: const TextStyle(color: Colors.red)),
+          ),
+        if (_batchProgress != null) _buildBatchProgressCard(),
+        Expanded(
+          child: _currentSite == null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.settings_outlined,
+                          size: 64,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          '尚未配置站点信息',
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '请先配置站点信息以开始使用应用',
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 32),
+                        FilledButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const ServerSettingsPage(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('配置站点'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : Builder(
+                  builder: (context) {
+                    final filteredItems = _filteredItems;
+                    if (filteredItems.isEmpty) {
+                      // 首屏加载中显示骨架屏
+                      if (_loading) {
+                        return const TorrentListSkeleton();
+                      }
+                      // 空状态也支持下拉刷新
+                      return RefreshIndicator(
+                        onRefresh: () => _search(reset: true),
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.of(context).size.height * 0.5,
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.search_off,
+                                      size: 64,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outline,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      _items.isEmpty
+                                          ? '未找到相关种子'
+                                          : '没有符合筛选条件的种子',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .outline,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '下拉刷新',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .outline,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return RefreshIndicator(
+                      onRefresh: () => _search(reset: true),
+                      child: Listener(
+                        onPointerMove: _onPointerMove,
+                        onPointerUp: _onPointerUp,
+                        child: ListView.builder(
+                          key: _listKey,
+                          controller: _scrollCtrl,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
+                          itemCount: filteredItems.length + (_hasMore ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == filteredItems.length) {
+                              return const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            final item = filteredItems[index];
+                            final isSelected = _selectedItems.contains(item.id);
+                            return MetaData(
+                              metaData: index,
+                              behavior: HitTestBehavior.translucent,
+                              child: TorrentListItem(
+                                torrent: item,
+                                isSelected: isSelected,
+                                isSelectionMode: _isSelectionMode,
+                                currentSite: _currentSite,
+                                showCoverSetting: showCoverSetting,
+                                batchOperationType: _batchProgress?.actionType,
+                                batchItemState: _batchItemStateFor(item.id),
+                                batchErrorMessage: _batchItemErrorFor(item.id),
+                                onRetryBatchAction: _buildRetryCallbackForItem(
+                                  item,
+                                ),
+                                onCoverTap: () => _openCoverGallery(index),
+                                onTap: () => _isSelectionMode
+                                    ? _onToggleSelection(item, index)
+                                    : _onTorrentTap(item),
+                                onLongPress: () => _onLongPress(item, index),
+                                onToggleCollection:
+                                    _isBatchActionRunning(
+                                      BatchOperationType.favorite,
+                                    )
+                                    ? null
+                                    : () => _onToggleCollection(item),
+                                onDownload:
+                                    _isBatchActionRunning(
+                                      BatchOperationType.download,
+                                    )
+                                    ? null
+                                    : () => _onDownload(item),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        // 选中模式下的操作栏
+        if (_isSelectionMode)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border(
+                top: BorderSide(
+                  color: Theme.of(context).dividerColor,
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: _isBatchRunning ? null : _onCancelSelection,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                      textStyle: const TextStyle(fontSize: 13),
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.outline,
+                        width: 1.0,
+                      ),
+                    ),
+                    child: const Text('取消'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // 全选按钮
+                Expanded(
+                  child: TextButton(
+                    onPressed: _isBatchRunning
+                        ? null
+                        : () {
+                            if (_selectedItems.length ==
+                                _filteredItems.length) {
+                              setState(() => _selectedItems.clear());
+                            } else {
+                              setState(() {
+                                _selectedItems.addAll(
+                                  _filteredItems.map((e) => e.id),
+                                );
+                              });
+                            }
+                          },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                      textStyle: const TextStyle(fontSize: 13),
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.outline,
+                        width: 1.0,
+                      ),
+                    ),
+                    child: Text(
+                      _selectedItems.length == _filteredItems.length
+                          ? '全不选'
+                          : '全选',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // 批量收藏按钮 - 仅在站点支持收藏功能时显示
+                if (_currentSite?.features.supportCollection ?? true) ...[
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: !_isBatchRunning && _selectedItems.isNotEmpty
+                          ? _onBatchFavorite
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 0),
+                        textStyle: const TextStyle(fontSize: 13),
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text('收藏 (${_selectedItems.length})'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                // 批量下载按钮 - 仅在站点支持下载功能时显示
+                if (_currentSite?.features.supportDownload ?? true)
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: !_isBatchRunning && _selectedItems.isNotEmpty
+                          ? _onBatchDownload
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 0),
+                        textStyle: const TextStyle(fontSize: 13),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Theme.of(context)
+                            .colorScheme
+                            .onPrimary,
+                      ),
+                      child: Text('下载 (${_selectedItems.length})'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
