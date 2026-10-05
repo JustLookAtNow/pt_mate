@@ -462,6 +462,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   // 优雅关闭 WebView，避免页面退出或跳转时出现崩溃
   Future<void> _disposeWebView() async {
     final controller = _webViewController;
+    _webViewController = null;
     if (controller == null) return;
     try {
       await controller.stopLoading();
@@ -471,7 +472,6 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
         urlRequest: URLRequest(url: WebUri('about:blank')),
       );
     } catch (_) {}
-    _webViewController = null;
   }
 
   @override
@@ -1960,6 +1960,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                       Theme.of(context).brightness == Brightness.dark,
                 ),
                 onWebViewCreated: (controller) async {
+                  if (!mounted) return;
                   _webViewController = controller;
                   if (widget.siteConfig?.cookie != null &&
                       widget.siteConfig!.cookie!.isNotEmpty) {
@@ -1982,12 +1983,14 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                   }
                 },
                 onLoadStart: (controller, url) {
+                  if (!mounted) return;
                   setState(() {
                     _webViewLoading = true;
                     _webViewError = null;
                   });
                 },
                 onLoadStop: (controller, url) {
+                  if (!mounted) return;
                   setState(() {
                     _webViewLoading = false;
                   });
@@ -1996,6 +1999,7 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
                   // 可以在这里显示加载进度
                 },
                 onReceivedError: (controller, request, error) {
+                  if (!mounted) return;
                   debugPrint(
                     'WebView错误: ${error.description}, URL: ${request.url}, isForMainFrame: ${request.isForMainFrame}',
                   );
@@ -2162,7 +2166,8 @@ class _TorrentDetailPageState extends State<TorrentDetailPage> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      // iOS 原生侧滑需要允许路由直接退出；其他平台保留网页历史返回。
+      canPop: Theme.of(context).platform == TargetPlatform.iOS,
       onPopInvokedWithResult: (bool didPop, dynamic result) async {
         if (didPop) return;
 
