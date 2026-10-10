@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:clock/clock.dart';
 import 'package:crypto/crypto.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -87,24 +88,27 @@ void main() {
     );
 
     test(
-      'getDownLoadHash should generate different tokens for different dates',
-      () async {
+      'getDownLoadHash should generate identical tokens with a fixed clock',
+      () {
         const passkey = 'test_passkey';
         const id = '12345';
         const userid = '67890';
 
-        final token1 = adapter.getDownLoadHash(passkey, id, userid);
+        final fixedTime = DateTime.utc(2026, 10, 10, 8, 3, 34, 999);
+        withClock(Clock.fixed(fixedTime), () {
+          final token1 = adapter.getDownLoadHash(passkey, id, userid);
+          final token2 = adapter.getDownLoadHash(passkey, id, userid);
 
-        // 等待一毫秒确保时间不同（虽然日期可能相同）
-        await Future.delayed(const Duration(milliseconds: 1));
+          expect(token1, equals(token2));
 
-        final token2 = adapter.getDownLoadHash(passkey, id, userid);
-
-        print('Token1: $token1');
-        print('Token2: $token2');
-
-        // 在同一天内，token应该相同（因为日期格式是Ymd）
-        expect(token1, equals(token2));
+          final key = md5.convert(utf8.encode('${passkey}20261010$userid'));
+          final jwt = JWT.verify(token1, SecretKey(key.toString()));
+          final payload = jwt.payload as Map<String, dynamic>;
+          final issuedAt = fixedTime.millisecondsSinceEpoch ~/ 1000;
+          expect(payload['id'], equals(id));
+          expect(payload['iat'], equals(issuedAt));
+          expect(payload['exp'], equals(issuedAt + 3600));
+        });
       },
     );
 
