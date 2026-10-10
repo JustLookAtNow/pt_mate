@@ -1,6 +1,9 @@
 import 'dart:convert';
+
+import 'package:clock/clock.dart';
 import 'package:crypto/crypto.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
+
 import '../../models/app_models.dart';
 
 /// NexusPHP相关站点的公共辅助方法
@@ -59,7 +62,7 @@ mixin NexusPHPHelper {
   /// 返回: JWT编码的下载令牌
   String getDownLoadHash(String passkey, String id, String userid) {
     // 生成MD5密钥: md5(passkey + 当前日期(Ymd) + userid)
-    final now = DateTime.now();
+    final now = clock.now();
     final dateStr =
         '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
     final keyString = passkey + dateStr + userid;
@@ -70,9 +73,7 @@ mixin NexusPHPHelper {
     // 创建JWT payload
     final payload = {
       'id': id,
-      'exp':
-          (DateTime.now().millisecondsSinceEpoch / 1000).floor() +
-          3600, // 1小时后过期
+      'exp': (now.millisecondsSinceEpoch / 1000).floor() + 3600, // 1小时后过期
     };
 
     // 使用HS256算法生成JWT
