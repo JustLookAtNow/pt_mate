@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -65,7 +66,11 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
 
   /// 图片是否被变换（放大/缩小/平移）；未变换时上下滑动用于翻页。
   bool _isTransformed = false;
-  double _swipeDy = 0;
+  final Set<int> _activePointers = {};
+  bool _canSwipe = false;
+  Offset _swipeStart = Offset.zero;
+  Offset _swipeDelta = Offset.zero;
+  VelocityTracker? _swipeVelocityTracker;
 
   @override
   void initState() {
@@ -164,18 +169,45 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
     _goTo(_position - 1);
   }
 
-  void _handleSwipeStart(DragStartDetails details) {
-    _swipeDy = 0;
+  void _handlePointerDown(PointerDownEvent event) {
+    _activePointers.add(event.pointer);
+    if (_activePointers.length > 1) {
+      // 多指手势一旦开始，剩余单指的移动也不能触发翻页。
+      _canSwipe = false;
+      _swipeVelocityTracker = null;
+      return;
+    }
+    _canSwipe = !_isTransformed;
+    _swipeStart = event.position;
+    _swipeDelta = Offset.zero;
+    _swipeVelocityTracker = _canSwipe
+        ? (VelocityTracker.withKind(event.kind)
+            ..addPosition(event.timeStamp, event.position))
+        : null;
   }
 
-  void _handleSwipeUpdate(DragUpdateDetails details) {
-    _swipeDy += details.primaryDelta ?? 0;
+  void _handlePointerMove(PointerMoveEvent event) {
+    if (!_canSwipe) return;
+    _swipeDelta = event.position - _swipeStart;
+    _swipeVelocityTracker?.addPosition(event.timeStamp, event.position);
   }
 
-  void _handleSwipeEnd(DragEndDetails details) {
-    final dy = _swipeDy;
-    _swipeDy = 0;
-    final velocity = details.primaryVelocity ?? 0;
+  void _handlePointerUp(PointerUpEvent event) {
+    _activePointers.remove(event.pointer);
+    if (_activePointers.isNotEmpty) return;
+
+    final canSwipe = _canSwipe;
+    final delta = _swipeDelta;
+    final velocity =
+        _swipeVelocityTracker?.getVelocity().pixelsPerSecond.dy ?? 0;
+    _canSwipe = false;
+    _swipeVelocityTracker = null;
+    if (!canSwipe ||
+        delta.distance <= kTouchSlop ||
+        delta.dy.abs() <= delta.dx.abs()) {
+      return;
+    }
+    final dy = delta.dy;
     if (dy.abs() <= _swipeDistanceThreshold &&
         velocity.abs() <= _swipeVelocityThreshold) {
       return;
@@ -196,6 +228,12 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
     } else {
       _goPrev();
     }
+  }
+
+  void _handlePointerCancel(PointerCancelEvent event) {
+    _activePointers.remove(event.pointer);
+    _canSwipe = false;
+    _swipeVelocityTracker = null;
   }
 
   /// 已翻到已知末尾但宿主可能还有下一页时，请求加载后继续前进。
@@ -258,95 +296,98 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
     return KeyboardListener(
       focusNode: _focusNode,
       onKeyEvent: _handleKey,
-      child: GestureDetector(
-        onTap: () => Navigator.of(context).pop(),
-        // 未变换（原始尺寸）时接管上下滑动翻页；已放大时把拖拽让给
-        // InteractiveViewer，保证图片平移不被抢占。
-        onVerticalDragStart: _isTransformed ? null : _handleSwipeStart,
-        onVerticalDragUpdate: _isTransformed ? null : _handleSwipeUpdate,
-        onVerticalDragEnd: _isTransformed ? null : _handleSwipeEnd,
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          body: Stack(
-            children: [
-              // 半透明遮罩，点击任意空白处关闭
-              const ColoredBox(color: Colors.black54),
-              Center(
-                child: GestureDetector(
-                  onDoubleTapDown: (details) =>
-                      _onDoubleTapAt(details.localPosition),
-                  child: InteractiveViewer(
-                    transformationController: _transformationController,
-                    minScale: 0.5,
-                    maxScale: 5.0,
-                    boundaryMargin: const EdgeInsets.all(double.infinity),
-                    constrained: true,
-                    clipBehavior: Clip.none,
-                    child: _buildImage(),
+      // 只观察指针，不参与手势竞争，确保原尺寸下也能直接双指缩放。
+      child: Listener(
+        onPointerDown: _handlePointerDown,
+        onPointerMove: _handlePointerMove,
+        onPointerUp: _handlePointerUp,
+        onPointerCancel: _handlePointerCancel,
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).pop(),
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: Stack(
+              children: [
+                // 半透明遮罩，点击任意空白处关闭
+                const ColoredBox(color: Colors.black54),
+                Center(
+                  child: GestureDetector(
+                    onDoubleTapDown: (details) =>
+                        _onDoubleTapAt(details.localPosition),
+                    child: InteractiveViewer(
+                      transformationController: _transformationController,
+                      panEnabled: _isTransformed,
+                      minScale: 0.5,
+                      maxScale: 5.0,
+                      boundaryMargin: const EdgeInsets.all(double.infinity),
+                      constrained: true,
+                      clipBehavior: Clip.none,
+                      child: _buildImage(),
+                    ),
                   ),
                 ),
-              ),
-              if (canPrev)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: _NavButton(
-                    icon: Icons.chevron_left,
-                    tooltip: '上一个',
-                    onPressed: _goPrev,
+                if (canPrev)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _NavButton(
+                      icon: Icons.chevron_left,
+                      tooltip: '上一个',
+                      onPressed: _goPrev,
+                    ),
                   ),
-                ),
-              if (canNext)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: _isLoadingMore
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 28),
-                          child: SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+                if (canNext)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _isLoadingMore
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 28),
+                            child: SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             ),
+                          )
+                        : _NavButton(
+                            icon: Icons.chevron_right,
+                            tooltip: '下一个',
+                            onPressed: _goNext,
                           ),
-                        )
-                      : _NavButton(
-                          icon: Icons.chevron_right,
-                          tooltip: '下一个',
-                          onPressed: _goNext,
+                  ),
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
                         ),
-                ),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 24),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.7,
-                        ),
-                        child: Text(
-                          '${widget.titleFor(_position)}  (${_position + 1} / ${widget.itemCount()})',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.7,
+                          ),
+                          child: Text(
+                            '${widget.titleFor(_position)}  (${_position + 1} / ${widget.itemCount()})',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

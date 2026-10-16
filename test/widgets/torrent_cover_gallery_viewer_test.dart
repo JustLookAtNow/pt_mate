@@ -5,7 +5,7 @@ import 'package:image/image.dart' as img;
 import 'package:pt_mate/widgets/torrent_cover_gallery_viewer.dart';
 
 Uint8List _png(Color color) {
-  final image = img.Image(width: 4, height: 4);
+  final image = img.Image(width: 240, height: 320);
   img.fill(
     image,
     color: img.ColorRgba8(
@@ -85,7 +85,182 @@ void main() {
     );
     await tester.tap(find.text('打开'));
     await tester.pumpAndSettle();
+    // 图片解码在测试时钟之外完成，等待后再发送多指事件，确保命中图片。
+    await tester.runAsync(() async {
+      await precacheImage(
+        MemoryImage(images[initialIndex]),
+        tester.element(find.byType(TorrentCoverGalleryViewer)),
+      );
+    });
+    await tester.pumpAndSettle();
   }
+
+  TransformationController controllerFor(WidgetTester tester) => tester
+      .widget<InteractiveViewer>(find.byType(InteractiveViewer))
+      .transformationController!;
+
+  Future<void> pinch(
+    WidgetTester tester, {
+    double startSpread = 30,
+    double endSpread = 90,
+  }) async {
+    final center = tester.getCenter(find.byType(InteractiveViewer));
+    final first = await tester.startGesture(
+      center - Offset(0, startSpread),
+      pointer: 1,
+    );
+    final second = await tester.startGesture(
+      center + Offset(0, startSpread),
+      pointer: 2,
+    );
+    for (var step = 1; step <= 6; step++) {
+      final spread = startSpread + (endSpread - startSpread) * step / 6;
+      await first.moveTo(center - Offset(0, spread));
+      await second.moveTo(center + Offset(0, spread));
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    await first.up();
+    await second.up();
+    await tester.pumpAndSettle();
+  }
+
+  for (final zoomIn in [true, false]) {
+    testWidgets('初始状态直接双指${zoomIn ? '放大' : '缩小'}且不翻页或关闭', (tester) async {
+      final changes = <int>[];
+      await pumpViewerInDialog(tester, onPageChanged: changes.add);
+
+      await pinch(
+        tester,
+        startSpread: zoomIn ? 30 : 90,
+        endSpread: zoomIn ? 90 : 30,
+      );
+
+      expect(
+        controllerFor(tester).value.getMaxScaleOnAxis(),
+        zoomIn ? greaterThan(1.0) : lessThan(1.0),
+      );
+      expect(changes, isEmpty);
+      expect(find.text('Title 0  (1 / 3)'), findsOneWidget);
+      expect(find.byType(TorrentCoverGalleryViewer), findsOneWidget);
+    });
+  }
+
+  testWidgets('单指先滑动再加入第二指可缩放且取消本次翻页', (tester) async {
+    final changes = <int>[];
+    await pumpViewerInDialog(tester, onPageChanged: changes.add);
+    final center = tester.getCenter(find.byType(InteractiveViewer));
+    final first = await tester.startGesture(center, pointer: 1);
+    await first.moveBy(const Offset(0, -80));
+    await tester.pump();
+    expect(controllerFor(tester).value, Matrix4.identity());
+
+    final second = await tester.startGesture(
+      center + const Offset(0, 30),
+      pointer: 2,
+    );
+    await first.moveBy(const Offset(0, -20));
+    await second.moveBy(const Offset(0, 20));
+    await tester.pump();
+    await first.moveBy(const Offset(0, -20));
+    await second.moveBy(const Offset(0, 20));
+    await tester.pump();
+    expect(controllerFor(tester).value.getMaxScaleOnAxis(), greaterThan(1));
+
+    await second.up();
+    await first.up();
+    await tester.pumpAndSettle();
+    expect(changes, isEmpty);
+    expect(find.byType(TorrentCoverGalleryViewer), findsOneWidget);
+  });
+
+  testWidgets('双指手势剩余单指继续移动不翻页，全部抬起后恢复翻页', (tester) async {
+    final changes = <int>[];
+    await pumpViewerInDialog(tester, onPageChanged: changes.add);
+    final center = tester.getCenter(find.byType(InteractiveViewer));
+    final first = await tester.startGesture(
+      center - const Offset(0, 30),
+      pointer: 1,
+    );
+    final second = await tester.startGesture(
+      center + const Offset(0, 30),
+      pointer: 2,
+    );
+    await first.moveBy(const Offset(0, -30));
+    await second.moveBy(const Offset(0, 30));
+    await tester.pump();
+    await first.moveBy(const Offset(0, -20));
+    await second.moveBy(const Offset(0, 20));
+    await tester.pump();
+    expect(controllerFor(tester).value.getMaxScaleOnAxis(), greaterThan(1));
+    await second.up();
+
+    // 即使剩下一指时已复位，也不能把同一手势误判为翻页。
+    controllerFor(tester).value = Matrix4.identity();
+    await tester.pump();
+    await first.moveBy(const Offset(0, -120));
+    await first.up();
+    await tester.pumpAndSettle();
+    expect(changes, isEmpty);
+
+    await tester.drag(find.byType(InteractiveViewer), const Offset(0, -120));
+    await tester.pumpAndSettle();
+    expect(changes, [1]);
+  });
+
+  testWidgets('双指放大后可平移，双击复位后恢复单指翻页', (tester) async {
+    final changes = <int>[];
+    await pumpViewerInDialog(tester, onPageChanged: changes.add);
+    await pinch(tester);
+    final controller = controllerFor(tester);
+    final before = controller.value.getTranslation().y;
+
+    await tester.drag(find.byType(InteractiveViewer), const Offset(0, -80));
+    await tester.pumpAndSettle();
+    expect(controller.value.getTranslation().y, isNot(before));
+    expect(changes, isEmpty);
+
+    final center = tester.getCenter(find.byType(InteractiveViewer));
+    await tester.tapAt(center);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tapAt(center);
+    await tester.pumpAndSettle();
+    expect(controller.value, Matrix4.identity());
+
+    await tester.drag(find.byType(InteractiveViewer), const Offset(0, -120));
+    await tester.pumpAndSettle();
+    expect(changes, [1]);
+  });
+
+  testWidgets('双指放大后按钮切图会复位并恢复单指翻页', (tester) async {
+    final changes = <int>[];
+    await pumpViewerInDialog(tester, onPageChanged: changes.add);
+    await pinch(tester);
+    expect(controllerFor(tester).value.getMaxScaleOnAxis(), greaterThan(1));
+
+    await tester.tap(find.byTooltip('下一个'));
+    await tester.pumpAndSettle();
+    expect(controllerFor(tester).value, Matrix4.identity());
+
+    await tester.drag(find.byType(InteractiveViewer), const Offset(0, -120));
+    await tester.pumpAndSettle();
+    expect(changes, [1, 2]);
+  });
+
+  testWidgets('取消单指滑动不翻页，下一次滑动仍可翻页', (tester) async {
+    final changes = <int>[];
+    await pumpViewerInDialog(tester, onPageChanged: changes.add);
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(InteractiveViewer)),
+    );
+    await gesture.moveBy(const Offset(0, -100));
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+    expect(changes, isEmpty);
+
+    await tester.drag(find.byType(InteractiveViewer), const Offset(0, -120));
+    await tester.pumpAndSettle();
+    expect(changes, [1]);
+  });
 
   testWidgets('初始加载显示第一张图与位置指示', (tester) async {
     await tester.pumpWidget(buildViewer());
