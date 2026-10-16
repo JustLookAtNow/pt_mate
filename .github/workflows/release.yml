@@ -652,10 +652,6 @@ jobs:
         target_commitish: ${{ github.event_name == 'workflow_dispatch' && needs.build-android-linux.outputs.source_sha || '' }}
         name: Release ${{ steps.version.outputs.tag }}
         body: |
-          ## 升级前必读：请先导出备份
-
-          本版本升级了 Android 安全存储，旧版安全存储可能无法直接兼容。请在升级安装前使用应用内导出功能备份数据；备份文件是包含 Cookie、API Key 和密码等凭据的明文 JSON，请妥善保管，并在恢复成功后立即删除。
-
           ## Changes in this release
           ${{ steps.commit_message.outputs.message }}
 
