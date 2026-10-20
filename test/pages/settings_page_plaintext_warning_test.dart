@@ -27,6 +27,17 @@ class _FailingSiteTagStorage implements StorageService {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class _FailingSwipeModeStorage extends _FailingVisibleTagStorage {
+  @override
+  Future<TorrentSwipeMode> loadTorrentSwipeMode() =>
+      StorageService.instance.loadTorrentSwipeMode();
+
+  @override
+  Future<void> saveTorrentSwipeMode(TorrentSwipeMode mode) async {
+    throw StateError('test preference write failure');
+  }
+}
+
 class _FailingVisibleTagStorage implements StorageService {
   @override
   Future<bool> loadShowCoverImages() =>
@@ -94,6 +105,58 @@ void main() {
   }
 
   Finder siteTagSwitch() => find.widgetWithText(SwitchListTile, '自动添加站点标签');
+
+  Future<void> selectSwipeMode(WidgetTester tester, String label) async {
+    final tile = find.widgetWithText(ListTile, '种子列表滑动方式');
+    await tester.scrollUntilVisible(
+      tile,
+      200,
+      scrollable: find.descendant(
+        of: find.byType(ListView).last,
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(tile);
+    await tester.pumpAndSettle();
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(SimpleDialogOption, label));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('滑动方式默认显示按钮，保存后重建仍保留且可切回', (tester) async {
+    await pumpSettings(tester);
+    await selectSwipeMode(tester, '左滑收藏，右滑下载');
+    expect(await storage.loadTorrentSwipeMode(), TorrentSwipeMode.swipeActions);
+    expect(
+      tester
+          .element(find.byType(SettingsPage))
+          .read<DisplaySettingsManager>()
+          .torrentSwipeMode,
+      TorrentSwipeMode.swipeActions,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await pumpSettings(tester);
+    await selectSwipeMode(tester, '左滑显示按钮');
+    expect(
+      await storage.loadTorrentSwipeMode(),
+      TorrentSwipeMode.revealButtons,
+    );
+  });
+
+  testWidgets('滑动方式保存失败时保留原值并提示错误', (tester) async {
+    await pumpSettings(tester, displayStorage: _FailingSwipeModeStorage());
+    await selectSwipeMode(tester, '左滑收藏，右滑下载');
+    expect(
+      await storage.loadTorrentSwipeMode(),
+      TorrentSwipeMode.revealButtons,
+    );
+    expect(find.text('左滑显示按钮'), findsOneWidget);
+    expect(find.textContaining('保存种子列表滑动方式失败'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+  });
 
   Future<Finder> expandVisibleTags(WidgetTester tester) async {
     final title = find.text('过滤标签设置');

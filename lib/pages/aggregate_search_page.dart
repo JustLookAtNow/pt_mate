@@ -371,6 +371,11 @@ class AggregateSearchViewState extends State<AggregateSearchView> {
                               itemCount: provider.filteredResults.length,
                               itemBuilder: (context, index) {
                                 final item = provider.filteredResults[index];
+                                final site = context
+                                    .read<StorageService>()
+                                    .siteConfigsCache
+                                    ?.where((site) => site.id == item.siteId)
+                                    .firstOrNull;
                                 // final Color siteColor = _colorForSite(item.siteId);
                                 return Container(
                                   key: ValueKey(item.identity),
@@ -381,6 +386,7 @@ class AggregateSearchViewState extends State<AggregateSearchView> {
                                     child: RepaintBoundary(
                                       child: TorrentListItem(
                                         torrent: item.torrent,
+                                        currentSite: site,
                                         isSelected: _selectedItems.contains(
                                           item.identity,
                                         ),

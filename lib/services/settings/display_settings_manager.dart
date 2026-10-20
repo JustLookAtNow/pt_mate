@@ -7,6 +7,7 @@ class DisplaySettingsManager extends ChangeNotifier {
   final StorageService _storageService;
 
   bool _showCoverImages = true;
+  TorrentSwipeMode _torrentSwipeMode = TorrentSwipeMode.revealButtons;
   Set<String> _visibleTags = Set.unmodifiable(
     TagType.values.map((tag) => tag.name),
   );
@@ -17,6 +18,7 @@ class DisplaySettingsManager extends ChangeNotifier {
   }
 
   bool get showCoverImages => _showCoverImages;
+  TorrentSwipeMode get torrentSwipeMode => _torrentSwipeMode;
   Set<String> get visibleTags => _visibleTags;
   bool get isLoading => _isLoading;
 
@@ -25,6 +27,14 @@ class DisplaySettingsManager extends ChangeNotifier {
 
     await _storageService.saveShowCoverImages(value);
     _showCoverImages = value;
+    notifyListeners();
+  }
+
+  Future<void> setTorrentSwipeMode(TorrentSwipeMode value) async {
+    if (_torrentSwipeMode == value) return;
+
+    await _storageService.saveTorrentSwipeMode(value);
+    _torrentSwipeMode = value;
     notifyListeners();
   }
 
@@ -42,6 +52,11 @@ class DisplaySettingsManager extends ChangeNotifier {
       _showCoverImages = await _storageService.loadShowCoverImages();
     } catch (_) {
       _showCoverImages = true;
+    }
+    try {
+      _torrentSwipeMode = await _storageService.loadTorrentSwipeMode();
+    } catch (_) {
+      _torrentSwipeMode = TorrentSwipeMode.revealButtons;
     }
     try {
       await _storageService.loadVisibleTags();

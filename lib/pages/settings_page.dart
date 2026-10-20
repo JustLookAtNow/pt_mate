@@ -219,6 +219,8 @@ class _SettingsBody extends StatelessWidget {
               _ShowCoverImagesTile(),
               const Divider(height: 1),
               const _DisplayTagSettingsTile(),
+              const Divider(height: 1),
+              const _TorrentSwipeModeTile(),
             ],
           ),
         ),
@@ -1067,6 +1069,80 @@ class _AutoAddSiteTagTileState extends State<_AutoAddSiteTagTile> {
       subtitle: const Text('添加下载任务时自动附加“站点/站点名称”标签，不支持标签的下载器会忽略此设置。'),
       value: _enabled,
       onChanged: _loading || _saving ? null : _saveSetting,
+    );
+  }
+}
+
+class _TorrentSwipeModeTile extends StatefulWidget {
+  const _TorrentSwipeModeTile();
+
+  @override
+  State<_TorrentSwipeModeTile> createState() => _TorrentSwipeModeTileState();
+}
+
+class _TorrentSwipeModeTileState extends State<_TorrentSwipeModeTile> {
+  bool _saving = false;
+
+  String _label(TorrentSwipeMode mode) => switch (mode) {
+    TorrentSwipeMode.revealButtons => '左滑显示按钮',
+    TorrentSwipeMode.swipeActions => '左滑收藏，右滑下载',
+  };
+
+  Future<void> _selectMode(DisplaySettingsManager settings) async {
+    final selected = await showDialog<TorrentSwipeMode>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('种子列表滑动方式'),
+        children: TorrentSwipeMode.values
+            .map(
+              (mode) => SimpleDialogOption(
+                onPressed: () => Navigator.of(context).pop(mode),
+                child: Row(
+                  children: [
+                    Icon(
+                      settings.torrentSwipeMode == mode
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(_label(mode))),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+    if (!mounted || selected == null || selected == settings.torrentSwipeMode) {
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await settings.setTorrentSwipeMode(selected);
+    } catch (e) {
+      if (mounted) {
+        NotificationHelper.showError(context, '保存种子列表滑动方式失败: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<DisplaySettingsManager>();
+    return ListTile(
+      leading: const Icon(Icons.swipe),
+      title: const Text('种子列表滑动方式'),
+      subtitle: Text(_label(settings.torrentSwipeMode)),
+      trailing: _saving || settings.isLoading
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.chevron_right),
+      onTap: _saving || settings.isLoading ? null : () => _selectMode(settings),
     );
   }
 }

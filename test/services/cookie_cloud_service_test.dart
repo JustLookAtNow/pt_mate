@@ -629,6 +629,75 @@ void main() {
     expect(await storage.loadAutoAddSiteTag(), isFalse);
   });
 
+  for (final mode in TorrentSwipeMode.values) {
+    test('滑动模式备份序列化后恢复：${mode.name}', () async {
+      final storage = StorageService.instance;
+      final backupService = BackupService(storage);
+      await storage.saveTorrentSwipeMode(mode);
+      final backup = await backupService.createBackup();
+      final preferences =
+          backup.data['userPreferences'] as Map<String, dynamic>;
+      expect(preferences['torrentSwipeMode'], mode.name);
+      expect(backup.version, '1.4.0');
+      await storage.saveTorrentSwipeMode(
+        mode == TorrentSwipeMode.revealButtons
+            ? TorrentSwipeMode.swipeActions
+            : TorrentSwipeMode.revealButtons,
+      );
+      final serialized = BackupData.fromJson(
+        jsonDecode(jsonEncode(backup.toJson())) as Map<String, dynamic>,
+      );
+      final result = await backupService.restoreBackup(serialized);
+      expect(result.success, isTrue, reason: result.message);
+      expect(await storage.loadTorrentSwipeMode(), mode);
+    });
+  }
+
+  for (final removePreferences in [false, true]) {
+    test('旧备份缺少滑动模式时恢复按钮模式，缺少偏好块：$removePreferences', () async {
+      final storage = StorageService.instance;
+      final backupService = BackupService(storage);
+      final backup = await backupService.createBackup();
+      if (removePreferences) {
+        backup.data.remove('userPreferences');
+      } else {
+        (backup.data['userPreferences'] as Map<String, dynamic>).remove(
+          'torrentSwipeMode',
+        );
+      }
+      await storage.saveTorrentSwipeMode(TorrentSwipeMode.swipeActions);
+      final result = await backupService.restoreBackup(backup);
+      expect(result.success, isTrue, reason: result.message);
+      expect(
+        await storage.loadTorrentSwipeMode(),
+        TorrentSwipeMode.revealButtons,
+      );
+    });
+  }
+
+  for (final invalid in <Object?>['unknown', true, 1, null]) {
+    test('非法滑动模式在恢复写入前拒绝：$invalid', () async {
+      final storage = StorageService.instance;
+      final backupService = BackupService(storage);
+      final backup = await backupService.createBackup();
+      (backup.data['userPreferences']
+              as Map<String, dynamic>)['torrentSwipeMode'] =
+          invalid;
+      await storage.saveTorrentSwipeMode(TorrentSwipeMode.swipeActions);
+      var beforeRestoreCalled = false;
+      final result = await backupService.restoreBackup(
+        backup,
+        onBeforeRestore: () async => beforeRestoreCalled = true,
+      );
+      expect(result.success, isFalse);
+      expect(beforeRestoreCalled, isFalse);
+      expect(
+        await storage.loadTorrentSwipeMode(),
+        TorrentSwipeMode.swipeActions,
+      );
+    });
+  }
+
   test('自动站点标签备份字段类型错误时在恢复前拒绝并保留现有值', () async {
     final storage = StorageService.instance;
     final backupService = BackupService(storage);

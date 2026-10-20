@@ -153,6 +153,7 @@ class BackupService {
       'dynamicColor': await _storageService.loadUseDynamicColor(),
       'seedColor': await _storageService.loadSeedColor(),
       'autoLoadImages': await _storageService.loadAutoLoadImages(),
+      'torrentSwipeMode': (await _storageService.loadTorrentSwipeMode()).name,
       'defaultDownloadSettings': {
         'category': await _storageService.loadDefaultDownloadCategory(),
         'tags': await _storageService.loadDefaultDownloadTags(),
@@ -494,8 +495,11 @@ class BackupService {
     Map<String, dynamic> data, {
     required List<Map<String, dynamic>>? sanitizedDownloaderConfigs,
   }) {
-    // 旧备份没有此字段时恢复为默认关闭，避免保留当前的开启状态。
-    final snapshot = <String, dynamic>{'autoAddSiteTag': false};
+    // 旧备份缺失新增偏好时恢复为默认值，避免保留当前设备的值。
+    final snapshot = <String, dynamic>{
+      'autoAddSiteTag': false,
+      'torrentSwipeMode': TorrentSwipeMode.revealButtons.name,
+    };
     final activeSiteId = data['activeSiteId'];
     if (activeSiteId != null) snapshot['activeSiteId'] = activeSiteId as String;
 
@@ -516,6 +520,10 @@ class BackupService {
       copyIfPresent('dynamicColor', 'dynamicColor');
       copyIfPresent('seedColor', 'seedColor');
       copyIfPresent('autoLoadImages', 'autoLoadImages');
+      // 显式的 null 也必须进入校验，避免把非法新字段当作旧备份。
+      if (preferences.containsKey('torrentSwipeMode')) {
+        snapshot['torrentSwipeMode'] = preferences['torrentSwipeMode'];
+      }
 
       final downloadSettings =
           preferences['defaultDownloadSettings'] as Map<String, dynamic>?;

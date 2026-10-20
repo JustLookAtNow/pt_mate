@@ -97,6 +97,7 @@ class StorageKeys {
   static const String logToFileEnabled = 'logging.toFile'; // bool
   // 标签显示设置
   static const String visibleTags = 'ui.visibleTags'; // List<String>
+  static const String torrentSwipeMode = 'ui.torrentSwipeMode'; // String
 
   // 聚合搜索设置
   static const String aggregateSearchSettings = 'aggregateSearch.settings';
@@ -1964,6 +1965,7 @@ class StorageService {
       'dynamicColor',
       'seedColor',
       'autoLoadImages',
+      'torrentSwipeMode',
       'defaultDownloadCategory',
       'defaultDownloadTags',
       'autoAddSiteTag',
@@ -1992,6 +1994,10 @@ class StorageService {
         (decoded.containsKey('seedColor') && decoded['seedColor'] is! int) ||
         (decoded.containsKey('autoLoadImages') &&
             decoded['autoLoadImages'] is! bool) ||
+        (decoded.containsKey('torrentSwipeMode') &&
+            !TorrentSwipeMode.values.any(
+              (mode) => mode.name == decoded['torrentSwipeMode'],
+            )) ||
         (decoded.containsKey('autoAddSiteTag') &&
             decoded['autoAddSiteTag'] is! bool) ||
         (decoded.containsKey('defaultDownloadCategory') &&
@@ -4241,6 +4247,22 @@ class StorageService {
     return prefs.getBool(StorageKeys.showCoverImages) ?? true; // 默认自动显示
   }
 
+  Future<void> saveTorrentSwipeMode(TorrentSwipeMode mode) async {
+    final prefs = await _prefs;
+    if (!await prefs.setString(StorageKeys.torrentSwipeMode, mode.name)) {
+      throw StateError('保存种子列表滑动方式失败');
+    }
+  }
+
+  Future<TorrentSwipeMode> loadTorrentSwipeMode() async {
+    final prefs = await _prefs;
+    final value = prefs.get(StorageKeys.torrentSwipeMode);
+    return TorrentSwipeMode.values.firstWhere(
+      (mode) => mode.name == value,
+      orElse: () => TorrentSwipeMode.revealButtons,
+    );
+  }
+
   Future<void> saveLogToFileEnabled(bool enabled) async {
     final prefs = await _prefs;
     await prefs.setBool(StorageKeys.logToFileEnabled, enabled);
@@ -4810,6 +4832,7 @@ class StorageService {
     await persistBool('dynamicColor', StorageKeys.themeUseDynamic);
     await persistInt('seedColor', StorageKeys.themeSeedColor);
     await persistBool('autoLoadImages', StorageKeys.autoLoadImages);
+    await persistString('torrentSwipeMode', StorageKeys.torrentSwipeMode);
     await persistBool('autoAddSiteTag', StorageKeys.autoAddSiteTag);
     await persistString(
       'defaultDownloadCategory',

@@ -12,6 +12,7 @@ import 'package:pt_mate/services/aggregate_search_service.dart';
 import 'package:pt_mate/services/settings/display_settings_manager.dart';
 import 'package:pt_mate/services/storage/storage_service.dart';
 import 'package:pt_mate/widgets/torrent_list_item.dart';
+import 'package:pt_mate/widgets/torrent_swipe_actions.dart';
 import 'package:pt_mate/widgets/tag_filter_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,6 +20,16 @@ const _configs = [
   AggregateSearchConfig(id: 'test-strategy', name: '测试策略'),
   AggregateSearchConfig(id: 'backup-strategy', name: '备用策略'),
 ];
+
+class _CachedSiteStorage implements StorageService {
+  List<SiteConfig>? sites;
+
+  @override
+  List<SiteConfig>? get siteConfigsCache => sites;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -65,6 +76,47 @@ void main() {
     expect(service.invocations, hasLength(1));
     service.invocations.single.complete();
     await _finishNotifications(tester);
+  });
+
+  testWidgets('聚合列表按所属站点限制快捷滑动能力', (tester) async {
+    const sites = [
+      SiteConfig(
+        id: 'site-a',
+        name: '站点 A',
+        baseUrl: 'https://a.example',
+        features: SiteFeatures(supportCollection: false),
+      ),
+      SiteConfig(
+        id: 'site-b',
+        name: '站点 B',
+        baseUrl: 'https://b.example',
+        features: SiteFeatures(supportDownload: false),
+      ),
+    ];
+    await StorageService.instance.saveTorrentSwipeMode(
+      TorrentSwipeMode.swipeActions,
+    );
+    final provider = AggregateSearchProvider();
+    final service = _FakeAggregateSearchService();
+    final storage = _CachedSiteStorage();
+    await _pumpView(tester, provider, service, storage: storage);
+    // 在结果到达前才加载站点，验证构建条目时使用最新缓存。
+    storage.sites = sites;
+    service.invocations.single.complete(
+      items: [
+        _resultItem(siteId: 'site-a', torrentId: '1', name: '种子 A'),
+        _resultItem(siteId: 'site-b', torrentId: '1', name: '种子 B'),
+      ],
+    );
+    await _finishNotifications(tester);
+    final actions = tester
+        .widgetList<TorrentSwipeActions>(find.byType(TorrentSwipeActions))
+        .toList();
+    expect(actions, hasLength(2));
+    expect(actions[0].onCollection, isNull);
+    expect(actions[0].onDownload, isNotNull);
+    expect(actions[1].onCollection, isNotNull);
+    expect(actions[1].onDownload, isNull);
   });
 
   testWidgets('only a new request sequence starts a replacement search', (
@@ -336,6 +388,7 @@ Future<GlobalKey<_HarnessState>> _pumpView(
   AggregateSearchProvider provider,
   AggregateSearchService service, {
   String keyword = '',
+  StorageService? storage,
 }) async {
   tester.view.physicalSize = const Size(393, 852);
   tester.view.devicePixelRatio = 1;
@@ -351,7 +404,9 @@ Future<GlobalKey<_HarnessState>> _pumpView(
         ChangeNotifierProvider(
           create: (_) => DisplaySettingsManager(StorageService.instance),
         ),
-        Provider<StorageService>.value(value: StorageService.instance),
+        Provider<StorageService>.value(
+          value: storage ?? StorageService.instance,
+        ),
       ],
       child: MaterialApp(
         home: _Harness(key: key, service: service, keyword: keyword),

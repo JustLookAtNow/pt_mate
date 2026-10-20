@@ -15,6 +15,7 @@ import 'dart:math' as math;
 import '../utils/format.dart';
 import 'cached_network_image.dart';
 import 'full_screen_image_viewer.dart';
+import 'torrent_swipe_actions.dart';
 
 // Helper method to parse rating
 // Using a static final RegExp to avoid recompiling the pattern on every call, improving performance.
@@ -225,8 +226,28 @@ class TorrentListItem extends StatelessWidget {
       ),
     );
 
-    // 移动设备使用自定义左滑功能
+    // 移动布局可选择按钮菜单或直接执行双向滑动操作。
     if (isMobile) {
+      final swipeMode = context
+          .select<DisplaySettingsManager, TorrentSwipeMode>(
+            (settings) => settings.torrentSwipeMode,
+          );
+      if (swipeMode == TorrentSwipeMode.swipeActions) {
+        return TorrentSwipeActions(
+          key: ValueKey('${currentSite?.id}:$siteName:${torrent.id}'),
+          enabled: !isSelectionMode,
+          collected: torrent.collection,
+          onCollection: (currentSite?.features.supportCollection ?? true)
+              ? onToggleCollection
+              : null,
+          onDownload: (currentSite?.features.supportDownload ?? true)
+              ? onDownload
+              : null,
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: mainContent,
+        );
+      }
       return _SwipeableItem(
         onTap: onTap,
         onLongPress: onLongPress,

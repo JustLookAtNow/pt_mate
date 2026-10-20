@@ -1,11 +1,16 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
+
 import '../services/site_config_service.dart';
 import '../utils/format.dart';
 
 final Logger _logger = Logger();
+
+/// 移动布局下种子列表的滑动操作方式。
+enum TorrentSwipeMode { revealButtons, swipeActions }
 
 // 用户资料信息
 class MemberProfile {

@@ -13,6 +13,10 @@ class _FailingTagStorage implements StorageService {
   Future<bool> loadShowCoverImages() => storage.loadShowCoverImages();
 
   @override
+  Future<TorrentSwipeMode> loadTorrentSwipeMode() =>
+      storage.loadTorrentSwipeMode();
+
+  @override
   Future<void> loadVisibleTags() => storage.loadVisibleTags();
 
   @override
@@ -20,6 +24,11 @@ class _FailingTagStorage implements StorageService {
 
   @override
   Future<void> saveVisibleTags(List<String> tags) async {
+    throw StateError('test preference write failure');
+  }
+
+  @override
+  Future<void> saveTorrentSwipeMode(TorrentSwipeMode mode) async {
     throw StateError('test preference write failure');
   }
 
@@ -46,6 +55,63 @@ void main() {
 
     expect(manager.isLoading, isFalse);
     expect(manager.showCoverImages, isFalse);
+  });
+
+  test(
+    'swipe mode defaults to buttons and tolerates invalid local values',
+    () async {
+      final prefs = await SharedPreferences.getInstance();
+      for (final value in <Object?>[null, 'unknown', true]) {
+        if (value is String) {
+          await prefs.setString(StorageKeys.torrentSwipeMode, value);
+        }
+        if (value is bool) {
+          await prefs.setBool(StorageKeys.torrentSwipeMode, value);
+        }
+        final manager = DisplaySettingsManager(storage);
+        addTearDown(manager.dispose);
+        await Future<void>.delayed(Duration.zero);
+        expect(manager.torrentSwipeMode, TorrentSwipeMode.revealButtons);
+        expect(manager.isLoading, isFalse);
+      }
+    },
+  );
+
+  test(
+    'swipe mode persists, notifies once and loads into a new manager',
+    () async {
+      final manager = DisplaySettingsManager(storage);
+      addTearDown(manager.dispose);
+      await Future<void>.delayed(Duration.zero);
+      var notifications = 0;
+      manager.addListener(() => notifications++);
+      await manager.setTorrentSwipeMode(TorrentSwipeMode.swipeActions);
+      await manager.setTorrentSwipeMode(TorrentSwipeMode.swipeActions);
+      expect(manager.torrentSwipeMode, TorrentSwipeMode.swipeActions);
+      expect(notifications, 1);
+      final restored = DisplaySettingsManager(storage);
+      addTearDown(restored.dispose);
+      await Future<void>.delayed(Duration.zero);
+      expect(restored.torrentSwipeMode, TorrentSwipeMode.swipeActions);
+    },
+  );
+
+  test('failed swipe mode save retains value without notifying', () async {
+    final manager = DisplaySettingsManager(_FailingTagStorage(storage));
+    addTearDown(manager.dispose);
+    await Future<void>.delayed(Duration.zero);
+    var notifications = 0;
+    manager.addListener(() => notifications++);
+    await expectLater(
+      manager.setTorrentSwipeMode(TorrentSwipeMode.swipeActions),
+      throwsStateError,
+    );
+    expect(manager.torrentSwipeMode, TorrentSwipeMode.revealButtons);
+    expect(
+      await storage.loadTorrentSwipeMode(),
+      TorrentSwipeMode.revealButtons,
+    );
+    expect(notifications, 0);
   });
 
   test('persists show cover preference and notifies listeners', () async {
