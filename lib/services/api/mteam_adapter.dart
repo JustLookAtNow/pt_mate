@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
+
 import '../../models/app_models.dart';
 import '../site_config_service.dart';
 import 'site_adapter.dart';
@@ -17,6 +18,11 @@ class MTeamAdapter extends SiteAdapter {
 
   @override
   SiteConfig get siteConfig => _siteConfig;
+
+  @visibleForTesting
+  void setHttpClientAdapterForTesting(HttpClientAdapter adapter) {
+    _dio.httpClientAdapter = adapter;
+  }
 
   @override
   Future<void> init(SiteConfig config) async {
@@ -57,8 +63,7 @@ class MTeamAdapter extends SiteAdapter {
 
           // 动态设置API密钥和UA
           options.headers['accept'] = 'application/json, text/plain, */*';
-          options.headers['user-agent'] =
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36';
+          options.headers['user-agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36';
           final hasExplicitKey =
               options.headers.containsKey('x-api-key') &&
               ((options.headers['x-api-key']?.toString().isNotEmpty) == true);

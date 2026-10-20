@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 
 /// 站点异常基类
@@ -46,14 +49,15 @@ class SiteAuthenticationException extends SiteException {
 }
 
 /// 网络超时异常
-/// 当连接超时、发送超时或接收超时时抛出
+/// 当请求超时时抛出；无法确定阶段时使用“请求超时”。
 class SiteNetworkException extends SiteException {
   final String timeoutType;
 
   const SiteNetworkException({required this.timeoutType, String? detail})
     : super('网络请求超时: $timeoutType', detail);
 
-  bool get isTimeout => const {'连接超时', '发送超时', '接收超时'}.contains(timeoutType);
+  bool get isTimeout =>
+      const {'连接超时', '发送超时', '接收超时', '请求超时'}.contains(timeoutType);
 }
 
 /// 服务端异常
@@ -101,6 +105,56 @@ class ApiExceptionAdapter {
   /// 截断内容的最大长度
   static const int _maxDetailLength = 200;
 
+  static final RegExp _socketTimeoutPattern = RegExp(
+    r'\btimed\s+out\b',
+    caseSensitive: false,
+  );
+
+  /// 统一识别原生异常和站点异常中的超时，供异常转换与请求重试共用。
+  /// 只展开无 HTTP 错误响应的 Dio 网络异常，不匹配普通错误的文本。
+  static String? timeoutTypeOf(Object error) {
+    Object? current = error;
+    final visited = Set<Object>.identity();
+    while (current != null && visited.add(current)) {
+      if (current is SiteNetworkException) {
+        return current.isTimeout ? current.timeoutType : null;
+      }
+      if (current is SiteException) return null;
+      if (current is TimeoutException) return '请求超时';
+      if (current is SocketException) {
+        return _socketTimeoutPattern.hasMatch(current.message) ||
+                _socketTimeoutPattern.hasMatch(current.osError?.message ?? '')
+            ? '连接超时'
+            : null;
+      }
+      if (current is! DioException) return null;
+
+      // 取消、证书及 HTTP 错误不能因附带的旧异常而触发重试。
+      if (current.type == DioExceptionType.cancel ||
+          current.type == DioExceptionType.badCertificate ||
+          current.type == DioExceptionType.badResponse ||
+          (current.response?.statusCode ?? 0) >= 400) {
+        return null;
+      }
+      // 与 wrapError 一致，保留已结构化的内部站点异常的含义。
+      if (current.error is SiteException) {
+        current = current.error;
+        continue;
+      }
+      switch (current.type) {
+        case DioExceptionType.connectionTimeout:
+          return '连接超时';
+        case DioExceptionType.sendTimeout:
+          return '发送超时';
+        case DioExceptionType.receiveTimeout:
+          return '接收超时';
+        default:
+          current = current.error;
+      }
+    }
+    return null;
+  }
+
   /// Cloudflare 特征关键字
   static const List<String> _cfKeywords = [
     'cloudflare',
@@ -125,6 +179,14 @@ class ApiExceptionAdapter {
       return _handleDioException(e, actionName);
     }
 
+    final timeoutType = e is Object ? timeoutTypeOf(e) : null;
+    if (timeoutType != null) {
+      return SiteNetworkException(
+        timeoutType: timeoutType,
+        detail: _truncateDetail(e.toString()),
+      );
+    }
+
     // 其他异常包装为服务异常
     return SiteServiceException(
       message: '$actionName失败',
@@ -134,21 +196,22 @@ class ApiExceptionAdapter {
 
   /// 处理 Dio 异常
   static SiteException _handleDioException(DioException e, String actionName) {
-    // 0. 检查内部异常是否已经是 SiteException
-    if (e.error is SiteException) {
-      return e.error as SiteException;
+    final timeoutType = timeoutTypeOf(e);
+    // 保留结构化站点异常，但不能让内部超时覆盖外层的取消或 HTTP 错误。
+    final innerError = e.error;
+    if (innerError is SiteException &&
+        (innerError is! SiteNetworkException ||
+            !innerError.isTimeout ||
+            timeoutType != null)) {
+      return innerError;
     }
 
     // 1. 超时检测
-    switch (e.type) {
-      case DioExceptionType.connectionTimeout:
-        return const SiteNetworkException(timeoutType: '连接超时');
-      case DioExceptionType.sendTimeout:
-        return const SiteNetworkException(timeoutType: '发送超时');
-      case DioExceptionType.receiveTimeout:
-        return const SiteNetworkException(timeoutType: '接收超时');
-      default:
-        break;
+    if (timeoutType != null) {
+      return SiteNetworkException(
+        timeoutType: timeoutType,
+        detail: _truncateDetail(e.error?.toString()),
+      );
     }
 
     // 2. 响应状态码检测
