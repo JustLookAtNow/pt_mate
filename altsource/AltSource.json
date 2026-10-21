@@ -1,10 +1,10 @@
 {
   "name": "PT Mate",
   "identifier": "com.github.justlookatnow.ptmate.source",
-  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.4/altsource/AltSource.json",
-  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.4/screenshots/1.png",
+  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.5/altsource/AltSource.json",
+  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.5/screenshots/1.png",
   "website": "https://github.com/JustLookAtNow/pt_mate",
-  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.4/mt.png",
+  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.5/mt.png",
   "subtitle": "PT private tracker companion",
   "description": "This is the official source for PT Mate.\n\nFor full details, check the GitHub repository:\nhttps://github.com/JustLookAtNow/pt_mate",
   "tintColor": "1D4ED8",
@@ -15,21 +15,28 @@
       "bundleIdentifier": "com.github.justlookatnow.ptmate",
       "developerName": "JustLookAtNow",
       "subtitle": "PT private tracker companion",
-      "version": "2.29.4",
-      "versionDate": "2026-10-18T06:12:52Z",
-      "versionDescription": "Changes in this release\nrelease: 2.29.4\n\n✨新增功能\n- 优化首页搜索弹框布局及分类、搜索策略选项样式，适配不同屏幕尺寸。\n\n🐛修复问题\n- 修复封面全屏预览双指缩放与滑动翻页的手势冲突。\n- 修复首页排序按钮未使用主题色的问题。\n\n\nSecure-storage rollout\n\n- Phase: `phase1`\n- `ENABLE_SECURE_STORAGE_TRANSACTIONS`: `false`\n- Android versionCode: `192`\n- Source commit: `1da123e52e25ad5a6fe4f703d485128b21cc0d81`\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
-      "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.29.4/pt_mate-2.29.4-unsigned.ipa",
+      "version": "2.29.5",
+      "versionDate": "2026-10-21T13:04:16Z",
+      "versionDescription": "Changes in this release\nrelease: 2.29.5\n\n✨新增功能\n- 种子列表新增“左滑收藏，右滑下载”模式，可在设置中切换。\n- 配置备份与恢复支持保存种子列表滑动方式。\n\n🐛修复问题\n- 修复下载、收藏操作遇到部分超时异常时未能自动重试的问题。\n\n\nSecure-storage rollout\n\n- Phase: `phase1`\n- `ENABLE_SECURE_STORAGE_TRANSACTIONS`: `false`\n- Android versionCode: `193`\n- Source commit: `5ae2f84b58ff186ad3250d546e6a2087d437be87`\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
+      "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.29.5/pt_mate-2.29.5-unsigned.ipa",
       "localizedDescription": "PT Mate is a Flutter-based private tracker client for browsing, searching, and managing downloads across multiple PT sites.",
-      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.4/mt.png",
+      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.5/mt.png",
       "tintColor": "1D4ED8",
       "category": "utilities",
-      "size": 14070391,
+      "size": 14084035,
       "screenshotURLs": [
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.4/screenshots/1.png",
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.4/screenshots/2.png",
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.4/screenshots/3.png"
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.5/screenshots/1.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.5/screenshots/2.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.5/screenshots/3.png"
       ],
       "versions": [
+        {
+          "version": "2.29.5",
+          "date": "2026-10-21T13:04:16Z",
+          "localizedDescription": "Changes in this release\nrelease: 2.29.5\n\n✨新增功能\n- 种子列表新增“左滑收藏，右滑下载”模式，可在设置中切换。\n- 配置备份与恢复支持保存种子列表滑动方式。\n\n🐛修复问题\n- 修复下载、收藏操作遇到部分超时异常时未能自动重试的问题。\n\n\nSecure-storage rollout\n\n- Phase: `phase1`\n- `ENABLE_SECURE_STORAGE_TRANSACTIONS`: `false`\n- Android versionCode: `193`\n- Source commit: `5ae2f84b58ff186ad3250d546e6a2087d437be87`\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
+          "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.29.5/pt_mate-2.29.5-unsigned.ipa",
+          "size": 14084035
+        },
         {
           "version": "2.29.4",
           "date": "2026-10-18T06:12:52Z",
@@ -222,14 +229,14 @@
   "news": [
     {
       "appID": "com.github.justlookatnow.ptmate",
-      "title": "2.29.4 - 18 Oct",
-      "identifier": "release-2.29.4",
+      "title": "2.29.5 - 21 Oct",
+      "identifier": "release-2.29.5",
       "caption": "Update for PT Mate now available!",
-      "date": "2026-10-18T06:12:52Z",
+      "date": "2026-10-21T13:04:16Z",
       "tintColor": "1D4ED8",
       "imageURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/master/screenshots/1.png",
       "notify": true,
-      "url": "https://github.com/JustLookAtNow/pt_mate/releases/tag/v2.29.4"
+      "url": "https://github.com/JustLookAtNow/pt_mate/releases/tag/v2.29.5"
     }
   ]
 }
