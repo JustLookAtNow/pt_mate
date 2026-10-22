@@ -24,6 +24,7 @@ void main() {
       final controller = AppUpdateFlowController(
         notificationService: _FakeNotificationService(),
         clearDownloadedApks: () async => 0,
+        tryInstallDownloadedApk: (_) async => false,
         startAndroidUpdate:
             ({
               required UpdateCheckResult updateResult,
@@ -53,12 +54,91 @@ void main() {
     },
   );
 
+  test('reuses a completed APK before clearing or downloading', () async {
+    var clearCount = 0;
+    var downloadCount = 0;
+    final filenames = <String>[];
+    final controller = AppUpdateFlowController(
+      notificationService: _FakeNotificationService(),
+      tryInstallDownloadedApk: (filename) async {
+        filenames.add(filename);
+        return true;
+      },
+      clearDownloadedApks: () async => ++clearCount,
+      startAndroidUpdate:
+          ({required updateResult, required onProgress, cancelToken}) async {
+            downloadCount++;
+          },
+    );
+
+    await controller.start(updateResult());
+    controller.resetIfFinished();
+    await controller.start(updateResult());
+
+    expect(filenames, List.filled(2, 'pt_mate-2.27.0-arm64-v8a.apk'));
+    expect(clearCount, 0);
+    expect(downloadCount, 0);
+    expect(controller.state.status, AppUpdateFlowStatus.installing);
+  });
+
+  test('downloads when no completed APK is available', () async {
+    final calls = <String>[];
+    final controller = AppUpdateFlowController(
+      notificationService: _FakeNotificationService(),
+      tryInstallDownloadedApk: (filename) async {
+        calls.add('reuse');
+        return false;
+      },
+      clearDownloadedApks: () async {
+        calls.add('clear');
+        return 0;
+      },
+      startAndroidUpdate:
+          ({required updateResult, required onProgress, cancelToken}) async {
+            calls.add('download');
+          },
+    );
+
+    await controller.start(updateResult());
+
+    expect(calls, ['reuse', 'clear', 'download']);
+  });
+
+  test(
+    'an installer failure keeps the cached APK for another attempt',
+    () async {
+      var attempts = 0;
+      var clears = 0;
+      final controller = AppUpdateFlowController(
+        notificationService: _FakeNotificationService(),
+        tryInstallDownloadedApk: (_) async {
+          if (++attempts == 1) throw StateError('installer unavailable');
+          return true;
+        },
+        clearDownloadedApks: () async => ++clears,
+        startAndroidUpdate:
+            ({required updateResult, required onProgress, cancelToken}) async {
+              fail('A completed APK must not be downloaded again');
+            },
+      );
+
+      await controller.start(updateResult());
+      expect(controller.state.status, AppUpdateFlowStatus.failed);
+      controller.resetIfFinished();
+      await controller.start(updateResult());
+      expect(controller.state.status, AppUpdateFlowStatus.installing);
+      expect(attempts, 2);
+      expect(clears, 0);
+    },
+  );
+
   test('cancel stops the active download and enters canceled state', () async {
     final releaseDownload = Completer<void>();
     AppUpdateCancelToken? capturedToken;
     final controller = AppUpdateFlowController(
       notificationService: _FakeNotificationService(),
       clearDownloadedApks: () async => 0,
+      tryInstallDownloadedApk: (_) async => false,
       startAndroidUpdate:
           ({
             required UpdateCheckResult updateResult,
@@ -91,6 +171,7 @@ void main() {
     final controller = AppUpdateFlowController(
       notificationService: notificationService,
       clearDownloadedApks: () async => 0,
+      tryInstallDownloadedApk: (_) async => false,
       startAndroidUpdate:
           ({
             required UpdateCheckResult updateResult,
@@ -121,6 +202,7 @@ void main() {
     final controller = AppUpdateFlowController(
       notificationService: _FakeNotificationService(),
       clearDownloadedApks: () async => 0,
+      tryInstallDownloadedApk: (_) async => false,
       startAndroidUpdate:
           ({
             required UpdateCheckResult updateResult,
@@ -150,6 +232,7 @@ void main() {
     final controller = AppUpdateFlowController(
       notificationService: _ThrowingNotificationService(),
       clearDownloadedApks: () async => 0,
+      tryInstallDownloadedApk: (_) async => false,
       startAndroidUpdate:
           ({
             required UpdateCheckResult updateResult,

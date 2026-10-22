@@ -29,6 +29,23 @@ import javax.crypto.spec.PSource
 import javax.crypto.spec.SecretKeySpec
 
 class MainActivity : FlutterActivity() {
+    private val updateInstaller by lazy { AndroidUpdateInstaller(this) }
+
+    override fun onPostResume() {
+        super.onPostResume()
+        updateInstaller.resumed = true
+        try {
+            updateInstaller.openPendingInstallation()
+        } catch (error: Exception) {
+            android.util.Log.e("AppUpdate", "Unable to open pending installation", error)
+        }
+    }
+
+    override fun onPause() {
+        updateInstaller.resumed = false
+        super.onPause()
+    }
+
     private var secureStorageTestBootstrapFailureCode: String? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -49,6 +66,20 @@ class MainActivity : FlutterActivity() {
 
                 "openInstallPermissionSettings" -> {
                     result.success(openInstallPermissionSettings())
+                }
+
+                "getUpdateApkPath", "completeUpdateDownload", "tryInstallDownloadedApk" -> {
+                    val filename = call.argument<String>("filename")
+                    try {
+                        require(!filename.isNullOrBlank()) { "filename is required" }
+                        result.success(when (call.method) {
+                            "getUpdateApkPath" -> updateInstaller.downloadPath(filename)
+                            "completeUpdateDownload" -> updateInstaller.completeDownload(filename)
+                            else -> updateInstaller.tryInstallDownloaded(filename)
+                        })
+                    } catch (error: Exception) {
+                        result.error("update_install_failed", error.message, null)
+                    }
                 }
 
                 "clearDownloadedApks" -> {
@@ -192,6 +223,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun clearDownloadedApks(): Int {
+        updateInstaller.clear()
         val otaDir = File(applicationInfo.dataDir, "files/ota_update")
         if (!otaDir.exists()) {
             return 0

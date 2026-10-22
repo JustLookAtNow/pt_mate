@@ -45,21 +45,24 @@ class AppUpdateFlowState {
   bool get canCancel => isRunning;
 }
 
-typedef StartAndroidUpdate =
-    Future<void> Function({
-      required UpdateCheckResult updateResult,
-      required ValueChanged<AppUpdateProgress> onProgress,
-      AppUpdateCancelToken? cancelToken,
-    });
+typedef StartAndroidUpdate = Future<void> Function({
+  required UpdateCheckResult updateResult,
+  required ValueChanged<AppUpdateProgress> onProgress,
+  AppUpdateCancelToken? cancelToken,
+});
 
 class AppUpdateFlowController extends ChangeNotifier {
   AppUpdateFlowController({
     StartAndroidUpdate? startAndroidUpdate,
     Future<int> Function()? clearDownloadedApks,
+    Future<bool> Function(String filename)? tryInstallDownloadedApk,
     AppUpdateNotificationService? notificationService,
   }) : _startAndroidUpdate =
            startAndroidUpdate ??
            AppUpdateDownloader.instance.startAndroidUpdate,
+       _tryInstallDownloadedApk =
+           tryInstallDownloadedApk ??
+           AndroidInstallPermissionService.instance.tryInstallDownloadedApk,
        _clearDownloadedApks =
            clearDownloadedApks ??
            AndroidInstallPermissionService.instance.clearDownloadedApks,
@@ -69,6 +72,7 @@ class AppUpdateFlowController extends ChangeNotifier {
   static final AppUpdateFlowController instance = AppUpdateFlowController();
 
   final StartAndroidUpdate _startAndroidUpdate;
+  final Future<bool> Function(String filename) _tryInstallDownloadedApk;
   final Future<int> Function() _clearDownloadedApks;
   final AppUpdateNotificationService _notificationService;
 
@@ -103,6 +107,23 @@ class AppUpdateFlowController extends ChangeNotifier {
     );
 
     try {
+      final reused = await _tryInstallDownloadedApk(
+        AppUpdateDownloader.apkFilename(updateResult.latestVersion),
+      );
+      cancelToken.throwIfCanceled();
+      if (reused) {
+        const message = '更新包已下载，已请求打开安装界面';
+        _setState(
+          runId,
+          const AppUpdateFlowState(
+            status: AppUpdateFlowStatus.installing,
+            message: message,
+            progress: 1,
+          ),
+        );
+        _notifyInBackground(() => _notificationService.showInstalling(message));
+        return;
+      }
       await _clearDownloadedApks();
       cancelToken.throwIfCanceled();
 

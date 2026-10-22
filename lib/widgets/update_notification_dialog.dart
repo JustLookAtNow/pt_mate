@@ -9,6 +9,7 @@ import '../services/android_install_permission_service.dart';
 import '../services/app_update_downloader.dart';
 import '../services/app_update_flow_controller.dart';
 import '../services/update_service.dart';
+
 import 'package:pt_mate/utils/notification_helper.dart';
 
 class UpdateNotificationDialog extends StatefulWidget {
@@ -91,9 +92,8 @@ class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
             if (widget.updateResult.latestVersion != null) ...[
               Text(
                 '最新版本: ${widget.updateResult.latestVersion}',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
             ],
@@ -101,9 +101,8 @@ class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
                 widget.updateResult.releaseNotes!.isNotEmpty) ...[
               Text(
                 '更新内容:',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Container(
@@ -263,7 +262,7 @@ class _UpdateNotificationDialogState extends State<UpdateNotificationDialog> {
 
     if (flowState.status == AppUpdateFlowStatus.installing) {
       _handledTerminalState = true;
-      NotificationHelper.showSuccess(context, '安装界面已打开，请按系统提示完成更新');
+      NotificationHelper.showSuccess(context, '更新包已下载，请按系统提示完成安装');
       Navigator.of(context).pop();
       return;
     }

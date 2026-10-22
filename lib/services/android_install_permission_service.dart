@@ -36,6 +36,29 @@ class AndroidInstallPermissionService {
     return opened ?? false;
   }
 
+  Future<String> getUpdateApkPath(String filename) async {
+    final path = await _channel.invokeMethod<String>('getUpdateApkPath', {
+      'filename': filename,
+    });
+    if (path == null) throw StateError('无法创建更新包文件');
+    return path;
+  }
+
+  Future<bool> completeUpdateDownload(String filename) async {
+    return await _channel.invokeMethod<bool>('completeUpdateDownload', {
+          'filename': filename,
+        }) ??
+        false;
+  }
+
+  Future<bool> tryInstallDownloadedApk(String filename) async {
+    if (!supportsInstallPermissionCheck) return false;
+    return await _channel.invokeMethod<bool>('tryInstallDownloadedApk', {
+          'filename': filename,
+        }) ??
+        false;
+  }
+
   Future<int> clearDownloadedApks() async {
     if (!supportsInstallPermissionCheck) {
       return 0;

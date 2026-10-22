@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:ota_update/ota_update.dart';
 
+import 'android_install_permission_service.dart';
 import 'update_service.dart';
 
 class AppUpdateProgress {
@@ -130,8 +130,7 @@ class AppUpdateDownloader {
       followRedirects: true,
       validateStatus: (code) => code != null && code >= 200 && code < 400,
       headers: const {
-        'User-Agent':
-            'Mozilla/5.0 (Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36',
         'Accept-Encoding': 'identity',
       },
     ),
@@ -182,19 +181,30 @@ class AppUpdateDownloader {
         ),
       );
       try {
-        await _executeOta(
+        await _downloadApk(
           url: candidate.url,
           version: updateResult.latestVersion,
           totalBytes: candidate.contentLength,
           onProgress: onProgress,
           cancelToken: cancelToken,
         );
-        return;
       } on AppUpdateCanceledException {
         rethrow;
       } catch (e) {
         lastError = e;
+        continue;
       }
+      cancelToken?.throwIfCanceled();
+      final opened = await AndroidInstallPermissionService.instance
+          .completeUpdateDownload(apkFilename(updateResult.latestVersion));
+      onProgress(
+        AppUpdateProgress(
+          message: opened ? '下载完成，已请求打开安装界面' : '下载完成，点击通知或返回应用继续安装',
+          progress: 1,
+          isFinal: true,
+        ),
+      );
+      return;
     }
 
     throw StateError('更新下载失败：${lastError ?? '未知错误'}');
@@ -431,120 +441,75 @@ class AppUpdateDownloader {
     return int.tryParse(header);
   }
 
-  Future<void> _executeOta({
+  Future<void> _downloadApk({
     required String url,
     required String? version,
     required int? totalBytes,
     required ValueChanged<AppUpdateProgress> onProgress,
     AppUpdateCancelToken? cancelToken,
   }) async {
-    final completer = Completer<void>();
-    final otaUpdate = OtaUpdate();
-    VoidCallback? removeCancelListener;
+    final installer = AndroidInstallPermissionService.instance;
+    final filename = apkFilename(version);
+    final path = await installer.getUpdateApkPath(filename);
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 60),
+        headers: const {'Accept-Encoding': 'identity'},
+      ),
+    );
+    final downloadCancelToken = CancelToken();
+    final progressClock = Stopwatch()..start();
+    var lastProgressAt = -200;
+    final removeCancelListener = cancelToken?.addCancelListener(
+      () => downloadCancelToken.cancel(),
+    );
+    try {
+      cancelToken?.throwIfCanceled();
+      await dio.download(
+        url,
+        path,
+        cancelToken: downloadCancelToken,
+        onReceiveProgress: (received, total) {
+          final now = progressClock.elapsedMilliseconds;
+          if (received != total && now - lastProgressAt < 200) return;
+          lastProgressAt = now;
+          final size = total > 0 ? total : totalBytes;
+          final progress = size == null || size <= 0
+              ? null
+              : (received / size).clamp(0, 1).toDouble();
+          onProgress(
+            AppUpdateProgress(
+              message: _buildDownloadMessage(
+                downloadedBytes: received,
+                totalBytes: size,
+                progressValue: progress == null ? null : progress * 100,
+              ),
+              progress: progress,
+              downloadedBytes: received,
+              totalBytes: size,
+            ),
+          );
+        },
+      );
+      cancelToken?.throwIfCanceled();
+    } on DioException {
+      if (cancelToken?.isCanceled ?? false) {
+        throw const AppUpdateCanceledException();
+      }
+      rethrow;
+    } finally {
+      removeCancelListener?.call();
+      dio.close();
+    }
+  }
 
-    final filenameVersion = (version ?? 'latest').replaceAll(
+  static String apkFilename(String? version) {
+    final safeVersion = (version ?? 'latest').replaceAll(
       RegExp(r'[^0-9A-Za-z._-]'),
       '_',
     );
-    final destinationFilename = 'pt_mate-$filenameVersion-arm64-v8a.apk';
-
-    late final StreamSubscription<OtaEvent> sub;
-    removeCancelListener = cancelToken?.addCancelListener(() {
-      otaUpdate.cancel();
-      if (!completer.isCompleted) {
-        completer.completeError(const AppUpdateCanceledException());
-      }
-    });
-
-    sub = otaUpdate
-        .execute(url, destinationFilename: destinationFilename)
-        .listen(
-          (event) {
-            if (cancelToken?.isCanceled ?? false) {
-              if (!completer.isCompleted) {
-                completer.completeError(const AppUpdateCanceledException());
-              }
-              return;
-            }
-
-            final status = event.status.toString().split('.').last;
-            final value = event.value ?? '';
-
-            if (status == 'CANCELED') {
-              if (!completer.isCompleted) {
-                completer.completeError(const AppUpdateCanceledException());
-              }
-              return;
-            }
-
-            if (status == 'DOWNLOADING') {
-              final progressValue = double.tryParse(value);
-              final normalizedProgress = progressValue == null
-                  ? null
-                  : (progressValue.clamp(0, 100) / 100).toDouble();
-              final downloadedBytes =
-                  normalizedProgress == null || totalBytes == null
-                  ? null
-                  : (normalizedProgress * totalBytes).round();
-              onProgress(
-                AppUpdateProgress(
-                  message: _buildDownloadMessage(
-                    downloadedBytes: downloadedBytes,
-                    totalBytes: totalBytes,
-                    progressValue: progressValue,
-                  ),
-                  progress: normalizedProgress,
-                  downloadedBytes: downloadedBytes,
-                  totalBytes: totalBytes,
-                ),
-              );
-              return;
-            }
-
-            if (status == 'INSTALLING') {
-              onProgress(
-                AppUpdateProgress(
-                  message: totalBytes == null
-                      ? '下载完成，正在打开安装界面...'
-                      : '下载完成 ${_formatBytes(totalBytes)}，正在打开安装界面...',
-                  progress: 1,
-                  downloadedBytes: totalBytes,
-                  totalBytes: totalBytes,
-                  isFinal: true,
-                ),
-              );
-              if (!completer.isCompleted) {
-                completer.complete();
-              }
-              return;
-            }
-
-            if (status.contains('ERROR')) {
-              final err = value.isEmpty ? status : value;
-              if (!completer.isCompleted) {
-                completer.completeError(StateError(err));
-              }
-            }
-          },
-          onError: (e) {
-            if (!completer.isCompleted) {
-              completer.completeError(e);
-            }
-          },
-          onDone: () {
-            if (!completer.isCompleted) {
-              completer.complete();
-            }
-          },
-          cancelOnError: true,
-        );
-
-    try {
-      await completer.future;
-    } finally {
-      removeCancelListener?.call();
-      await sub.cancel();
-    }
+    return 'pt_mate-$safeVersion-arm64-v8a.apk';
   }
 
   String _buildDownloadMessage({
