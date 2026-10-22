@@ -139,6 +139,25 @@ void main() {
     });
   }
 
+  for (final width in [320.0, 390.0, 768.0]) {
+    testWidgets('较短滑动可触发双向操作，轻微滑动不触发，宽度：$width', (tester) async {
+      await settings.setTorrentSwipeMode(TorrentSwipeMode.swipeActions);
+      await pumpItem(tester, width: width);
+      await swipe(tester, -30);
+      await swipe(tester, 30);
+      expect(collections, 0);
+      expect(downloads, 0);
+
+      final distance = width == 768 ? 100.0 : 80.0;
+      await swipe(tester, -distance);
+      expect(collections, 1);
+      expect(downloads, 0);
+      await swipe(tester, distance);
+      expect(collections, 1);
+      expect(downloads, 1);
+    });
+  }
+
   testWidgets('默认左滑只显示按钮，点击后执行', (tester) async {
     await pumpItem(tester);
     expect(find.byType(TorrentSwipeActions), findsNothing);

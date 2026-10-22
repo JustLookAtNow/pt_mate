@@ -35,7 +35,7 @@ class _TorrentSwipeActionsState extends State<TorrentSwipeActions>
   bool _returning = false;
   int _gestureGeneration = 0;
 
-  double get _threshold => (_width * 0.25).clamp(72.0, 120.0);
+  double get _threshold => (_width * 0.15).clamp(48.0, 72.0);
 
   @override
   void didUpdateWidget(TorrentSwipeActions oldWidget) {
