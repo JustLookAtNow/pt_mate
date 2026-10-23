@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:webdav_client/webdav_client.dart' as webdav;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -14,6 +18,15 @@ class WebDAVTestResult {
   WebDAVTestResult({required this.success, this.errorMessage});
 }
 
+class WebDAVException implements Exception {
+  final String message;
+
+  WebDAVException(this.message);
+
+  @override
+  String toString() => message;
+}
+
 class WebDAVService {
   static const String _configKey = 'webdav_config';
   static const String _lastSyncKey = 'webdav_last_sync';
@@ -25,10 +38,66 @@ class WebDAVService {
   webdav.Client? _client;
   WebDAVConfig? _currentConfig;
   final StorageService _storageService = StorageService.instance;
+  webdav.Client Function(WebDAVConfig config, String password)?
+  _clientFactoryForTest;
+
+  @visibleForTesting
+  void overrideClientFactoryForTest(
+    webdav.Client Function(WebDAVConfig config, String password) factory,
+  ) {
+    _clientFactoryForTest = factory;
+    _client = null;
+  }
 
   void resetForTest() {
     _client = null;
     _currentConfig = null;
+    _clientFactoryForTest = null;
+  }
+
+  webdav.Client _createClient(WebDAVConfig config, String password) {
+    final client =
+        _clientFactoryForTest?.call(config, password) ??
+        webdav.newClient(
+          config.serverUrl,
+          user: config.username,
+          password: password,
+        );
+    client.setConnectTimeout(30000);
+    client.setSendTimeout(30000);
+    client.setReceiveTimeout(30000);
+    return client;
+  }
+
+  WebDAVException _describeError(Object error) {
+    if (error is WebDAVException) return error;
+    final dioError = error is DioException ? error : null;
+    final cause = dioError?.error ?? error;
+    final details = cause.toString().toLowerCase();
+    if (dioError?.type == DioExceptionType.badCertificate ||
+        cause is TlsException ||
+        details.contains('certificate') ||
+        details.contains('ssl') ||
+        details.contains('handshake')) {
+      return WebDAVException('SSL证书验证失败，请检查HTTPS配置');
+    }
+    if (cause is TimeoutException ||
+        dioError?.type == DioExceptionType.connectionTimeout ||
+        dioError?.type == DioExceptionType.sendTimeout ||
+        dioError?.type == DioExceptionType.receiveTimeout ||
+        details.contains('timeout') ||
+        details.contains('timed out')) {
+      return WebDAVException('连接超时，请检查服务器地址和网络连接');
+    }
+    switch (dioError?.response?.statusCode) {
+      case 401:
+        return WebDAVException('用户名或密码错误');
+      case 403:
+        return WebDAVException('WebDAV访问被拒绝，请检查账号权限');
+      case 404:
+        return WebDAVException('服务器地址或远程路径不存在，请检查WebDAV配置');
+    }
+    return WebDAVException('WebDAV请求失败: $error');
   }
 
   // 配置管理
@@ -127,13 +196,17 @@ class WebDAVService {
   }
 
   // WebDAV客户端管理
-  Future<webdav.Client?> _getClient() async {
+  Future<webdav.Client> _getClient() async {
     final config = await loadConfig();
-    if (config == null || !config.isEnabled) return null;
+    if (config == null || !config.isEnabled) {
+      throw WebDAVException('WebDAV未配置或未启用');
+    }
 
     // 从安全存储中获取密码
     final password = await _storageService.loadWebDAVPassword(config.id);
-    if (password == null || password.isEmpty) return null;
+    if (password == null || password.isEmpty) {
+      throw WebDAVException('WebDAV密码不能为空，请检查配置');
+    }
 
     // 检查配置是否发生变化，如果变化则重新创建客户端
     if (_client != null && _currentConfig != null) {
@@ -147,19 +220,12 @@ class WebDAVService {
       }
     }
 
-    if (_client != null) return _client;
+    if (_client != null) return _client!;
 
     _currentConfig = config;
-    _client = webdav.newClient(
-      config.serverUrl,
-      user: config.username,
-      password: password,
-    );
-    _client!.setConnectTimeout(30000); // 30秒超时
-    _client!.setSendTimeout(30000);
-    _client!.setReceiveTimeout(30000);
+    _client = _createClient(config, password);
 
-    return _client;
+    return _client!;
   }
 
   // 连接测试
@@ -180,14 +246,7 @@ class WebDAVService {
         return WebDAVTestResult(success: false, errorMessage: '密码不能为空');
       }
 
-      final client = webdav.newClient(
-        testConfig.serverUrl,
-        user: testConfig.username,
-        password: testPassword,
-      );
-      client.setConnectTimeout(30000); // 30秒超时
-      client.setSendTimeout(30000);
-      client.setReceiveTimeout(30000);
+      final client = _createClient(testConfig, testPassword);
 
       // 尝试读取根目录
       await client.readDir('/');
@@ -195,22 +254,10 @@ class WebDAVService {
     } on SecureStorageUnavailableException {
       rethrow;
     } catch (e) {
-      String errorMessage = '连接失败';
-      if (e.toString().contains('timeout')) {
-        errorMessage = '连接超时，请检查服务器地址和网络连接';
-      } else if (e.toString().contains('401') ||
-          e.toString().contains('Unauthorized')) {
-        errorMessage = '用户名或密码错误';
-      } else if (e.toString().contains('404') ||
-          e.toString().contains('Not Found')) {
-        errorMessage = '服务器地址不正确或WebDAV服务未启用';
-      } else if (e.toString().contains('SSL') ||
-          e.toString().contains('certificate')) {
-        errorMessage = 'SSL证书验证失败，请检查HTTPS配置';
-      } else {
-        errorMessage = '连接失败: ${e.toString()}';
-      }
-      return WebDAVTestResult(success: false, errorMessage: errorMessage);
+      return WebDAVTestResult(
+        success: false,
+        errorMessage: _describeError(e).message,
+      );
     }
   }
 
@@ -219,9 +266,6 @@ class WebDAVService {
     await _runWithStableSecureStorageEpoch((epoch) async {
       try {
         final client = await _getClient();
-        if (client == null) {
-          throw Exception('无法创建WebDAV客户端，请检查配置');
-        }
 
         final config = _currentConfig!;
         final now = DateTime.now();
@@ -249,8 +293,7 @@ class WebDAVService {
       } on SecureStorageUnavailableException {
         rethrow;
       } catch (e) {
-        // 重新抛出异常，让调用方能够获取具体的错误信息
-        throw Exception('WebDAV上传失败: $e');
+        throw _describeError(e);
       }
     });
   }
@@ -260,12 +303,12 @@ class WebDAVService {
     return _runWithStableSecureStorageEpoch((epoch) async {
       try {
         final client = await _getClient();
-        if (client == null) return null;
 
         final config = _currentConfig!;
 
         // 列出远程目录中的备份文件
         final files = await client.readDir(config.remotePath);
+        _storageService.requireSecureStorageOperationEpoch(epoch);
         final backupFiles = files
             .where((file) => file.name?.endsWith('.json') == true)
             .toList();
@@ -291,7 +334,7 @@ class WebDAVService {
       } on SecureStorageUnavailableException {
         rethrow;
       } catch (e) {
-        return null;
+        throw _describeError(e);
       }
     });
   }
@@ -301,7 +344,6 @@ class WebDAVService {
     return _runWithStableSecureStorageEpoch((epoch) async {
       try {
         final client = await _getClient();
-        if (client == null) return [];
 
         final config = _currentConfig!;
 
@@ -330,7 +372,7 @@ class WebDAVService {
       } on SecureStorageUnavailableException {
         rethrow;
       } catch (e) {
-        return [];
+        throw _describeError(e);
       }
     });
   }
@@ -340,7 +382,6 @@ class WebDAVService {
     return _runWithStableSecureStorageEpoch((epoch) async {
       try {
         final client = await _getClient();
-        if (client == null) return null;
 
         final bytes = await client.read(remotePath);
         _storageService.requireSecureStorageOperationEpoch(epoch);
@@ -348,7 +389,7 @@ class WebDAVService {
       } on SecureStorageUnavailableException {
         rethrow;
       } catch (e) {
-        return null;
+        throw _describeError(e);
       }
     });
   }
@@ -358,7 +399,6 @@ class WebDAVService {
     return _runWithStableSecureStorageEpoch((epoch) async {
       try {
         final client = await _getClient();
-        if (client == null) return false;
 
         _storageService.requireSecureStorageOperationEpoch(epoch);
         await client.remove(remotePath);
@@ -380,7 +420,6 @@ class WebDAVService {
         if (backups.length <= keepCount) return;
 
         final client = await _getClient();
-        if (client == null) return;
 
         // 删除超出保留数量的旧备份
         final toDelete = backups.skip(keepCount);
@@ -427,31 +466,31 @@ class WebDAVService {
   }) async {
     try {
       await client.readDir(path);
+      _storageService.requireSecureStorageOperationEpoch(
+        expectedSecureStorageEpoch,
+      );
     } catch (e) {
-      if (e is SecureStorageUnavailableException) rethrow;
-      // 目录不存在，尝试创建
+      if (e is! DioException || e.response?.statusCode != 404) rethrow;
+      // 只有明确不存在时才创建，其他连接错误必须直接上报。
       try {
         _storageService.requireSecureStorageOperationEpoch(
           expectedSecureStorageEpoch,
         );
         await client.mkdir(path);
       } catch (e) {
-        if (e is SecureStorageUnavailableException) rethrow;
-        // 创建失败，可能是父目录不存在，递归创建
+        if (e is! DioException ||
+            (e.response?.statusCode != 404 && e.response?.statusCode != 409)) {
+          rethrow;
+        }
+        // 父目录不存在，逐层创建；客户端已将“目录存在”的 405 视为成功。
         final parts = path.split('/').where((part) => part.isNotEmpty).toList();
         String currentPath = '';
         for (final part in parts) {
           currentPath += '/$part';
-          try {
-            _storageService.requireSecureStorageOperationEpoch(
-              expectedSecureStorageEpoch,
-            );
-            await client.mkdir(currentPath);
-          } on SecureStorageUnavailableException {
-            rethrow;
-          } catch (e) {
-            // 忽略已存在的目录错误
-          }
+          _storageService.requireSecureStorageOperationEpoch(
+            expectedSecureStorageEpoch,
+          );
+          await client.mkdir(currentPath);
         }
       }
     }

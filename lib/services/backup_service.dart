@@ -614,28 +614,16 @@ class BackupService {
       onProgress?.call('正在检查导出方式...');
       final webdavConfig = await _webdavService.loadConfig();
       if (webdavConfig != null && webdavConfig.isEnabled) {
-        try {
-          // 直接上传到WebDAV，不创建本地文件
-          onProgress?.call('正在上传到 WebDAV...');
-          await _storageService.runWithSecureStorageOperationEpoch(
-            prepared.secureStorageEpoch,
-            () => _webdavService.uploadBackup(
-              prepared.content,
-              filename: prepared.fileName,
-            ),
-          );
-          // WebDAV上传成功，返回特殊标识表示上传到云端
-          return 'WebDAV云端备份';
-        } on SecureStorageUnavailableException {
-          rethrow;
-        } catch (e) {
-          // WebDAV上传失败，在Linux平台上直接抛出异常，避免文件选择器问题
-          if (defaultTargetPlatform == TargetPlatform.linux) {
-            throw BackupException('WebDAV备份失败: $e');
-          }
-          // 在移动平台上，WebDAV失败时回退到本地导出
-          return await exportBackup();
-        }
+        // 上传失败交由调用方提示，不能静默转为本地导出。
+        onProgress?.call('正在上传到 WebDAV...');
+        await _storageService.runWithSecureStorageOperationEpoch(
+          prepared.secureStorageEpoch,
+          () => _webdavService.uploadBackup(
+            prepared.content,
+            filename: prepared.fileName,
+          ),
+        );
+        return 'WebDAV云端备份';
       } else {
         // 没有配置WebDAV或未启用，直接导出到本地
         if (defaultTargetPlatform == TargetPlatform.linux) {

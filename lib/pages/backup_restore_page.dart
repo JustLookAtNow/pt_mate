@@ -53,6 +53,7 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
   Future<void> _loadWebDAVConfigs() async {
     try {
       final currentConfig = await _webdavService.loadConfig();
+      if (!mounted) return;
       setState(() {
         _selectedConfig = currentConfig;
       });
@@ -269,6 +270,17 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
     final TextEditingController remotePathController = TextEditingController(
       text: '/PTMate',
     );
+    final scrollController = ScrollController();
+    final errorKey = GlobalKey();
+
+    void disposeControllers() {
+      nameController.dispose();
+      serverUrlController.dispose();
+      usernameController.dispose();
+      passwordController.dispose();
+      remotePathController.dispose();
+      scrollController.dispose();
+    }
 
     if (_selectedConfig != null) {
       nameController.text = _selectedConfig!.name;
@@ -279,17 +291,45 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
       passwordController.text = password ?? '';
       remotePathController.text = _selectedConfig!.remotePath;
     }
-    if (!mounted) return;
+    if (!mounted) {
+      disposeControllers();
+      return;
+    }
     bool isLoading = false;
     String? errorMessage;
 
-    await showDialog(
+    final route = DialogRoute<void>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
+          bool isDialogActive() =>
+              mounted &&
+              context.mounted &&
+              (ModalRoute.of(context)?.isCurrent ?? false);
+
+          void showDialogError(String message) {
+            if (!isDialogActive()) return;
+            setDialogState(() {
+              errorMessage = message;
+            });
+            FocusScope.of(context).unfocus();
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!isDialogActive()) return;
+              final errorContext = errorKey.currentContext;
+              if (errorContext == null) return;
+              Scrollable.ensureVisible(
+                errorContext,
+                alignment: 1,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+              );
+            });
+          }
+
           return AlertDialog(
             title: Text(_selectedConfig == null ? '添加WebDAV配置' : '编辑WebDAV配置'),
             content: SingleChildScrollView(
+              controller: scrollController,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -344,6 +384,7 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                   if (errorMessage != null) ...[
                     const SizedBox(height: 16),
                     Container(
+                      key: errorKey,
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -394,17 +435,16 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                       ? null
                       : () async {
                           final navigator = Navigator.of(context);
-                          final currentContext = context;
                           // 删除当前配置
                           await _webdavService.deleteConfig();
                           await _loadWebDAVConfigs();
-                          if (mounted && currentContext.mounted) {
+                          if (isDialogActive()) {
                             navigator.pop();
                             // 延迟显示消息，确保对话框完全关闭
                             Future.delayed(
                               const Duration(milliseconds: 100),
                               () {
-                                if (mounted && currentContext.mounted) {
+                                if (mounted) {
                                   _showWebDAVMessage('WebDAV配置已删除');
                                 }
                               },
@@ -424,6 +464,7 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                 onPressed: isLoading
                     ? null
                     : () async {
+                        FocusScope.of(context).unfocus();
                         setDialogState(() {
                           errorMessage = null;
                         });
@@ -432,9 +473,7 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                             serverUrlController.text.isEmpty ||
                             usernameController.text.isEmpty ||
                             passwordController.text.isEmpty) {
-                          setDialogState(() {
-                            errorMessage = '请填写所有必填字段';
-                          });
+                          showDialogError('请填写所有必填字段');
                           return;
                         }
 
@@ -462,6 +501,7 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
 
                           final testResult = await _webdavService
                               .testConnection(config, passwordController.text);
+                          if (!isDialogActive()) return;
 
                           if (testResult.success) {
                             await _webdavService.saveConfig(
@@ -470,32 +510,31 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
                             );
                             await _loadWebDAVConfigs();
                             final currentContext = context;
-                            if (mounted && currentContext.mounted) {
+                            if (isDialogActive() && currentContext.mounted) {
                               Navigator.of(currentContext).pop();
                               // 延迟显示消息，确保对话框完全关闭
                               Future.delayed(
                                 const Duration(milliseconds: 100),
                                 () {
-                                  if (mounted && currentContext.mounted) {
+                                  if (mounted) {
                                     _showWebDAVMessage('WebDAV配置保存成功');
                                   }
                                 },
                               );
                             }
                           } else {
-                            setDialogState(() {
-                              errorMessage =
-                                  testResult.errorMessage ?? '连接测试失败，请检查配置';
-                            });
+                            showDialogError(
+                              testResult.errorMessage ?? '连接测试失败，请检查配置',
+                            );
                           }
                         } catch (e) {
-                          setDialogState(() {
-                            errorMessage = '保存配置时发生错误: $e';
-                          });
+                          showDialogError('保存配置时发生错误: $e');
                         } finally {
-                          setDialogState(() {
-                            isLoading = false;
-                          });
+                          if (isDialogActive()) {
+                            setDialogState(() {
+                              isLoading = false;
+                            });
+                          }
                         }
                       },
                 child: const Text('保存'),
@@ -505,9 +544,11 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
         },
       ),
     );
+    await Navigator.of(context, rootNavigator: true).push(route);
+    // 等待退出动画完成，避免仍在树中的输入框访问已释放的控制器。
+    await route.completed;
+    disposeControllers();
   }
-
-  // 上传备份到WebDAV
 
   // 上传备份到WebDAV
   Future<void> _uploadBackupToWebDAV() async {
@@ -534,10 +575,11 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
     } catch (e) {
       _showWebDAVMessage('备份上传失败: $e', isError: true);
     } finally {
-      setState(() {
-        _isWebDAVLoading = false;
-        _webdavStatusMessage = null;
-      });
+      if (mounted) {
+        setState(() {
+          _isWebDAVLoading = false;
+        });
+      }
     }
   }
 
@@ -550,7 +592,7 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
 
     // 显示确认对话框
     final confirmed = await _showRestoreConfirmDialog();
-    if (!confirmed) return;
+    if (!confirmed || !mounted) return;
 
     setState(() {
       _isWebDAVLoading = true;
@@ -566,8 +608,15 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
       }
 
       // 显示备份文件选择对话框
+      if (!mounted) return;
       final selectedFile = await _showBackupFileSelectionDialog(backupFiles);
-      if (selectedFile == null) return;
+      if (!mounted) return;
+      if (selectedFile == null) {
+        setState(() {
+          _webdavStatusMessage = null;
+        });
+        return;
+      }
 
       setState(() {
         _webdavStatusMessage = '正在从WebDAV下载并恢复备份...';
@@ -585,6 +634,7 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
       final result = await _backupService.restoreBackup(backupData);
 
       if (result.success) {
+        _showWebDAVMessage('已成功从WebDAV恢复备份');
         if (mounted) {
           await _showRestartDialog();
         }
@@ -594,10 +644,11 @@ class _BackupRestorePageState extends State<BackupRestorePage> {
     } catch (e) {
       _showWebDAVMessage('从WebDAV恢复备份失败: $e', isError: true);
     } finally {
-      setState(() {
-        _isWebDAVLoading = false;
-        _webdavStatusMessage = null;
-      });
+      if (mounted) {
+        setState(() {
+          _isWebDAVLoading = false;
+        });
+      }
     }
   }
 
