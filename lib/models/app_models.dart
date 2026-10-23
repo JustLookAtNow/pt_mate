@@ -356,9 +356,9 @@ enum TagType {
   ),
   fourK('4K', Colors.orange, r'\b4K\b|\b2160p\b'),
   eightK('8K', Colors.cyan, r'\b8K\b'),
-  resolution1080('1080p', Colors.blue, r'\b1080p\b|x1080'),
+  resolution1080('1080p', Colors.blue, r'\b1080p\b|(?:\d+)?x1080'),
   hdr('HDR', Colors.purple, r'\bHDR\b|\bHDR10\b'),
-  vr('VR', Colors.indigo, r'［vr］|\[vr\]'),
+  vr('VR', Colors.indigo, r'【vr】|［vr］|\[vr\]|\bvr\b'),
   h265(
     'H265',
     Color.fromARGB(255, 51, 162, 217),
@@ -369,7 +369,7 @@ enum TagType {
     Color.fromARGB(255, 162, 41, 178),
     r'\bWEB-DL\b|\bWEBDL\b|\bWEB\.DL\b',
   ),
-  dovi('DOVI', Colors.pink, r'\bDOVI\b|Dolby Vision|\bDV\b|杜比(视界)*'),
+  dovi('DOVI', Colors.pink, r'\bDOVI\b|Dolby Vision|\bDV\b|杜比(?:视界)*(?!视界)'),
   blueRay('Blu-ray', Colors.red, r'\bblu-ray\b|\bbluray\b');
 
   const TagType(this.content, this.color, this.regex);
@@ -389,7 +389,13 @@ enum TagType {
       // on hot paths like list rendering and parsing.
       final regExp = _regexCache.putIfAbsent(
         tag,
-        () => RegExp(tag.regex, caseSensitive: false),
+        // A hyphen joins a token rather than delimiting it. Keep hyphens
+        // within patterns (e.g. WEB-DL and E01-E02) valid, and prevent
+        // variable-length patterns from backtracking into a partial token.
+        () => RegExp(
+          r'(?<![\w-])(?:' + tag.regex + r')(?![\w-])',
+          caseSensitive: false,
+        ),
       );
 
       if (regExp.hasMatch(text)) {

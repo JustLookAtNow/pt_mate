@@ -332,30 +332,41 @@ void main() {
       });
 
       test('should match bracketed VR variants', () {
-        final tags = TypedConverter.parseTags('Movie ［vR］ [VR]', '', [], {});
+        final tags = TypedConverter.parseTags(
+          'Movie 【vr】 ［vR］ [VR]',
+          '',
+          [],
+          {},
+        );
 
         expect(tags.contains(TagType.vr), true);
         expect(tags.where((tag) => tag == TagType.vr), hasLength(1));
       });
 
-      test('should not match unbracketed VR', () {
+      test('should match standalone VR from the description', () {
         final tags = TypedConverter.parseTags(
-          'Movie vr VirtualReality',
-          '',
+          'Movie',
+          'vr VirtualReality',
           [],
           {},
         );
 
-        expect(tags.contains(TagType.vr), false);
+        expect(tags.contains(TagType.vr), true);
+      });
+
+      test('should not match tags joined to other tokens by hyphens', () {
+        final tags = TypedConverter.parseTags(
+          'Movie dv-123 8K-UHD',
+          'HDR-x265 ABC-VR',
+          [],
+          {},
+        );
+
+        expect(tags, isEmpty);
       });
 
       test('should match 8K as a standalone term', () {
-        final tags = TypedConverter.parseTags(
-          'Movie 8k [8K] 8K-UHD',
-          '',
-          [],
-          {},
-        );
+        final tags = TypedConverter.parseTags('Movie 8k [8K]', '', [], {});
 
         expect(tags.contains(TagType.eightK), true);
         expect(tags.where((tag) => tag == TagType.eightK), hasLength(1));
@@ -377,6 +388,17 @@ void main() {
 
         expect(tags.contains(TagType.chinese), true);
         expect(tags.contains(TagType.official), true);
+      });
+
+      test('should preserve mapped tags for hyphen-connected titles', () {
+        final tags = TypedConverter.parseTags(
+          'Movie DV-123',
+          '',
+          ['Dolby Vision'],
+          {'Dolby Vision': 'dovi'},
+        );
+
+        expect(tags, [TagType.dovi]);
       });
 
       test('should not duplicate tags', () {
