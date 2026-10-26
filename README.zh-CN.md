@@ -38,9 +38,10 @@
 ## 截图预览
 
 <p align="center">
-  <img src="screenshots/1.png" width="600" alt="截图1">
-  <img src="screenshots/2.jpg" width="300" alt="截图2">
-  <img src="screenshots/3.jpg" width="300" alt="截图3">
+  <img src="screenshots/desktop.png" width="800" alt="桌面布局的种子浏览页面">
+</p>
+<p align="center">
+  <img src="screenshots/mobile.png" width="300" alt="手机布局的种子浏览页面">
 </p>
 
 ## Cookie Cloud 同步与安全警示

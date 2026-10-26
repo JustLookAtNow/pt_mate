@@ -40,9 +40,10 @@ The following list is based on `assets/sites/*.json` (40 total):
 ## Screenshots
 
 <p align="center">
-  <img src="screenshots/1.png" width="600" alt="Screenshot 1">
-  <img src="screenshots/2.jpg" width="300" alt="Screenshot 2">
-  <img src="screenshots/3.jpg" width="300" alt="Screenshot 3">
+  <img src="screenshots/desktop.png" width="800" alt="Torrent browsing in the desktop layout">
+</p>
+<p align="center">
+  <img src="screenshots/mobile.png" width="300" alt="Torrent browsing in the mobile layout">
 </p>
 
 ## Cookie Cloud Sync & Critical Security Warning
