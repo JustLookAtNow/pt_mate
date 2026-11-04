@@ -15,7 +15,9 @@ void main() async {
 
       String? secureStorageFailureCode;
       try {
-        await StorageService.instance.initializeSecureStorage();
+        await StorageService.instance.initializeSecureStorage(
+          trigger: SecureStorageTrigger.startup,
+        );
       } on SecureStorageUnavailableException catch (error) {
         secureStorageFailureCode = error.code;
       } catch (error) {
@@ -28,12 +30,13 @@ void main() async {
 
       if (secureStorageFailureCode != null) {
         LogFileService.instance.append(
-          'Secure storage '
-          'profile=${StorageService.instance.secureStorageProfile?.name ?? 'unknown'}, '
-          'state=${StorageService.instance.secureStorageState.name}, '
-          'stage=${StorageService.instance.secureStorageFailureStage?.name ?? 'unknown'}, '
-          'type=${StorageService.instance.secureStorageFailureType ?? 'unknown'}, '
-          'code=$secureStorageFailureCode',
+          StorageService.instance.secureStorageFailureAuditLine ??
+              'Secure storage '
+                  'profile=${StorageService.instance.secureStorageProfile?.name ?? 'unknown'}, '
+                  'state=${StorageService.instance.secureStorageState.name}, '
+                  'stage=${StorageService.instance.secureStorageFailureStage?.name ?? 'unknown'}, '
+                  'type=${StorageService.instance.secureStorageFailureType ?? 'unknown'}, '
+                  'code=$secureStorageFailureCode',
         );
       }
 
@@ -47,12 +50,13 @@ void main() async {
             ..proxyUsername = ''
             ..proxyPassword = '';
           LogFileService.instance.append(
-            'Secure storage '
-            'profile=${StorageService.instance.secureStorageProfile?.name ?? 'unknown'}, '
-            'state=${StorageService.instance.secureStorageState.name}, '
-            'stage=${StorageService.instance.secureStorageFailureStage?.name ?? 'unknown'}, '
-            'type=${StorageService.instance.secureStorageFailureType ?? 'unknown'}, '
-            'code=${error.code}',
+            StorageService.instance.secureStorageFailureAuditLine ??
+                'Secure storage '
+                    'profile=${StorageService.instance.secureStorageProfile?.name ?? 'unknown'}, '
+                    'state=${StorageService.instance.secureStorageState.name}, '
+                    'stage=${StorageService.instance.secureStorageFailureStage?.name ?? 'unknown'}, '
+                    'type=${StorageService.instance.secureStorageFailureType ?? 'unknown'}, '
+                    'code=${error.code}',
           );
         }
       }

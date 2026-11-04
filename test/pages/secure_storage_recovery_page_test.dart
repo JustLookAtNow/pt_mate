@@ -3,6 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pt_mate/pages/secure_storage_recovery_page.dart';
 
 void main() {
+  final diagnosticSemantics = find.byWidgetPredicate(
+    (widget) => widget is Semantics && widget.properties.label == '安全存储诊断信息',
+  );
+
   testWidgets('shows a blocking explanation and exposes recovery actions', (
     tester,
   ) async {
@@ -93,5 +97,89 @@ void main() {
     await tester.tap(find.text('放弃旧数据'));
     await tester.pumpAndSettle();
     expect(discardCount, 1);
+  });
+
+  testWidgets('shows probe step and elapsed time when provided', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SecureStorageRecoveryPage(
+          failureStage: 'read',
+          failureType: 'PlatformException',
+          failureStep: 'readSecret',
+          elapsedMs: 125,
+          onRetry: () async {},
+          onOpenBackupRestore: () {},
+        ),
+      ),
+    );
+
+    expect(find.text('失败阶段：read'), findsOneWidget);
+    expect(find.text('异常类别：PlatformException'), findsOneWidget);
+    expect(find.text('探测步骤：readSecret'), findsOneWidget);
+    expect(find.text('探测耗时：125 ms'), findsOneWidget);
+    expect(find.byType(SelectableText), findsNWidgets(4));
+  });
+
+  testWidgets('shows the diagnostic area with only the new fields', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SecureStorageRecoveryPage(
+          failureStep: 'readSecret',
+          elapsedMs: 0,
+          onRetry: () async {},
+          onOpenBackupRestore: () {},
+        ),
+      ),
+    );
+
+    expect(diagnosticSemantics, findsOneWidget);
+    expect(find.text('探测步骤：readSecret'), findsOneWidget);
+    expect(find.text('探测耗时：0 ms'), findsOneWidget);
+    expect(find.byType(SelectableText), findsNWidgets(2));
+  });
+
+  testWidgets('omits probe diagnostics when the new fields are missing', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SecureStorageRecoveryPage(
+          failureStage: 'read',
+          failureType: 'PlatformException',
+          failureCode: 'invalid_key',
+          onRetry: () async {},
+          onOpenBackupRestore: () {},
+        ),
+      ),
+    );
+
+    expect(find.text('失败阶段：read'), findsOneWidget);
+    expect(find.text('异常类别：PlatformException'), findsOneWidget);
+    expect(find.text('错误代码：invalid_key'), findsOneWidget);
+    expect(find.textContaining('探测步骤：'), findsNothing);
+    expect(find.textContaining('探测耗时：'), findsNothing);
+    expect(find.byType(SelectableText), findsNWidgets(3));
+  });
+
+  testWidgets('does not render a diagnostic area without diagnostics', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SecureStorageRecoveryPage(
+          onRetry: () async {},
+          onOpenBackupRestore: () {},
+        ),
+      ),
+    );
+
+    expect(diagnosticSemantics, findsNothing);
+    expect(find.byType(SelectableText), findsNothing);
+    expect(find.text('重试'), findsOneWidget);
+    expect(find.text('进入备份恢复'), findsOneWidget);
   });
 }

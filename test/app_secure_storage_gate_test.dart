@@ -85,6 +85,51 @@ void main() {
     expect(find.byType(ServerSettingsPage), findsOneWidget);
   });
 
+  testWidgets('Android capability diagnostics reach the blocking page', (
+    tester,
+  ) async {
+    const profileChannel = MethodChannel('pt_mate/secure_storage_profile');
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(profileChannel, null),
+    );
+    storage.resetForTest();
+    storage.overridePlatformForTest(TargetPlatform.android);
+    storage.overrideAndroidSecureStorageProfileForTest(null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(profileChannel, (call) async {
+          if (call.method == 'getLegacyAndroidMigrationState') {
+            return <String, Object?>{'status': 'none'};
+          }
+          if (call.method == 'probeAndroidSecureStorage') {
+            return <String, Object?>{
+              'status': 'fresh',
+              'profile': 'fresh',
+              'hasEncryptedEntries': false,
+              'hasWrappedKeys': false,
+            };
+          }
+          return <String, Object?>{
+            'status': 'unavailable',
+            'failureCode': 'capability_probe_failed',
+            'failureStep': 'certificateRead',
+            'failureType': 'ProviderException',
+            'elapsedMs': 137,
+          };
+        });
+    await expectLater(
+      storage.initializeSecureStorage(trigger: SecureStorageTrigger.startup),
+      throwsA(isA<SecureStorageUnavailableException>()),
+    );
+    await tester.pumpWidget(const MTeamApp());
+    await tester.pump();
+    expect(find.text('失败阶段：profileProbe'), findsOneWidget);
+    expect(find.text('错误代码：capability_probe_failed'), findsOneWidget);
+    expect(find.text('异常类别：ProviderException'), findsOneWidget);
+    expect(find.text('探测步骤：certificateRead'), findsOneWidget);
+    expect(find.text('探测耗时：137 ms'), findsOneWidget);
+  });
+
   testWidgets('resume failure blocks the currently visible nested route', (
     tester,
   ) async {
@@ -129,6 +174,8 @@ void main() {
     // Automatic restore and Cookie Cloud have been drained above. Startup
     // cleanup is generation-guarded and is covered independently by the
     // storage-service concurrency tests.
+    final auditLines = <String>[];
+    storage.overrideSecureStorageAuditObserverForTest(auditLines.add);
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(secureStorageChannel, (call) async {
           if (call.method == 'read') {
@@ -140,6 +187,9 @@ void main() {
     await tester.pump();
 
     expect(find.text('暂时无法读取安全存储'), findsOneWidget);
+    expect(auditLines, hasLength(1));
+    expect(auditLines.single, contains('trigger=resume'));
+    expect(auditLines.single, contains('lifecycle='));
     expect(underlyingFocus.hasFocus, isFalse);
     final accessibleLabels = tester.semantics
         .simulatedAccessibilityTraversal()
@@ -151,6 +201,8 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
     expect(underlyingTapCount, 0);
+    await tester.runAsync(appState.retrySecureStorageForTest);
+    expect(auditLines.last, contains('trigger=retry'));
   });
 
   testWidgets(

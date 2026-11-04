@@ -35,12 +35,10 @@ void main() {
   });
 
   test('第二阶段事务默认关闭且只能由显式构建参数开启', () {
-    final source = File(
-      'lib/services/storage/storage_service.dart',
-    ).readAsStringSync();
-    final releaseWorkflow = File(
-      '.github/workflows/release.yml',
-    ).readAsStringSync();
+    final source = File('lib/services/storage/storage_service.dart')
+        .readAsStringSync();
+    final releaseWorkflow = File('.github/workflows/release.yml')
+        .readAsStringSync();
     final gate = RegExp(
       r"bool\.fromEnvironment\(\s*'ENABLE_SECURE_STORAGE_TRANSACTIONS',(.*?)\);",
       dotAll: true,
@@ -118,9 +116,8 @@ void main() {
     final transactionSource = File(
       'lib/services/storage/secure_storage_transaction.dart',
     ).readAsStringSync();
-    final storageSource = File(
-      'lib/services/storage/storage_service.dart',
-    ).readAsStringSync();
+    final storageSource = File('lib/services/storage/storage_service.dart')
+        .readAsStringSync();
     final start = nativeSource.indexOf(
       'private fun flushAndroidSecureStorage()',
     );
@@ -164,12 +161,10 @@ void main() {
   });
 
   test('Manifest 与两套规则禁止备份全部安全存储文件', () {
-    final manifest = File(
-      'android/app/src/main/AndroidManifest.xml',
-    ).readAsStringSync();
-    final legacyRules = File(
-      'android/app/src/main/res/xml/backup_rules.xml',
-    ).readAsStringSync();
+    final manifest = File('android/app/src/main/AndroidManifest.xml')
+        .readAsStringSync();
+    final legacyRules = File('android/app/src/main/res/xml/backup_rules.xml')
+        .readAsStringSync();
     final modernRules = File(
       'android/app/src/main/res/xml/data_extraction_rules.xml',
     ).readAsStringSync();
@@ -188,9 +183,8 @@ void main() {
   });
 
   test('Android profile 解析后不存在 OAEP 默认选项回退', () {
-    final source = File(
-      'lib/services/storage/storage_service.dart',
-    ).readAsStringSync();
+    final source = File('lib/services/storage/storage_service.dart')
+        .readAsStringSync();
     final start = source.indexOf(
       'Future<AndroidOptions> _getAndroidSecureOptions()',
     );
@@ -216,18 +210,14 @@ void main() {
 
   test('Release 日志路径不采集任意异常、堆栈、print 或 HTML', () {
     final mainSource = File('lib/main.dart').readAsStringSync();
-    final storageSource = File(
-      'lib/services/storage/storage_service.dart',
-    ).readAsStringSync();
-    final adapterSource = File(
-      'lib/services/api/nexusphp_web_adapter.dart',
-    ).readAsStringSync();
-    final gradleSource = File(
-      'android/app/build.gradle.kts',
-    ).readAsStringSync();
-    final proguardSource = File(
-      'android/app/proguard-rules.pro',
-    ).readAsStringSync();
+    final storageSource = File('lib/services/storage/storage_service.dart')
+        .readAsStringSync();
+    final adapterSource = File('lib/services/api/nexusphp_web_adapter.dart')
+        .readAsStringSync();
+    final gradleSource = File('android/app/build.gradle.kts')
+        .readAsStringSync();
+    final proguardSource = File('android/app/proguard-rules.pro')
+        .readAsStringSync();
 
     expect(mainSource, contains('if (!kIsWeb && kDebugMode)'));
     expect(mainSource, contains('if (kDebugMode) {'));
@@ -239,17 +229,23 @@ void main() {
       expect(proguardSource, contains('public static int $level(...);'));
     }
 
-    final auditStart = storageSource.indexOf('final auditLine');
+    final auditStart = storageSource.indexOf(
+      'String _buildSecureStorageFailureAuditLine(',
+    );
+    expect(auditStart, isNonNegative);
     final auditEnd = storageSource.indexOf(
       'LogFileService.instance.append(auditLine)',
       auditStart,
     );
-    expect(auditStart, isNonNegative);
     expect(auditEnd, greaterThan(auditStart));
     final auditBlock = storageSource.substring(auditStart, auditEnd);
     expect(auditBlock, contains('profile='));
     expect(auditBlock, contains('state='));
     expect(auditBlock, contains('code='));
+    expect(auditBlock, contains('failureStep='));
+    expect(auditBlock, contains('elapsedMs='));
+    expect(auditBlock, contains('trigger='));
+    expect(auditBlock, contains('lifecycle='));
     expect(auditBlock, isNot(contains('platform=')));
     expect(auditBlock, isNot(contains(r'$error')));
     expect(auditBlock, isNot(contains('siteId')));

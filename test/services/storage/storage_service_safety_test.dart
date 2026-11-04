@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pt_mate/models/app_models.dart';
 import 'package:pt_mate/services/downloader/downloader_config.dart';
@@ -372,6 +373,154 @@ void main() {
 
     expect(enabledPlaintext, isFalse);
     expect(storage.secureStorageState, SecureStorageState.unavailable);
+  });
+
+  test('能力诊断贯穿异常、状态和日志，重试成功后清除', () async {
+    storage.overridePlatformForTest(TargetPlatform.android);
+    storage.overrideAndroidSecureStorageProfileForTest(null);
+    var failCapability = true;
+    var initialized = false;
+    final auditLines = <String>[];
+    final statuses = <SecureStorageStatus>[];
+    storage.overrideSecureStorageAuditObserverForTest(auditLines.add);
+    void observeStatus() =>
+        statuses.add(storage.secureStorageStatusListenable.value);
+    storage.secureStorageStatusListenable.addListener(observeStatus);
+    addTearDown(
+      () => storage.secureStorageStatusListenable.removeListener(observeStatus),
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageProfileChannel, (call) async {
+          switch (call.method) {
+            case 'getLegacyAndroidMigrationState':
+              return <String, Object?>{'status': 'none'};
+            case 'probeModernSecureStorageCapability':
+              return <String, Object?>{
+                'status': failCapability ? 'unavailable' : 'supported',
+                'failureCode': failCapability
+                    ? 'capability_probe_failed'
+                    : null,
+                if (failCapability) 'failureStep': 'certificateRead',
+                if (failCapability) 'failureType': 'ProviderException',
+                'elapsedMs': 137,
+              };
+            case 'initializeFreshAndroidSecureStorage':
+              initialized = true;
+          }
+          return <String, Object?>{
+            'status': initialized ? 'ready' : 'fresh',
+            'profile': initialized ? 'oaepGcm' : 'fresh',
+            'keyCipher': initialized
+                ? 'RSA_ECB_OAEPwithSHA_256andMGF1Padding'
+                : null,
+            'storageCipher': initialized ? 'AES_GCM_NoPadding' : null,
+            'hasEncryptedEntries': false,
+            'hasWrappedKeys': false,
+          };
+        });
+
+    final failure = isA<SecureStorageUnavailableException>()
+        .having((error) => error.code, 'code', 'capability_probe_failed')
+        .having(
+          (error) => error.stage,
+          'stage',
+          SecureStorageFailureStage.profileProbe,
+        )
+        .having((error) => error.failureType, 'type', 'ProviderException')
+        .having((error) => error.failureStep, 'step', 'certificateRead')
+        .having((error) => error.elapsedMs, 'elapsedMs', 137);
+    await expectLater(
+      storage.initializeSecureStorage(trigger: SecureStorageTrigger.startup),
+      throwsA(failure),
+    );
+    // A later caller must receive the same diagnostic fields while failure is latched.
+    await expectLater(storage.initializeSecureStorage(), throwsA(failure));
+    final status = statuses.last;
+    expect(status.state, SecureStorageState.unavailable);
+    expect(status.failureStep, 'certificateRead');
+    expect(status.failureType, 'ProviderException');
+    expect(status.elapsedMs, 137);
+    expect(storage.secureStorageFailureStep, 'certificateRead');
+    expect(storage.secureStorageFailureElapsedMs, 137);
+    expect(auditLines, hasLength(1));
+    expect(auditLines.single, contains('failureStep=certificateRead'));
+    expect(auditLines.single, contains('elapsedMs=137'));
+    expect(auditLines.single, contains('trigger=startup'));
+    expect(
+      auditLines.single,
+      contains(
+        'lifecycle=${WidgetsBinding.instance.lifecycleState?.name ?? 'unknown'}',
+      ),
+    );
+    expect(storage.secureStorageFailureAuditLine, auditLines.single);
+
+    // An explicit retry reports its own trigger and can later clear the diagnosis.
+    await expectLater(
+      storage.initializeSecureStorage(
+        force: true,
+        trigger: SecureStorageTrigger.retry,
+      ),
+      throwsA(failure),
+    );
+    expect(auditLines, hasLength(2));
+    expect(auditLines.last, contains('trigger=retry'));
+    failCapability = false;
+    await storage.initializeSecureStorage(
+      force: true,
+      trigger: SecureStorageTrigger.retry,
+    );
+    expect(storage.secureStorageState, SecureStorageState.ready);
+    expect(storage.secureStorageFailureType, isNull);
+    expect(storage.secureStorageFailureStep, isNull);
+    expect(storage.secureStorageFailureElapsedMs, isNull);
+    expect(storage.secureStorageFailureAuditLine, isNull);
+    expect(storage.secureStorageStatusListenable.value.failureStep, isNull);
+    expect(storage.secureStorageStatusListenable.value.elapsedMs, isNull);
+    expect(auditLines, hasLength(2));
+  });
+
+  test('迁移能力探测失败记录诊断但不更改原有阻断状态', () async {
+    storage.overridePlatformForTest(TargetPlatform.android);
+    final auditLines = <String>[];
+    storage.overrideSecureStorageAuditObserverForTest(auditLines.add);
+    storage.overrideAndroidSecureStorageProfileForTest(
+      AndroidSecureStorageProfile.pkcs1Gcm,
+    );
+    await expectLater(
+      storage.initializeSecureStorage(),
+      throwsA(isA<SecureStorageUnavailableException>()),
+    );
+    final originalStatus = storage.secureStorageStatusListenable.value;
+    final originalAudit = storage.secureStorageFailureAuditLine;
+    auditLines.clear();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          secureStorageProfileChannel,
+          (_) async => <String, Object?>{
+            'status': 'unavailable',
+            'failureCode': 'capability_probe_failed',
+            'failureStep': 'oaepDecrypt',
+            'failureType': 'InvalidKeyException',
+            'elapsedMs': 42,
+          },
+        );
+
+    await expectLater(
+      storage.probeLegacyMigrationTarget(),
+      throwsA(
+        isA<SecureStorageUnavailableException>()
+            .having((error) => error.failureStep, 'step', 'oaepDecrypt')
+            .having((error) => error.failureType, 'type', 'InvalidKeyException')
+            .having((error) => error.elapsedMs, 'elapsedMs', 42),
+      ),
+    );
+    expect(storage.secureStorageStatusListenable.value, same(originalStatus));
+    expect(storage.secureStorageFailureAuditLine, originalAudit);
+    expect(auditLines, hasLength(1));
+    expect(auditLines.single, contains('trigger=migration'));
+    expect(auditLines.single, contains('failureStep=oaepDecrypt'));
+    expect(auditLines.single, contains('type=InvalidKeyException'));
+    expect(auditLines.single, contains('elapsedMs=42'));
   });
 
   test('Android 明文事务保存、重启读取及删除保持一致', () async {

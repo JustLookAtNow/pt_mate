@@ -49,11 +49,17 @@ class AndroidSecureStorageCapabilityResult {
     required this.isSupported,
     required this.isExplicitlyUnsupported,
     this.failureCode,
+    this.failureStep,
+    this.failureType,
+    this.elapsedMs,
   });
 
   final bool isSupported;
   final bool isExplicitlyUnsupported;
   final String? failureCode;
+  final String? failureStep;
+  final String? failureType;
+  final int? elapsedMs;
 }
 
 class AndroidSecureStorageFlushResult {
@@ -158,23 +164,33 @@ class AndroidSecureStorageProfileResolver {
         failureCode: 'not_android',
       );
     }
+    final stopwatch = Stopwatch()..start();
     try {
       final response = await _channel
           .invokeMapMethod<String, Object?>(_probeCapabilityMethodName)
           .timeout(_probeTimeout);
       final status = response?['status'];
       final failureCode = response?['failureCode'];
+      final failureStep = response?['failureStep'];
+      final failureType = response?['failureType'];
+      final elapsedMs = response?['elapsedMs'];
       if (status == 'supported' && failureCode == null) {
-        return const AndroidSecureStorageCapabilityResult(
+        return AndroidSecureStorageCapabilityResult(
           isSupported: true,
           isExplicitlyUnsupported: false,
+          failureStep: failureStep is String ? failureStep : null,
+          failureType: failureType is String ? failureType : null,
+          elapsedMs: elapsedMs is int ? elapsedMs : null,
         );
       }
       if (status == 'unsupported' && failureCode == 'unsupported_algorithm') {
-        return const AndroidSecureStorageCapabilityResult(
+        return AndroidSecureStorageCapabilityResult(
           isSupported: false,
           isExplicitlyUnsupported: true,
           failureCode: 'unsupported_algorithm',
+          failureStep: failureStep is String ? failureStep : null,
+          failureType: failureType is String ? failureType : null,
+          elapsedMs: elapsedMs is int ? elapsedMs : null,
         );
       }
       return AndroidSecureStorageCapabilityResult(
@@ -183,24 +199,39 @@ class AndroidSecureStorageProfileResolver {
         failureCode: failureCode is String && failureCode.isNotEmpty
             ? failureCode
             : 'capability_probe_failed',
+        failureStep: failureStep is String ? failureStep : null,
+        failureType: failureType is String ? failureType : null,
+        elapsedMs: elapsedMs is int ? elapsedMs : null,
       );
     } on TimeoutException {
-      return const AndroidSecureStorageCapabilityResult(
+      stopwatch.stop();
+      return AndroidSecureStorageCapabilityResult(
         isSupported: false,
         isExplicitlyUnsupported: false,
         failureCode: 'native_capability_probe_timeout',
+        failureStep: 'awaitNativeResult',
+        failureType: 'TimeoutException',
+        elapsedMs: stopwatch.elapsedMilliseconds,
       );
     } on PlatformException catch (error) {
+      stopwatch.stop();
       return AndroidSecureStorageCapabilityResult(
         isSupported: false,
         isExplicitlyUnsupported: false,
         failureCode: 'native_${error.code}',
+        failureStep: 'awaitNativeResult',
+        failureType: error.runtimeType.toString(),
+        elapsedMs: stopwatch.elapsedMilliseconds,
       );
-    } catch (_) {
-      return const AndroidSecureStorageCapabilityResult(
+    } catch (error) {
+      stopwatch.stop();
+      return AndroidSecureStorageCapabilityResult(
         isSupported: false,
         isExplicitlyUnsupported: false,
         failureCode: 'capability_probe_failed',
+        failureStep: 'awaitNativeResult',
+        failureType: error.runtimeType.toString(),
+        elapsedMs: stopwatch.elapsedMilliseconds,
       );
     }
   }

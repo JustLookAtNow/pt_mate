@@ -1156,7 +1156,10 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
 
     final storage = StorageService.instance;
     try {
-      await storage.initializeSecureStorage(force: true);
+      await storage.initializeSecureStorage(
+        force: true,
+        trigger: SecureStorageTrigger.retry,
+      );
       if (!storage.canAccessSensitiveStorage) {
         throw SecureStorageUnavailableException(
           storage.secureStorageFailureCode ?? 'secure_storage_not_ready',
@@ -1336,7 +1339,10 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
         initializedDuringResume = true;
       }
 
-      await storage.initializeSecureStorage(force: true);
+      await storage.initializeSecureStorage(
+        force: true,
+        trigger: SecureStorageTrigger.resume,
+      );
       if (!storage.canAccessSensitiveStorage) {
         throw SecureStorageUnavailableException(
           storage.secureStorageFailureCode ?? 'secure_storage_not_ready',
@@ -1535,6 +1541,10 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
                           ?.name,
                       failureType:
                           StorageService.instance.secureStorageFailureType,
+                      failureStep:
+                          StorageService.instance.secureStorageFailureStep,
+                      elapsedMs:
+                          StorageService.instance.secureStorageFailureElapsedMs,
                       isRetrying: _isCheckingSecureStorage,
                     ),
                   ),

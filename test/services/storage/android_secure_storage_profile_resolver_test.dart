@@ -140,8 +140,80 @@ void main() {
       expect(result.isSupported, isFalse);
       expect(result.isExplicitlyUnsupported, isTrue);
       expect(result.failureCode, 'unsupported_algorithm');
+      expect(result.failureStep, isNull);
+      expect(result.failureType, isNull);
+      expect(result.elapsedMs, isNull);
     },
   );
+
+  test('preserves native capability diagnostics for every outcome', () async {
+    final cases =
+        <
+          ({
+            String status,
+            bool isSupported,
+            bool isExplicitlyUnsupported,
+            String? failureCode,
+            String? failureStep,
+            String? failureType,
+            int elapsedMs,
+          })
+        >[
+          (
+            status: 'supported',
+            isSupported: true,
+            isExplicitlyUnsupported: false,
+            failureCode: null,
+            failureStep: 'checkCipher',
+            failureType: null,
+            elapsedMs: 12,
+          ),
+          (
+            status: 'unsupported',
+            isSupported: false,
+            isExplicitlyUnsupported: true,
+            failureCode: 'unsupported_algorithm',
+            failureStep: 'createCipher',
+            failureType: 'GeneralSecurityException',
+            elapsedMs: 7,
+          ),
+          (
+            status: 'unavailable',
+            isSupported: false,
+            isExplicitlyUnsupported: false,
+            failureCode: 'capability_probe_failed',
+            failureStep: 'probeKeystore',
+            failureType: 'NoSuchAlgorithmException',
+            elapsedMs: 9,
+          ),
+        ];
+
+    for (final entry in cases) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            expect(call.method, 'probeModernSecureStorageCapability');
+            return <String, Object?>{
+              'status': entry.status,
+              'failureCode': entry.failureCode,
+              'failureStep': entry.failureStep,
+              'failureType': entry.failureType,
+              'elapsedMs': entry.elapsedMs,
+            };
+          });
+
+      final result = await AndroidSecureStorageProfileResolver(
+        channel: channel,
+        isAndroid: true,
+      ).probeModernCapability();
+
+      expect(result.isSupported, entry.isSupported);
+      expect(result.isExplicitlyUnsupported, entry.isExplicitlyUnsupported);
+      expect(result.failureCode, entry.failureCode);
+      expect(result.failureStep, entry.failureStep);
+      expect(result.failureType, entry.failureType);
+      expect(result.elapsedMs, entry.elapsedMs);
+    }
+  });
 
   test('capability probe transient errors remain fail-closed', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -161,6 +233,96 @@ void main() {
     expect(result.isSupported, isFalse);
     expect(result.isExplicitlyUnsupported, isFalse);
     expect(result.failureCode, 'capability_probe_failed');
+    expect(result.failureStep, isNull);
+    expect(result.failureType, isNull);
+    expect(result.elapsedMs, isNull);
+  });
+
+  test('capability timeout reports measured diagnostics', () async {
+    final timeoutChannel = MethodChannel(
+      'pt_mate/secure_storage_capability_timeout_'
+      '${DateTime.now().microsecondsSinceEpoch}',
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          timeoutChannel,
+          (_) => Completer<Object?>().future,
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(timeoutChannel, null),
+    );
+
+    final result = await AndroidSecureStorageProfileResolver(
+      channel: timeoutChannel,
+      isAndroid: true,
+      probeTimeout: const Duration(milliseconds: 40),
+    ).probeModernCapability();
+
+    expect(result.isSupported, isFalse);
+    expect(result.isExplicitlyUnsupported, isFalse);
+    expect(result.failureCode, 'native_capability_probe_timeout');
+    expect(result.failureStep, 'awaitNativeResult');
+    expect(result.failureType, 'TimeoutException');
+    expect(result.elapsedMs, greaterThanOrEqualTo(20));
+  });
+
+  test('capability platform failures omit sensitive exception text', () async {
+    const sensitiveMessage = 'sensitive-platform-message';
+    const sensitiveDetails = 'sensitive-platform-details';
+    const sensitiveStack = 'sensitive-platform-stack';
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (_) async {
+          throw PlatformException(
+            code: 'probe_failed',
+            message: sensitiveMessage,
+            details: sensitiveDetails,
+            stacktrace: sensitiveStack,
+          );
+        });
+
+    final result = await AndroidSecureStorageProfileResolver(
+      channel: channel,
+      isAndroid: true,
+    ).probeModernCapability();
+
+    expect(result.isSupported, isFalse);
+    expect(result.isExplicitlyUnsupported, isFalse);
+    expect(result.failureCode, 'native_probe_failed');
+    expect(result.failureStep, 'awaitNativeResult');
+    expect(result.failureType, 'PlatformException');
+    expect(result.elapsedMs, greaterThanOrEqualTo(0));
+    final exposedFields = <String?>[
+      result.failureCode,
+      result.failureStep,
+      result.failureType,
+      result.elapsedMs?.toString(),
+    ].join('|');
+    expect(exposedFields, isNot(contains(sensitiveMessage)));
+    expect(exposedFields, isNot(contains(sensitiveDetails)));
+    expect(exposedFields, isNot(contains(sensitiveStack)));
+  });
+
+  test('capability Dart failures retain only the exception type', () async {
+    const sensitiveMessage = 'sensitive-dart-message';
+    final result = await AndroidSecureStorageProfileResolver(
+      channel: _ThrowingCapabilityChannel(StateError(sensitiveMessage)),
+      isAndroid: true,
+    ).probeModernCapability();
+
+    expect(result.isSupported, isFalse);
+    expect(result.isExplicitlyUnsupported, isFalse);
+    expect(result.failureCode, 'capability_probe_failed');
+    expect(result.failureStep, 'awaitNativeResult');
+    expect(result.failureType, 'StateError');
+    expect(result.elapsedMs, greaterThanOrEqualTo(0));
+    final exposedFields = <String?>[
+      result.failureCode,
+      result.failureStep,
+      result.failureType,
+      result.elapsedMs?.toString(),
+    ].join('|');
+    expect(exposedFields, isNot(contains(sensitiveMessage)));
   });
 
   test('legacy reset requires confirmation and native fresh result', () async {
@@ -528,4 +690,15 @@ void main() {
     expect(result.failureCode, 'native_probe_timeout');
     expect(result.isReady, isFalse);
   });
+}
+
+class _ThrowingCapabilityChannel extends MethodChannel {
+  _ThrowingCapabilityChannel(this.error) : super('pt_mate/throwing_channel');
+
+  final Object error;
+
+  @override
+  Future<T?> invokeMethod<T>(String method, [dynamic arguments]) async {
+    throw error;
+  }
 }

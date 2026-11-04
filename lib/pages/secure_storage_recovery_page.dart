@@ -9,6 +9,8 @@ class SecureStorageRecoveryPage extends StatelessWidget {
     this.failureCode,
     this.failureStage,
     this.failureType,
+    this.failureStep,
+    this.elapsedMs,
     this.isRetrying = false,
   });
 
@@ -21,6 +23,8 @@ class SecureStorageRecoveryPage extends StatelessWidget {
   final String? failureCode;
   final String? failureStage;
   final String? failureType;
+  final String? failureStep;
+  final int? elapsedMs;
   final bool isRetrying;
 
   bool get _requiresLegacyBackupRestore =>
@@ -112,7 +116,9 @@ class SecureStorageRecoveryPage extends StatelessWidget {
                       ),
                       if ((failureStage != null && failureStage!.isNotEmpty) ||
                           (failureType != null && failureType!.isNotEmpty) ||
-                          (failureCode != null && failureCode!.isNotEmpty)) ...[
+                          (failureCode != null && failureCode!.isNotEmpty) ||
+                          (failureStep != null && failureStep!.isNotEmpty) ||
+                          elapsedMs != null) ...[
                         const SizedBox(height: 16),
                         Semantics(
                           label: '安全存储诊断信息',
@@ -140,6 +146,23 @@ class SecureStorageRecoveryPage extends StatelessWidget {
                                   failureCode!.isNotEmpty)
                                 SelectableText(
                                   '错误代码：$failureCode',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              if (failureStep != null &&
+                                  failureStep!.isNotEmpty)
+                                SelectableText(
+                                  '探测步骤：$failureStep',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              if (elapsedMs != null)
+                                SelectableText(
+                                  '探测耗时：$elapsedMs ms',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.onSurfaceVariant,
                                   ),

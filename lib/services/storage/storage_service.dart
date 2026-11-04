@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -259,6 +260,8 @@ class _LegacyCookieCloudSecrets {
 
 enum SecureStorageState { unknown, ready, unavailable }
 
+enum SecureStorageTrigger { startup, resume, retry, migration, runtime }
+
 enum SecureStorageFailureStage {
   profileProbe,
   cipherInitialization,
@@ -283,12 +286,16 @@ class SecureStorageStatus {
     this.failureCode,
     this.failureStage,
     this.failureType,
+    this.failureStep,
+    this.elapsedMs,
   });
 
   final SecureStorageState state;
   final String? failureCode;
   final SecureStorageFailureStage? failureStage;
   final String? failureType;
+  final String? failureStep;
+  final int? elapsedMs;
 }
 
 enum SecureReadStatus { found, missing, unavailable }
@@ -319,12 +326,16 @@ class SecureStorageUnavailableException implements Exception {
     this.cause,
     this.stage,
     this.failureType,
+    this.failureStep,
+    this.elapsedMs,
   ]);
 
   final String code;
   final Object? cause;
   final SecureStorageFailureStage? stage;
   final String? failureType;
+  final String? failureStep;
+  final int? elapsedMs;
 
   @override
   String toString() => 'SecureStorageUnavailableException($code)';
@@ -352,6 +363,7 @@ class StorageService {
   static final Object _secureStorageOperationEpochZoneKey = Object();
   static final Object _linuxPlaintextFallbackReplayZoneKey = Object();
   static final Object _secureStorageFailureStageZoneKey = Object();
+  static final Object _secureStorageTriggerZoneKey = Object();
   static final Object _legacySecureValuesZoneKey = Object();
   static const Duration _secureStorageTimeout = Duration(milliseconds: 800);
   static const Duration _secureStorageInitializationTimeout = Duration(
@@ -400,6 +412,9 @@ class StorageService {
   String? _secureStorageFailureCode;
   SecureStorageFailureStage? _secureStorageFailureStage;
   String? _secureStorageFailureType;
+  String? _secureStorageFailureStep;
+  int? _secureStorageFailureElapsedMs;
+  String? _secureStorageFailureAuditLine;
   bool _secureStorageUnavailableLatched = false;
   int _secureStorageOperationGeneration = 0;
   final ValueNotifier<SecureStorageStatus> _secureStorageStatusNotifier =
@@ -512,6 +527,13 @@ class StorageService {
 
   String? get secureStorageFailureType => _secureStorageFailureType;
 
+  String? get secureStorageFailureStep => _secureStorageFailureStep;
+
+  int? get secureStorageFailureElapsedMs => _secureStorageFailureElapsedMs;
+
+  /// Captured when the failure occurs, including before file logging starts.
+  String? get secureStorageFailureAuditLine => _secureStorageFailureAuditLine;
+
   /// 在用户已选择并验证备份、且再次确认后，清理白名单内的旧 Android
   /// PKCS#1/CBC 安全存储。原生侧会再次核验当前 profile，modern、fresh、
   /// plaintext 与 inconsistent 状态都会拒绝该操作。
@@ -545,6 +567,7 @@ class StorageService {
     await initializeSecureStorage(
       force: true,
       allowPendingLegacyMigration: true,
+      trigger: SecureStorageTrigger.migration,
     );
   }
 
@@ -573,9 +596,27 @@ class StorageService {
     if (capability.isExplicitlyUnsupported) {
       return LegacyAndroidMigrationTarget.plaintext;
     }
-    throw SecureStorageUnavailableException(
+    final error = SecureStorageUnavailableException(
       capability.failureCode ?? 'android_capability_probe_failed',
+      null,
+      SecureStorageFailureStage.profileProbe,
+      capability.failureType,
+      capability.failureStep,
+      capability.elapsedMs,
     );
+    // Migration preparation already runs behind the blocking page. Report its
+    // probe failure without changing the existing storage state or retry latch.
+    _writeSecureStorageFailureAudit(
+      _buildSecureStorageFailureAuditLine(
+        code: error.code,
+        stage: error.stage,
+        failureType: error.failureType,
+        failureStep: error.failureStep,
+        elapsedMs: error.elapsedMs,
+        trigger: SecureStorageTrigger.migration,
+      ),
+    );
+    throw error;
   }
 
   Future<void> beginLegacyAndroidMigration(
@@ -597,6 +638,7 @@ class StorageService {
     await initializeSecureStorage(
       force: true,
       allowPendingLegacyMigration: true,
+      trigger: SecureStorageTrigger.migration,
     );
     try {
       await _androidProfileResolver.markLegacyMigrationTargetInitialized();
@@ -624,6 +666,7 @@ class StorageService {
     await initializeSecureStorage(
       force: true,
       allowPendingLegacyMigration: true,
+      trigger: SecureStorageTrigger.migration,
     );
     if (state.phase == LegacyAndroidMigrationPhase.backupConfirmed ||
         state.phase == LegacyAndroidMigrationPhase.legacyCleared) {
@@ -661,6 +704,8 @@ class StorageService {
         null,
         _secureStorageFailureStage,
         _secureStorageFailureType,
+        _secureStorageFailureStep,
+        _secureStorageFailureElapsedMs,
       );
     }
     return _secureStorageOperationGeneration;
@@ -833,22 +878,33 @@ class StorageService {
     String? failureCode,
     SecureStorageFailureStage? failureStage,
     String? failureType,
+    String? failureStep,
+    int? elapsedMs,
   }) {
     final changed =
         _secureStorageState != state ||
         _secureStorageFailureCode != failureCode ||
         _secureStorageFailureStage != failureStage ||
-        _secureStorageFailureType != failureType;
+        _secureStorageFailureType != failureType ||
+        _secureStorageFailureStep != failureStep ||
+        _secureStorageFailureElapsedMs != elapsedMs;
     _secureStorageState = state;
     _secureStorageFailureCode = failureCode;
     _secureStorageFailureStage = failureStage;
     _secureStorageFailureType = failureType;
+    _secureStorageFailureStep = failureStep;
+    _secureStorageFailureElapsedMs = elapsedMs;
+    if (state != SecureStorageState.unavailable) {
+      _secureStorageFailureAuditLine = null;
+    }
     if (changed) {
       _secureStorageStatusNotifier.value = SecureStorageStatus(
         state: state,
         failureCode: failureCode,
         failureStage: failureStage,
         failureType: failureType,
+        failureStep: failureStep,
+        elapsedMs: elapsedMs,
       );
     }
   }
@@ -1029,6 +1085,12 @@ class StorageService {
             ? error.failureType
             : null) ??
         classification.failureType;
+    final failureStep = error is SecureStorageUnavailableException
+        ? error.failureStep
+        : null;
+    final elapsedMs = error is SecureStorageUnavailableException
+        ? error.elapsedMs
+        : null;
     // Linux is the sole supported plaintext fallback. A keyring failure moves
     // the current run into that explicitly supported mode; it is not a new
     // run, so the operation that observed the failure must be allowed to
@@ -1041,23 +1103,53 @@ class StorageService {
     if (!preservesCurrentOperationEpoch) {
       _secureStorageOperationGeneration++;
     }
+    _secureStorageFailureAuditLine = _buildSecureStorageFailureAuditLine(
+      code: failureCode,
+      stage: resolvedStage,
+      failureType: resolvedFailureType,
+      failureStep: failureStep,
+      elapsedMs: elapsedMs,
+    );
     _setSecureStorageStatus(
       SecureStorageState.unavailable,
       failureCode: failureCode,
       failureStage: resolvedStage,
       failureType: resolvedFailureType,
+      failureStep: failureStep,
+      elapsedMs: elapsedMs,
     );
     if (_hasLoggedSecureStorageUnavailable) {
       return;
     }
     _hasLoggedSecureStorageUnavailable = true;
-    final auditLine =
-        'Secure storage '
+    _writeSecureStorageFailureAudit(_secureStorageFailureAuditLine!);
+  }
+
+  String _buildSecureStorageFailureAuditLine({
+    required String code,
+    SecureStorageFailureStage? stage,
+    String? failureType,
+    String? failureStep,
+    int? elapsedMs,
+    SecureStorageTrigger? trigger,
+  }) {
+    final source =
+        trigger ??
+        Zone.current[_secureStorageTriggerZoneKey] as SecureStorageTrigger? ??
+        SecureStorageTrigger.runtime;
+    return 'Secure storage '
         'profile=${_secureStorageProfile?.name ?? 'unknown'}, '
         'state=${SecureStorageState.unavailable.name}, '
-        'stage=${_secureStorageFailureStage?.name ?? 'unknown'}, '
-        'type=${_secureStorageFailureType ?? 'unknown'}, '
-        'code=$_secureStorageFailureCode';
+        'stage=${stage?.name ?? 'unknown'}, '
+        'type=${failureType ?? 'unknown'}, '
+        'code=$code, '
+        'failureStep=${failureStep ?? 'unknown'}, '
+        'elapsedMs=${elapsedMs ?? 'unknown'}, '
+        'trigger=${source.name}, '
+        'lifecycle=${WidgetsBinding.instance.lifecycleState?.name ?? 'unknown'}';
+  }
+
+  void _writeSecureStorageFailureAudit(String auditLine) {
     _secureStorageAuditObserverForTest?.call(auditLine);
     if (kDebugMode) _logger.w(auditLine);
     LogFileService.instance.append(auditLine);
@@ -1223,6 +1315,8 @@ class StorageService {
           error.cause ?? error,
           error.stage ?? stage,
           error.failureType ?? classification.failureType,
+          error.failureStep,
+          error.elapsedMs,
         );
       }
       throw SecureStorageUnavailableException(
@@ -1237,6 +1331,7 @@ class StorageService {
   Future<void> initializeSecureStorage({
     bool force = false,
     bool allowPendingLegacyMigration = false,
+    SecureStorageTrigger trigger = SecureStorageTrigger.runtime,
   }) async {
     if (_legacySecureValues != null) return;
     _requireExpectedSecureStorageOperationEpoch();
@@ -1248,6 +1343,8 @@ class StorageService {
         null,
         _secureStorageFailureStage,
         _secureStorageFailureType,
+        _secureStorageFailureStep,
+        _secureStorageFailureElapsedMs,
       );
     }
 
@@ -1261,11 +1358,16 @@ class StorageService {
           null,
           _secureStorageFailureStage,
           _secureStorageFailureType,
+          _secureStorageFailureStep,
+          _secureStorageFailureElapsedMs,
         );
       }
-      await _initializeSecureStorageUnlocked(
-        force: force,
-        allowPendingLegacyMigration: allowPendingLegacyMigration,
+      await runZoned(
+        () => _initializeSecureStorageUnlocked(
+          force: force,
+          allowPendingLegacyMigration: allowPendingLegacyMigration,
+        ),
+        zoneValues: <Object?, Object?>{_secureStorageTriggerZoneKey: trigger},
       );
     });
   }
@@ -1344,6 +1446,11 @@ class StorageService {
                   throw SecureStorageUnavailableException(
                     capability?.failureCode ??
                         'android_capability_probe_failed',
+                    null,
+                    null,
+                    capability?.failureType,
+                    capability?.failureStep,
+                    capability?.elapsedMs,
                   );
                 }
                 probe = await _androidProfileResolver.probe();
@@ -1487,7 +1594,14 @@ class StorageService {
         _secureStorageProfile = SecureStorageProfile.linuxPlaintextFallback;
         return;
       }
-      throw SecureStorageUnavailableException(code, error, stage, failureType);
+      throw SecureStorageUnavailableException(
+        code,
+        error,
+        stage,
+        failureType,
+        error is SecureStorageUnavailableException ? error.failureStep : null,
+        error is SecureStorageUnavailableException ? error.elapsedMs : null,
+      );
     }
   }
 

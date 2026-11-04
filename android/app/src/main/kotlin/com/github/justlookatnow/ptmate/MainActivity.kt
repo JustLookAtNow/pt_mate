@@ -404,66 +404,73 @@ class MainActivity : FlutterActivity() {
         // storage namespace, so it is safe to run before a legacy migration.
         val alias = "$packageName.ptmate.oaep-capability.${UUID.randomUUID()}"
         return try {
-            val generator = KeyPairGenerator.getInstance(
-                KeyProperties.KEY_ALGORITHM_RSA,
-                ANDROID_KEYSTORE_PROVIDER,
-            )
-            generator.initialize(
-                KeyGenParameterSpec.Builder(
-                    alias,
-                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
-                )
-                    .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA1)
-                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_OAEP)
-                    .build(),
-            )
-            generator.generateKeyPair()
+            SecureStorageCapabilityProbe().run(::isExplicitAlgorithmUnsupported) {
+                step(SecureStorageCapabilityProbe.Step.KEY_GENERATION) {
+                    val generator = KeyPairGenerator.getInstance(
+                        KeyProperties.KEY_ALGORITHM_RSA,
+                        ANDROID_KEYSTORE_PROVIDER,
+                    )
+                    generator.initialize(
+                        KeyGenParameterSpec.Builder(
+                            alias,
+                            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+                        )
+                            .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA1)
+                            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_OAEP)
+                            .build(),
+                    )
+                    generator.generateKeyPair()
+                }
 
-            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE_PROVIDER).apply { load(null) }
-            val certificate = keyStore.getCertificate(alias)
-                ?: throw IllegalStateException("capability_certificate_missing")
-            val privateKey = keyStore.getKey(alias, null)
-                ?: throw IllegalStateException("capability_private_key_missing")
-            val oaepSpec = OAEPParameterSpec(
-                "SHA-256",
-                "MGF1",
-                MGF1ParameterSpec.SHA1,
-                PSource.PSpecified.DEFAULT,
-            )
-            val secret = ByteArray(32).also(SecureRandom()::nextBytes)
-            val encryptCipher = Cipher.getInstance(
-                "RSA/ECB/OAEPPadding",
-                ANDROID_KEYSTORE_CIPHER_PROVIDER,
-            ).apply { init(Cipher.ENCRYPT_MODE, certificate.publicKey, oaepSpec) }
-            val wrapped = encryptCipher.doFinal(secret)
-            val unwrapped = Cipher.getInstance(
-                "RSA/ECB/OAEPPadding",
-                ANDROID_KEYSTORE_CIPHER_PROVIDER,
-            ).apply { init(Cipher.DECRYPT_MODE, privateKey, oaepSpec) }.doFinal(wrapped)
-            check(secret.contentEquals(unwrapped)) { "oaep_round_trip_failed" }
+                val keyStore = step(SecureStorageCapabilityProbe.Step.KEYSTORE_LOAD) {
+                    KeyStore.getInstance(ANDROID_KEYSTORE_PROVIDER).apply { load(null) }
+                }
+                val certificate = step(SecureStorageCapabilityProbe.Step.CERTIFICATE_READ) {
+                    keyStore.getCertificate(alias)
+                        ?: throw IllegalStateException("capability_certificate_missing")
+                }
+                val privateKey = step(SecureStorageCapabilityProbe.Step.PRIVATE_KEY_READ) {
+                    keyStore.getKey(alias, null)
+                        ?: throw IllegalStateException("capability_private_key_missing")
+                }
+                val oaepSpec = OAEPParameterSpec(
+                    "SHA-256",
+                    "MGF1",
+                    MGF1ParameterSpec.SHA1,
+                    PSource.PSpecified.DEFAULT,
+                )
+                val secret = step(SecureStorageCapabilityProbe.Step.SECRET_GENERATION) {
+                    ByteArray(32).also(SecureRandom()::nextBytes)
+                }
+                val wrapped = step(SecureStorageCapabilityProbe.Step.OAEP_ENCRYPT) {
+                    val encryptCipher = Cipher.getInstance(
+                        "RSA/ECB/OAEPPadding",
+                        ANDROID_KEYSTORE_CIPHER_PROVIDER,
+                    ).apply { init(Cipher.ENCRYPT_MODE, certificate.publicKey, oaepSpec) }
+                    encryptCipher.doFinal(secret)
+                }
+                step(SecureStorageCapabilityProbe.Step.OAEP_DECRYPT) {
+                    val unwrapped = Cipher.getInstance(
+                        "RSA/ECB/OAEPPadding",
+                        ANDROID_KEYSTORE_CIPHER_PROVIDER,
+                    ).apply { init(Cipher.DECRYPT_MODE, privateKey, oaepSpec) }.doFinal(wrapped)
+                    check(secret.contentEquals(unwrapped)) { "oaep_round_trip_failed" }
+                }
 
-            val aesKey = SecretKeySpec(secret, "AES")
-            val gcmEncrypt = Cipher.getInstance("AES/GCM/NoPadding").apply {
-                init(Cipher.ENCRYPT_MODE, aesKey)
-            }
-            val plaintext = "ptmate-gcm-capability".toByteArray()
-            val ciphertext = gcmEncrypt.doFinal(plaintext)
-            val decrypted = Cipher.getInstance("AES/GCM/NoPadding").apply {
-                init(Cipher.DECRYPT_MODE, aesKey, GCMParameterSpec(128, gcmEncrypt.iv))
-            }.doFinal(ciphertext)
-            check(plaintext.contentEquals(decrypted)) { "gcm_round_trip_failed" }
-            mapOf<String, Any?>("status" to "supported", "failureCode" to null)
-        } catch (error: Throwable) {
-            if (isExplicitAlgorithmUnsupported(error)) {
-                mapOf(
-                    "status" to "unsupported",
-                    "failureCode" to "unsupported_algorithm",
-                )
-            } else {
-                mapOf(
-                    "status" to "unavailable",
-                    "failureCode" to "capability_probe_failed",
-                )
+                val aesKey = SecretKeySpec(secret, "AES")
+                val plaintext = "ptmate-gcm-capability".toByteArray()
+                val (gcmEncrypt, ciphertext) = step(SecureStorageCapabilityProbe.Step.GCM_ENCRYPT) {
+                    val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
+                        init(Cipher.ENCRYPT_MODE, aesKey)
+                    }
+                    cipher to cipher.doFinal(plaintext)
+                }
+                step(SecureStorageCapabilityProbe.Step.GCM_DECRYPT) {
+                    val decrypted = Cipher.getInstance("AES/GCM/NoPadding").apply {
+                        init(Cipher.DECRYPT_MODE, aesKey, GCMParameterSpec(128, gcmEncrypt.iv))
+                    }.doFinal(ciphertext)
+                    check(plaintext.contentEquals(decrypted)) { "gcm_round_trip_failed" }
+                }
             }
         } finally {
             try {
