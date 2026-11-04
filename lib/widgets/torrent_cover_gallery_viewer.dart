@@ -2,6 +2,22 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+class TorrentCoverActions {
+  final bool supportsCollection;
+  final bool collected;
+  final bool supportsDownload;
+  final Future<void> Function()? onCollection;
+  final Future<void> Function()? onDownload;
+
+  const TorrentCoverActions({
+    this.supportsCollection = false,
+    this.collected = false,
+    this.supportsDownload = true,
+    this.onCollection,
+    this.onDownload,
+  });
+}
+
 /// 种子封面画廊查看器：支持左右翻页查看相邻种子封面。
 ///
 /// 宿主通过 [loadCover] 提供指定位置的数据，通过 [onPageChanged]
@@ -19,6 +35,9 @@ class TorrentCoverGalleryViewer extends StatefulWidget {
   /// 获取指定位置的种子标题（用于底部信息展示）。
   final String Function(int position) titleFor;
 
+  /// 获取当前条目的操作和收藏状态。
+  final TorrentCoverActions? Function(int position)? actionsFor;
+
   /// 翻页回调（position 为新位置）。
   final ValueChanged<int>? onPageChanged;
 
@@ -34,6 +53,7 @@ class TorrentCoverGalleryViewer extends StatefulWidget {
     required this.initialIndex,
     required this.loadCover,
     required this.titleFor,
+    this.actionsFor,
     this.onPageChanged,
     this.hasMore,
     this.onLoadMore,
@@ -287,11 +307,22 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
     }
   }
 
+  Future<void> _runAction(Future<void> Function() action) async {
+    final operation = action();
+    if (mounted) setState(() {});
+    try {
+      await operation;
+    } finally {
+      if (mounted) setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final canPrev = _position > 0;
     final canNext =
         _position + 1 < widget.itemCount() || (widget.hasMore?.call() ?? false);
+    final actions = widget.actionsFor?.call(_position);
 
     return KeyboardListener(
       focusNode: _focusNode,
@@ -358,30 +389,70 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
                   ),
                 Align(
                   alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.7,
-                          ),
-                          child: Text(
-                            '${widget.titleFor(_position)}  (${_position + 1} / ${widget.itemCount()})',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth:
+                                      MediaQuery.of(context).size.width * 0.7,
+                                ),
+                                child: Text(
+                                  '${widget.titleFor(_position)}  (${_position + 1} / ${widget.itemCount()})',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                          if (actions != null &&
+                              (actions.supportsCollection ||
+                                  actions.supportsDownload)) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (actions.supportsCollection)
+                                  _ActionButton(
+                                    icon: actions.collected
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    label: actions.collected ? '取消收藏' : '收藏',
+                                    onPressed: actions.onCollection == null
+                                        ? null
+                                        : () =>
+                                              _runAction(actions.onCollection!),
+                                  ),
+                                if (actions.supportsCollection &&
+                                    actions.supportsDownload)
+                                  const SizedBox(width: 16),
+                                if (actions.supportsDownload)
+                                  _ActionButton(
+                                    icon: Icons.download_outlined,
+                                    label: '下载',
+                                    onPressed: actions.onDownload == null
+                                        ? null
+                                        : () => _runAction(actions.onDownload!),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
@@ -415,6 +486,27 @@ class _TorrentCoverGalleryViewerState extends State<TorrentCoverGalleryViewer> {
       errorBuilder: (context, error, stack) => const Center(
         child: Text('图片加载失败', style: TextStyle(color: Colors.white)),
       ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.tonalIcon(
+      onPressed: onPressed,
+      icon: Icon(icon),
+      label: Text(label),
     );
   }
 }

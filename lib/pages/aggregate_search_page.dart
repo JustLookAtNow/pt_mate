@@ -915,6 +915,25 @@ class AggregateSearchViewState extends State<AggregateSearchView> {
         return TorrentCoverGalleryViewer(
           itemCount: () => computeCoverIndices().length,
           initialIndex: initialPosition,
+          actionsFor: (position) {
+            final indices = computeCoverIndices();
+            if (position < 0 || position >= indices.length) return null;
+            final item = items[indices[position]];
+            final site = context
+                .read<StorageService>()
+                .siteConfigsCache
+                ?.where((site) => site.id == item.siteId)
+                .firstOrNull;
+            return TorrentCoverActions(
+              supportsCollection: site?.features.supportCollection ?? true,
+              collected: item.torrent.collection,
+              supportsDownload: site?.features.supportDownload ?? true,
+              onCollection: () => _onToggleCollection(item),
+              onDownload: _isBatchActionRunning(BatchOperationType.download)
+                  ? null
+                  : () => _showDownloadDialog(item),
+            );
+          },
           titleFor: (position) {
             final indices = computeCoverIndices();
             final i = (position >= 0 && position < indices.length)

@@ -2523,6 +2523,23 @@ class _HomePageState extends State<HomePage> {
         return TorrentCoverGalleryViewer(
           itemCount: () => computeCoverIndices().length,
           initialIndex: initialPosition,
+          actionsFor: (position) {
+            final indices = computeCoverIndices();
+            if (position < 0 || position >= indices.length) return null;
+            final item = _filteredItems[indices[position]];
+            return TorrentCoverActions(
+              supportsCollection:
+                  _currentSite?.features.supportCollection ?? true,
+              collected: item.collection,
+              supportsDownload: _currentSite?.features.supportDownload ?? true,
+              onCollection: _isBatchActionRunning(BatchOperationType.favorite)
+                  ? null
+                  : () => _onToggleCollection(item),
+              onDownload: _isBatchActionRunning(BatchOperationType.download)
+                  ? null
+                  : () => _onDownload(item),
+            );
+          },
           titleFor: (position) {
             final indices = computeCoverIndices();
             final i = (position >= 0 && position < indices.length)

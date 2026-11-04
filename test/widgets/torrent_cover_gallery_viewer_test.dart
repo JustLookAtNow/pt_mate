@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,6 +39,7 @@ void main() {
     int Function()? itemCount,
     bool Function()? hasMore,
     Future<void> Function()? onLoadMore,
+    TorrentCoverActions? Function(int)? actionsFor,
   }) {
     return MaterialApp(
       home: Scaffold(
@@ -45,6 +48,7 @@ void main() {
           initialIndex: initialIndex,
           loadCover: loadCover,
           titleFor: (p) => 'Title $p',
+          actionsFor: actionsFor,
           onPageChanged: onPageChanged,
           hasMore: hasMore,
           onLoadMore: onLoadMore,
@@ -507,5 +511,62 @@ void main() {
     expect(loadMoreCalls, 1);
     expect(find.text('Title 1  (2 / 2)'), findsOneWidget);
     expect(find.byTooltip('下一个'), findsNothing);
+  });
+
+  testWidgets('操作按钮随封面切换并整体居中', (tester) async {
+    var downloaded = -1;
+    await tester.pumpWidget(
+      buildViewer(
+        actionsFor: (position) => TorrentCoverActions(
+          supportsCollection: position == 0,
+          collected: position == 0,
+          onCollection: () async {},
+          onDownload: () async => downloaded = position,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Finder button(String label) => find.ancestor(
+      of: find.text(label),
+      matching: find.byType(FilledButton),
+    );
+    final favorite = tester.getRect(button('取消收藏'));
+    final download = tester.getRect(button('下载'));
+    expect((favorite.left + download.right) / 2, closeTo(400, 0.1));
+    await tester.tap(find.byTooltip('下一个'));
+    await tester.pumpAndSettle();
+    expect(find.text('取消收藏'), findsNothing);
+    expect(tester.getCenter(button('下载')).dx, closeTo(400, 0.1));
+    await tester.tap(find.text('下载'));
+    await tester.pump();
+    expect(downloaded, 1);
+    expect(find.byType(TorrentCoverGalleryViewer), findsOneWidget);
+  });
+
+  testWidgets('收藏操作立即更新并在失败回滚后刷新', (tester) async {
+    var collected = false;
+    final result = Completer<void>();
+    await tester.pumpWidget(
+      buildViewer(
+        actionsFor: (_) => TorrentCoverActions(
+          supportsCollection: true,
+          collected: collected,
+          onCollection: () async {
+            collected = true;
+            await result.future;
+            collected = false;
+          },
+          onDownload: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('收藏'));
+    await tester.pump();
+    expect(find.text('取消收藏'), findsOneWidget);
+    result.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('收藏'), findsOneWidget);
   });
 }
