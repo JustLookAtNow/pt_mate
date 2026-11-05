@@ -1,10 +1,10 @@
 {
   "name": "PT Mate",
   "identifier": "com.github.justlookatnow.ptmate.source",
-  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.6-beta/altsource/AltSource.json",
-  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.6-beta/screenshots/1.png",
+  "sourceURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.7-beta/altsource/AltSource.json",
+  "headerURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.7-beta/screenshots/1.png",
   "website": "https://github.com/JustLookAtNow/pt_mate",
-  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.6-beta/mt.png",
+  "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.7-beta/mt.png",
   "subtitle": "PT private tracker companion",
   "description": "This is the official source for PT Mate.\n\nFor full details, check the GitHub repository:\nhttps://github.com/JustLookAtNow/pt_mate",
   "tintColor": "1D4ED8",
@@ -20,14 +20,14 @@
       "versionDescription": "Changes in this release\nrelease: 2.29.5\n\n✨新增功能\n- 种子列表新增“左滑收藏，右滑下载”模式，可在设置中切换。\n- 配置备份与恢复支持保存种子列表滑动方式。\n\n🐛修复问题\n- 修复下载、收藏操作遇到部分超时异常时未能自动重试的问题。\n\n\nSecure-storage rollout\n\n- Phase: `phase1`\n- `ENABLE_SECURE_STORAGE_TRANSACTIONS`: `false`\n- Android versionCode: `193`\n- Source commit: `5ae2f84b58ff186ad3250d546e6a2087d437be87`\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
       "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.29.5/pt_mate-2.29.5-unsigned.ipa",
       "localizedDescription": "PT Mate is a Flutter-based private tracker client for browsing, searching, and managing downloads across multiple PT sites.",
-      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.6-beta/mt.png",
+      "iconURL": "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.7-beta/mt.png",
       "tintColor": "1D4ED8",
       "category": "utilities",
       "size": 14084035,
       "screenshotURLs": [
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.6-beta/screenshots/1.png",
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.6-beta/screenshots/2.png",
-        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.6-beta/screenshots/3.png"
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.7-beta/screenshots/1.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.7-beta/screenshots/2.png",
+        "https://raw.githubusercontent.com/JustLookAtNow/pt_mate/refs/heads/v2.29.7-beta/screenshots/3.png"
       ],
       "versions": [
         {
@@ -204,13 +204,6 @@
           "localizedDescription": "Changes in this release\nrelease: 2.22.1\n\n🎉 Highlights\n- 全新设计的选择模式操作栏，采用固定底部容器和优化按钮布局\n\n✨ 新增功能\n- 聚合搜索新增按时间排序选项\n\n🐛 修复问题\n- 修复详情页收藏状态返回列表页刷新不及时的问题\n- 优化Torrent列表项布局，调整右侧列大小、边距和对齐样式\n\n🔧 性能优化\n- 优化聚合搜索页失败提示 ExpansionTile 的间距和密度\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
           "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.22.1/pt_mate-2.22.1-unsigned.ipa",
           "size": 16293865
-        },
-        {
-          "version": "2.22.0",
-          "date": "2026-04-27T06:34:15Z",
-          "localizedDescription": "Changes in this release\nrelease: 2.22.0\n\n🎉Highlights\n- 首页与站点列表页全新 UI 重构，界面更简洁、更精致\n\n✨新增功能\n- 优化桌面端大屏体验，站点设置页增加表头结构\n- 种子列表项布局优化：重构为双列布局，标签行支持显示置顶图标，空间利用更高效\n\n🐛修复问题\n- 修复移动端种子列表布局对齐与间距问题\n- 优化种子列表滑动性能，修复部分布局异常\n\n\n📱 Android APK Downloads\n\n- **ARM64 APK** (arm64-v8a): For modern 64-bit devices\n\n💻 Desktop Downloads\n\n- **Windows x64**: Windows installer for 64-bit systems\n- **Linux x64**: Linux AppImage for 64-bit systems (portable, no installation required)\n- **macOS x64**: macOS DMG image for 64-bit systems\n- **macOS x64 (app)**: Zipped .app file for manual installation or use on systems where DMG is not preferred\n\n🍎 iOS Downloads\n\n- **Unsigned IPA**: For sideloading with tools like AltStore, Sideloadly, etc.\n- **Xcode Archive**: For developers to re-sign and distribute",
-          "downloadURL": "https://github.com/JustLookAtNow/pt_mate/releases/download/v2.22.0/pt_mate-2.22.0-unsigned.ipa",
-          "size": 16291909
         }
       ],
       "appPermissions": {
