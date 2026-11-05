@@ -128,6 +128,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('确认改用明文存储'), findsOneWidget);
+      expect(find.textContaining('此设备未通过 OAEP+GCM 能力检查'), findsOneWidget);
       expect(find.textContaining('Cookie、API Key 和密码将以明文保存'), findsOneWidget);
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();

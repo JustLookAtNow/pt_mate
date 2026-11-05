@@ -415,6 +415,7 @@ class StorageService {
   String? _secureStorageFailureStep;
   int? _secureStorageFailureElapsedMs;
   String? _secureStorageFailureAuditLine;
+  String? _androidPlaintextFallbackAuditLine;
   bool _secureStorageUnavailableLatched = false;
   int _secureStorageOperationGeneration = 0;
   final ValueNotifier<SecureStorageStatus> _secureStorageStatusNotifier =
@@ -534,6 +535,10 @@ class StorageService {
   /// Captured when the failure occurs, including before file logging starts.
   String? get secureStorageFailureAuditLine => _secureStorageFailureAuditLine;
 
+  /// Retains the fallback decision until startup file logging is initialized.
+  String? get androidPlaintextFallbackAuditLine =>
+      _androidPlaintextFallbackAuditLine;
+
   /// 在用户已选择并验证备份、且再次确认后，清理白名单内的旧 Android
   /// PKCS#1/CBC 安全存储。原生侧会再次核验当前 profile，modern、fresh、
   /// plaintext 与 inconsistent 状态都会拒绝该操作。
@@ -592,31 +597,32 @@ class StorageService {
 
   Future<LegacyAndroidMigrationTarget> probeLegacyMigrationTarget() async {
     final capability = await _androidProfileResolver.probeModernCapability();
+    return _targetForAndroidCapability(
+      capability,
+      trigger: SecureStorageTrigger.migration,
+    );
+  }
+
+  LegacyAndroidMigrationTarget _targetForAndroidCapability(
+    AndroidSecureStorageCapabilityResult capability, {
+    SecureStorageTrigger? trigger,
+  }) {
     if (capability.isSupported) return LegacyAndroidMigrationTarget.oaepGcm;
-    if (capability.isExplicitlyUnsupported) {
-      return LegacyAndroidMigrationTarget.plaintext;
-    }
-    final error = SecureStorageUnavailableException(
-      capability.failureCode ?? 'android_capability_probe_failed',
-      null,
-      SecureStorageFailureStage.profileProbe,
-      capability.failureType,
-      capability.failureStep,
-      capability.elapsedMs,
+    // Selecting a target must not mark an existing store unreadable. The native
+    // plaintext initializer still requires empty storage or a confirmed reset.
+    final diagnosticLine = _buildSecureStorageFailureAuditLine(
+      code: capability.failureCode ?? 'android_capability_probe_failed',
+      stage: SecureStorageFailureStage.profileProbe,
+      failureType: capability.failureType,
+      failureStep: capability.failureStep,
+      elapsedMs: capability.elapsedMs,
+      trigger: trigger,
+      state: _secureStorageState,
     );
-    // Migration preparation already runs behind the blocking page. Report its
-    // probe failure without changing the existing storage state or retry latch.
-    _writeSecureStorageFailureAudit(
-      _buildSecureStorageFailureAuditLine(
-        code: error.code,
-        stage: error.stage,
-        failureType: error.failureType,
-        failureStep: error.failureStep,
-        elapsedMs: error.elapsedMs,
-        trigger: SecureStorageTrigger.migration,
-      ),
-    );
-    throw error;
+    final auditLine = '$diagnosticLine, fallback=plaintext';
+    _androidPlaintextFallbackAuditLine = auditLine;
+    _writeSecureStorageFailureAudit(auditLine);
+    return LegacyAndroidMigrationTarget.plaintext;
   }
 
   Future<void> beginLegacyAndroidMigration(
@@ -1132,6 +1138,7 @@ class StorageService {
     String? failureStep,
     int? elapsedMs,
     SecureStorageTrigger? trigger,
+    SecureStorageState state = SecureStorageState.unavailable,
   }) {
     final source =
         trigger ??
@@ -1139,7 +1146,7 @@ class StorageService {
         SecureStorageTrigger.runtime;
     return 'Secure storage '
         'profile=${_secureStorageProfile?.name ?? 'unknown'}, '
-        'state=${SecureStorageState.unavailable.name}, '
+        'state=${state.name}, '
         'stage=${stage?.name ?? 'unknown'}, '
         'type=${failureType ?? 'unknown'}, '
         'code=$code, '
@@ -1211,6 +1218,7 @@ class StorageService {
           ? error.code
           : 'secure_storage_flush_failed';
       _markSecureStorageUnavailable(error, code: code);
+      if (error is SecureStorageUnavailableException) rethrow;
       throw SecureStorageUnavailableException(code, error);
     }
   }
@@ -1414,11 +1422,12 @@ class StorageService {
                 final pendingTarget = allowPendingLegacyMigration
                     ? migrationState.target
                     : null;
-                final capability = pendingTarget == null
-                    ? await _androidProfileResolver.probeModernCapability()
-                    : null;
-                if (pendingTarget == LegacyAndroidMigrationTarget.oaepGcm ||
-                    capability?.isSupported == true) {
+                final target =
+                    pendingTarget ??
+                    _targetForAndroidCapability(
+                      await _androidProfileResolver.probeModernCapability(),
+                    );
+                if (target == LegacyAndroidMigrationTarget.oaepGcm) {
                   final initialized = await _androidProfileResolver
                       .initializeFreshOaepGcm();
                   if (!initialized.isReady ||
@@ -1429,9 +1438,7 @@ class StorageService {
                           'android_fresh_initialization_invalid',
                     );
                   }
-                } else if (pendingTarget ==
-                        LegacyAndroidMigrationTarget.plaintext ||
-                    capability?.isExplicitlyUnsupported == true) {
+                } else {
                   final initialized = await _androidProfileResolver
                       .enablePlaintextFallback();
                   if (!initialized.isReady ||
@@ -1442,16 +1449,6 @@ class StorageService {
                           'android_plaintext_enable_failed',
                     );
                   }
-                } else {
-                  throw SecureStorageUnavailableException(
-                    capability?.failureCode ??
-                        'android_capability_probe_failed',
-                    null,
-                    null,
-                    capability?.failureType,
-                    capability?.failureStep,
-                    capability?.elapsedMs,
-                  );
                 }
                 probe = await _androidProfileResolver.probe();
                 if (!probe.isReady ||
@@ -5916,6 +5913,7 @@ class StorageService {
     // Invalidate any late platform completion from the previous test run.
     _secureStorageOperationGeneration++;
     _hasLoggedSecureStorageUnavailable = false;
+    _androidPlaintextFallbackAuditLine = null;
     _cookieCloudBundleCreatedThisRun = false;
     _secureStorageProfile = null;
     _androidSecureOptions = null;

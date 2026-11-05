@@ -28,6 +28,12 @@ void main() async {
       await LogFileService.instance.init(enabled: enabled);
       await StorageService.instance.loadVisibleTags();
 
+      final fallbackAudit =
+          StorageService.instance.androidPlaintextFallbackAuditLine;
+      if (fallbackAudit != null) {
+        LogFileService.instance.append(fallbackAudit);
+      }
+
       if (secureStorageFailureCode != null) {
         LogFileService.instance.append(
           StorageService.instance.secureStorageFailureAuditLine ??

@@ -121,7 +121,7 @@ void main() {
   });
 
   test(
-    'only explicit unsupported_algorithm permits plaintext fallback',
+    'explicit unsupported_algorithm is distinguished from other probe failures',
     () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (call) async {
@@ -215,28 +215,31 @@ void main() {
     }
   });
 
-  test('capability probe transient errors remain fail-closed', () async {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (call) async {
-          expect(call.method, 'probeModernSecureStorageCapability');
-          return <String, Object?>{
-            'status': 'unavailable',
-            'failureCode': 'capability_probe_failed',
-          };
-        });
+  test(
+    'capability probe failures retain diagnostics without claiming support',
+    () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            expect(call.method, 'probeModernSecureStorageCapability');
+            return <String, Object?>{
+              'status': 'unavailable',
+              'failureCode': 'capability_probe_failed',
+            };
+          });
 
-    final result = await AndroidSecureStorageProfileResolver(
-      channel: channel,
-      isAndroid: true,
-    ).probeModernCapability();
+      final result = await AndroidSecureStorageProfileResolver(
+        channel: channel,
+        isAndroid: true,
+      ).probeModernCapability();
 
-    expect(result.isSupported, isFalse);
-    expect(result.isExplicitlyUnsupported, isFalse);
-    expect(result.failureCode, 'capability_probe_failed');
-    expect(result.failureStep, isNull);
-    expect(result.failureType, isNull);
-    expect(result.elapsedMs, isNull);
-  });
+      expect(result.isSupported, isFalse);
+      expect(result.isExplicitlyUnsupported, isFalse);
+      expect(result.failureCode, 'capability_probe_failed');
+      expect(result.failureStep, isNull);
+      expect(result.failureType, isNull);
+      expect(result.elapsedMs, isNull);
+    },
+  );
 
   test('capability timeout reports measured diagnostics', () async {
     final timeoutChannel = MethodChannel(

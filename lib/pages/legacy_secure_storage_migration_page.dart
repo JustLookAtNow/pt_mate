@@ -102,7 +102,7 @@ class _LegacySecureStorageMigrationPageState
             title: Text(plaintext ? '确认改用明文存储' : '确认升级安全存储'),
             content: Text(
               plaintext
-                  ? '此设备不支持 OAEP+GCM。继续后，Cookie、API Key 和密码将以明文保存在仅限本应用访问的本地目录中。\n\n'
+                  ? '此设备未通过 OAEP+GCM 能力检查。继续后，Cookie、API Key 和密码将以明文保存在仅限本应用访问的本地目录中。\n\n'
                         '请确认已经妥善保存刚导出的备份，且不会导出或共享应用数据。'
                   : '应用将清理旧版加密数据，并使用刚导出的备份恢复到 OAEP+GCM 安全存储。\n\n'
                         '迁移完成前请勿关闭应用。',

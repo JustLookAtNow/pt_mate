@@ -33,11 +33,14 @@ void main() {
     await tester.pumpWidget(const MTeamApp());
     await tester.pump();
 
-    expect(find.textContaining('此 Android 设备不支持 OAEP+GCM'), findsOneWidget);
+    expect(
+      find.textContaining('此 Android 设备未通过 OAEP+GCM 能力检查'),
+      findsOneWidget,
+    );
     expect(find.text('我已知晓'), findsOneWidget);
 
     await tester.tap(find.text('我已知晓'));
     await tester.pump();
-    expect(find.textContaining('此 Android 设备不支持 OAEP+GCM'), findsNothing);
+    expect(find.textContaining('此 Android 设备未通过 OAEP+GCM 能力检查'), findsNothing);
   });
 }

@@ -106,7 +106,8 @@ profile 和测试后缀常量均为空；即使误传该属性也不能启用覆
 3. PKCS1/GCM 与 PKCS1/CBC 只在 `DEBUG + 独立测试后缀 + fresh` 同时满足时执行测试 bootstrap，
    在 Flutter 插件首次初始化前用同步 `commit()` 写入对应 marker 并精确复查；release 构建不能
    进入这条路径。三个 profile 的全新测试包首启都不得先进入阻断页，也不得依赖用户重试。生产
-   新设备不存在历史 bootstrap，只允许 OAEP/GCM guarded 初始化。
+   新设备不存在历史 bootstrap；OAEP/GCM 能力检查成功时走 guarded 初始化，检查失败时自动
+   转为明文 profile。明文初始化仍须由原生侧再次确认没有旧密文、包装密钥和算法 marker。
 4. 在测试包中新增一个专用测试站点及 Cookie/API Key，然后完全退出应用。
 5. 仅查看非敏感算法标记，确认 profile。不要输出 `FlutterSecureStorage.xml` 的内容：
 
@@ -116,7 +117,11 @@ adb shell run-as "$test_package" grep FlutterSecureSAlgorithm shared_prefs/Flutt
 ```
 
 首次初始化完成后，真实探测不再是 fresh，历史 profile bootstrap 会自动失效；后续启动必须依赖刚创建的
-真实算法标记和包装密钥。
+真实算法标记和包装密钥。明文 profile 则读取持久化的模式标记，不再重复 OAEP/GCM 能力检查。
+
+在出现 `oaepDecrypt / BadPaddingException` 的空库设备上，确认应用自动进入明文模式并显示现有的
+明文存储告知，日志保留探测诊断及 `fallback=plaintext`；保存专用测试凭据后重启，确认仍可读取。
+已有加密数据读取失败时仍应进入恢复流程，不得直接初始化明文模式。
 
 ## 冷启动、强杀与重启
 

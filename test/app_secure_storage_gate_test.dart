@@ -85,7 +85,7 @@ void main() {
     expect(find.byType(ServerSettingsPage), findsOneWidget);
   });
 
-  testWidgets('Android capability diagnostics reach the blocking page', (
+  testWidgets('Android plaintext initialization opens the app with notice', (
     tester,
   ) async {
     const profileChannel = MethodChannel('pt_mate/secure_storage_profile');
@@ -94,40 +94,90 @@ void main() {
           .setMockMethodCallHandler(profileChannel, null),
     );
     storage.resetForTest();
+    storage.overrideSecureStorageTransactionsForTest(false);
     storage.overridePlatformForTest(TargetPlatform.android);
     storage.overrideAndroidSecureStorageProfileForTest(null);
+    final plaintextValues = <String, String>{};
+    var probeCount = 0;
+    var securePluginCalls = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageChannel, (_) async {
+          securePluginCalls++;
+          return null;
+        });
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(profileChannel, (call) async {
-          if (call.method == 'getLegacyAndroidMigrationState') {
-            return <String, Object?>{'status': 'none'};
+          final args = call.arguments as Map<dynamic, dynamic>?;
+          switch (call.method) {
+            case 'getLegacyAndroidMigrationState':
+              return <String, Object?>{'status': 'none', 'failureCode': null};
+            case 'probeAndroidSecureStorage':
+              probeCount++;
+              return <String, Object?>{
+                'status': probeCount == 1 ? 'fresh' : 'ready',
+                'profile': probeCount == 1 ? 'fresh' : 'plaintext',
+                'keyCipher': null,
+                'storageCipher': null,
+                'hasEncryptedEntries': false,
+                'hasWrappedKeys': false,
+                'failureCode': null,
+              };
+            case 'probeModernSecureStorageCapability':
+              return <String, Object?>{
+                'status': 'unavailable',
+                'failureCode': 'capability_probe_failed',
+                'failureStep': 'oaepDecrypt',
+                'failureType': 'BadPaddingException',
+                'elapsedMs': 116,
+              };
+            case 'enableAndroidPlaintextFallback':
+              return <String, Object?>{
+                'status': 'ready',
+                'profile': 'plaintext',
+                'keyCipher': null,
+                'storageCipher': null,
+                'hasEncryptedEntries': false,
+                'hasWrappedKeys': false,
+                'failureCode': null,
+              };
+            case 'readAndroidPlaintextSensitive':
+              return plaintextValues[args?['key']];
+            case 'commitAndroidPlaintextSensitive':
+              for (final entry in (args?['mutations'] as Map).entries) {
+                if (entry.value == null) {
+                  plaintextValues.remove(entry.key);
+                } else {
+                  plaintextValues[entry.key as String] = entry.value as String;
+                }
+              }
+              return <String, Object?>{'status': 'ready', 'failureCode': null};
+            case 'flushAndroidSecureStorage':
+              return <String, Object?>{'status': 'ready', 'failureCode': null};
+            default:
+              fail('unexpected native call: ${call.method}');
           }
-          if (call.method == 'probeAndroidSecureStorage') {
-            return <String, Object?>{
-              'status': 'fresh',
-              'profile': 'fresh',
-              'hasEncryptedEntries': false,
-              'hasWrappedKeys': false,
-            };
-          }
-          return <String, Object?>{
-            'status': 'unavailable',
-            'failureCode': 'capability_probe_failed',
-            'failureStep': 'certificateRead',
-            'failureType': 'ProviderException',
-            'elapsedMs': 137,
-          };
         });
-    await expectLater(
-      storage.initializeSecureStorage(trigger: SecureStorageTrigger.startup),
-      throwsA(isA<SecureStorageUnavailableException>()),
+
+    await storage.initializeSecureStorage(
+      trigger: SecureStorageTrigger.startup,
     );
+    await storage.saveDeviceId('plaintext-device-id');
+    expect(await storage.loadDeviceId(), 'plaintext-device-id');
+    expect(plaintextValues[StorageKeys.deviceId], 'plaintext-device-id');
+    expect(storage.secureStorageState, SecureStorageState.ready);
+    expect(storage.isAndroidPlaintextFallback, isTrue);
+    expect(securePluginCalls, 0);
+
     await tester.pumpWidget(const MTeamApp());
-    await tester.pump();
-    expect(find.text('失败阶段：profileProbe'), findsOneWidget);
-    expect(find.text('错误代码：capability_probe_failed'), findsOneWidget);
-    expect(find.text('异常类别：ProviderException'), findsOneWidget);
-    expect(find.text('探测步骤：certificateRead'), findsOneWidget);
-    expect(find.text('探测耗时：137 ms'), findsOneWidget);
+    await _pumpUntilFound(tester, find.byType(ServerSettingsPage));
+
+    expect(find.text('暂时无法读取安全存储'), findsNothing);
+    expect(find.text('进入备份恢复'), findsNothing);
+    expect(
+      find.text('此 Android 设备未通过 OAEP+GCM 能力检查。凭据正使用明文本地存储；请勿导出或共享应用数据。'),
+      findsOneWidget,
+    );
+    expect(find.byType(ServerSettingsPage), findsOneWidget);
   });
 
   testWidgets('resume failure blocks the currently visible nested route', (

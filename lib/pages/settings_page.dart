@@ -84,7 +84,7 @@ class _AndroidPlaintextStorageWarning extends StatelessWidget {
           leading: Icon(Icons.warning_amber_rounded, color: colors.error),
           title: const Text('Android 明文凭据存储'),
           subtitle: const Text(
-            '此设备不支持 OAEP+GCM 安全存储。Cookie、API Key 和密码正以明文保存在仅限本应用的本地存储中，请勿导出或共享应用数据。',
+            '此设备未通过 OAEP+GCM 能力检查。Cookie、API Key 和密码正以明文保存在仅限本应用的本地存储中，请勿导出或共享应用数据。',
           ),
         ),
       ),

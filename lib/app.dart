@@ -1484,7 +1484,7 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
                                     const SizedBox(width: 12),
                                     const Expanded(
                                       child: Text(
-                                        '此 Android 设备不支持 OAEP+GCM。凭据正使用明文本地存储；请勿导出或共享应用数据。',
+                                        '此 Android 设备未通过 OAEP+GCM 能力检查。凭据正使用明文本地存储；请勿导出或共享应用数据。',
                                       ),
                                     ),
                                     TextButton(
