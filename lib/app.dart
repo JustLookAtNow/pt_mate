@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'dart:async';
 
@@ -1110,13 +1111,16 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
   bool _resumeCheckRunning = false;
   bool _backupRestoreOpen = false;
   bool _hasLeftForeground = false;
-  bool _showAndroidPlaintextStorageWarning = true;
+  static const _plaintextWarningAcknowledgedKey =
+      'android_plaintext_storage_warning_acknowledged';
+  bool _showAndroidPlaintextStorageWarning = false;
 
   @override
   void initState() {
     super.initState();
     _ownsAppState = widget.appState == null;
     _appState = widget.appState ?? AppState();
+    _loadPlaintextWarningPreference();
     final storage = StorageService.instance;
     _secureStorageReady = storage.canAccessSensitiveStorage;
     _secureStorageFailureCode = storage.secureStorageFailureCode;
@@ -1127,6 +1131,22 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
       _loadApplicationState();
     }
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  Future<void> _loadPlaintextWarningPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _showAndroidPlaintextStorageWarning =
+          !(prefs.getBool(_plaintextWarningAcknowledgedKey) ?? false);
+    });
+  }
+
+  Future<void> _acknowledgePlaintextWarning() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_plaintextWarningAcknowledgedKey, true);
+    if (!mounted) return;
+    setState(() => _showAndroidPlaintextStorageWarning = false);
   }
 
   Future<void> _loadApplicationState({bool forceReload = false}) async {
@@ -1488,10 +1508,7 @@ class MTeamAppState extends State<MTeamApp> with WidgetsBindingObserver {
                                       ),
                                     ),
                                     TextButton(
-                                      onPressed: () => setState(() {
-                                        _showAndroidPlaintextStorageWarning =
-                                            false;
-                                      }),
+                                      onPressed: _acknowledgePlaintextWarning,
                                       child: const Text('我已知晓'),
                                     ),
                                   ],
