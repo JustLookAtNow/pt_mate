@@ -1,5 +1,5 @@
 ---
-name: Add Site
+name: add-site
 description: Create a new site configuration, update the manifest, and fetch icons.
 ---
 
